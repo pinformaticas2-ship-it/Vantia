@@ -64,16 +64,28 @@ export function esOscuro(modo: Modo): boolean {
   return false;
 }
 
+/** Cambio de apariencia con un fundido corto de la pantalla entera (View
+ *  Transitions: el navegador funde dos capturas, así que va fluido aunque la
+ *  página tenga miles de elementos). Sin soporte, el cambio es instantáneo.
+ *  16/10/2026: antes se animaba cada elemento por separado y se notaba lento. */
+export function conFundido(cambio: () => void) {
+  const doc = document as any;
+  const sinMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (typeof doc.startViewTransition !== 'function' || sinMovimiento) { cambio(); return; }
+  // Si empieza otro fundido antes de acabar este, el navegador cancela el
+  // primero y rechaza sus promesas: no es un error, se ignora.
+  const t = doc.startViewTransition(cambio);
+  for (const pr of [t?.ready, t?.finished, t?.updateCallbackDone]) pr?.catch?.(() => {});
+}
+
 export function aplicarModo(modo: Modo) {
   const html = document.documentElement;
   const nuevo = esOscuro(modo) ? 'oscuro' : 'claro';
   const anterior = html.getAttribute('data-modo');
-  // Al cambiar (no en la primera carga), transición suave de colores.
-  if (anterior && anterior !== nuevo) {
-    html.classList.add('cambiando-apariencia');
-    window.setTimeout(() => html.classList.remove('cambiando-apariencia'), 450);
-  }
-  html.setAttribute('data-modo', nuevo);
+  if (anterior === nuevo) return;
+  // En la primera carga, sin animación; al cambiar, fundido.
+  if (anterior) conFundido(() => html.setAttribute('data-modo', nuevo));
+  else html.setAttribute('data-modo', nuevo);
 }
 
 // Lo antes posible (al importar el módulo): el modo guardado, sin parpadeo.

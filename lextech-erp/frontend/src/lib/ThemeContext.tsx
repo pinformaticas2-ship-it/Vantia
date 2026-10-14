@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from './api';
+import { conFundido } from './preferencias';
 
 export type AppTheme = 'rojo' | 'azul' | 'verde' | 'violeta' | 'grafito' | 'indigo' | 'custom';
 
@@ -35,12 +36,6 @@ const ThemeContext = createContext<ThemeCtx>({
 const TEMAS_VALIDOS: AppTheme[] = ['rojo', 'azul', 'verde', 'violeta', 'grafito', 'indigo'];
 const temaValido = (t: any): AppTheme => (TEMAS_VALIDOS.includes(t) ? t : 'rojo');
 
-/** Transición suave al cambiar de tema o de modo (solo durante el cambio). */
-export function transicionSuave() {
-  const html = document.documentElement;
-  html.classList.add('cambiando-apariencia');
-  window.setTimeout(() => html.classList.remove('cambiando-apariencia'), 450);
-}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -66,10 +61,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = (tPedido: AppTheme) => {
     const t = temaValido(tPedido);
-    transicionSuave();
     setThemeState(t);
     localStorage.setItem('app-theme', t);
-    applyTheme(t, customColor, customSecondary, customSidebar);
+    conFundido(() => applyTheme(t));
     if (isSignedIn) {
       apiFetch('/api/preferences', {
         method: 'PUT',

@@ -137,10 +137,11 @@ function PaletteCard({ p, active, onClick }: {
   // En modo oscuro, la vista previa enseña la versión oscura del tema.
   const { prefs } = usePreferencias();
   const oscuro = esOscuro(prefs.modo);
-  const panel = oscuro ? { backgroundColor: '#111a2e', border: '1px solid #23304a' } : { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' };
-  const fondo = oscuro ? '#0b1220' : p.bg;
-  const barraLateral = oscuro ? '#0f172a' : p.sidebar;
-  const bordeLateral = oscuro ? '#1e293b' : p.sidebarBorder;
+  // Mismos grises neutros que el modo oscuro de la app (lib/temasExtra.css).
+  const panel = oscuro ? { backgroundColor: '#1a1d21', border: '1px solid #2c3036' } : { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' };
+  const fondo = oscuro ? '#121417' : p.bg;
+  const barraLateral = oscuro ? '#1a1d21' : p.sidebar;
+  const bordeLateral = oscuro ? '#2c3036' : p.sidebarBorder;
   return (
     <div className="relative">
       {/* ── Resplandor ambiental cuando está activo ── */}
@@ -186,7 +187,7 @@ function PaletteCard({ p, active, onClick }: {
             className="rounded-lg h-7 flex items-center px-2 gap-2"
             style={panel}
           >
-            <div className="rounded h-2 flex-1" style={{ backgroundColor: oscuro ? '#23304a' : '#e2e8f0' }} />
+            <div className="rounded h-2 flex-1" style={{ backgroundColor: oscuro ? '#2c3036' : '#e2e8f0' }} />
             <div className="rounded h-4 w-10" style={{ backgroundColor: p.accent }} />
           </div>
           {/* Cards row */}
