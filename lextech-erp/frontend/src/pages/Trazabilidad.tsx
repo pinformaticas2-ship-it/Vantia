@@ -569,8 +569,9 @@ export default function Trazabilidad() {
               </div>
 
               {/* Barra de filtros */}
-              <div className="px-8 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
+              {/* Si no cabe en una línea, salta (antes se cortaban las fechas). */}
+              <div className="px-4 sm:px-8 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <Filter size={13} className="text-slate-400" />
                   <select
                     value={eventFilter}
@@ -615,7 +616,7 @@ export default function Trazabilidad() {
                     )}
                   </div>
                 </div>
-                <span className="text-xs font-medium text-slate-500">Mostrando {filteredItems.length} de {total} registros</span>
+                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mostrando {filteredItems.length} de {total} registros</span>
               </div>
 
               {/* TIMELINE */}

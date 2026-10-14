@@ -2323,8 +2323,12 @@ export default function Configuracion() {
       </aside>
 
       {/* ── Contenido del ajuste ── */}
-      <div className="flex-1 overflow-y-auto modules-scrollbar p-4 sm:p-8 lg:p-12 bg-[#f4f6f8]">
-        <div className={`mx-auto ${activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}`}>
+      {/* Trazabilidad ocupa todo el hueco (lista + detalle, como su propia
+          pantalla); el resto de secciones van centradas con ancho de lectura. */}
+      <div className={activeSection === 'trazabilidad'
+        ? 'flex-1 min-h-0 overflow-hidden bg-[#f4f6f8]'
+        : 'flex-1 overflow-y-auto modules-scrollbar p-4 sm:p-8 lg:p-12 bg-[#f4f6f8]'}>
+        <div className={activeSection === 'trazabilidad' ? 'h-full' : `mx-auto ${activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}`}>
 
           {activeSection === 'apariencia' ? (
             <>
@@ -2464,9 +2468,7 @@ export default function Configuracion() {
           ) : activeSection === 'automatizaciones' && (myRol === 'propietario' || myRol === 'admin') ? (
             <AutomatizacionesPanel />
           ) : activeSection === 'trazabilidad' ? (
-            // La vista de Trazabilidad es a pantalla completa (lista + detalle):
-            // aquí va en un marco de altura fija.
-            <div className="-m-4 sm:m-0 h-[calc(100dvh-9rem)] min-h-[520px] overflow-hidden sm:rounded-2xl border border-slate-200">
+            <div className="h-full min-h-[520px] overflow-hidden">
               <Trazabilidad />
             </div>
           ) : activeSection === 'usuarios' ? (
