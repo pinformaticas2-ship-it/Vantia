@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ArrowLeft, CheckCircle2, FileText, Loader2, Sparkles, AlertCircle, Building2 } from 'lucide-react';
-import { safeJson } from '../lib/api';
+import { Link } from 'react-router-dom';
+import { safeJson, resolveUploadUrl } from '../lib/api';
 import { aviso } from '../lib/avisos';
 
 // ── Revisar los datos antes de generar un documento (15/10/2026) ─────────────
@@ -19,6 +20,9 @@ interface Campo {
   origen: 'vantia' | 'guardado' | 'vacio';
   conoceVantia: boolean;
   deDespacho: boolean;
+  /** El logo: una imagen que sale de Ajustes → Mi Despacho (no se escribe). */
+  imagen?: boolean;
+  imagenUrl?: string | null;
 }
 
 const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
@@ -86,6 +90,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
       // Con "dejar marcados", lo vacío no se manda: en el documento queda el
       // «Campo» visible para completarlo en Word.
       const enviar = Object.fromEntries(campos
+        .filter((c) => !c.imagen)
         .filter((c) => !dejarMarcados || (valores[c.clave] || '').trim())
         .map((c) => [c.nombre, valores[c.clave] ?? '']));
       if (generarFuera) { await generarFuera(enviar); return; }
@@ -166,7 +171,18 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                       </span>
                       {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title="Lo que escribas aquí se recuerda para todo el despacho"><Building2 size={9} /> despacho</span>}
                     </div>
-                    {largo ? (
+                    {c.imagen ? (
+                      c.imagenUrl ? (
+                        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                          <img src={resolveUploadUrl(c.imagenUrl) || undefined} alt="Logo del despacho" className="h-9 max-w-[140px] object-contain" />
+                          <span className="text-xs text-slate-500">Se pondrá el logo de Mi Despacho.</span>
+                        </div>
+                      ) : (
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                          El despacho no tiene logo: súbelo en <Link to="/dashboard/config?section=despacho" className="font-semibold underline">Ajustes → Mi Despacho</Link> y saldrá en todos los documentos.
+                        </p>
+                      )
+                    ) : largo ? (
                       <textarea value={v} rows={Math.min(5, Math.max(2, v.split('\n').length))}
                         onChange={(e) => setValores((p) => ({ ...p, [c.clave]: e.target.value }))}
                         className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-800 focus:bg-white focus:border-red-300 outline-none" />

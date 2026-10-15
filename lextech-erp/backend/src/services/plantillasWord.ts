@@ -61,7 +61,43 @@ function marcadoresDeXml(xml: string, out: Set<string>) {
 
 /** Valor en XML de un run: los saltos de línea pasan a <w:br/>. */
 function textoRun(valor: string) {
+  // Imagen: "\u0001rId\u0001" → se cierra el texto, va el dibujo y se reabre.
+  const img = valor.match(/^\u0001([^\u0001]+)\u0001$/);
+  if (img) return `</w:t></w:r><w:r>${DIBUJOS.get(img[1]) || ''}</w:r><w:r><w:t xml:space="preserve">`;
   return valor.split(/\r?\n/).map(escapar).join('</w:t><w:br/><w:t xml:space="preserve">');
+}
+
+// ── Imágenes (logo del despacho) ─────────────────────────────────────────────
+export interface ImagenPlantilla { buffer: Buffer; mime: string }
+const DIBUJOS = new Map<string, string>(); // rId → XML del dibujo (solo durante un relleno)
+const EMU_PX = 9525;                       // 96 ppp
+const MAX_ANCHO = 5 * 360000, MAX_ALTO = 2.5 * 360000; // 5 x 2,5 cm
+
+/** Tamaño en píxeles de PNG, JPEG o GIF (lo que entiende cualquier Word). */
+export function medidasImagen(b: Buffer): { w: number; h: number; ext: 'png' | 'jpeg' | 'gif' } | null {
+  if (b.length > 24 && b.readUInt32BE(0) === 0x89504e47) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), ext: 'png' };
+  if (b.length > 10 && b.toString('ascii', 0, 3) === 'GIF') return { w: b.readUInt16LE(6), h: b.readUInt16LE(8), ext: 'gif' };
+  if (b.length > 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      if (m >= 0xc0 && m <= 0xc3) return { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7), ext: 'jpeg' };
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+
+function xmlDibujo(rId: string, cx: number, cy: number, id: number) {
+  return `<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">`
+    + `<wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${id}" name="Logo ${id}"/>`
+    + `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>`
+    + `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">`
+    + `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${id}" name="logo"/><pic:cNvPicPr/></pic:nvPicPr>`
+    + `<pic:blipFill><a:blip r:embed="${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
+    + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`
+    + `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>`;
 }
 
 function sustituirEnXml(xml: string, valores: Map<string, string>): string {
@@ -154,14 +190,63 @@ export function camposDePlantilla(docx: Buffer): string[] {
 }
 
 /** Rellena la plantilla. `valores` va por clave canónica; lo que no esté se deja como «Campo». */
-export function rellenarPlantilla(docx: Buffer, valores: Record<string, string>): Buffer {
+/** Rellena la plantilla. `valores` va por clave canónica; lo que no esté se
+ *  deja como «Campo». `imagenes` (p. ej. el logo) se insertan como dibujo. */
+export function rellenarPlantilla(docx: Buffer, valores: Record<string, string>, imagenes: Record<string, ImagenPlantilla> = {}): Buffer {
   const mapa = new Map(Object.entries(valores).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
   const zip = new AdmZip(docx);
+  // Imágenes válidas, con su tamaño ajustado (sin deformar)
+  const imgs = new Map<string, { img: ImagenPlantilla; ext: string; cx: number; cy: number; media: string }>();
+  let n = 0;
+  for (const [k, img] of Object.entries(imagenes)) {
+    const m = medidasImagen(img.buffer);
+    if (!m || !m.w || !m.h) continue;
+    const escala = Math.min(1, MAX_ANCHO / (m.w * EMU_PX), MAX_ALTO / (m.h * EMU_PX));
+    imgs.set(claveCanonica(k), { img, ext: m.ext, cx: Math.round(m.w * EMU_PX * escala), cy: Math.round(m.h * EMU_PX * escala), media: `vantia_img${++n}.${m.ext === 'jpeg' ? 'jpg' : m.ext}` });
+  }
+  let usadas = false;
   for (const e of zip.getEntries()) {
     if (!PARTES.test(e.entryName)) continue;
     const xml = e.getData().toString('utf-8');
-    const nuevo = sustituirEnXml(xml, mapa);
-    if (nuevo !== xml) zip.updateFile(e.entryName, Buffer.from(nuevo, 'utf-8'));
+    // Para cada parte que tenga el marcador de una imagen: su relación (rId) y su dibujo
+    const mapaParte = new Map(mapa);
+    const rels: { rId: string; media: string }[] = [];
+    for (const [clave, d] of imgs) {
+      const rId = `rIdVantia${rels.length + 1}`;
+      DIBUJOS.set(rId, xmlDibujo(rId, d.cx, d.cy, 9000 + rels.length + 1 + Math.floor(Math.random() * 1000)));
+      mapaParte.set(clave, `\u0001${rId}\u0001`);
+      rels.push({ rId, media: d.media });
+    }
+    const nuevo = sustituirEnXml(xml, mapaParte);
+    DIBUJOS.clear();
+    if (nuevo === xml) continue;
+    zip.updateFile(e.entryName, Buffer.from(nuevo, 'utf-8'));
+    // Relaciones de la parte (word/_rels/<parte>.xml.rels), solo de las imágenes usadas
+    const usadasAqui = rels.filter((r) => nuevo.includes(`r:embed="${r.rId}"`));
+    if (!usadasAqui.length) continue;
+    usadas = true;
+    const relsPath = e.entryName.replace(/^word\/(.+)$/, 'word/_rels/$1.rels');
+    let relsXml = zip.getEntry(relsPath)?.getData().toString('utf-8')
+      || '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    for (const r of usadasAqui) {
+      relsXml = relsXml.replace('</Relationships>', `<Relationship Id="${r.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${r.media}"/></Relationships>`);
+    }
+    if (zip.getEntry(relsPath)) zip.updateFile(relsPath, Buffer.from(relsXml, 'utf-8'));
+    else zip.addFile(relsPath, Buffer.from(relsXml, 'utf-8'));
+  }
+  if (usadas) {
+    for (const d of imgs.values()) if (!zip.getEntry(`word/media/${d.media}`)) zip.addFile(`word/media/${d.media}`, d.img.buffer);
+    // Tipos de contenido de las imágenes
+    const ct = zip.getEntry('[Content_Types].xml');
+    if (ct) {
+      let x = ct.getData().toString('utf-8');
+      x = x.replace(/<Types([^>]*)\/>\s*$/, '<Types$1></Types>');
+      for (const [ext, mime] of [['png', 'image/png'], ['jpg', 'image/jpeg'], ['gif', 'image/gif']]) {
+        if (![...imgs.values()].some((d) => d.media.endsWith('.' + ext))) continue;
+        if (!new RegExp(`Extension="${ext}"`, 'i').test(x)) x = x.replace('</Types>', `<Default Extension="${ext}" ContentType="${mime}"/></Types>`);
+      }
+      zip.updateFile('[Content_Types].xml', Buffer.from(x, 'utf-8'));
+    }
   }
   return zip.toBuffer();
 }

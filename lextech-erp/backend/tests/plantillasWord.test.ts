@@ -165,3 +165,67 @@ test('documentos base: con nombres repetidos en subcarpetas gana la de la carpet
   assert.equal(mejorPlantilla(renombrada, 'hoja_encargo', plantillaPara('hoja_encargo', civil))?.nombre, 'Hoja de encargo - civil (2026).docx');
   assert.equal(mejorPlantilla(renombrada, 'lopd', plantillaPara('lopd', civil)), null);
 });
+
+// ── Logo del despacho como imagen ───────────────────────────────────────────
+import { partirDireccion } from '../src/services/plantillasDatos';
+import zlib from 'zlib';
+function pngDePrueba(w: number, h: number): Buffer {
+  const crc = (buf: Buffer) => { let c = ~0; for (const b of buf) { c ^= b; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
+  const chunk = (t: string, d: Buffer) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const filas = Buffer.alloc((w * 3 + 1) * h);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(filas)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+test('el logo se inserta como imagen (cabecera), sin deformar y con su relación', () => {
+  const plantilla = docx(`<w:p>${run('Cuerpo')}</w:p>`, `<w:p>${run('«Empresa_Logo_')}${run('de_Empresa»', true)}${run(' Despacho')}</w:p>`);
+  const out = rellenarPlantilla(plantilla, {}, { Empresa_Logo_de_Empresa: { buffer: pngDePrueba(400, 100), mime: 'image/png' } });
+  const z = new AdmZip(out);
+  const cab = z.readAsText('word/header1.xml');
+  assert.ok(/<w:drawing>/.test(cab) && !cab.includes('Empresa_Logo'), 'dibujo en lugar del marcador');
+  const ext = cab.match(/<wp:extent cx="(\d+)" cy="(\d+)"/)!;
+  assert.equal(Number(ext[1]) / Number(ext[2]), 4, 'mantiene la proporción 4:1');
+  assert.ok(Number(ext[1]) <= 5 * 360000, 'como mucho 5 cm de ancho');
+  const rels = z.readAsText('word/_rels/header1.xml.rels');
+  const rid = cab.match(/r:embed="([^"]+)"/)![1];
+  assert.ok(rels.includes(`Id="${rid}"`) && /Target="media\/vantia_img1\.png"/.test(rels));
+  assert.ok(z.getEntry('word/media/vantia_img1.png'));
+  assert.ok(/Extension="png"/.test(z.readAsText('[Content_Types].xml')));
+  assert.equal(texto(out, 'word/header1.xml'), ' Despacho');
+});
+
+test('dirección del despacho en distintos formatos', () => {
+  assert.deepEqual(partirDireccion('Avda. Duque de Tamames, 20 - Planta 9 Izq. - ORIHUELA (Alicante) - 03300'),
+    { direccion: 'Avda. Duque de Tamames, 20, Planta 9 Izq.', cp: '03300', poblacion: 'Orihuela', provincia: 'Alicante' });
+  assert.deepEqual(partirDireccion('Avda. Jaume III 18, 07012 Palma (Illes Balears)'),
+    { direccion: 'Avda. Jaume III 18', cp: '07012', poblacion: 'Palma', provincia: 'Illes Balears' });
+  assert.deepEqual(partirDireccion('C/ Mayor 1, 28013 Madrid'), { direccion: 'C/ Mayor 1', cp: '28013', poblacion: 'Madrid', provincia: '' });
+});
+
+// Todas las plantillas reales, con TODOS los campos rellenos y el logo: el
+// resultado tiene que ser XML válido de verdad (lo comprueba Python/lxml).
+test('todas las plantillas .docx + logo: Word válido (XML estricto)', { skip: (!fs.existsSync(DOCPLANT) && 'sin DocPlant') || (() => { try { require('child_process').execFileSync('python', ['-c', 'import lxml']); return false; } catch { return 'sin python/lxml'; } })() }, () => {
+  const os = require('os'); const cp = require('child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vantia-tpl-'));
+  const files: string[] = [];
+  (function w(d: string) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) w(p); else if (/\.docx$/i.test(e.name) && !e.name.startsWith('~$')) files.push(p); } })(DOCPLANT);
+  const logo = { buffer: pngDePrueba(300, 120), mime: 'image/png' };
+  let conLogo = 0;
+  files.forEach((f, i) => {
+    const buf = fs.readFileSync(f);
+    const valores: Record<string, string> = {};
+    const imgs: Record<string, any> = {};
+    for (const n of camposDePlantilla(buf)) {
+      if (/LOGO/.test(claveCanonica(n))) imgs[claveCanonica(n)] = logo;
+      else valores[claveCanonica(n)] = 'Línea 1 & <dato>\nLínea 2';
+    }
+    const out = rellenarPlantilla(buf, valores, imgs);
+    if (Object.keys(imgs).length) { conLogo++; assert.ok(new AdmZip(out).getEntries().some((e) => e.entryName.startsWith('word/media/vantia_img')), `${path.basename(f)}: sin logo`); }
+    fs.writeFileSync(path.join(dir, `${i}.docx`), out);
+  });
+  const py = `import zipfile,glob,sys\nfrom lxml import etree\nmal=[]\nfor f in glob.glob(sys.argv[1]+'/*.docx'):\n  z=zipfile.ZipFile(f)\n  for n in z.namelist():\n    if n.endswith('.xml') or n.endswith('.rels'):\n      try: etree.fromstring(z.read(n))\n      except Exception as e: mal.append(f+' '+n+' '+str(e))\nprint(len(mal)); print(chr(10).join(mal[:5]))`;
+  const r = cp.execFileSync('python', ['-c', py, dir]).toString().trim().split('\n');
+  assert.equal(r[0], '0', `XML roto:\n${r.slice(1).join('\n')}`);
+  assert.ok(conLogo > 30, `plantillas con logo: ${conLogo}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

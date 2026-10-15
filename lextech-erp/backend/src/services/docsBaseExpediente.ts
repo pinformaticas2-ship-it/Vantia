@@ -3,7 +3,7 @@ import pool from '../config/database';
 import { rutaPlantillaOrg, nombrePlantillaOrg, saveExpedienteAttachmentFromBuffer } from '../controllers/filesController';
 import { configPlantillas, usaNube, listarPlantillasNube } from './plantillasNube';
 import { leerComoDocx, camposDePlantilla, rellenarPlantilla, claveCanonica } from './plantillasWord';
-import { contextoPlantilla, valorVantia, valoresGuardados } from './plantillasDatos';
+import { contextoPlantilla, valorVantia, valoresGuardados, esCampoLogo, logoDespacho } from './plantillasDatos';
 
 // ── Documentos base de cada expediente (15/10/2026) ─────────────────────────
 // Con la automatización activada en la organización (Ajustes →
@@ -110,14 +110,17 @@ export async function generarDocBase(opts: {
   const guardados = await valoresGuardados(organizacionId, expedienteId);
   const enviados = new Map(Object.entries(opts.valores || {}).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
   const valores: Record<string, string> = {};
+  const imagenes: Record<string, { buffer: Buffer; mime: string }> = {};
+  const logo = nombres.some(esCampoLogo) ? await logoDespacho(organizacionId) : null;
   let pendientes = 0;
   for (const n of nombres) {
     const clave = claveCanonica(n);
+    if (esCampoLogo(n)) { if (logo) imagenes[clave] = logo; else pendientes++; continue; }
     const v = enviados.get(clave) ?? guardados.get(clave) ?? valorVantia(n, ctx);
     if (v !== undefined && v !== '') valores[clave] = v;
     else pendientes++; // se queda «marcado» en el documento
   }
-  const salida = rellenarPlantilla(docx, valores);
+  const salida = rellenarPlantilla(docx, valores, imagenes);
   const nombreDoc = DOCS_BASE.find((d) => d.tipo === tipo)!.nombre;
   const ref = `${ctx.exp.anio}-${ctx.exp.num_exp}`;
   const archivo = await saveExpedienteAttachmentFromBuffer(
