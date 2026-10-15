@@ -140,3 +140,28 @@ test('documentos base: plantilla según el asunto (y todas existen en DocPlant)'
     }
   }
 });
+
+// Plantillas en subcarpetas y con nombres repetidos (carpeta del despacho en la nube).
+import { mejorPlantilla } from '../src/services/docsBaseExpediente';
+test('documentos base: con nombres repetidos en subcarpetas gana la de la carpeta que toca', { skip: !fs.existsSync(DOCPLANT) && 'sin DocPlant' }, () => {
+  // Simula la carpeta de Drive del despacho: el mismo árbol, metido en otra carpeta más
+  const lista: { nombre: string; carpeta: string; ext: string }[] = [];
+  (function w(d: string, rel: string) {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) w(p, rel ? `${rel}/${e.name}` : e.name);
+      else if (/\.docx?$/i.test(e.name) && !e.name.startsWith('~$')) lista.push({ nombre: e.name, carpeta: `Despacho/Plantillas${rel ? '/' + rel : ''}`, ext: path.extname(e.name).toLowerCase() });
+    }
+  })(DOCPLANT, '');
+  const civil = { tipo: 'judicial', descripcion: 'Reclamación de cantidad' };
+  const lopd = mejorPlantilla(lista, 'lopd', plantillaPara('lopd', civil))!;
+  assert.equal(`${lopd.carpeta}/${lopd.nombre}`, 'Despacho/Plantillas/Clientes/Clientes/Documento LOPD.docx'); // no la de Trabajadores
+  const penal = mejorPlantilla(lista, 'hoja_encargo', plantillaPara('hoja_encargo', { tipo: 'penal' }))!;
+  assert.equal(`${penal.carpeta}/${penal.nombre}`, 'Despacho/Plantillas/Facturas/Proformas/Expedientes/HOJA DE ENCARGO ASUNTO PENAL.doc');
+  const usura = mejorPlantilla(lista, 'toma_requisitos', plantillaPara('toma_requisitos', { tipo: 'judicial', tipos_asunto: 'Usura' }))!;
+  assert.equal(usura.nombre, 'INFORME DE TOMA DE REQUISITOS USURA-TRANSPARENCIA-ABUSIVIDAD.doc');
+  // Si el despacho renombró su hoja de encargo, se encuentra igualmente por palabras
+  const renombrada = [{ nombre: 'Hoja de encargo - civil (2026).docx', carpeta: 'Plantillas/Expedientes/Nuevas', ext: '.docx' }, { nombre: 'Otra cosa.docx', carpeta: 'Plantillas', ext: '.docx' }];
+  assert.equal(mejorPlantilla(renombrada, 'hoja_encargo', plantillaPara('hoja_encargo', civil))?.nombre, 'Hoja de encargo - civil (2026).docx');
+  assert.equal(mejorPlantilla(renombrada, 'lopd', plantillaPara('lopd', civil)), null);
+});

@@ -97,7 +97,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   const [showTemplates, setShowTemplates] = useState(false);
   const [genLoading, setGenLoading] = useState<string | null>(null);
   // DocPlant templates
-  const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string }[] }[]>([]);
+  const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string; sub?: string }[] }[]>([]);
   const [docPlantLoading, setDocPlantLoading] = useState(false);
   const [docPlantError, setDocPlantError]     = useState<string | null>(null);
   const [templateTab, setTemplateTab] = useState<'docplant' | 'generated'>('docplant');
@@ -1405,7 +1405,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                       const q = templateSearch.toLowerCase().trim();
                       const filteredFolders = docPlantFolders.map(folder => ({
                         ...folder,
-                        files: q ? folder.files.filter(f => f.name.toLowerCase().includes(q)) : folder.files,
+                        files: q ? folder.files.filter(f => `${f.name} ${f.sub || ""}`.toLowerCase().includes(q)) : folder.files,
                       })).filter(f => f.files.length > 0);
 
                       if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">Sin resultados</p>;
@@ -1445,7 +1445,10 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${isSelected ? 'bg-red-50 text-red-700' : 'hover:bg-neutral-50 text-neutral-600'}`}
                                     >
                                       <span className="shrink-0 text-xs">{f.ext === '.docx' ? '📝' : '📄'}</span>
-                                      <span className="text-xs truncate flex-1" title={f.name}>{f.name.replace(/\.[^.]+$/, '')}</span>
+                                      <span className="flex-1 min-w-0" title={f.sub ? `${f.sub} / ${f.name}` : f.name}>
+                                        <span className="block text-xs truncate">{f.name.replace(/\.[^.]+$/, '')}</span>
+                                        {f.sub && <span className="block text-[10px] text-slate-400 truncate">en {f.sub}</span>}
+                                      </span>
                                     </button>
                                   );
                                 })}

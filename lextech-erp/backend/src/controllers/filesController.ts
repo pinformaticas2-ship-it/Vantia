@@ -2247,7 +2247,8 @@ const BLANK_DOCX_B64 =
   'AAgAvFlrXDiB3SmoAAAA5QAAABAAAAAAAAAAAAAAAIAB2gcAAGRvY1Byb3BzL2FwcC54bWxQSwUG' +
   'AAAAAAgACAD8AQAAsAgAAAAA';
 
-interface TemplateFile { name: string; path: string; ext: string; }
+// sub: subcarpetas entre la carpeta de primer nivel y el archivo ("Clientes/Oportunidades" → "Oportunidades").
+interface TemplateFile { name: string; path: string; ext: string; sub?: string; }
 interface TemplateFolder { name: string; files: TemplateFile[]; }
 
 function scanDocPlant(dir: string, relBase: string): TemplateFile[] {
@@ -2945,9 +2946,9 @@ export const listTemplates = async (req: any, res: Response) => {
       for (const p of lista) {
         const key = p.carpeta ? p.carpeta.split('/')[0] : 'General';
         if (!porCarpeta.has(key)) porCarpeta.set(key, []);
-        porCarpeta.get(key)!.push({ name: p.nombre, path: p.ref, ext: p.ext });
+        porCarpeta.get(key)!.push({ name: p.nombre, path: p.ref, ext: p.ext, sub: p.carpeta.split('/').slice(1).join(' / ') || undefined });
       }
-      const folders = [...porCarpeta].map(([name, files]) => ({ name, files: files.sort((a, b) => a.name.localeCompare(b.name, 'es')) }));
+      const folders = [...porCarpeta].map(([name, files]) => ({ name, files: files.sort((a, b) => (a.sub || '').localeCompare(b.sub || '', 'es') || a.name.localeCompare(b.name, 'es')) }));
       return res.json({ success: true, data: folders.sort((a, b) => a.name.localeCompare(b.name, 'es')), origen: cfg.proveedor });
     }
     const { root, candidates } = getDocPlantRoot();
@@ -2959,11 +2960,11 @@ export const listTemplates = async (req: any, res: Response) => {
     for (const f of allFiles) {
       const key = f.path.includes('/') ? f.path.split('/')[0] : 'General';
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(f);
+      map.get(key)!.push({ ...f, sub: f.path.split('/').slice(1, -1).join(' / ') || undefined });
     }
     const folders: TemplateFolder[] = [];
     for (const [name, files] of map) {
-      folders.push({ name, files: files.sort((a, b) => a.name.localeCompare(b.name, 'es')) });
+      folders.push({ name, files: files.sort((a, b) => (a.sub || '').localeCompare(b.sub || '', 'es') || a.name.localeCompare(b.name, 'es')) });
     }
     res.json({ success: true, data: folders.sort((a, b) => a.name.localeCompare(b.name, 'es')) });
   } catch (err: any) {

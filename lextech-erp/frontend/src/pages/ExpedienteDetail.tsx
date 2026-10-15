@@ -1936,7 +1936,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
   const [editAttachmentType, setEditAttachmentType] = useState("Sin clasificar");
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateSearch, setTemplateSearch] = useState("");
-  const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string }[] }[]>([]);
+  const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string; sub?: string }[] }[]>([]);
   const [docPlantLoading, setDocPlantLoading] = useState(false);
   const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
   // Paso "revisar datos" antes de generar el documento (ver RellenarPlantilla).
@@ -2362,7 +2362,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
   const filteredFolders = useMemo(() => {
     const q = templateSearch.trim().toLowerCase();
     if (!q) return docPlantFolders;
-    return docPlantFolders.map((folder) => ({ ...folder, files: folder.files.filter((f) => f.name.toLowerCase().includes(q)) })).filter((folder) => folder.files.length > 0);
+    return docPlantFolders.map((folder) => ({ ...folder, files: folder.files.filter((f) => `${f.name} ${f.sub || ""}`.toLowerCase().includes(q)) })).filter((folder) => folder.files.length > 0);
   }, [docPlantFolders, templateSearch]);
 
   const filteredFiles = useMemo(() => {
@@ -2855,7 +2855,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                         {folder.files.map((file) => (
                           <button key={file.path} type="button" onClick={() => { setSelectedTpl(file); setRellenando(false); }}
                             className={`w-full px-4 py-3 text-left text-sm transition-colors ${selectedTpl?.path === file.path ? "bg-red-50 text-red-700" : "hover:bg-slate-50 text-slate-700"}`}>
-                            {file.name}
+                            <span className="block">{file.name}</span>{file.sub && <span className="block text-[11px] text-slate-400 truncate">en {file.sub}</span>}
                           </button>
                         ))}
                       </div>

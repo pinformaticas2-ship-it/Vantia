@@ -57,14 +57,34 @@ export async function elegirPlantilla(organizacionId: string, tipo: TipoDocBase,
   const integrada = plantillaPara(tipo, exp);
   if (!usaNube(await configPlantillas(organizacionId))) return integrada;
   const lista = await listarPlantillasNube(organizacionId);
-  const nombre = norm(path.basename(integrada));
-  const exacta = lista.find((p) => norm(p.nombre) === nombre);
-  if (exacta) return exacta.ref;
-  // Por palabras: "hoja de encargo" + el tipo de asunto si aparece en el nombre.
-  const candidatas = lista.filter((p) => PALABRA_CLAVE[tipo].test(norm(p.nombre)));
-  const pista = norm(path.basename(integrada)).replace(/\.docx?$/, '').split(/[^a-z0-9]+/).filter((w) => w.length > 3);
-  candidatas.sort((a, b) => pista.filter((w) => norm(b.nombre).includes(w)).length - pista.filter((w) => norm(a.nombre).includes(w)).length);
-  return candidatas[0]?.ref || null;
+  return mejorPlantilla(lista, tipo, integrada)?.ref || null;
+}
+
+/** Las plantillas pueden estar en subcarpetas y repetirse con el mismo nombre
+ *  (p. ej. "Documento LOPD" de Clientes y de Trabajadores): se puntúa cada
+ *  candidata y gana la que más se parece a la integrada, también por carpeta. */
+export function mejorPlantilla<T extends { nombre: string; carpeta: string; ext: string }>(lista: T[], tipo: TipoDocBase, integrada: string): T | null {
+  const sinExt = (s: string) => norm(s).replace(/\.docx?$/, '').trim();
+  const nombre = sinExt(path.basename(integrada));
+  const carpetaInt = norm(path.posix.dirname(integrada));
+  const pista = nombre.split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+  const puntos = (p: T) => {
+    const n = sinExt(p.nombre);
+    const c = norm(p.carpeta);
+    let s = 0;
+    if (n === nombre) s += 100;
+    else if (PALABRA_CLAVE[tipo].test(n)) s += 20 + 3 * pista.filter((w) => n.includes(w)).length;
+    else return -1;
+    // La carpeta de la integrada ("clientes/clientes", "expedientes"...) al final de la ruta en la nube
+    if (carpetaInt !== '.' && (c === carpetaInt || c.endsWith('/' + carpetaInt))) s += 30;
+    else if (carpetaInt !== '.' && c.includes(carpetaInt.split('/')[0])) s += 10;
+    // Documentos de empleados, nunca para un expediente
+    if (/trabajador|emplead|personal/.test(c)) s -= 60;
+    if (p.ext === '.docx') s += 2;
+    return s;
+  };
+  const ordenadas = lista.map((p) => ({ p, s: puntos(p) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+  return ordenadas[0]?.p || null;
 }
 
 export async function docsBaseActivos(organizacionId: string): Promise<boolean> {
