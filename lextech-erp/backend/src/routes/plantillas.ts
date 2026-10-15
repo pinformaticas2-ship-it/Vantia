@@ -6,8 +6,9 @@ import { getDocPlantRoot } from '../controllers/filesController';
 import { logActivityForReq } from '../controllers/activityController';
 import {
   configPlantillas, usaNube, listarPlantillasNube, conectarCarpeta, desconectarCarpeta,
-  subirPlantilla, importarIntegradas, proveedoresConectados, olvidarListado,
+  subirPlantilla, importarIntegradas, proveedoresConectados, olvidarListado, carpetasDrive, elegirCarpetaDrive,
 } from '../services/plantillasNube';
+import { driveTieneLectura } from '../utils/googleDrive';
 
 // Ajustes → Mi Despacho → Plantillas (ver services/plantillasNube).
 const router = Router();
@@ -31,6 +32,10 @@ router.get('/config', requireAuth, async (req: any, res: Response) => {
       data: {
         origen: usaNube(cfg) ? cfg.proveedor : 'integradas',
         carpetaUrl: cfg.proveedor === 'drive' && cfg.carpetaId ? `https://drive.google.com/drive/folders/${cfg.carpetaId}` : null,
+        carpetaNombre: cfg.carpetaNombre || null,
+        // En una carpeta elegida del Drive (no creada por Vantia) no se puede subir desde aquí.
+        sePuedeSubir: usaNube(cfg) && (cfg.proveedor === 'dropbox' || cfg.carpetaPropia !== false),
+        driveLectura: conectados.drive ? await driveTieneLectura(req.organizacionId) : false,
         carpetaTexto: cfg.proveedor === 'dropbox' ? 'Dropbox › Aplicaciones › (Vantia) › Plantillas' : null,
         total, error, conectados,
         importacion: cfg.importacion || null,
@@ -51,6 +56,29 @@ router.post('/conectar', requireAuth, soloGestor, async (req: any, res: Response
     res.json({ success: true });
   } catch (e: any) {
     res.status(400).json({ success: false, error: e?.message || 'No se pudo conectar la carpeta.' });
+  }
+});
+
+// Explorador de carpetas de Drive (necesita el permiso de lectura de Drive).
+router.get('/drive/carpetas', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    if (!(await driveTieneLectura(req.organizacionId))) return res.status(403).json({ success: false, error: 'Falta el permiso de lectura de Google Drive.', code: 'SIN_LECTURA' });
+    const padre = String(req.query.padre || 'root');
+    res.json({ success: true, data: await carpetasDrive(req.organizacionId, padre) });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudieron leer las carpetas.' });
+  }
+});
+
+router.post('/elegir-carpeta', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const id = String(req.body?.carpetaId || '').trim();
+    if (!id) return res.status(400).json({ success: false, error: 'Falta la carpeta.' });
+    await elegirCarpetaDrive(req.organizacionId, id, String(req.body?.nombre || ''));
+    logActivityForReq(req, `Plantillas del despacho: carpeta de Drive elegida «${String(req.body?.nombre || id).slice(0, 200)}»`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'No se pudo elegir la carpeta.' });
   }
 });
 

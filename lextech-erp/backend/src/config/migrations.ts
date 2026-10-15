@@ -2460,6 +2460,8 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS docs_base_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
       // Carpeta de plantillas del despacho en su nube (ver services/plantillasNube).
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS plantillas_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      // Permisos que dio Google al conectar Drive (lectura completa para elegir carpeta de plantillas).
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_scopes TEXT`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS expediente_docs_base (
           id               BIGSERIAL    PRIMARY KEY,

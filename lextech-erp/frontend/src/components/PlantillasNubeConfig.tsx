@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, Copy, ExternalLink, FileText, FolderOpen, Loader2, RefreshCw, Upload, AlertTriangle } from 'lucide-react';
 import { apiFetch, safeJson } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
+import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
+import ElegirCarpetaDrive from './ElegirCarpetaDrive';
 
 // ── Ajustes → Mi Despacho → Plantillas del despacho (15/10/2026) ────────────
 // Cada despacho usa las plantillas de una carpeta "Plantillas" de su Google
@@ -19,6 +21,9 @@ interface Config {
   importacion: { estado: 'importando' | 'hecha' | 'error'; hechos: number; total: number; error?: string } | null;
   hayIntegradas: boolean;
   canManage: boolean;
+  carpetaNombre: string | null;
+  sePuedeSubir: boolean;
+  driveLectura: boolean;
 }
 
 export default function PlantillasNubeConfig() {
@@ -26,6 +31,29 @@ export default function PlantillasNubeConfig() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [eligiendo, setEligiendo] = useState(false);
+
+  // Elegir una carpeta cualquiera del Drive: si aún no hay permiso de
+  // lectura, primero se pide a Google (popup) y luego se abre el explorador.
+  const elegirCarpeta = () => {
+    if (cfg?.driveLectura) { setEligiendo(true); return; }
+    startGoogleDriveConnect({
+      getToken,
+      lectura: true,
+      onBusy: (b) => setOcupado(b ? 'permiso' : null),
+      onError: (m) => { setOcupado(null); aviso.error(m); },
+      onConnected: async () => { setOcupado(null); await cargar(); setEligiendo(true); },
+    });
+  };
+  const usarCarpeta = async (c: { id: string; ruta: string }) => {
+    try {
+      const r = await apiFetch('/api/plantillas/elegir-carpeta', { method: 'POST', getToken, body: JSON.stringify({ carpetaId: c.id, nombre: c.ruta }) });
+      if (r?.success === false) throw new Error(r.error);
+      setEligiendo(false);
+      aviso.ok(`Plantillas: se usará la carpeta «${c.ruta}»`);
+      await cargar();
+    } catch (e: any) { aviso.error(e?.message || 'No se pudo usar esa carpeta.'); }
+  };
 
   const cargar = useCallback(async () => {
     try {
@@ -84,7 +112,7 @@ export default function PlantillasNubeConfig() {
           <h3 className="text-sm font-bold text-slate-800">Plantillas del despacho</h3>
           <p className="text-xs text-slate-500 mt-0.5">
             {enNube
-              ? <>Se usan las plantillas de la carpeta <b className="text-slate-700">Plantillas</b> de vuestro {nubeNombre}{cfg.total != null && <> · <b className="text-slate-700">{cfg.total}</b> plantilla{cfg.total === 1 ? '' : 's'}</>}.</>
+              ? <>Se usan las plantillas de la carpeta <b className="text-slate-700">{cfg.carpetaNombre || 'Plantillas'}</b> de vuestro {nubeNombre}{cfg.total != null && <> · <b className="text-slate-700">{cfg.total}</b> plantilla{cfg.total === 1 ? '' : 's'}</>}.</>
               : 'Ahora se usan las plantillas integradas de Vantia. Conecta una carpeta de vuestra nube para usar las vuestras.'}
           </p>
         </div>
@@ -97,9 +125,15 @@ export default function PlantillasNubeConfig() {
           {cfg.conectados.drive || cfg.conectados.dropbox ? (
             <div className="flex flex-wrap gap-2">
               {cfg.conectados.drive && (
-                <button type="button" disabled={!!ocupado} onClick={() => void accion('conectar', '/api/plantillas/conectar', { proveedor: 'drive' }, 'Carpeta «Plantillas» creada en Google Drive')}
+                <button type="button" disabled={!!ocupado} onClick={elegirCarpeta}
                   className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                  {ocupado === 'conectar' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Usar una carpeta de Google Drive
+                  {ocupado === 'permiso' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Elegir carpeta de Google Drive
+                </button>
+              )}
+              {cfg.conectados.drive && (
+                <button type="button" disabled={!!ocupado} onClick={() => void accion('conectar', '/api/plantillas/conectar', { proveedor: 'drive' }, 'Carpeta «Plantillas» creada en Google Drive')}
+                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                  {ocupado === 'conectar' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Crear una carpeta nueva
                 </button>
               )}
               {cfg.conectados.dropbox && (
@@ -112,7 +146,7 @@ export default function PlantillasNubeConfig() {
           ) : (
             <p className="text-xs text-slate-600">Primero conecta Google Drive o Dropbox en <Link to="/dashboard/config?section=integraciones" className="font-semibold text-red-600 hover:underline">Integraciones</Link>.</p>
           )}
-          <p className="mt-2 text-xs text-slate-500">Se crea la carpeta <b>Plantillas</b> dentro de la carpeta de Vantia de vuestra nube. Desde ese momento este despacho solo verá sus plantillas.</p>
+          <p className="mt-2 text-xs text-slate-500">Elige la carpeta de vuestro Drive donde tenéis las plantillas (Google pedirá permiso para que Vantia pueda leer vuestro Drive), o crea una nueva. Desde ese momento este despacho solo verá sus plantillas.</p>
         </div>
       )}
 
@@ -124,7 +158,13 @@ export default function PlantillasNubeConfig() {
                 <ExternalLink size={14} /> Abrir la carpeta
               </a>
             )}
-            {cfg.canManage && (
+            {cfg.canManage && cfg.origen === 'drive' && (
+              <button type="button" disabled={!!ocupado} onClick={elegirCarpeta}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                {ocupado === 'permiso' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Cambiar carpeta
+              </button>
+            )}
+            {cfg.canManage && cfg.sePuedeSubir && (
               <>
                 <input ref={inputRef} type="file" multiple accept=".doc,.docx" className="hidden" onChange={(e) => void subir(e.target.files)} />
                 <button type="button" disabled={!!ocupado} onClick={() => inputRef.current?.click()}
@@ -140,11 +180,11 @@ export default function PlantillasNubeConfig() {
                     <Copy size={14} /> Copiar las plantillas integradas
                   </button>
                 )}
-                <button type="button" onClick={() => void cargar()} title="Volver a leer la carpeta" className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
-                  <RefreshCw size={14} />
-                </button>
               </>
             )}
+            <button type="button" onClick={() => void cargar()} title="Volver a leer la carpeta" className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
+              <RefreshCw size={14} />
+            </button>
           </div>
 
           {imp && (
@@ -162,7 +202,9 @@ export default function PlantillasNubeConfig() {
 
           <p className="text-xs text-slate-500">
             {cfg.origen === 'drive'
-              ? 'Por privacidad, Vantia solo puede ver en vuestro Drive lo que ella misma ha subido: añade las plantillas nuevas con «Subir plantillas». Las que ya están se pueden abrir y editar en Drive.'
+              ? (cfg.driveLectura
+                ? 'Añadid, cambiad o borrad las plantillas directamente en esa carpeta de Drive (también con subcarpetas): Vantia las lee de ahí. Sirven los Word (.doc, .docx) y los documentos de Google Docs.'
+                : 'Vantia solo puede ver en vuestro Drive lo que ella misma ha subido. Para usar las plantillas que ya tenéis en Drive, pulsa «Cambiar carpeta» y dale permiso de lectura.')
               : <>Lo que pongáis en <b>{cfg.carpetaTexto}</b> (también desde el Dropbox del ordenador) aparece aquí, con sus subcarpetas.</>}
           </p>
 
@@ -176,6 +218,7 @@ export default function PlantillasNubeConfig() {
           )}
         </div>
       )}
+      {eligiendo && <ElegirCarpetaDrive onElegir={usarCarpeta} onCerrar={() => setEligiendo(false)} />}
     </section>
   );
 }

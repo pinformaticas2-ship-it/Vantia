@@ -27,6 +27,15 @@ interface GoogleTokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
+  scope?: string;
+}
+
+/** ¿Puede Vantia leer todo el Drive (no solo lo que ella sube)? Hace falta
+ *  para elegir una carpeta cualquiera de plantillas. */
+export async function driveTieneLectura(organizacionId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT google_drive_scopes FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
+  const s = String(rows[0]?.google_drive_scopes || '');
+  return /auth\/drive\.readonly\b|auth\/drive(\s|$)/.test(s);
 }
 
 async function googleTokenRequest(params: Record<string, string>): Promise<GoogleTokenResponse> {

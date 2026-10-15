@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import pool from '../config/database';
-import { driveFetch, findFolder, createFolder, ensureRootFolder, uploadFileToDrive, downloadDriveFile, isDriveConnected } from '../utils/googleDrive';
+import { driveFetch, findFolder, createFolder, ensureRootFolder, uploadFileToDrive, isDriveConnected } from '../utils/googleDrive';
 import { dropboxRpc, ensureFolder, uploadFileToDropbox, downloadDropboxFile } from '../utils/dropboxStorage';
 import { isDropboxConnected } from '../utils/dropboxAuth';
 
@@ -26,12 +26,30 @@ export interface ConfigPlantillas {
   proveedor?: 'drive' | 'dropbox';
   carpetaId?: string;          // Drive: id de la carpeta "Plantillas"
   carpetaPath?: string;        // Dropbox: "/Plantillas"
+  carpetaNombre?: string;      // Drive: ruta legible de la carpeta elegida
+  carpetaPropia?: boolean;     // Drive: la creó Vantia (se puede subir a ella)
   importacion?: { estado: 'importando' | 'hecha' | 'error'; hechos: number; total: number; error?: string; at: string };
 }
 
 export interface PlantillaNube { ref: string; nombre: string; carpeta: string; ext: string; modificada: string }
 
 const CACHE = path.join(os.tmpdir(), 'vantia-plantillas-nube');
+const GDOC = 'application/vnd.google-apps.document';
+const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+/** Descarga de Drive; los documentos de Google Docs se exportan como Word. */
+async function bajarDeDrive(organizacionId: string, id: string): Promise<Buffer> {
+  const meta = await driveFetch(organizacionId, `/files/${id}?fields=mimeType&supportsAllDrives=true`);
+  const m: any = await meta.json().catch(() => ({}));
+  if (m.mimeType === GDOC) {
+    const r = await driveFetch(organizacionId, `/files/${id}/export?mimeType=${encodeURIComponent(MIME_DOCX)}`);
+    if (!r.ok) throw new Error('No se pudo exportar el documento de Google Docs');
+    return Buffer.from(await r.arrayBuffer());
+  }
+  const r = await driveFetch(organizacionId, `/files/${id}?alt=media&supportsAllDrives=true`);
+  if (!r.ok) throw new Error('No se pudo descargar la plantilla de Google Drive');
+  return Buffer.from(await r.arrayBuffer());
+}
 const EXT = /\.(docx?|DOCX?)$/;
 
 export async function configPlantillas(organizacionId: string): Promise<ConfigPlantillas> {
@@ -56,16 +74,17 @@ async function listarDrive(organizacionId: string, carpetaId: string): Promise<P
   const out: PlantillaNube[] = [];
   const pendientes: { id: string; ruta: string }[] = [{ id: carpetaId, ruta: '' }];
   let vueltas = 0;
-  while (pendientes.length && vueltas++ < 200) {
+  while (pendientes.length && vueltas++ < 1000) {
     const { id, ruta } = pendientes.shift()!;
     let pageToken = '';
     do {
       const q = encodeURIComponent(`'${id}' in parents and trashed = false`);
-      const res = await driveFetch(organizacionId, `/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000${pageToken ? `&pageToken=${pageToken}` : ''}`);
+      const res = await driveFetch(organizacionId, `/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime)&pageSize=1000&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ''}`);
       const data: any = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error?.message || 'No se pudo leer la carpeta de plantillas en Google Drive');
       for (const f of data.files || []) {
         if (f.mimeType === 'application/vnd.google-apps.folder') pendientes.push({ id: f.id, ruta: ruta ? `${ruta}/${f.name}` : f.name });
+        else if (f.mimeType === GDOC) out.push({ ref: `nube:${f.id}`, nombre: `${f.name}.docx`, carpeta: ruta, ext: '.docx', modificada: f.modifiedTime });
         else if (EXT.test(f.name) && !f.name.startsWith('~$')) out.push({ ref: `nube:${f.id}`, nombre: f.name, carpeta: ruta, ext: path.extname(f.name).toLowerCase(), modificada: f.modifiedTime });
       }
       pageToken = data.nextPageToken || '';
@@ -113,8 +132,8 @@ export async function rutaLocalPlantillaNube(organizacionId: string, ref: string
   const destino = path.join(dir, `${clave}${p.ext}`);
   if (fs.existsSync(destino)) return destino;
   await fs.promises.mkdir(dir, { recursive: true });
-  const f = cfg.proveedor === 'drive' ? await downloadDriveFile(organizacionId, id) : await downloadDropboxFile(organizacionId, id);
-  await fs.promises.writeFile(destino, f.buffer);
+  const buf = cfg.proveedor === 'drive' ? await bajarDeDrive(organizacionId, id) : (await downloadDropboxFile(organizacionId, id)).buffer;
+  await fs.promises.writeFile(destino, buf);
   return destino;
 }
 
@@ -124,7 +143,7 @@ export async function conectarCarpeta(organizacionId: string, proveedor: 'drive'
     if (!(await isDriveConnected(organizacionId))) throw new Error('Primero conecta Google Drive en Ajustes → Integraciones.');
     const raiz = await ensureRootFolder(organizacionId);
     const carpetaId = (await findFolder(organizacionId, 'Plantillas', raiz)) || (await createFolder(organizacionId, 'Plantillas', raiz));
-    await guardarConfig(organizacionId, { proveedor, carpetaId, carpetaPath: null as any });
+    await guardarConfig(organizacionId, { proveedor, carpetaId, carpetaPath: null as any, carpetaPropia: true, carpetaNombre: 'Plantillas' });
   } else {
     if (!(await isDropboxConnected(organizacionId))) throw new Error('Primero conecta Dropbox en Ajustes → Integraciones.');
     await ensureFolder(organizacionId, '/Plantillas');
@@ -132,6 +151,29 @@ export async function conectarCarpeta(organizacionId: string, proveedor: 'drive'
   }
   olvidarListado(organizacionId);
   return configPlantillas(organizacionId);
+}
+
+/** Carpetas de Drive para elegir (necesita el permiso de lectura). */
+export async function carpetasDrive(organizacionId: string, padre: string): Promise<{ id: string; nombre: string; compartida?: boolean }[]> {
+  if (padre === 'compartidas') {
+    const r = await driveFetch(organizacionId, '/drives?pageSize=100&fields=drives(id,name)');
+    const d: any = await r.json().catch(() => ({}));
+    return (d.drives || []).map((x: any) => ({ id: x.id, nombre: x.name, compartida: true }));
+  }
+  const q = encodeURIComponent(`'${padre.replace(/'/g, '')}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`);
+  const r = await driveFetch(organizacionId, `/files?q=${q}&fields=files(id,name)&orderBy=name&pageSize=500&supportsAllDrives=true&includeItemsFromAllDrives=true`);
+  const d: any = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d?.error?.message || 'No se pudieron leer las carpetas de Google Drive');
+  return (d.files || []).map((x: any) => ({ id: x.id, nombre: x.name }));
+}
+
+export async function elegirCarpetaDrive(organizacionId: string, carpetaId: string, carpetaNombre: string) {
+  // Que exista y se pueda leer
+  const r = await driveFetch(organizacionId, `/files/${encodeURIComponent(carpetaId)}?fields=id,name,mimeType&supportsAllDrives=true`);
+  const d: any = await r.json().catch(() => ({}));
+  if (!r.ok || d.mimeType !== 'application/vnd.google-apps.folder') throw new Error('No se puede leer esa carpeta de Google Drive.');
+  await guardarConfig(organizacionId, { proveedor: 'drive', carpetaId, carpetaPath: null as any, carpetaPropia: false, carpetaNombre: String(carpetaNombre || d.name).slice(0, 300) });
+  olvidarListado(organizacionId);
 }
 
 export async function desconectarCarpeta(organizacionId: string) {

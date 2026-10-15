@@ -281,9 +281,10 @@ export async function exchangeGoogleDriveCode(req: Request, res: Response) {
              google_drive_refresh_token_enc = $2,
              google_drive_token_expiry = $3,
              google_drive_email = $4,
+             google_drive_scopes = $6,
              updated_at = NOW()
        WHERE id = $5`,
-      [encryptPassword(tokenData.access_token), encryptPassword(tokenData.refresh_token), tokenExpiry, email, ctx.organizacionId],
+      [encryptPassword(tokenData.access_token), encryptPassword(tokenData.refresh_token), tokenExpiry, email, ctx.organizacionId, (tokenData as any).scope || null],
     );
     return ok(res, { connected: true, email });
   } catch (e: any) {
