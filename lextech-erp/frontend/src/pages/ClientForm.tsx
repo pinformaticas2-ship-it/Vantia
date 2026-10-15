@@ -2,7 +2,7 @@
 import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
-import {
+import { Landmark,
   Save, X, ScanLine, Upload, Image as ImageIcon,
   Loader2, Sparkles, RotateCcw, AlertTriangle, CheckCircle2,
   Camera, Edit3, Users, MapPin, Phone, Briefcase, MessageSquare, ChevronLeft,
@@ -261,6 +261,12 @@ const EMPTY_FORM = {
   center: "",
   photo_url: "",
   observaciones: "",
+  // Datos bancarios / mandato SEPA y referencia (salen en las plantillas de documentos)
+  iban: "",
+  bic: "",
+  mandato_numero: "",
+  mandato_fecha: "",
+  referencia_cliente: "",
 };
 
 export default function ClientForm() {
@@ -384,6 +390,11 @@ export default function ClientForm() {
           center:                  d.center                   || "",
           photo_url:               d.photo_url                || "",
           observaciones:           d.observaciones            || "",
+          iban:                    d.iban                     || "",
+          bic:                     d.bic                      || "",
+          mandato_numero:          d.mandato_numero           || "",
+          mandato_fecha:           toInputDate(d.mandato_fecha),
+          referencia_cliente:      d.referencia_cliente       || "",
         });
         if (d.photo_url) setPhotoPreview(d.photo_url);
       } catch (err: any) {
@@ -1588,6 +1599,36 @@ export default function ClientForm() {
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>Página Web</label>
                   <input name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" className={inputCls("website")} />
+                </div>
+              </div>
+            </div>
+
+            {/* DATOS BANCARIOS Y REFERENCIA (15/10/2026): salen solos en las plantillas */}
+            <div className="pt-8 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <Landmark size={16} className="text-slate-400" /> Datos bancarios y referencia
+              </h3>
+              <p className="text-xs text-slate-500 mb-6">Se usan en los documentos (domiciliaciones, mandatos SEPA, hojas de encargo...) sin tener que escribirlos cada vez.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className={lbl}>IBAN</label>
+                  <input name="iban" value={form.iban} onChange={handleChange} placeholder="ES00 0000 0000 0000 0000 0000" className={inputCls("iban")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>BIC / SWIFT</label>
+                  <input name="bic" value={form.bic} onChange={handleChange} placeholder="CAIXESBBXXX" className={inputCls("bic")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Nº mandato SEPA</label>
+                  <input name="mandato_numero" value={form.mandato_numero} onChange={handleChange} placeholder="—" className={inputCls("mandato_numero")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha mandato</label>
+                  <input type="date" name="mandato_fecha" value={form.mandato_fecha} onChange={handleChange} className={inputCls("mandato_fecha")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Referencia del cliente</label>
+                  <input name="referencia_cliente" value={form.referencia_cliente} onChange={handleChange} placeholder="—" className={inputCls("referencia_cliente")} />
                 </div>
               </div>
             </div>

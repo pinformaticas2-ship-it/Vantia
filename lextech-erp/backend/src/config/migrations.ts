@@ -2466,6 +2466,12 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS telefono TEXT`);
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS email_contacto TEXT`);
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS web TEXT`);
+      // Ficha del cliente: datos bancarios / mandato SEPA y referencia (salen en las plantillas).
+      for (const col of ['iban', 'bic', 'mandato_numero', 'referencia_cliente']) {
+        await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS ${col} TEXT`);
+      }
+      // Texto "AAAA-MM-DD" (no DATE): así la zona horaria nunca mueve el día.
+      await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS mandato_fecha TEXT`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS expediente_docs_base (
           id               BIGSERIAL    PRIMARY KEY,

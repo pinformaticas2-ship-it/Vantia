@@ -275,6 +275,23 @@ export const getEntityById = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 // POST /api/entities
 // ─────────────────────────────────────────────────────────────
+// Datos bancarios / mandato SEPA y referencia del cliente (15/10/2026): se
+// guardan aparte para no tocar el alta/edición; solo los que vengan.
+const EXTRA_CLIENTE = ['iban', 'bic', 'mandato_numero', 'mandato_fecha', 'referencia_cliente'] as const;
+async function guardarExtraCliente(id: string, organizacionId: string, body: any) {
+  const presentes = EXTRA_CLIENTE.filter((k) => body && k in body);
+  if (!presentes.length) return;
+  const limpiar = (k: string, v: any) => {
+    const t = String(v ?? '').trim();
+    if (!t) return null;
+    return k === 'iban' ? t.replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim() : t.slice(0, 200);
+  };
+  await pool.query(
+    `UPDATE entities SET ${presentes.map((k, i) => `${k} = $${i + 3}`).join(', ')} WHERE id = $1 AND organizacion_id = $2`,
+    [id, organizacionId, ...presentes.map((k) => limpiar(k, body[k]))],
+  );
+}
+
 export const createEntity = async (req: any, res: Response) => {
   const {
     type, client_status, document_type,
@@ -377,6 +394,7 @@ export const createEntity = async (req: any, res: Response) => {
         req.organizacionId,                                  // $33
       ]
     );
+    await guardarExtraCliente(result.rows[0].id, req.organizacionId, req.body);
     // Crear carpetas para archivos del cliente (uploads del servidor + carpeta local)
     try {
       const clientId = result.rows[0].id;
@@ -544,7 +562,9 @@ export const updateEntity = async (req: any, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
     }
-    const updatedRow = result.rows[0];
+    await guardarExtraCliente(id, req.organizacionId, req.body);
+    const updatedRow = { ...result.rows[0] };
+    for (const k of EXTRA_CLIENTE) if (k in (req.body || {})) (updatedRow as any)[k] = req.body[k] || null;
     const updatedName = updatedRow.commercial_name
       || [updatedRow.first_name, updatedRow.last_name].filter(Boolean).join(' ')
       || id;

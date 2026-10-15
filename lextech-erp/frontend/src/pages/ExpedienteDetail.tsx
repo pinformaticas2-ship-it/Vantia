@@ -79,6 +79,7 @@ import { useAvisoSalida } from "../lib/borradores";
 import RellenarPlantilla from "../components/RellenarPlantilla";
 import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
 import DocumentosBaseExpediente from "../components/DocumentosBaseExpediente";
+import DatosDocumentosExpediente from "../components/DatosDocumentosExpediente";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -233,13 +234,14 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia" | "correo" | "conversaciones";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia" | "correo" | "conversaciones" | "datos_documentos";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",          label: "Datos",                  icon: User },
   { key: "clientes",        label: "Propio",                 icon: Users },
   { key: "contrarios",      label: "Contrarios",             icon: Users },
   { key: "adjuntos",        label: "Adjuntos",               icon: Paperclip },
+  { key: "datos_documentos", label: "Datos para documentos", icon: FileText },
   { key: "agenda",          label: "Agenda",                 icon: Calendar },
   { key: "actuacion",       label: "Actuaciones",            icon: ClipboardList },
   { key: "tareas",          label: "Tareas / Plazos",        icon: AlertTriangle },
@@ -6139,6 +6141,9 @@ export default function ExpedienteDetail() {
               <TabContrarios exp={exp} onPatch={patchExp} />
             )}
 
+            {tab === "datos_documentos" && (
+              <DatosDocumentosExpediente expedienteId={id!} bloqueado={exp.estado === "cerrado"} />
+            )}
             {tab === "relacionados" && (
               <TabExpedientesRelacionados
                 expedienteId={id!}

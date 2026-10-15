@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { SidebarContext } from "../layouts/DashboardLayout";
-import {
+import { Landmark,
   Edit3, Loader2, AlertCircle,
   Mail, Phone, MapPin, User, Briefcase,
   Calendar, Hash, FileText, Shield, StickyNote,
@@ -154,6 +154,14 @@ function TabPerfil({ client, formatDate, age }: any) {
         <Field label="Teléfono 3" value={client.phone_3} />
         <Field label="Fax"        value={client.phone_fax} />
         <Field label="Web"        value={client.website} />
+      </Section>
+
+      <Section title="Datos bancarios y referencia" icon={Landmark}>
+        <Field label="IBAN"                       value={client.iban} />
+        <Field label="BIC / SWIFT"                value={client.bic} />
+        <Field label="Nº mandato SEPA"            value={client.mandato_numero} />
+        <Field label="Fecha mandato"              value={formatDate(client.mandato_fecha)} />
+        <Field label="Referencia del cliente"     value={client.referencia_cliente} />
       </Section>
 
       <Section title="Administración" icon={Shield}>
@@ -3943,6 +3951,11 @@ export default function ClientDetail() {
       lopd: client.lopd || "",
       commercial_communications: client.commercial_communications || "",
       center: client.center || "",
+      iban: client.iban || "",
+      bic: client.bic || "",
+      mandato_numero: client.mandato_numero || "",
+      mandato_fecha: client.mandato_fecha ? String(client.mandato_fecha).slice(0, 10) : "",
+      referencia_cliente: client.referencia_cliente || "",
     });
     setEditing(true);
     setActiveTab("perfil");
@@ -4010,6 +4023,11 @@ export default function ClientDetail() {
       lopd: client.lopd || "",
       commercial_communications: client.commercial_communications || "",
       center: client.center || "",
+      iban: client.iban || "",
+      bic: client.bic || "",
+      mandato_numero: client.mandato_numero || "",
+      mandato_fecha: client.mandato_fecha ? String(client.mandato_fecha).slice(0, 10) : "",
+      referencia_cliente: client.referencia_cliente || "",
     });
     setEditing(true);
     setActiveTab("perfil");
@@ -4259,6 +4277,21 @@ export default function ClientDetail() {
                       <EF label="Teléfono 3"><input value={editForm.phone_3} onChange={e => setEF("phone_3", e.target.value)} className={EI} /></EF>
                       <EF label="Fax"><input value={editForm.phone_fax} onChange={e => setEF("phone_fax", e.target.value)} className={EI} /></EF>
                       <EF label="Web"><input value={editForm.website} onChange={e => setEF("website", e.target.value)} className={EI} placeholder="https://…" /></EF>
+                    </div>
+                  </div>
+
+                  {/* Datos bancarios y referencia (salen en las plantillas) */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <Landmark size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Datos bancarios y referencia</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <EF label="IBAN"><input value={editForm.iban} onChange={e => setEF("iban", e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" className={EI} /></EF>
+                      <EF label="BIC / SWIFT"><input value={editForm.bic} onChange={e => setEF("bic", e.target.value)} className={EI} /></EF>
+                      <EF label="Referencia del cliente"><input value={editForm.referencia_cliente} onChange={e => setEF("referencia_cliente", e.target.value)} className={EI} /></EF>
+                      <EF label="Nº mandato SEPA"><input value={editForm.mandato_numero} onChange={e => setEF("mandato_numero", e.target.value)} className={EI} /></EF>
+                      <EF label="Fecha mandato"><input type="date" value={editForm.mandato_fecha} onChange={e => setEF("mandato_fecha", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>
 

@@ -9,6 +9,10 @@ import {
   subirPlantilla, importarIntegradas, proveedoresConectados, olvidarListado, carpetasDrive, elegirCarpetaDrive,
 } from '../services/plantillasNube';
 import { driveTieneLectura } from '../utils/googleDrive';
+import pool from '../config/database';
+import { requireModulePermission } from '../middleware/requireModulePermission';
+import { CATALOGO_CAMPOS_MN } from '../data/catalogoCamposMN';
+import { guardarValores, etiquetaDe } from '../services/plantillasDatos';
 
 // Ajustes → Mi Despacho → Plantillas (ver services/plantillasNube).
 const router = Router();
@@ -117,6 +121,59 @@ router.post('/importar-integradas', requireAuth, soloGestor, async (req: any, re
   importarIntegradas(req.organizacionId, root).catch((e) => console.error('[plantillas] importar:', e?.message));
   logActivityForReq(req, 'Plantillas del despacho: importación de las integradas iniciada', 'ORGANIZACION', req.organizacionId).catch(() => {});
   res.json({ success: true });
+});
+
+// ── Datos para documentos de un expediente ─────────────────────────────────
+// Los datos propios del asunto que Vantia no guarda en otro sitio (fichas
+// WIZINK, cláusulas, recursos, campos libres...): se rellenan una vez en el
+// expediente y los usan todas sus plantillas (tabla plantillas_valores).
+async function expedienteDeLaOrg(req: any): Promise<string | null> {
+  const id = String(req.params.id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const { rows } = await pool.query(`SELECT id FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
+  return rows[0]?.id || null;
+}
+
+router.get('/datos/:id', requireAuth, requireModulePermission('expedientes'), async (req: any, res: Response) => {
+  try {
+    const id = await expedienteDeLaOrg(req);
+    if (!id) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
+    const { rows } = await pool.query(
+      `SELECT clave, valor, updated_at FROM plantillas_valores WHERE organizacion_id = $1 AND expediente_id = $2`,
+      [req.organizacionId, id],
+    );
+    // Campos que este despacho ya ha usado en otros expedientes (sugerencias)
+    const { rows: usados } = await pool.query(
+      `SELECT DISTINCT clave FROM plantillas_valores WHERE organizacion_id = $1 AND expediente_id IS NOT NULL`, [req.organizacionId],
+    );
+    const enCatalogo = new Set(CATALOGO_CAMPOS_MN.map((c) => c.clave));
+    const extra = [...new Set([...rows.map((r) => r.clave), ...usados.map((r) => r.clave)])]
+      .filter((k) => !enCatalogo.has(k))
+      .map((k) => ({ grupo: 'Otros datos del expediente', etiqueta: etiquetaDe(k).replace(/_/g, ' '), nombre: k, clave: k }));
+    res.json({
+      success: true,
+      data: {
+        campos: [...CATALOGO_CAMPOS_MN, ...extra],
+        valores: Object.fromEntries(rows.map((r) => [r.clave, r.valor])),
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message });
+  }
+});
+
+router.put('/datos/:id', requireAuth, requireModulePermission('expedientes'), async (req: any, res: Response) => {
+  try {
+    const id = await expedienteDeLaOrg(req);
+    if (!id) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
+    const valores = req.body?.valores && typeof req.body.valores === 'object' ? req.body.valores : {};
+    const n = Object.keys(valores).length;
+    if (!n || n > 500) return res.status(400).json({ success: false, error: 'Nada que guardar.' });
+    await guardarValores(req.organizacionId, id, req.auth?.userId || '', valores);
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo guardar.' });
+  }
 });
 
 export default router;

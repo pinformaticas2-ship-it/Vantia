@@ -20,7 +20,8 @@ type Persona = Partial<{
   telefono: string; movil: string; email: string; colegiado: string; tipo: string; pais: string; nacimiento: string;
   telefono2: string; telefono3: string; fax: string; web: string; nacionalidad: string; sexo: string;
   alta: string; baja: string; estado: string; numero: string; comercial: string; notas: string;
-  iban: string;     // despacho: cuenta de Facturación / Quipu
+  iban: string;     // despacho: cuenta de Facturación / Quipu; cliente: su ficha
+  bic: string; mandato: string; fechaMandato: string; referencia: string;
   cuenta: string;   // procurador: cuenta de consignaciones (Directorio)
 }>;
 
@@ -135,7 +136,11 @@ function campoPersona(p: Persona, resto: string): string | undefined {
     if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) e--;
     return String(e);
   }
-  if (es(r, 'CODIGO_DE_CUENTA_IBAN', 'IBAN')) return p.iban;
+  if (es(r, 'CODIGO_DE_CUENTA_IBAN', 'IBAN', 'CODIGO_DE_CUENTA_IBAN_CIFRADO')) return p.iban;
+  if (es(r, 'CODIGO_BIC_SWIFT', 'BIC', 'SWIFT')) return p.bic;
+  if (es(r, 'NUMERO_MANDATO', 'NMANDATO', 'MANDATO')) return p.mandato;
+  if (es(r, 'FECHA_MANDATO')) return p.fechaMandato ? fechaCorta(p.fechaMandato) : p.fechaMandato;
+  if (es(r, 'REF_CLIENTE', 'REFERENCIA_CLIENTE', 'REFERENCIA')) return p.referencia;
   if (es(r, 'CCC_PROCURADOR', 'CUENTA_CONSIGNACIONES', 'CCC')) return p.cuenta;
   if (es(r, 'NUMERO_CLIENTE', 'NUM_CLIENTE')) return p.numero;
   if (es(r, 'ESTADO')) return p.estado;
@@ -178,6 +183,7 @@ function campoExpediente(exp: any, resto: string, ctx?: Contexto): string | unde
   if (es(r, 'ETAPA', 'FASE_PROCEDIMIENTO', 'FASE')) return exp.etapa || '';
   if (es(r, 'USUARIO')) return exp.abogado_propio || '';
   if (es(r, 'CENTRO')) return exp.centro || '';
+  if (es(r, 'REF_CLIENTE', 'REFERENCIA_CLIENTE')) return ctx?.cliente.referencia ?? '';
   if (es(r, 'TOTAL_COBRO', 'TOTAL_COBROS', 'TOTAL_COBRADO')) return ctx?.totalCobrado != null ? euros(ctx.totalCobrado) : '';
   if (r === 'NOTAS' || es(r, 'COMENTARIOS', 'OBSERVACIONES')) return exp.observaciones || '';
   return undefined;
@@ -272,6 +278,8 @@ function personaDe(r: any, nombreTexto?: string | null): Persona {
     numero: r.internal_number != null ? String(r.internal_number) : '',
     notas: r.observaciones || r.notes || '',
     cuenta: r.cuenta_consignaciones || '',
+    iban: r.iban || '', bic: r.bic || '', mandato: r.mandato_numero || '',
+    fechaMandato: r.mandato_fecha || '', referencia: r.referencia_cliente || '',
   };
 }
 
