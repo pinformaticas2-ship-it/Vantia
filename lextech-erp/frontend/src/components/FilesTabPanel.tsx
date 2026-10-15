@@ -16,6 +16,7 @@ import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 import { aviso } from "../lib/avisos";
+import RellenarPlantilla from './RellenarPlantilla';
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -104,6 +105,8 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   // Preview panel de plantillas
   const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
+  // Paso "revisar datos" para rellenar la plantilla con los datos del expediente o del cliente.
+  const [rellenando, setRellenando] = useState(false);
   const [tplPreviewHtml, setTplPreviewHtml] = useState<string | null>(null);
   const [tplPreviewUrl, setTplPreviewUrl] = useState<string | null>(null);
   const [tplPreviewMime, setTplPreviewMime] = useState<string | null>(null);
@@ -770,6 +773,27 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
     setEditAttachmentType('Sin clasificar');
   };
 
+  // ── Documento generado con "Usar y autorrellenar": se adjunta directamente ──
+  const adjuntarGenerado = async (archivo: File) => {
+    const token = await getToken({ skipCache: true });
+    const fd = new FormData();
+    fd.append('files', archivo);
+    const res = await fetch(`/api/files/${entityId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
+    if (!res.ok) throw new Error('No se pudo adjuntar el documento.');
+    const data = await res.json().catch(() => null);
+    const fileId = data?.data?.[0]?.id;
+    if (fileId) {
+      await fetch(`/api/files/${entityId}/${fileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ document_name: archivo.name.replace(/\.[^/.]+$/, ''), attachment_type: 'Sin clasificar' }),
+      }).catch(() => {});
+    }
+    await loadFiles();
+    setRellenando(false);
+    setShowTemplates(false);
+  };
+
   // ── Adjuntar plantilla de DocPlant (después de ingresar nombre y tipo) ────
   const downloadDocPlantTemplate = async () => {
     if (!pendingTemplate) return;
@@ -1417,7 +1441,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                   return (
                                     <button
                                       key={f.path}
-                                      onClick={() => loadTplPreview(f)}
+                                      onClick={() => { setRellenando(false); loadTplPreview(f); }}
                                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${isSelected ? 'bg-red-50 text-red-700' : 'hover:bg-neutral-50 text-neutral-600'}`}
                                     >
                                       <span className="shrink-0 text-xs">{f.ext === '.docx' ? '📝' : '📄'}</span>
@@ -1450,14 +1474,39 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                           <span className="text-xs font-semibold text-slate-700 truncate">{selectedTpl.name}</span>
                           <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">{selectedTpl.ext}</span>
                         </div>
-                        <button
-                          onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
-                          className="shrink-0 ml-3 flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg active:scale-95 transition-all"
-                        >
-                          <Download size={12} /> Seleccionar
-                        </button>
+                        <div className="shrink-0 ml-3 flex items-center gap-2">
+                          <button
+                            onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
+                            title="Adjuntarla tal cual, sin rellenar"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg active:scale-95 transition-all"
+                          >
+                            <Download size={12} /> Usar tal cual
+                          </button>
+                          {/\.docx?$/i.test(selectedTpl.name) && (
+                            <button
+                              onClick={() => setRellenando(true)}
+                              title={entityType === 'expediente' ? 'Rellenarla con los datos de este expediente' : 'Rellenarla con los datos de este cliente'}
+                              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95 transition-all"
+                            >
+                              <Sparkles size={12} /> Usar y autorrellenar
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {/* Preview content */}
+                      {/* Preview content (o el paso de revisar datos) */}
+                      {rellenando ? (
+                        <div className="flex-1 min-h-0 flex flex-col p-4 bg-white">
+                          <RellenarPlantilla
+                            key={selectedTpl.path}
+                            path={selectedTpl.path}
+                            nombre={selectedTpl.name}
+                            expedienteId={entityType === 'expediente' ? entityId : undefined}
+                            clienteId={entityType === 'expediente' ? undefined : entityId}
+                            onVolver={() => setRellenando(false)}
+                            onGenerado={adjuntarGenerado}
+                          />
+                        </div>
+                      ) : (
                       <div className="flex-1 overflow-hidden relative">
                         {tplPreviewLoading ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -1480,6 +1529,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                           />
                         ) : null}
                       </div>
+                      )}
                     </>
                   )}
                 </div>

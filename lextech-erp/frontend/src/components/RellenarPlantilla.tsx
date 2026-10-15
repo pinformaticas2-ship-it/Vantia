@@ -27,10 +27,12 @@ const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
   vacio: { label: 'Falta', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
 };
 
-export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver, onGenerado, generar: generarFuera, textoBoton = 'Generar documento' }: {
+export default function RellenarPlantilla({ path, nombre, expedienteId, clienteId, onVolver, onGenerado, generar: generarFuera, textoBoton = 'Generar documento' }: {
   path: string;
   nombre: string;
-  expedienteId: string;
+  /** De qué se sacan los datos: un expediente o, desde la ficha del cliente, un cliente. */
+  expedienteId?: string;
+  clienteId?: string;
   onVolver: () => void;
   onGenerado?: (archivo: File) => Promise<void> | void;
   /** Si se pasa, genera y guarda quien llama (p. ej. los documentos base del expediente). */
@@ -51,7 +53,8 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
     (async () => {
       try {
         const token = await getToken({ skipCache: true });
-        const res = await fetch(`/api/files/templates/campos?path=${encodeURIComponent(path)}&expedienteId=${encodeURIComponent(expedienteId)}`, {
+        const de = expedienteId ? `expedienteId=${encodeURIComponent(expedienteId)}` : `clienteId=${encodeURIComponent(clienteId || '')}`;
+        const res = await fetch(`/api/files/templates/campos?path=${encodeURIComponent(path)}&${de}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const d = await safeJson(res);
@@ -63,7 +66,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
       } catch (e: any) { if (vivo) setError(e?.message || 'No se pudo leer la plantilla.'); }
     })();
     return () => { vivo = false; };
-  }, [path, expedienteId, getToken]);
+  }, [path, expedienteId, clienteId, getToken]);
 
   const rellenos = useMemo(() => (campos || []).filter((c) => (valores[c.clave] || '').trim()).length, [campos, valores]);
   const grupos = useMemo(() => {
@@ -90,7 +93,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
       const res = await fetch('/api/files/templates/generar', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, expedienteId, valores: enviar }),
+        body: JSON.stringify({ path, expedienteId, clienteId, valores: enviar }),
       });
       if (!res.ok) { const d = await safeJson(res); throw new Error(d?.error || 'No se pudo generar el documento.'); }
       const blob = await res.blob();
@@ -98,7 +101,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
       await onGenerado?.(archivo);
-      aviso.ok('Documento generado y adjuntado a la actuación');
+      aviso.ok('Documento generado con los datos y adjuntado');
     } catch (e: any) {
       aviso.error(e?.message || 'No se pudo generar el documento.');
     } finally { setGenerando(false); }

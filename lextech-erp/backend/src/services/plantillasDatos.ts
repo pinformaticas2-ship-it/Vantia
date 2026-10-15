@@ -202,14 +202,23 @@ async function delDirectorio(organizacionId: string, tipos: string[], nombre?: s
   return rows[0] || null;
 }
 
-export async function contextoPlantilla(organizacionId: string, expedienteId?: string | null): Promise<Contexto> {
+/** Con expediente: todo. Sin expediente pero con cliente (plantilla usada
+ *  desde la ficha del cliente): los datos del despacho y del cliente. */
+export async function contextoPlantilla(organizacionId: string, expedienteId?: string | null, clienteId?: string | null): Promise<Contexto> {
   const { rows: org } = await pool.query(`SELECT nombre, nif_cif, direccion_fiscal FROM organizaciones WHERE id = $1`, [organizacionId]);
   const o = org[0] || {};
   const ctx: Contexto = {
     org: { nombre: o.nombre || '', nif: o.nif_cif || '', ...partirDireccion(o.direccion_fiscal) },
     exp: null, cliente: {}, contrario: {}, juzgado: {}, procurador: {}, procuradorContrario: {}, abogado: {}, abogadoContrario: {},
   };
-  if (!expedienteId) return ctx;
+  if (!expedienteId) {
+    if (clienteId) {
+      const { rows: c } = await pool.query(`SELECT * FROM entities WHERE id = $1 AND organizacion_id = $2`, [clienteId, organizacionId]);
+      if (c[0]) ctx.cliente = personaDe(c[0]);
+      (ctx as any).clienteEncontrado = Boolean(c[0]);
+    }
+    return ctx;
+  }
   const { rows } = await pool.query(`SELECT * FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, organizacionId]);
   const exp = rows[0];
   if (!exp) return ctx;
@@ -250,6 +259,7 @@ export async function guardarValores(organizacionId: string, expedienteId: strin
     if (!clave) continue;
     const valor = String(valorBruto ?? '').slice(0, 5000);
     const exp = esDeDespacho(nombre) ? null : expedienteId;
+    if (!esDeDespacho(nombre) && !expedienteId) continue;
     if (!valor.trim()) {
       await pool.query(
         `DELETE FROM plantillas_valores WHERE organizacion_id = $1 AND clave = $2 AND expediente_id IS NOT DISTINCT FROM $3`,

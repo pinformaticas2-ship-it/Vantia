@@ -14,6 +14,11 @@ import { logActivityForReq } from './activityController';
 
 const ORDEN_GRUPOS = ['Expediente', 'Cliente', 'Contrario', 'Juzgado', 'Procurador', 'Procurador contrario', 'Abogado', 'Abogado contrario', 'Despacho', 'Otros'];
 
+function clienteDeLaPeticion(req: any): string | null {
+  const id = String(req.query.clienteId || req.body?.clienteId || '').trim();
+  return /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+}
+
 async function expedienteDeLaOrg(req: any): Promise<string | null> {
   const id = String(req.query.expedienteId || req.body?.expedienteId || '').trim();
   return /^[0-9a-f-]{36}$/i.test(id) ? id : null;
@@ -26,8 +31,10 @@ export const camposPlantilla = async (req: any, res: Response) => {
     const expedienteId = await expedienteDeLaOrg(req);
     const docx = await leerComoDocx(ruta);
     const nombres = camposDePlantilla(docx);
-    const ctx = await contextoPlantilla(req.organizacionId, expedienteId);
+    const clienteId = expedienteId ? null : clienteDeLaPeticion(req);
+    const ctx = await contextoPlantilla(req.organizacionId, expedienteId, clienteId);
     if (expedienteId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
+    if (clienteId && !(ctx as any).clienteEncontrado) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
     const campos = nombres.map((nombre) => {
       const clave = claveCanonica(nombre);
@@ -56,8 +63,10 @@ export const generarPlantilla = async (req: any, res: Response) => {
   if (!ruta) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
   try {
     const expedienteId = await expedienteDeLaOrg(req);
-    const ctx = await contextoPlantilla(req.organizacionId, expedienteId);
+    const clienteId = expedienteId ? null : clienteDeLaPeticion(req);
+    const ctx = await contextoPlantilla(req.organizacionId, expedienteId, clienteId);
     if (expedienteId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
+    if (clienteId && !(ctx as any).clienteEncontrado) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const docx = await leerComoDocx(ruta);
     const nombres = camposDePlantilla(docx);
     const enviados: Record<string, string> = req.body?.valores && typeof req.body.valores === 'object' ? req.body.valores : {};
@@ -82,6 +91,8 @@ export const generarPlantilla = async (req: any, res: Response) => {
     const nombreArchivo = path.basename(ruta).replace(/\.docx?$/i, '') + '.docx';
     if (expedienteId) {
       logActivityForReq(req, `Documento generado desde la plantilla «${path.basename(ruta)}»`, 'EXPEDIENTE', expedienteId).catch(() => {});
+    } else if (clienteId) {
+      logActivityForReq(req, `Documento generado desde la plantilla «${path.basename(ruta)}»`, 'CLIENT', clienteId).catch(() => {});
     }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(nombreArchivo)}`);
