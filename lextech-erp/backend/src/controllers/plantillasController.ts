@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import path from 'path';
-import { resolverPlantilla } from './filesController';
+import { rutaPlantillaOrg, nombrePlantillaOrg } from './filesController';
 import { camposDePlantilla, rellenarPlantilla, leerComoDocx, claveCanonica } from '../services/plantillasWord';
 import { contextoPlantilla, valorVantia, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho } from '../services/plantillasDatos';
 import { logActivityForReq } from './activityController';
@@ -25,7 +25,7 @@ async function expedienteDeLaOrg(req: any): Promise<string | null> {
 }
 
 export const camposPlantilla = async (req: any, res: Response) => {
-  const ruta = resolverPlantilla(req.query.path as string | undefined);
+  const ruta = await rutaPlantillaOrg(req.organizacionId, req.query.path as string | undefined);
   if (!ruta) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
   try {
     const expedienteId = await expedienteDeLaOrg(req);
@@ -59,7 +59,7 @@ export const camposPlantilla = async (req: any, res: Response) => {
 };
 
 export const generarPlantilla = async (req: any, res: Response) => {
-  const ruta = resolverPlantilla(req.body?.path);
+  const ruta = await rutaPlantillaOrg(req.organizacionId, req.body?.path);
   if (!ruta) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
   try {
     const expedienteId = await expedienteDeLaOrg(req);
@@ -88,11 +88,12 @@ export const generarPlantilla = async (req: any, res: Response) => {
     if (Object.keys(aGuardar).length) await guardarValores(req.organizacionId, expedienteId, req.auth?.userId || '', aGuardar);
 
     const salida = rellenarPlantilla(docx, valores);
-    const nombreArchivo = path.basename(ruta).replace(/\.docx?$/i, '') + '.docx';
+    const nombreTpl = await nombrePlantillaOrg(req.organizacionId, req.body.path);
+    const nombreArchivo = nombreTpl.replace(/\.docx?$/i, '') + '.docx';
     if (expedienteId) {
-      logActivityForReq(req, `Documento generado desde la plantilla «${path.basename(ruta)}»`, 'EXPEDIENTE', expedienteId).catch(() => {});
+      logActivityForReq(req, `Documento generado desde la plantilla «${nombreTpl}»`, 'EXPEDIENTE', expedienteId).catch(() => {});
     } else if (clienteId) {
-      logActivityForReq(req, `Documento generado desde la plantilla «${path.basename(ruta)}»`, 'CLIENT', clienteId).catch(() => {});
+      logActivityForReq(req, `Documento generado desde la plantilla «${nombreTpl}»`, 'CLIENT', clienteId).catch(() => {});
     }
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(nombreArchivo)}`);

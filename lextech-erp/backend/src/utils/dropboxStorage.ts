@@ -29,7 +29,7 @@ export async function clearDropboxError(organizacionId: string): Promise<void> {
   ).catch(() => {});
 }
 
-async function dropboxRpc(organizacionId: string, path: string, body: Record<string, any>): Promise<any> {
+export async function dropboxRpc(organizacionId: string, path: string, body: Record<string, any>): Promise<any> {
   const token = await getDropboxAccessToken(organizacionId);
   const res = await fetch(`${DROPBOX_API}${path}`, {
     method: 'POST',
@@ -47,7 +47,7 @@ async function dropboxRpc(organizacionId: string, path: string, body: Record<str
 // Dropbox no tiene "buscar por nombre y crear si no existe" en una sola
 // llamada: create_folder_v2 falla con path/conflict/folder si ya existe --
 // eso es justo la señal de "ya está, sigue" (idempotente).
-async function ensureFolder(organizacionId: string, path: string): Promise<void> {
+export async function ensureFolder(organizacionId: string, path: string): Promise<void> {
   try {
     await dropboxRpc(organizacionId, '/files/create_folder_v2', { path, autorename: false });
   } catch (e: any) {

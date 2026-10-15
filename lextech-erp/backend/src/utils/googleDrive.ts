@@ -105,7 +105,7 @@ export async function getDriveAccessToken(organizacionId: string): Promise<strin
   return tokenData.access_token;
 }
 
-async function driveFetch(organizacionId: string, path: string, init?: RequestInit): Promise<Response> {
+export async function driveFetch(organizacionId: string, path: string, init?: RequestInit): Promise<Response> {
   const token = await getDriveAccessToken(organizacionId);
   return fetch(`${DRIVE_API}${path}`, {
     ...init,
@@ -113,7 +113,7 @@ async function driveFetch(organizacionId: string, path: string, init?: RequestIn
   });
 }
 
-async function findFolder(organizacionId: string, name: string, parentId: string | null): Promise<string | null> {
+export async function findFolder(organizacionId: string, name: string, parentId: string | null): Promise<string | null> {
   const q = [
     `name = '${name.replace(/'/g, "\\'")}'`,
     `mimeType = 'application/vnd.google-apps.folder'`,
@@ -126,7 +126,7 @@ async function findFolder(organizacionId: string, name: string, parentId: string
   return data.files?.[0]?.id || null;
 }
 
-async function createFolder(organizacionId: string, name: string, parentId: string | null): Promise<string> {
+export async function createFolder(organizacionId: string, name: string, parentId: string | null): Promise<string> {
   const res = await driveFetch(organizacionId, '/files?fields=id', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

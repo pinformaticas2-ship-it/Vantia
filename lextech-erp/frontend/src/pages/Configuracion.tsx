@@ -13,6 +13,7 @@ import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api'
 import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
+import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, IntegracionesPropias } from '../components/AjustesPaneles';
@@ -2352,7 +2353,7 @@ export default function Configuracion() {
           ) : activeSection === 'manual' ? (
             <ManualPanel />
           ) : activeSection === 'despacho' ? (
-            <DespachoPanel />
+            <><DespachoPanel /><PlantillasNubeConfig /></>
           ) : activeSection === 'perfil' ? (
             <PerfilPanel />
           ) : activeSection === 'preferencias' ? (

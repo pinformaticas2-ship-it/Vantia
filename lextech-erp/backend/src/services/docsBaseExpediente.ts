@@ -1,6 +1,7 @@
 import path from 'path';
 import pool from '../config/database';
-import { resolverPlantilla, saveExpedienteAttachmentFromBuffer } from '../controllers/filesController';
+import { rutaPlantillaOrg, nombrePlantillaOrg, saveExpedienteAttachmentFromBuffer } from '../controllers/filesController';
+import { configPlantillas, usaNube, listarPlantillasNube } from './plantillasNube';
 import { leerComoDocx, camposDePlantilla, rellenarPlantilla, claveCanonica } from './plantillasWord';
 import { contextoPlantilla, valorVantia, valoresGuardados } from './plantillasDatos';
 
@@ -44,6 +45,28 @@ export function plantillaPara(tipo: TipoDocBase, exp: any): string {
   return 'Facturas/HOJA DE ENCARGO ASUNTO CIVIL.doc';
 }
 
+const PALABRA_CLAVE: Record<TipoDocBase, RegExp> = {
+  lopd: /lopd|proteccion de datos|consentimiento/,
+  toma_requisitos: /toma de requisitos/,
+  hoja_encargo: /hoja de encargo/,
+};
+
+/** Plantilla para esta organización: la integrada que toca o, si el despacho
+ *  tiene su carpeta en la nube, la de mismo nombre allí (o la más parecida). */
+export async function elegirPlantilla(organizacionId: string, tipo: TipoDocBase, exp: any): Promise<string | null> {
+  const integrada = plantillaPara(tipo, exp);
+  if (!usaNube(await configPlantillas(organizacionId))) return integrada;
+  const lista = await listarPlantillasNube(organizacionId);
+  const nombre = norm(path.basename(integrada));
+  const exacta = lista.find((p) => norm(p.nombre) === nombre);
+  if (exacta) return exacta.ref;
+  // Por palabras: "hoja de encargo" + el tipo de asunto si aparece en el nombre.
+  const candidatas = lista.filter((p) => PALABRA_CLAVE[tipo].test(norm(p.nombre)));
+  const pista = norm(path.basename(integrada)).replace(/\.docx?$/, '').split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+  candidatas.sort((a, b) => pista.filter((w) => norm(b.nombre).includes(w)).length - pista.filter((w) => norm(a.nombre).includes(w)).length);
+  return candidatas[0]?.ref || null;
+}
+
 export async function docsBaseActivos(organizacionId: string): Promise<boolean> {
   const { rows } = await pool.query(`SELECT docs_base_config FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
   return Boolean(rows[0]?.docs_base_config?.activo);
@@ -57,9 +80,10 @@ export async function generarDocBase(opts: {
   const { organizacionId, expedienteId, tipo, userId } = opts;
   const ctx = await contextoPlantilla(organizacionId, expedienteId);
   if (!ctx.exp) throw new Error('Expediente no encontrado.');
-  const rel = opts.plantilla || plantillaPara(tipo, ctx.exp);
-  const ruta = resolverPlantilla(rel);
-  if (!ruta) throw new Error(`No se encuentra la plantilla «${rel}».`);
+  const rel = opts.plantilla || (await elegirPlantilla(organizacionId, tipo, ctx.exp));
+  if (!rel) throw new Error('No hay ninguna plantilla para este documento en la carpeta de plantillas del despacho.');
+  const ruta = await rutaPlantillaOrg(organizacionId, rel);
+  if (!ruta) throw new Error(`No se encuentra la plantilla «${await nombrePlantillaOrg(organizacionId, rel)}».`);
 
   const docx = await leerComoDocx(ruta);
   const nombres = camposDePlantilla(docx);
@@ -122,18 +146,19 @@ export async function estadoDocsBase(organizacionId: string, expedienteId: strin
     [expedienteId, organizacionId],
   );
   const { rows: exp } = await pool.query(`SELECT * FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, organizacionId]);
-  return DOCS_BASE.map(({ tipo, nombre }) => {
+  return Promise.all(DOCS_BASE.map(async ({ tipo, nombre }) => {
     const r = rows.find((x) => x.tipo === tipo);
+    const plantilla = r?.plantilla || (await elegirPlantilla(organizacionId, tipo, exp[0]).catch(() => null)) || '';
     return {
       tipo, nombre,
       estado: r?.estado || 'pendiente',
-      plantilla: r?.plantilla || plantillaPara(tipo, exp[0]),
-      plantillaNombre: path.basename(r?.plantilla || plantillaPara(tipo, exp[0])),
+      plantilla,
+      plantillaNombre: plantilla ? await nombrePlantillaOrg(organizacionId, plantilla) : 'Sin plantilla',
       fileId: r?.file_id || null,
       archivo: r?.document_name || r?.original_name || null,
       pendientes: r?.pendientes ?? null,
       error: r?.error || null,
       generadoAt: r?.generado_at || null,
     };
-  });
+  }));
 }

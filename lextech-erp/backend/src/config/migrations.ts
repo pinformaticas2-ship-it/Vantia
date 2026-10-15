@@ -2458,6 +2458,8 @@ export async function runMigrations(): Promise<void> {
     // tiene activada la automatización (ver services/docsBaseExpediente).
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS docs_base_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      // Carpeta de plantillas del despacho en su nube (ver services/plantillasNube).
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS plantillas_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS expediente_docs_base (
           id               BIGSERIAL    PRIMARY KEY,

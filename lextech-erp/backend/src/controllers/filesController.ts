@@ -6,6 +6,7 @@ import AdmZip = require('adm-zip');
 import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, DATA_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
+import { configPlantillas, usaNube, listarPlantillasNube, rutaLocalPlantillaNube } from '../services/plantillasNube';
 import {
   isDriveConnected,
   ensureExpedienteFolder,
@@ -2182,7 +2183,7 @@ export { ensureClientDir, UPLOADS_ROOT };
 // DocPlant está en la raíz del backend (junto a package.json).
 // Usamos __dirname (dist/controllers/) → ../../DocPlant para ser
 // independientes del CWD que Railway pueda establecer.
-function getDocPlantRoot() {
+export function getDocPlantRoot() {
   const candidates = [
     process.env.DOCPLANT_PATH ? path.resolve(process.env.DOCPLANT_PATH) : null,
     path.resolve(__dirname, '../DocPlant'),    // dist/controllers → dist/DocPlant (nixpacks cp)
@@ -2278,15 +2279,8 @@ export const previewTemplateAsHtml = async (req: any, res: Response) => {
   const relPath = req.query.path as string | undefined;
   if (!relPath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
 
-  const { root } = getDocPlantRoot();
-  const resolved = path.resolve(root, relPath);
-  const docplantRoot = path.resolve(root);
-  if (!resolved.startsWith(docplantRoot + path.sep) && resolved !== docplantRoot) {
-    return res.status(403).json({ success: false, error: 'Acceso denegado.' });
-  }
-  if (!fs.existsSync(resolved)) {
-    return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
-  }
+  const resolved = await rutaPlantillaOrg(req.organizacionId, relPath);
+  if (!resolved) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
 
   const { execFile } = require('child_process');
   const ext = path.extname(resolved).toLowerCase();
@@ -2941,8 +2935,21 @@ export async function migrateLocalFoldersStructure(): Promise<void> {
 }
 
 // GET /api/files/templates
-export const listTemplates = (_req: any, res: Response) => {
+export const listTemplates = async (req: any, res: Response) => {
   try {
+    // Con carpeta propia en la nube, solo las suyas (ver services/plantillasNube).
+    const cfg = await configPlantillas(req.organizacionId);
+    if (usaNube(cfg)) {
+      const lista = await listarPlantillasNube(req.organizacionId, req.query.refrescar === '1');
+      const porCarpeta = new Map<string, TemplateFile[]>();
+      for (const p of lista) {
+        const key = p.carpeta ? p.carpeta.split('/')[0] : 'General';
+        if (!porCarpeta.has(key)) porCarpeta.set(key, []);
+        porCarpeta.get(key)!.push({ name: p.nombre, path: p.ref, ext: p.ext });
+      }
+      const folders = [...porCarpeta].map(([name, files]) => ({ name, files: files.sort((a, b) => a.name.localeCompare(b.name, 'es')) }));
+      return res.json({ success: true, data: folders.sort((a, b) => a.name.localeCompare(b.name, 'es')), origen: cfg.proveedor });
+    }
     const { root, candidates } = getDocPlantRoot();
     if (!fs.existsSync(root)) {
       return res.json({ success: true, data: [], warning: `DocPlant no encontrado en: ${root}. Candidatos: ${candidates.join(' | ')}` });
@@ -2969,15 +2976,8 @@ export const previewTemplateAsPdf = async (req: any, res: Response) => {
   const relPath = req.query.path as string | undefined;
   if (!relPath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
 
-  const { root } = getDocPlantRoot();
-  const resolved = path.resolve(root, relPath);
-  const docplantRoot = path.resolve(root);
-  if (!resolved.startsWith(docplantRoot + path.sep) && resolved !== docplantRoot) {
-    return res.status(403).json({ success: false, error: 'Acceso denegado.' });
-  }
-  if (!fs.existsSync(resolved)) {
-    return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
-  }
+  const resolved = await rutaPlantillaOrg(req.organizacionId, relPath);
+  if (!resolved) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
 
   const ext = path.extname(resolved).toLowerCase();
   if (ext !== '.doc' && ext !== '.docx') {
@@ -3117,8 +3117,25 @@ sys.exit(1)
   }
 };
 
+/** Ruta local de una plantilla para esta organización: de su carpeta en la
+ *  nube ("nube:<id>", descargada a caché) o, si no tiene carpeta propia, de
+ *  las integradas (DocPlant). Con carpeta propia, las integradas ya no valen. */
+export async function rutaPlantillaOrg(organizacionId: string, ref: string | undefined): Promise<string | null> {
+  if (!ref) return null;
+  if (ref.startsWith('nube:')) return rutaLocalPlantillaNube(organizacionId, ref).catch(() => null);
+  if (usaNube(await configPlantillas(organizacionId))) return null;
+  return resolverPlantilla(ref);
+}
+
+/** Nombre del archivo de una plantilla, tal como lo ve el despacho. */
+export async function nombrePlantillaOrg(organizacionId: string, ref: string): Promise<string> {
+  if (!ref.startsWith('nube:')) return path.basename(ref);
+  const p = (await listarPlantillasNube(organizacionId).catch(() => [])).find((x) => x.ref === ref);
+  return p?.nombre || 'Plantilla.docx';
+}
+
 /** Ruta absoluta de una plantilla de DocPlant, o null si se sale de la carpeta
- *  o no existe (ver plantillasController). */
+ *  o no existe. */
 export function resolverPlantilla(rel: string | undefined): string | null {
   if (!rel) return null;
   const { root } = getDocPlantRoot();
@@ -3130,18 +3147,11 @@ export function resolverPlantilla(rel: string | undefined): string | null {
 }
 
 // GET /api/files/templates/download?path=...
-export const downloadTemplate = (req: any, res: Response) => {
+export const downloadTemplate = async (req: any, res: Response) => {
   const filePath = req.query.path as string | undefined;
   if (!filePath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
-  const { root } = getDocPlantRoot();
-  const resolved = path.resolve(root, filePath);
-  const normalizedRoot = path.resolve(root);
-  if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
-    return res.status(403).json({ success: false, error: 'Acceso denegado.' });
-  }
-  if (!fs.existsSync(resolved)) {
-    return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
-  }
+  const resolved = await rutaPlantillaOrg(req.organizacionId, filePath);
+  if (!resolved) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
   const ext = path.extname(resolved).toLowerCase();
   const mime = ext === '.docx'
     ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -3216,15 +3226,8 @@ export const downloadMergedTemplate = async (req: any, res: Response) => {
   const filePath = req.query.path as string | undefined;
   const expedienteId = req.query.expedienteId as string | undefined;
   if (!filePath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
-  const { root } = getDocPlantRoot();
-  const resolved = path.resolve(root, filePath);
-  const normalizedRoot = path.resolve(root);
-  if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
-    return res.status(403).json({ success: false, error: 'Acceso denegado.' });
-  }
-  if (!fs.existsSync(resolved)) {
-    return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
-  }
+  const resolved = await rutaPlantillaOrg(req.organizacionId, filePath);
+  if (!resolved) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
   if (path.extname(resolved).toLowerCase() !== '.docx') {
     return res.status(400).json({ success: false, error: 'El autorrelleno solo está disponible para plantillas .docx.' });
   }
