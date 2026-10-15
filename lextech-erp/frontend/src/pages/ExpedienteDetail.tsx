@@ -77,6 +77,7 @@ import { PlazoCalculator } from "../components/PlazoCalculator";
 import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
 import RellenarPlantilla from "../components/RellenarPlantilla";
+import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -2835,13 +2836,13 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <X size={16} />
               </button>
             </div>
-            <div className="grid grid-cols-[320px_1fr] min-h-[480px]">
+            <div className="grid grid-cols-[320px_1fr] h-[min(78vh,720px)]">
               <div className="border-r border-slate-100 p-4 space-y-3">
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} placeholder="Buscar plantilla..." className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
-                <div className="max-h-[380px] overflow-y-auto rounded-2xl border border-slate-200">
+                <div className="max-h-[calc(min(78vh,720px)-100px)] overflow-y-auto rounded-2xl border border-slate-200">
                   {docPlantLoading ? (
                     <div className="p-6 text-sm text-slate-400">Cargando plantillas...</div>
                   ) : filteredFolders.length === 0 ? (
@@ -2875,25 +2876,26 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                     }}
                   />
                 ) : (<>
-                <div className="flex-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-8">
-                  {selectedTpl ? (
-                    <div>
-                      <Sparkles size={22} className="mx-auto mb-3 text-red-300" />
-                      <p className="text-sm font-semibold text-slate-700">{selectedTpl.name}</p>
-                      <p className="mt-1 text-xs text-slate-400">Se anadira como adjunto propio de esta actuacion.</p>
+                {selectedTpl ? (
+                  <div className="flex-1 min-h-0 flex flex-col gap-2">
+                    <p className="text-sm font-semibold text-slate-700 truncate" title={selectedTpl.name}>{selectedTpl.name}</p>
+                    <div className="flex-1 min-h-0">
+                      <VistaPreviaPlantilla key={selectedTpl.path} path={selectedTpl.path} ext={selectedTpl.ext} />
                     </div>
-                  ) : (
+                  </div>
+                ) : (
+                <div className="flex-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-8">
                     <div>
                       <Sparkles size={22} className="mx-auto mb-3 text-slate-300" />
                       <p className="text-sm font-semibold text-slate-700">Selecciona una plantilla</p>
                       <p className="mt-1 text-xs text-slate-400">Eligela en el panel izquierdo para adjuntarla a la actuacion.</p>
                     </div>
-                  )}
                 </div>
+                )}
                 <div className="flex justify-end gap-2 pt-4">
                   <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
                   <button type="button" onClick={() => attachTemplate(false)} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl">Usar tal cual</button>
-                  {!!expedienteId && /.docx?$/i.test(selectedTpl?.name || "") && (
+                  {!!expedienteId && /\.docx?$/i.test(selectedTpl?.name || "") && (
                     <button type="button" onClick={() => setRellenando(true)} disabled={uploading}
                       title="Rellena el cliente, la otra parte, el juzgado, los autos... con los datos de este expediente y te deja revisar y completar el resto"
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">
