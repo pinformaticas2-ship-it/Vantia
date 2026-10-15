@@ -304,3 +304,7 @@ html[data-modo="oscuro"] .erp-org-menu .erp-org-activa { background-color: rgba(
 @media (prefers-reduced-motion: reduce) { .aviso-entra, .aviso-fondo, .aviso-dialogo { animation: none; } }
 
 html input.paleta-input, html input.paleta-input:focus, html[data-modo] input.paleta-input, html[data-modo] input.paleta-input:focus { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; }
+/* Desglose de lo pendiente en otra organización (menú del selector) */
+.erp-org-menu .erp-org-pendiente { color: #dc2626; }
+[data-theme="rojo"] .erp-org-menu .erp-org-pendiente, [data-theme="grafito"] .erp-org-menu .erp-org-pendiente,
+html[data-modo="oscuro"] .erp-org-menu .erp-org-pendiente { color: #fca5a5; }

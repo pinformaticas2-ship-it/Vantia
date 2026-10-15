@@ -25,8 +25,12 @@ import {
   disconnectDropbox,
   updateDocumentStorageSettings,
 } from '../controllers/organizacionesController';
+import { getPendientesOrgs } from '../controllers/pendientesOrgsController';
 
 const router = Router();
+
+// Cuánto hay pendiente en cada organización del usuario (selector de organización).
+router.get('/pendientes', requireAuth, getPendientesOrgs);
 
 router.get('/', requireAuth, getMyOrganizacion);
 router.put('/', requireAuth, updateMyOrganizacion);

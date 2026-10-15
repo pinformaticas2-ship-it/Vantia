@@ -1459,13 +1459,26 @@ function OrgRolChip({ rol, className = "" }: { rol?: string | null; className?: 
   );
 }
 
-function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, onSwitch, onClose }: {
+// Pendientes de cada organización (backend: GET /api/organizacion/pendientes).
+type PendientesOrg = { total: number; chat: number; vistas: number; plazos: number; tareas: number };
+function textoPendientes(p?: PendientesOrg): string {
+  if (!p || !p.total) return "";
+  const partes: string[] = [];
+  if (p.chat) partes.push(`${p.chat} mensaje${p.chat === 1 ? "" : "s"}`);
+  if (p.vistas) partes.push(`${p.vistas} vista${p.vistas === 1 ? "" : "s"} por confirmar`);
+  if (p.plazos) partes.push(`${p.plazos} plazo${p.plazos === 1 ? "" : "s"} próximo${p.plazos === 1 ? "" : "s"}`);
+  if (p.tareas) partes.push(`${p.tareas} tarea${p.tareas === 1 ? "" : "s"} próxima${p.tareas === 1 ? "" : "s"}`);
+  return partes.join(" · ");
+}
+
+function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, onSwitch, onClose, pendientes = {} }: {
   menuRef: React.RefObject<HTMLDivElement>;
   pos: { top: number; left: number; width: number };
   organizaciones: { id: string; nombre: string; logoUrl?: string | null; rol: string }[];
   activaId?: string;
   rolActivo?: string | null;
   onSwitch: (id: string) => void;
+  pendientes?: Record<string, PendientesOrg>;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
@@ -1575,12 +1588,19 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
               <div className="min-w-0 flex-1">
                 <p className={`text-[13px] leading-snug font-semibold line-clamp-2 break-words om-t1`}>{o.nombre}</p>
                 <OrgRolChip rol={o.rol} className="mt-0.5 text-[11px] om-t3" />
+                {!activa && pendientes[o.id]?.total ? (
+                  <p className="erp-org-pendiente mt-0.5 text-[11px] font-medium truncate">{textoPendientes(pendientes[o.id])}</p>
+                ) : null}
               </div>
               {cambiando === o.id ? (
                 <Loader2 size={16} className="shrink-0 animate-spin text-red-600" />
               ) : activa ? (
                 <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
                   <Check size={11} strokeWidth={3} /> Actual
+                </span>
+              ) : pendientes[o.id]?.total ? (
+                <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-[11px] font-bold text-white flex items-center justify-center tabular-nums" title={textoPendientes(pendientes[o.id])}>
+                  {pendientes[o.id].total > 99 ? "99+" : pendientes[o.id].total}
                 </span>
               ) : (
                 <ArrowRight size={15} className={`shrink-0 om-t3 transition-all ${enFoco ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1"}`} />
@@ -1702,6 +1722,31 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { visible: vistasVisible, pendientes: vistasPendientes } = useVistasStatus();
   const { organizacion, organizaciones, rol: orgRol, puede, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  // Lo pendiente en las OTRAS organizaciones (la campana ya cuenta lo de esta).
+  const { getToken: getTokenSidebar } = useAuth();
+  const [pendientesOrgs, setPendientesOrgs] = useState<Record<string, PendientesOrg>>({});
+  useEffect(() => {
+    if (organizaciones.length < 2) return;
+    let vivo = true;
+    const cargar = async () => {
+      try {
+        const token = await getTokenSidebar();
+        if (!token) return;
+        const res = await fetch("/api/organizacion/pendientes", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await safeJson(res);
+        if (vivo && res.ok && Array.isArray(d?.data)) setPendientesOrgs(Object.fromEntries(d.data.map((x: any) => [x.organizacionId, x])));
+      } catch { /* sin conexión: se reintenta en el siguiente ciclo */ }
+    };
+    void cargar();
+    const t = window.setInterval(cargar, 60_000);
+    const alVolver = () => { if (document.visibilityState === "visible") void cargar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { vivo = false; window.clearInterval(t); document.removeEventListener("visibilitychange", alVolver); };
+  }, [organizaciones.length, getTokenSidebar]);
+  const pendientesOtras = organizaciones.filter((o) => o.id !== organizacion?.id).reduce((a, o) => a + (pendientesOrgs[o.id]?.total || 0), 0);
+  const avisoOtras = pendientesOtras > 0
+    ? `${pendientesOtras} aviso${pendientesOtras === 1 ? "" : "s"} pendiente${pendientesOtras === 1 ? "" : "s"} en tus otras organizaciones`
+    : "";
   const orgMenuRef = useRef<HTMLDivElement>(null);
   // El desplegable de la vista colapsada se pinta en un portal (ver más abajo,
   // "erp-company-icon-collapsed") porque el contenedor del sidebar tiene
@@ -1780,7 +1825,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               ref={orgBtnRef}
               type="button"
-              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización` : "Vantia Legis"}
+              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización${avisoOtras ? ` (${avisoOtras})` : ""}` : "Vantia Legis"}
               aria-haspopup="menu"
               aria-expanded={orgMenuOpen}
               onClick={toggleOrgMenu}
@@ -1803,9 +1848,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
                 )}
               </span>
-              {organizaciones.length > 1 && (
-                <span className="erp-company-count absolute -bottom-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center tabular-nums">
-                  {organizaciones.length}
+              {pendientesOtras > 0 && (
+                <span title={avisoOtras} className="erp-company-count absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center tabular-nums">
+                  {pendientesOtras > 99 ? "99+" : pendientesOtras}
                 </span>
               )}
             </button>
@@ -1816,7 +1861,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               ref={orgBtnRef}
               type="button"
-              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización` : "Organización"}
+              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización${avisoOtras ? ` (${avisoOtras})` : ""}` : "Organización"}
               aria-haspopup="menu"
               aria-expanded={orgMenuOpen}
               onClick={toggleOrgMenu}
@@ -1849,12 +1894,17 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 )}
                 <div className="erp-company-sub mt-1 flex items-center gap-1.5 text-[11px] text-slate-400 min-w-0">
                   {orgRol && <OrgRolChip rol={orgRol} className={`erp-company-role erp-company-role-${orgRol} shrink-0 rounded-md px-1.5 py-px font-medium`} />}
-                  {organizaciones.length > 1 && onToggleCollapse && <span className="truncate">{organizaciones.length} organizaciones</span>}
                 </div>
               </div>
-              <span className="erp-company-chevron shrink-0 h-6 w-6 flex items-center justify-center rounded-lg text-slate-500 group-hover:text-slate-300 transition-colors">
-                <ChevronsUpDown size={14} />
-              </span>
+              {pendientesOtras > 0 ? (
+                <span title={avisoOtras} className="erp-company-count shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center tabular-nums">
+                  {pendientesOtras > 99 ? "99+" : pendientesOtras}
+                </span>
+              ) : (
+                <span className="erp-company-chevron shrink-0 h-6 w-6 flex items-center justify-center rounded-lg text-slate-500 group-hover:text-slate-300 transition-colors">
+                  <ChevronsUpDown size={14} />
+                </span>
+              )}
             </button>
           </div>
           {onToggleCollapse && <button
@@ -1875,6 +1925,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             activaId={organizacion?.id}
             rolActivo={orgRol}
             onSwitch={switchOrganizacion}
+            pendientes={pendientesOrgs}
             onClose={closeOrgMenu}
           />
         )}
