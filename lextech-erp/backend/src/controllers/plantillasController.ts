@@ -48,8 +48,9 @@ export const camposPlantilla = async (req: any, res: Response) => {
         };
       }
       const deVantia = valorVantia(nombre, ctx);
-      const guardado = guardados.get(clave);
-      // Lo escrito a mano manda (alguien lo corrigió a propósito); si no, lo de Vantia.
+      // Los datos del despacho que están en Mi Despacho mandan siempre; en lo
+      // demás, lo escrito a mano (alguien lo corrigió a propósito) y si no, lo de Vantia.
+      const guardado = esDeDespacho(nombre) && deVantia ? undefined : guardados.get(clave);
       const valor = guardado ?? deVantia ?? '';
       return {
         nombre, clave,
@@ -91,7 +92,7 @@ export const generarPlantilla = async (req: any, res: Response) => {
       if (esCampoLogo(nombre)) { if (logo) imagenes[clave] = logo; continue; }
       const deVantia = valorVantia(nombre, ctx);
       const enviado = enviadosPorClave.get(clave);
-      const valor = enviado ?? guardados.get(clave) ?? deVantia;
+      const valor = enviado ?? (esDeDespacho(nombre) && deVantia ? deVantia : guardados.get(clave)) ?? deVantia;
       if (valor !== undefined) valores[clave] = valor;
       // Se recuerda lo que difiere de lo que Vantia ya sabe (o lo que Vantia no sabe).
       if (enviado !== undefined && enviado !== (deVantia ?? '')) aGuardar[nombre] = enviado;

@@ -389,6 +389,9 @@ function DespachoPanel() {
   const [nombre, setNombre] = useState('');
   const [nifCif, setNifCif] = useState('');
   const [direccionFiscal, setDireccionFiscal] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [emailContacto, setEmailContacto] = useState('');
+  const [web, setWeb] = useState('');
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
   const [welcomeEmailSubject, setWelcomeEmailSubject] = useState('');
   const [welcomeEmailBody, setWelcomeEmailBody] = useState('');
@@ -414,6 +417,9 @@ function DespachoPanel() {
     setNombre(organizacion.nombre);
     setNifCif(organizacion.nifCif || '');
     setDireccionFiscal(organizacion.direccionFiscal || '');
+    setTelefono(organizacion.telefono || '');
+    setEmailContacto(organizacion.emailContacto || '');
+    setWeb(organizacion.web || '');
     setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
     setWelcomeEmailSubject(organizacion.clientWelcomeEmailSubject || '');
     setWelcomeEmailBody(organizacion.clientWelcomeEmailBody || '');
@@ -432,6 +438,9 @@ function DespachoPanel() {
           nombre: nombre.trim(),
           nifCif: nifCif.trim(),
           direccionFiscal: direccionFiscal.trim(),
+          telefono: telefono.trim(),
+          emailContacto: emailContacto.trim(),
+          web: web.trim(),
           textoLegalFacturas: textoLegalFacturas.trim(),
           clientWelcomeEmailSubject: welcomeEmailSubject.trim(),
           clientWelcomeEmailBody: welcomeEmailBody.trim(),
@@ -626,10 +635,24 @@ function DespachoPanel() {
                   <input
                     value={direccionFiscal}
                     onChange={(e) => setDireccionFiscal(e.target.value)}
-                    placeholder="Calle, número, ciudad"
+                    placeholder="Calle, número, CP Población (Provincia)"
                     className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
                   />
                 </div>
+              </div>
+              {/* Contacto del despacho: también sale en las plantillas (teléfono, correo, web) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {([
+                  ['Teléfono', telefono, setTelefono, '971 00 00 00', 'tel'],
+                  ['Correo electrónico', emailContacto, setEmailContacto, 'despacho@ejemplo.es', 'email'],
+                  ['Web', web, setWeb, 'www.despacho.es', 'text'],
+                ] as const).map(([label, valor, set, ph, tipo]) => (
+                  <div key={label}>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+                    <input type={tipo} value={valor} onChange={(e) => set(e.target.value)} placeholder={ph}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300" />
+                  </div>
+                ))}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas</label>

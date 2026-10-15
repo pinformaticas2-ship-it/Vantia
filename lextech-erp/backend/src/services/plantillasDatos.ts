@@ -20,6 +20,8 @@ type Persona = Partial<{
   telefono: string; movil: string; email: string; colegiado: string; tipo: string; pais: string; nacimiento: string;
   telefono2: string; telefono3: string; fax: string; web: string; nacionalidad: string; sexo: string;
   alta: string; baja: string; estado: string; numero: string; comercial: string; notas: string;
+  iban: string;     // despacho: cuenta de Facturación / Quipu
+  cuenta: string;   // procurador: cuenta de consignaciones (Directorio)
 }>;
 
 interface Contexto {
@@ -27,6 +29,8 @@ interface Contexto {
   exp: any | null;
   /** Última actuación del expediente (Datos_del_Expediente_Última_Actuación_*). */
   ultimaActuacion?: { titulo?: string; fecha?: any; notas?: string } | null;
+  /** Suma de los abonos (lo cobrado) de los apuntes económicos del expediente. */
+  totalCobrado?: number | null;
   cliente: Persona;
   contrario: Persona;
   juzgado: Persona & { autos?: string };
@@ -131,6 +135,8 @@ function campoPersona(p: Persona, resto: string): string | undefined {
     if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) e--;
     return String(e);
   }
+  if (es(r, 'CODIGO_DE_CUENTA_IBAN', 'IBAN')) return p.iban;
+  if (es(r, 'CCC_PROCURADOR', 'CUENTA_CONSIGNACIONES', 'CCC')) return p.cuenta;
   if (es(r, 'NUMERO_CLIENTE', 'NUM_CLIENTE')) return p.numero;
   if (es(r, 'ESTADO')) return p.estado;
   if (es(r, 'NOTAS', 'OBSERVACIONES')) return p.notas;
@@ -172,6 +178,7 @@ function campoExpediente(exp: any, resto: string, ctx?: Contexto): string | unde
   if (es(r, 'ETAPA', 'FASE_PROCEDIMIENTO', 'FASE')) return exp.etapa || '';
   if (es(r, 'USUARIO')) return exp.abogado_propio || '';
   if (es(r, 'CENTRO')) return exp.centro || '';
+  if (es(r, 'TOTAL_COBRO', 'TOTAL_COBROS', 'TOTAL_COBRADO')) return ctx?.totalCobrado != null ? euros(ctx.totalCobrado) : '';
   if (r === 'NOTAS' || es(r, 'COMENTARIOS', 'OBSERVACIONES')) return exp.observaciones || '';
   return undefined;
 }
@@ -264,6 +271,7 @@ function personaDe(r: any, nombreTexto?: string | null): Persona {
     alta: r.date_alta || '', baja: r.date_baja || '', estado: r.client_status || r.estado || '',
     numero: r.internal_number != null ? String(r.internal_number) : '',
     notas: r.observaciones || r.notes || '',
+    cuenta: r.cuenta_consignaciones || '',
   };
 }
 
@@ -284,10 +292,20 @@ async function delDirectorio(organizacionId: string, tipos: string[], nombre?: s
 /** Con expediente: todo. Sin expediente pero con cliente (plantilla usada
  *  desde la ficha del cliente): los datos del despacho y del cliente. */
 export async function contextoPlantilla(organizacionId: string, expedienteId?: string | null, clienteId?: string | null): Promise<Contexto> {
-  const { rows: org } = await pool.query(`SELECT nombre, nif_cif, direccion_fiscal FROM organizaciones WHERE id = $1`, [organizacionId]);
+  const { rows: org } = await pool.query(`SELECT nombre, nif_cif, direccion_fiscal, telefono, email_contacto, web FROM organizaciones WHERE id = $1`, [organizacionId]);
   const o = org[0] || {};
+  // IBAN del despacho: su cuenta de Facturación o, si no tiene, la de Quipu.
+  const ibanDe = (sql: string) => pool.query(sql, [organizacionId]).then((r) => r.rows[0]?.iban || '').catch(() => '');
+  const ibanDespacho = (await ibanDe(`SELECT iban FROM billing_bank_accounts
+        WHERE organizacion_id = $1 AND COALESCE(iban, '') <> '' ORDER BY created_at LIMIT 1`))
+    || (await ibanDe(`SELECT q.iban FROM quipu_bank_accounts q JOIN quipu_settings s ON s.id = q.quipu_setting_id
+        WHERE s.organizacion_id = $1 AND COALESCE(q.iban, '') <> '' ORDER BY q.created_at LIMIT 1`));
   const ctx: Contexto = {
-    org: { nombre: o.nombre || '', nif: o.nif_cif || '', ...partirDireccion(o.direccion_fiscal) },
+    org: {
+      nombre: o.nombre || '', nif: o.nif_cif || '', iban: ibanDespacho,
+      telefono: o.telefono || '', email: o.email_contacto || '', web: o.web || '',
+      ...partirDireccion(o.direccion_fiscal),
+    },
     exp: null, cliente: {}, contrario: {}, juzgado: {}, procurador: {}, procuradorContrario: {}, abogado: {}, abogadoContrario: {},
   };
   if (!expedienteId) {
@@ -319,6 +337,10 @@ export async function contextoPlantilla(organizacionId: string, expedienteId?: s
     [expedienteId, organizacionId],
   ).catch(() => ({ rows: [] as any[] }));
   ctx.ultimaActuacion = act[0] || null;
+  const { rows: cob } = await pool.query(
+    `SELECT SUM(importe) FILTER (WHERE tipo = 'abono') AS cobrado, COUNT(*) AS n FROM expediente_apuntes WHERE expediente_id = $1`, [expedienteId],
+  ).catch(() => ({ rows: [] as any[] }));
+  ctx.totalCobrado = Number(cob[0]?.n) > 0 ? Number(cob[0]?.cobrado || 0) : null;
   return ctx;
 }
 

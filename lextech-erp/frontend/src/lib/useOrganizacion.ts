@@ -17,6 +17,9 @@ export interface OrganizacionInfo {
   nombre: string;
   nifCif?: string | null;
   direccionFiscal?: string | null;
+  telefono?: string | null;
+  emailContacto?: string | null;
+  web?: string | null;
   logoUrl?: string | null;
   textoLegalFacturas?: string | null;
   clientWelcomeEmailSubject?: string | null;

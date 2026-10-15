@@ -125,7 +125,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     let organizacion = null;
     if (activa) {
       const { rows } = await pool.query(
-        `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
+        `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas, telefono, email_contacto, web,
                 client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature,
                 google_drive_refresh_token_enc, google_drive_email,
                 google_drive_last_error, google_drive_last_error_at,
@@ -141,6 +141,9 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         logoUrl: org.logo_url,
         nifCif: canSeeCredenciales ? org.nif_cif : null,
         direccionFiscal: canSeeCredenciales ? org.direccion_fiscal : null,
+        telefono: canSeeCredenciales ? org.telefono : null,
+        emailContacto: canSeeCredenciales ? org.email_contacto : null,
+        web: canSeeCredenciales ? org.web : null,
         textoLegalFacturas: canSeeCredenciales ? org.texto_legal_facturas : null,
         clientWelcomeEmailSubject: canSeeCredenciales ? org.client_welcome_email_subject : null,
         clientWelcomeEmailBody: canSeeCredenciales ? org.client_welcome_email_body : null,
@@ -187,14 +190,22 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const clientWelcomeEmailSubject = nullIfEmpty(req.body?.clientWelcomeEmailSubject);
     const clientWelcomeEmailBody = nullIfEmpty(req.body?.clientWelcomeEmailBody);
     const clientWelcomeEmailSignature = nullIfEmpty(req.body?.clientWelcomeEmailSignature);
+    // Contacto del despacho: si no se manda (versiones antiguas del frontend), se deja como estaba.
+    const contacto = (k: string) => (k in (req.body || {}) ? nullIfEmpty(req.body[k]) : undefined);
+    const telefono = contacto('telefono'), emailContacto = contacto('emailContacto'), web = contacto('web');
 
     await pool.query(
       `UPDATE organizaciones
          SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4,
              client_welcome_email_subject = $5, client_welcome_email_body = $6,
-             client_welcome_email_signature = $7, updated_at = NOW()
+             client_welcome_email_signature = $7,
+             telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END,
+             email_contacto = CASE WHEN $11::boolean THEN $12 ELSE email_contacto END,
+             web = CASE WHEN $13::boolean THEN $14 ELSE web END,
+             updated_at = NOW()
        WHERE id = $8`,
-      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature, ctx.organizacionId]
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature, ctx.organizacionId,
+        telefono !== undefined, telefono ?? null, emailContacto !== undefined, emailContacto ?? null, web !== undefined, web ?? null]
     );
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);

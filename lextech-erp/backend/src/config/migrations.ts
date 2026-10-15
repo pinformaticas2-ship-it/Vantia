@@ -2462,6 +2462,10 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS plantillas_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
       // Permisos que dio Google al conectar Drive (lectura completa para elegir carpeta de plantillas).
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_scopes TEXT`);
+      // Contacto del despacho (Mi Despacho): sale en las plantillas («Empresa_Teléfono»...).
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS telefono TEXT`);
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS email_contacto TEXT`);
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS web TEXT`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS expediente_docs_base (
           id               BIGSERIAL    PRIMARY KEY,
