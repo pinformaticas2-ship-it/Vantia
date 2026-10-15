@@ -119,6 +119,20 @@ function fmtFecha(iso: string | null, withTime = true) {
   });
 }
 
+/** Fecha corta para la lista: "hoy 10:32", "ayer 18:05", "12 oct, 09:14". */
+function fmtCorto(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const dia = new Date(d); dia.setHours(0, 0, 0, 0);
+  const dias = Math.round((hoy.getTime() - dia.getTime()) / 86400000);
+  if (dias === 0) return `hoy ${hora}`;
+  if (dias === 1) return `ayer ${hora}`;
+  const fecha = d.toLocaleDateString("es-ES", { day: "numeric", month: "short", ...(d.getFullYear() !== hoy.getFullYear() ? { year: "numeric" } : {}) });
+  return `${fecha}, ${hora}`;
+}
+
 /** ISO → valor de <input type="datetime-local"> en la hora local del navegador. */
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -398,6 +412,11 @@ function VistasModulo() {
                     <span className="truncate">{s.from_name || s.from_email}</span>
                     {s.datos?.num_autos && <span className="shrink-0">· autos {s.datos.num_autos}</span>}
                     {s.expediente_ref && <span className="shrink-0">· exp. {s.expediente_ref}</span>}
+                    {(s.received_at || s.created_at) && (
+                      <span className="ml-auto shrink-0 inline-flex items-center gap-1" title={`Correo recibido: ${fmtFecha(s.received_at || s.created_at)}`}>
+                        <Mail size={10} /> {fmtCorto(s.received_at || s.created_at)}
+                      </span>
+                    )}
                   </div>
                   {conflict && (
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
@@ -720,6 +739,14 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               </span>
             )}
           </div>
+          <p className="text-xs text-slate-500 mt-1 inline-flex flex-wrap items-center gap-x-1.5">
+            <Mail size={12} className="text-slate-400" />
+            <span>Correo recibido el <strong className="font-semibold text-slate-700">{fmtFecha(d.received_at || d.created_at)}</strong></span>
+            {/* Solo si Vantia lo procesó bastante después (p. ej. el buzón estuvo sin sincronizar) */}
+            {d.received_at && new Date(d.created_at).getTime() - new Date(d.received_at).getTime() > 10 * 60000 && (
+              <span className="text-slate-400">· procesado {fmtCorto(d.created_at)}</span>
+            )}
+          </p>
           {d.decidido_por_nombre && (
             <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
           )}
