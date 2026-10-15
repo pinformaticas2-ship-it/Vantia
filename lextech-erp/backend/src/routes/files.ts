@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth';
 import { requireFilesPermission } from '../middleware/requireFilesPermission';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 import { getFileAsPdf, runPdfTool } from '../controllers/pdfToolController';
+import { camposPlantilla, generarPlantilla } from '../controllers/plantillasController';
 const router = Router();
 const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 
@@ -42,6 +43,8 @@ router.get('/templates/preview-pdf',  requireAuth, previewTemplateAsPdf);
 router.get('/templates/preview',      requireAuth, previewTemplateAsHtml);
 router.get('/templates/download',     requireAuth, downloadTemplate);
 router.get('/templates/merge',        requireAuth, downloadMergedTemplate);
+router.get('/templates/campos',       requireAuth, camposPlantilla);
+router.post('/templates/generar',     requireAuth, express.json({ limit: '1mb' }), generarPlantilla);
 router.get('/templates/blank.docx',   requireAuth, downloadBlank);
 router.get('/test-preview',           requireAuth, testPreviewImages);
 

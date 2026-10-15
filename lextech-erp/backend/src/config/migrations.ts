@@ -2435,6 +2435,24 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_trazabilidad_accesos_org_user ON trazabilidad_accesos (organizacion_id, user_id);`);
     } catch (_e: any) {}
 
+    // Plantillas Word (15/10/2026): valores escritos a mano para campos que
+    // Vantia no guarda (WIZINK_*, CLÁUSULAS_*... de MN Program). Con
+    // expediente_id NULL valen para todo el despacho (los de Empresa).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS plantillas_valores (
+          id               BIGSERIAL    PRIMARY KEY,
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          expediente_id    UUID         REFERENCES expedientes(id) ON DELETE CASCADE,
+          clave            VARCHAR(120) NOT NULL,
+          valor            TEXT         NOT NULL,
+          updated_by       VARCHAR(150),
+          updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_plantillas_valores_unico ON plantillas_valores (organizacion_id, (COALESCE(expediente_id, '00000000-0000-0000-0000-000000000000'::uuid)), clave);`);
+    } catch (e: any) { console.error('[migrations] plantillas_valores:', e?.message); }
+
     // Errores de la app en el navegador (16/10/2026): ver erroresClienteController.
     try {
       await client.query(`

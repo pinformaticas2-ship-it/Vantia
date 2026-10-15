@@ -2259,7 +2259,7 @@ function scanDocPlant(dir: string, relBase: string): TemplateFile[] {
       const relPath  = relBase ? `${relBase}/${e.name}` : e.name;
       if (e.isDirectory()) {
         out.push(...scanDocPlant(fullPath, relPath));
-      } else if (e.isFile() && /\.(doc|docx)$/i.test(e.name)) {
+      } else if (e.isFile() && /\.(doc|docx)$/i.test(e.name) && !e.name.startsWith('~$')) { // ~$...: temporales de Word
         out.push({ name: e.name, path: relPath, ext: path.extname(e.name).toLowerCase() });
       }
     }
@@ -3116,6 +3116,18 @@ sys.exit(1)
     return res.status(500).json({ success: false, error: err.message });
   }
 };
+
+/** Ruta absoluta de una plantilla de DocPlant, o null si se sale de la carpeta
+ *  o no existe (ver plantillasController). */
+export function resolverPlantilla(rel: string | undefined): string | null {
+  if (!rel) return null;
+  const { root } = getDocPlantRoot();
+  const resolved = path.resolve(root, rel);
+  const normalizedRoot = path.resolve(root);
+  if (!resolved.startsWith(normalizedRoot + path.sep)) return null;
+  if (!/\.(docx?|DOCX?)$/.test(resolved) || !fs.existsSync(resolved)) return null;
+  return resolved;
+}
 
 // GET /api/files/templates/download?path=...
 export const downloadTemplate = (req: any, res: Response) => {

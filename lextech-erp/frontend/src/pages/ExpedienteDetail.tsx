@@ -76,6 +76,7 @@ import { useUndoDelete } from "../lib/useUndoDelete";
 import { PlazoCalculator } from "../components/PlazoCalculator";
 import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
+import RellenarPlantilla from "../components/RellenarPlantilla";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -1936,6 +1937,8 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
   const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string }[] }[]>([]);
   const [docPlantLoading, setDocPlantLoading] = useState(false);
   const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
+  // Paso "revisar datos" antes de generar el documento (ver RellenarPlantilla).
+  const [rellenando, setRellenando] = useState(false);
   const [query, setQuery] = useState("");
   // Preview
   const [preview, setPreview] = useState<{ url: string; name: string; mime: string; fileId: string } | null>(null);
@@ -2848,7 +2851,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                       <div className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50">{folder.name}</div>
                       <div className="divide-y divide-slate-100">
                         {folder.files.map((file) => (
-                          <button key={file.path} type="button" onClick={() => setSelectedTpl(file)}
+                          <button key={file.path} type="button" onClick={() => { setSelectedTpl(file); setRellenando(false); }}
                             className={`w-full px-4 py-3 text-left text-sm transition-colors ${selectedTpl?.path === file.path ? "bg-red-50 text-red-700" : "hover:bg-slate-50 text-slate-700"}`}>
                             {file.name}
                           </button>
@@ -2858,7 +2861,20 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                   ))}
                 </div>
               </div>
-              <div className="p-6 flex flex-col">
+              <div className="p-6 flex flex-col min-w-0">
+                {rellenando && selectedTpl && expedienteId ? (
+                  <RellenarPlantilla
+                    key={selectedTpl.path}
+                    path={selectedTpl.path}
+                    nombre={selectedTpl.name}
+                    expedienteId={expedienteId}
+                    onVolver={() => setRellenando(false)}
+                    onGenerado={async (archivo) => {
+                      await uploadFiles([archivo], { document_name: archivo.name.replace(/.[^/.]+$/, ""), attachment_type: "Sin clasificar" });
+                      setShowTemplates(false); setSelectedTpl(null); setRellenando(false);
+                    }}
+                  />
+                ) : (<>
                 <div className="flex-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-8">
                   {selectedTpl ? (
                     <div>
@@ -2877,14 +2893,15 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <div className="flex justify-end gap-2 pt-4">
                   <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
                   <button type="button" onClick={() => attachTemplate(false)} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl">Usar tal cual</button>
-                  {!!expedienteId && selectedTpl?.name.toLowerCase().endsWith(".docx") && (
-                    <button type="button" onClick={() => attachTemplate(true)} disabled={uploading}
-                      title="Rellena {{cliente_nombre}}, {{contrario}}, {{juzgado}}, etc. con los datos de este expediente"
+                  {!!expedienteId && /.docx?$/i.test(selectedTpl?.name || "") && (
+                    <button type="button" onClick={() => setRellenando(true)} disabled={uploading}
+                      title="Rellena el cliente, la otra parte, el juzgado, los autos... con los datos de este expediente y te deja revisar y completar el resto"
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">
                       <Sparkles size={13} /> Usar y autorrellenar
                     </button>
                   )}
                 </div>
+                </>)}
               </div>
             </div>
           </div>
