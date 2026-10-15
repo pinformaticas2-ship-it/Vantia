@@ -78,6 +78,7 @@ import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
 import RellenarPlantilla from "../components/RellenarPlantilla";
 import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
+import DocumentosBaseExpediente from "../components/DocumentosBaseExpediente";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -5981,6 +5982,7 @@ export default function ExpedienteDetail() {
                   <Field label="Tipos de asunto" value={exp.tipos_asunto} />
                   <Field label="Etapa" value={exp.etapa} />
                 </Section>
+                <DocumentosBaseExpediente expedienteId={exp.id} bloqueado={exp.estado === "cerrado"} />
 
                 <Section title="Procedimiento judicial" icon={Scale} cols={3}>
                   <Field label="Tipo de procedimiento" value={exp.tipo_proc} />

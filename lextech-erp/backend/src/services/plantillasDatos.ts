@@ -38,7 +38,7 @@ const PREFIJOS: [string, GrupoCampo][] = ([
   ['EMPRESA', 'Despacho'],
   ['DATOS_DEL_EXPEDIENTE', 'Expediente'], ['EXPEDIENTES', 'Expediente'],
   ['TIPOS_DE_PROCEDIMIENTO', 'Expediente'],
-  ['CLIENTE_PRINCIPAL', 'Cliente'], ['CLIENTE_LINEA', 'Cliente'], ['LISTADO_DE_CLIENTES', 'Cliente'], ['CLIENTES', 'Cliente'], ['CLIENTE', 'Cliente'],
+  ['DATOS_CLIENTES', 'Cliente'], ['DATOS_CLIENTE', 'Cliente'], ['CLIENTE_PRINCIPAL', 'Cliente'], ['CLIENTE_LINEA', 'Cliente'], ['LISTADO_DE_CLIENTES', 'Cliente'], ['CLIENTES', 'Cliente'], ['CLIENTE', 'Cliente'],
   ['CONTRARIO_PRINCIPAL', 'Contrario'], ['CONTRARIOS_LINEA', 'Contrario'], ['TODOS_LOS_CONTRARIOS', 'Contrario'], ['CONTRARIOS', 'Contrario'], ['CONTRARIO', 'Contrario'],
   ['JUZGADO_PRINCIPAL', 'Juzgado'], ['JUZGADOS_POR_LINEAS', 'Juzgado'], ['JUZGADOS', 'Juzgado'], ['JUZGADO', 'Juzgado'],
   ['PROCURADOR_PROPIO_PRINCIPAL', 'Procurador'], ['LISTADO_DE_PROCURADORES_PROPIOS', 'Procurador'], ['PROCURADORES_PROPIOS_POR_LINEA', 'Procurador'], ['PROCURADORES_PROPIOS', 'Procurador'],

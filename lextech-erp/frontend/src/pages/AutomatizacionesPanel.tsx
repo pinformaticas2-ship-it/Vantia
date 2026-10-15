@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarCheck, Check, Loader2, Mail, Settings2, Sparkles
 import { apiFetch } from '../lib/api';
 import { notifyVistasChanged } from '../lib/useVistasStatus';
 import VistasCorreoConfigModal, { CorreoConfig } from '../components/VistasCorreoConfigModal';
+import DocsBaseAutomatizacion from '../components/DocsBaseAutomatizacion';
 
 // Configuración → Automatizaciones. Un único interruptor: al encenderlo se
 // activa la automatización de vistas por correo para la organización activa,
@@ -198,6 +199,8 @@ export default function AutomatizacionesPanel() {
 
         {error && !eligiendoBuzon && <p className="peligro mt-3 text-sm text-red-600">{error}</p>}
       </div>
+
+      <DocsBaseAutomatizacion />
 
       {eligiendoBuzon && data && (
         <ElegirBuzon

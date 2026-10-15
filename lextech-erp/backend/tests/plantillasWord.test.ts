@@ -120,3 +120,23 @@ test('todas las plantillas .docx de DocPlant se rellenan sin romperse', { skip: 
   }
   assert.ok(campos > 3000);
 });
+
+// Documentos base de cada expediente: qué plantilla toca según el asunto, y que existan.
+import { plantillaPara } from '../src/services/docsBaseExpediente';
+test('documentos base: plantilla según el asunto (y todas existen en DocPlant)', { skip: !fs.existsSync(DOCPLANT) && 'sin DocPlant' }, () => {
+  const casos: [any, string, string][] = [
+    [{ tipo: 'judicial', descripcion: 'Reclamación de cantidad' }, 'INFORME DE TOMA DE REQUISITOS.doc', 'HOJA DE ENCARGO ASUNTO CIVIL.doc'],
+    [{ tipo: 'penal' }, 'INFORME DE TOMA DE REQUISITOS.doc', 'HOJA DE ENCARGO ASUNTO PENAL.doc'],
+    [{ tipo: 'judicial', tipos_asunto: 'Usura', descripcion: 'Tarjeta revolving Wizink' }, 'INFORME DE TOMA DE REQUISITOS USURA-TRANSPARENCIA-ABUSIVIDAD.doc', 'HOJA DE ENCARGO TARJETA REVOLVING.docx'],
+    [{ tipo: 'judicial', descripcion: 'Cláusula suelo hipoteca' }, 'INFORME TOMA DE REQUISITOS CLÁUSULAS-HIPOTECAS.doc', 'HOJA DE ENCARGO ASUNTO CIVIL.doc'],
+    [{ tipo: 'extrajudicial', tipos_asunto: 'Medidas de apoyo' }, 'INFORME TOMA DE REQUISITOS MEDIDAS DE APOYO PERS. DISC..doc', 'HOJA DE ENCARGO ESPECÍFICA IFP MEDIDAS DE APOYO SIN APLAZAR.doc'],
+    [{ tipo: 'obligacion_hacer' }, 'INFORME DE TOMA DE REQUISITOS.doc', 'HOJA DE ENCARGO OBLIGACIÓN DE HACER.doc'],
+  ];
+  for (const [exp, toma, encargo] of casos) {
+    assert.equal(path.basename(plantillaPara('toma_requisitos', exp)), toma);
+    assert.equal(path.basename(plantillaPara('hoja_encargo', exp)), encargo);
+    for (const t of ['lopd', 'toma_requisitos', 'hoja_encargo'] as const) {
+      assert.ok(fs.existsSync(path.join(DOCPLANT, plantillaPara(t, exp))), `no existe ${plantillaPara(t, exp)}`);
+    }
+  }
+});

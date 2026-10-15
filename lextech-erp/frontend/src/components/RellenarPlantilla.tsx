@@ -27,12 +27,15 @@ const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
   vacio: { label: 'Falta', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
 };
 
-export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver, onGenerado }: {
+export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver, onGenerado, generar: generarFuera, textoBoton = 'Generar documento' }: {
   path: string;
   nombre: string;
   expedienteId: string;
   onVolver: () => void;
-  onGenerado: (archivo: File) => Promise<void> | void;
+  onGenerado?: (archivo: File) => Promise<void> | void;
+  /** Si se pasa, genera y guarda quien llama (p. ej. los documentos base del expediente). */
+  generar?: (valores: Record<string, string>) => Promise<void>;
+  textoBoton?: string;
 }) {
   const { getToken } = useAuth();
   const [campos, setCampos] = useState<Campo[] | null>(null);
@@ -82,6 +85,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
       const enviar = Object.fromEntries(campos
         .filter((c) => !dejarMarcados || (valores[c.clave] || '').trim())
         .map((c) => [c.nombre, valores[c.clave] ?? '']));
+      if (generarFuera) { await generarFuera(enviar); return; }
       const token = await getToken({ skipCache: true });
       const res = await fetch('/api/files/templates/generar', {
         method: 'POST',
@@ -93,7 +97,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
       const archivo = new File([blob], nombre.replace(/\.docx?$/i, '') + '.docx', {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
-      await onGenerado(archivo);
+      await onGenerado?.(archivo);
       aviso.ok('Documento generado y adjuntado a la actuación');
     } catch (e: any) {
       aviso.error(e?.message || 'No se pudo generar el documento.');
@@ -188,7 +192,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, onVolver
           <button type="button" onClick={onVolver} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Volver</button>
           <button type="button" onClick={generar} disabled={generando}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-xl">
-            {generando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Generar documento
+            {generando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {textoBoton}
           </button>
         </div>
       </div>

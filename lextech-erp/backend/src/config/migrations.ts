@@ -2453,6 +2453,30 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_plantillas_valores_unico ON plantillas_valores (organizacion_id, (COALESCE(expediente_id, '00000000-0000-0000-0000-000000000000'::uuid)), clave);`);
     } catch (e: any) { console.error('[migrations] plantillas_valores:', e?.message); }
 
+    // Documentos base de cada expediente (15/10/2026): LOPD, toma de requisitos y
+    // hoja de encargo, generados al crear/abrir el expediente si la organización
+    // tiene activada la automatización (ver services/docsBaseExpediente).
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS docs_base_config JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS expediente_docs_base (
+          id               BIGSERIAL    PRIMARY KEY,
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          expediente_id    UUID         NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
+          tipo             VARCHAR(30)  NOT NULL,
+          estado           VARCHAR(20)  NOT NULL DEFAULT 'generando',
+          plantilla        TEXT,
+          file_id          UUID         REFERENCES client_files(id) ON DELETE SET NULL,
+          pendientes       INTEGER,
+          error            TEXT,
+          generado_at      TIMESTAMPTZ,
+          generado_por     VARCHAR(150),
+          updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          UNIQUE (expediente_id, tipo)
+        );
+      `);
+    } catch (e: any) { console.error('[migrations] expediente_docs_base:', e?.message); }
+
     // Errores de la app en el navegador (16/10/2026): ver erroresClienteController.
     try {
       await client.query(`
