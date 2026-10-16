@@ -184,7 +184,6 @@ export function HalloweenDecor() {
               x="-20" y="-18" width="40" height="40"
               preserveAspectRatio="xMidYMid slice"
               clipPath="url(#vantia-spider-foto)"
-              draggable={false}
             />
             <circle cx="0" cy="2" r="20" fill="none" strokeWidth="1.5" className="text-slate-400" />
           </g>
