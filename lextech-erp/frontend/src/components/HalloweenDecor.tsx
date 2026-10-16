@@ -159,7 +159,7 @@ export function HalloweenDecor() {
     >
       <g className={enMovimiento ? undefined : "vantia-spider-sway"} style={{ transformOrigin: `${a.x}px ${a.y}px` }}>
         <g ref={grupoBajada} className={enMovimiento ? undefined : "vantia-spider-drop"}>
-          <line x1={a.x} y1={a.y} x2={arana.x} y2={arana.y - 10} strokeWidth="0.8" />
+          <line x1={a.x} y1={a.y} x2={arana.x} y2={arana.y - 18} strokeWidth="0.8" />
           <g
             transform={`translate(${arana.x} ${arana.y}) rotate(${enMovimiento ? giro : 0})`}
             className="vantia-spider text-slate-800"
@@ -173,23 +173,20 @@ export function HalloweenDecor() {
           >
             {/* Zona para agarrarla más fácil que el propio dibujo */}
             <circle cx="0" cy="2" r="24" fill="transparent" stroke="none" />
-            {/* Patas */}
-            <g strokeWidth="1.6" fill="none">
-              <path d="M-5 -2 Q-14 -12 -20 -6" />
-              <path d="M-5 1 Q-16 -3 -22 4" />
-              <path d="M-5 4 Q-15 6 -20 14" />
-              <path d="M-4 6 Q-11 12 -14 20" />
-              <path d="M5 -2 Q14 -12 20 -6" />
-              <path d="M5 1 Q16 -3 22 4" />
-              <path d="M5 4 Q15 6 20 14" />
-              <path d="M4 6 Q11 12 14 20" />
-            </g>
-            {/* Cuerpo */}
-            <ellipse cx="0" cy="4" rx="7" ry="8.5" stroke="none" />
-            <circle cx="0" cy="-6" r="4.5" stroke="none" />
-            {/* Ojos */}
-            <circle cx="-1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
-            <circle cx="1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
+            {/* Foto en lugar del dibujo de la araña */}
+            <defs>
+              <clipPath id="vantia-spider-foto">
+                <circle cx="0" cy="2" r="20" />
+              </clipPath>
+            </defs>
+            <image
+              href="/halloween-arana.jpg"
+              x="-20" y="-18" width="40" height="40"
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#vantia-spider-foto)"
+              draggable={false}
+            />
+            <circle cx="0" cy="2" r="20" fill="none" strokeWidth="1.5" className="text-slate-400" />
           </g>
         </g>
       </g>
