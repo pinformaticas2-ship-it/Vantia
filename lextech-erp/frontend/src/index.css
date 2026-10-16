@@ -1521,3 +1521,22 @@
 .quick-popup {
   animation: quick-popup 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+
+/* Tamaño del texto (Ajustes → Apariencia, 16/10/2026). Lo que va en rem crece
+   con la letra base de <html>; los tamaños fijos en px (text-[11px]...) se
+   escalan aquí con la misma proporción. Dentro de @layer utilities para que las variantes (sm:text-xs...) sigan
+   mandando sobre ellas, como con cualquier otra clase de Tailwind. */
+@layer utilities {
+  .text-\[9px\] { font-size: calc(9px * var(--escala-texto, 1)); }
+  .text-\[9\.5px\] { font-size: calc(9.5px * var(--escala-texto, 1)); }
+  .text-\[10px\] { font-size: calc(10px * var(--escala-texto, 1)); }
+  .text-\[10\.5px\] { font-size: calc(10.5px * var(--escala-texto, 1)); }
+  .text-\[11px\] { font-size: calc(11px * var(--escala-texto, 1)); }
+  .text-\[11\.5px\] { font-size: calc(11.5px * var(--escala-texto, 1)); }
+  .text-\[12px\] { font-size: calc(12px * var(--escala-texto, 1)); }
+  .text-\[12\.5px\] { font-size: calc(12.5px * var(--escala-texto, 1)); }
+  .text-\[13px\] { font-size: calc(13px * var(--escala-texto, 1)); }
+  .text-\[14px\] { font-size: calc(14px * var(--escala-texto, 1)); }
+  .text-\[15px\] { font-size: calc(15px * var(--escala-texto, 1)); }
+  .text-\[17px\] { font-size: calc(17px * var(--escala-texto, 1)); }
+}

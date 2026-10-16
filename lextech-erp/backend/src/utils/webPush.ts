@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import pool from '../config/database';
 import { Modulo, resolveEffectivePermission } from '../config/permissions';
 import { TipoAviso, filtrarPorPreferencias } from './avisoPreferencias';
+import { enviarAvisoPorCorreo } from './avisoCorreo';
 
 // ── Notificaciones push del navegador ────────────────────────────────────────
 // Envío best-effort: si faltan las claves VAPID en el entorno (no configuradas
@@ -78,15 +79,20 @@ export async function sendPushToUser(userId: string | null | undefined, payload:
 export async function sendPushToUsers(userIds: string[], payload: PushPayload, excludeUserId?: string | null): Promise<ResultadoPush> {
   let ids = [...new Set(userIds.filter((id) => id && id !== excludeUserId))];
   const resultado: ResultadoPush = { enviados: 0, silenciados: 0 };
-  if (!enabled || !ids.length) return resultado;
+  if (!ids.length) return resultado;
   try {
     if (payload.tipo) {
       const f = await filtrarPorPreferencias(ids, payload.tipo);
       ids = f.destinatarios;
       resultado.silenciados = f.silenciados.length;
+      // Avisos por correo: en segundo plano, no retrasan el push.
+      if (f.porCorreo.length) {
+        resultado.enviados += f.porCorreo.filter((id) => !ids.includes(id)).length;
+        void enviarAvisoPorCorreo(f.porCorreo, payload).catch(() => {});
+      }
     }
-    if (!ids.length) return resultado;
-    resultado.enviados = ids.length;
+    if (!enabled || !ids.length) return resultado;
+    resultado.enviados += ids.length;
     const { rows } = await pool.query<SubRow>(
       `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::text[])`,
       [ids],
@@ -118,7 +124,7 @@ export async function miembrosConAcceso(organizacionId: string, modulo: Modulo):
 export async function sendPushToOrgModule(
   organizacionId: string | null | undefined, modulo: Modulo, payload: PushPayload, excludeUserId?: string | null,
 ): Promise<ResultadoPush> {
-  if (!enabled || !organizacionId) return { enviados: 0, silenciados: 0 };
+  if (!organizacionId) return { enviados: 0, silenciados: 0 };
   try {
     return await sendPushToUsers(await miembrosConAcceso(organizacionId, modulo), payload, excludeUserId);
   } catch (e) { console.error('[push] sendPushToOrgModule:', e); return { enviados: 0, silenciados: 0 }; }

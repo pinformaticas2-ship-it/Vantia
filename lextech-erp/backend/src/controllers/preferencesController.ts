@@ -101,10 +101,12 @@ export interface PrefsExtras {
   atajos: boolean;
   cargo: string;
   telefono: string;
+  /** Tamaño del texto de toda la app (accesibilidad, 16/10/2026). */
+  texto: 'normal' | 'grande' | 'muy_grande';
 }
 
 export const EXTRAS_POR_DEFECTO: PrefsExtras = {
-  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '',
+  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal',
 };
 
 export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECTO): PrefsExtras {
@@ -116,6 +118,7 @@ export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECT
     atajos: typeof r.atajos === 'boolean' ? r.atajos : base.atajos,
     cargo: typeof r.cargo === 'string' ? r.cargo.trim().slice(0, 100) : base.cargo,
     telefono: typeof r.telefono === 'string' ? r.telefono.replace(/[^\d+()\s-]/g, '').trim().slice(0, 30) : base.telefono,
+    texto: ['normal', 'grande', 'muy_grande'].includes(r.texto) ? r.texto : base.texto,
   };
 }
 

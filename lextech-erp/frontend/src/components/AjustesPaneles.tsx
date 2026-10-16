@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth, useUser } from '@clerk/clerk-react';
+import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { Download, Keyboard, Loader2, Moon, Monitor, Sun, Trash2 } from 'lucide-react';
+import { BookOpen, Copy, Download, ExternalLink, Keyboard, LifeBuoy, Loader2, LogOut, Moon, Monitor, Sun, Trash2, Type } from 'lucide-react';
 import { apiFetch, resolveApiUrl } from '../lib/api';
-import { PAGINAS_INICIO, usePreferencias, Modo } from '../lib/preferencias';
+import { PAGINAS_INICIO, TAMANOS_TEXTO, usePreferencias, Modo } from '../lib/preferencias';
 import { AyudaAtajos } from './AtajosTeclado';
 import { confirmar } from "../lib/avisos";
 
@@ -53,6 +53,30 @@ export function SelectorModo() {
         })}
       </div>
       <p className="mt-2 text-xs text-slate-500">El modo oscuro es nuevo: si ves alguna pantalla con colores raros, avísanos desde el Centro de soporte.</p>
+    </section>
+  );
+}
+
+// ── Apariencia: tamaño del texto (16/10/2026) ───────────────────────────
+export function SelectorTexto() {
+  const { prefs, guardar } = usePreferencias();
+  return (
+    <section className="mb-10">
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tamaño del texto</h3>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {TAMANOS_TEXTO.map(({ valor, label, px }) => {
+          const activo = prefs.texto === valor;
+          return (
+            <button key={valor} type="button" onClick={() => void guardar({ texto: valor }).catch(() => {})}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-600 bg-red-600/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              <Type size={Math.round(16 * (px / 16))} className={activo ? 'text-red-600' : 'text-slate-400'} />
+              {/* Cada opción en su propio tamaño, sin escalar con el elegido */}
+              <span className="block font-semibold text-slate-800" style={{ fontSize: `${px * 0.875}px` }}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">Agranda la letra de toda la aplicación en tus dispositivos. Si necesitas más, el zoom del navegador (Ctrl y +) también funciona.</p>
     </section>
   );
 }
@@ -297,6 +321,174 @@ export function IntegracionesPropias() {
           {quipu?.connected ? 'Ir a Facturación' : 'Conectar desde Facturación'}
         </Link>
       </div>
+    </div>
+  );
+}
+
+// ── Mis datos y privacidad (cada persona, 16/10/2026) ─────────────────────
+// Descargar lo que Vantia guarda de ti (art. 15 RGPD), qué se guarda en el
+// navegador, cerrar sesión y eliminar la cuenta.
+
+/** Lo que no se borra al "borrar los datos de este navegador": la sesión de
+ *  Clerk (si no, te echa) y el identificador del dispositivo (Trazabilidad). */
+const CLAVES_QUE_SE_QUEDAN = /^(__clerk|clerk|lextech_device_id$)/;
+
+async function borrarDatosNavegador() {
+  try {
+    for (const k of Object.keys(localStorage)) if (!CLAVES_QUE_SE_QUEDAN.test(k)) localStorage.removeItem(k);
+  } catch { /* sin almacenamiento */ }
+  try { sessionStorage.clear(); } catch { /* idem */ }
+  try {
+    if ('caches' in window) for (const k of await caches.keys()) await caches.delete(k);
+  } catch { /* idem */ }
+}
+
+export function MisDatosPanel() {
+  const { getToken } = useAuth();
+  const clerk = useClerk();
+  const [descargando, setDescargando] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmacion, setConfirmacion] = useState('');
+  const [eliminando, setEliminando] = useState(false);
+
+  const descargar = async () => {
+    setDescargando(true); setError('');
+    try {
+      const token = await getToken();
+      const res = await fetch(resolveApiUrl('/api/privacidad/mis-datos'), { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error('No se pudieron descargar tus datos');
+      const blob = await res.blob();
+      const nombre = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || 'vantia-mis-datos.json';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (e: any) { setError(e?.message || 'No se pudieron descargar tus datos'); } finally { setDescargando(false); }
+  };
+
+  const borrarNavegador = async () => {
+    if (!(await confirmar({
+      titulo: '¿Borrar los datos de este navegador?',
+      mensaje: 'Se borran las preferencias guardadas en este equipo, la caché y los borradores de correo sin guardar. Tu cuenta y todo lo del despacho no se tocan. La página se recargará.',
+      confirmar: 'Borrar y recargar',
+    }))) return;
+    await borrarDatosNavegador();
+    window.location.reload();
+  };
+
+  const eliminarCuenta = async () => {
+    setEliminando(true); setError('');
+    try {
+      const res = await apiFetch('/api/privacidad/eliminar-cuenta', { method: 'POST', getToken, body: JSON.stringify({ confirmacion }) });
+      if (res?.success === false) throw new Error(res.error);
+      await borrarDatosNavegador();
+      await clerk.signOut({ redirectUrl: '/' });
+    } catch (e: any) { setError(e?.message || 'No se pudo eliminar la cuenta'); setEliminando(false); }
+  };
+
+  const boton = 'inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60';
+  return (
+    <div className="space-y-6">
+      <Tarjeta titulo="Descargar mis datos">
+        <p className="text-sm text-slate-600">
+          Un archivo con lo que Vantia guarda de ti: tu perfil, tus preferencias, los despachos a los que perteneces y tu actividad.
+          Lo que creas dentro de un despacho (clientes, expedientes, documentos) es del despacho: su propietario lo exporta desde Datos y privacidad.
+        </p>
+        <button type="button" onClick={() => void descargar()} disabled={descargando} className={`mt-4 ${boton}`}>
+          {descargando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Descargar (JSON)
+        </button>
+      </Tarjeta>
+
+      <Tarjeta titulo="Cookies y este navegador">
+        <p className="text-sm text-slate-600">
+          Vantia no usa cookies de publicidad ni de analítica y no envía datos de uso a terceros. Solo guarda lo imprescindible:
+          la sesión iniciada y, en este navegador, tus preferencias y algo de caché para que todo cargue más rápido.
+        </p>
+        <button type="button" onClick={() => void borrarNavegador()} className={`mt-4 ${boton}`}>
+          <Trash2 size={14} /> Borrar los datos de este navegador
+        </button>
+        <p className="mt-2 text-xs text-slate-500">Útil si algo se ve raro o desactualizado. No cierra la sesión.</p>
+      </Tarjeta>
+
+      <Tarjeta titulo="Sesión">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">Cierra la sesión en este dispositivo. Las demás sesiones abiertas se ven y se cierran en Seguridad.</p>
+          <button type="button" onClick={() => void clerk.signOut({ redirectUrl: '/' })} className={boton}>
+            <LogOut size={14} /> Cerrar sesión
+          </button>
+        </div>
+      </Tarjeta>
+
+      <div className="rounded-2xl border border-red-200 bg-white p-5">
+        <h3 className="mb-4 border-b border-red-100 pb-2 text-sm font-bold uppercase tracking-wider text-red-700">Eliminar mi cuenta</h3>
+        <p className="text-sm text-slate-600">
+          Tu usuario se borra y ya no podrás entrar. Sales de todos tus despachos; lo que hiciste en ellos se queda, porque es del despacho.
+          Si eres propietario de un despacho, antes tienes que transferirlo a otra persona o eliminarlo. No se puede deshacer.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} placeholder="Escribe ELIMINAR"
+            aria-label="Escribe ELIMINAR para confirmar"
+            className="w-48 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-300" />
+          <button type="button" onClick={() => void eliminarCuenta()} disabled={confirmacion.trim().toUpperCase() !== 'ELIMINAR' || eliminando}
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+            {eliminando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Eliminar mi cuenta
+          </button>
+        </div>
+      </div>
+      {error && <p className="peligro text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+// ── Ayuda e información (16/10/2026) ──────────────────────────────────────
+// Los textos legales se publican fuera de la app: sus direcciones van en
+// VITE_TERMINOS_URL y VITE_PRIVACIDAD_URL (sin ellas, "Pendiente de publicar").
+const URL_TERMINOS = import.meta.env.VITE_TERMINOS_URL as string | undefined;
+const URL_PRIVACIDAD = import.meta.env.VITE_PRIVACIDAD_URL as string | undefined;
+
+export function AyudaPanel() {
+  const [copiado, setCopiado] = useState(false);
+  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+  const commit = typeof __APP_COMMIT__ !== 'undefined' && __APP_COMMIT__ !== 'dev' ? __APP_COMMIT__.slice(0, 7) : '';
+  const build = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '';
+  const fechaBuild = build ? new Date(build).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) : '';
+  const infoSoporte = [
+    `Vantia ${version}${commit ? ` (${commit})` : ''}`,
+    fechaBuild && `Publicada: ${fechaBuild}`,
+    `Navegador: ${navigator.userAgent}`,
+    `Pantalla: ${window.innerWidth}×${window.innerHeight}`,
+  ].filter(Boolean).join('\n');
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(infoSoporte); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500); } catch { /* sin portapapeles */ }
+  };
+  const enlace = 'flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50';
+  const legal = (url: string | undefined, label: string) => url
+    ? <a href={url} target="_blank" rel="noopener noreferrer" className={enlace}>{label} <ExternalLink size={14} className="text-slate-400" /></a>
+    : <div className={`${enlace} cursor-default !text-slate-400 hover:bg-white`}>{label} <span className="text-[11px] font-normal">Pendiente de publicar</span></div>;
+  return (
+    <div className="space-y-6">
+      <Tarjeta titulo="Ayuda">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link to="/dashboard/config?section=manual" className={enlace}><span className="flex items-center gap-2"><BookOpen size={15} className="text-slate-400" /> Manual de usuario</span></Link>
+          <Link to="/dashboard/soporte" className={enlace}><span className="flex items-center gap-2"><LifeBuoy size={15} className="text-slate-400" /> Centro de soporte</span></Link>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">¿Algo no funciona o tienes una duda? Abre un ticket en el Centro de soporte: te contestamos por ahí y por correo.</p>
+      </Tarjeta>
+      <Tarjeta titulo="Información legal">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {legal(URL_TERMINOS, 'Términos y condiciones')}
+          {legal(URL_PRIVACIDAD, 'Política de privacidad')}
+        </div>
+      </Tarjeta>
+      <Tarjeta titulo="Versión">
+        <p className="text-sm text-slate-700">Vantia <span className="font-semibold">{version || '—'}</span>{commit && <span className="text-slate-400"> · {commit}</span>}</p>
+        {fechaBuild && <p className="mt-0.5 text-xs text-slate-500">Publicada el {fechaBuild}</p>}
+        <button type="button" onClick={() => void copiar()}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+          <Copy size={14} /> {copiado ? 'Copiado' : 'Copiar información para soporte'}
+        </button>
+        <p className="mt-2 text-xs text-slate-500">Pégala en tu ticket: nos dice qué versión y qué navegador usas.</p>
+      </Tarjeta>
     </div>
   );
 }

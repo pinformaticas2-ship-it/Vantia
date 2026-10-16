@@ -12,11 +12,15 @@ export const TIPOS_PREF: TipoPref[] = ['chat', 'correo', 'whatsapp', 'plazo', 'v
 
 export interface AvisoPrefs {
   tipos: Record<TipoPref, boolean>;
+  /** Además del push, por correo (16/10/2026). Por defecto, ninguno; "correo"
+   *  no se ofrece (sería un correo para avisar de un correo). */
+  email: Record<TipoPref, boolean>;
   silencio: { activo: boolean; desde: string; hasta: string; finDeSemana: boolean };
 }
 
 export const PREFS_POR_DEFECTO: AvisoPrefs = {
   tipos: { chat: true, correo: true, whatsapp: true, plazo: true, vista: true, soporte: true },
+  email: { chat: false, correo: false, whatsapp: false, plazo: false, vista: false, soporte: false },
   silencio: { activo: true, desde: '21:00', hasta: '08:00', finDeSemana: true },
 };
 
@@ -29,9 +33,12 @@ export function normalizarPrefs(raw: any): AvisoPrefs {
   const p = raw && typeof raw === 'object' ? raw : {};
   const tipos = { ...PREFS_POR_DEFECTO.tipos };
   for (const t of TIPOS_PREF) if (typeof p.tipos?.[t] === 'boolean') tipos[t] = p.tipos[t];
+  const email = { ...PREFS_POR_DEFECTO.email };
+  for (const t of TIPOS_PREF) if (t !== 'correo' && typeof p.email?.[t] === 'boolean') email[t] = p.email[t];
   const s = p.silencio || {};
   return {
     tipos,
+    email,
     silencio: {
       activo: typeof s.activo === 'boolean' ? s.activo : PREFS_POR_DEFECTO.silencio.activo,
       desde: HORA.test(s.desde) ? s.desde : PREFS_POR_DEFECTO.silencio.desde,
@@ -75,16 +82,20 @@ export async function prefsDe(userIds: string[]): Promise<Map<string, AvisoPrefs
 
 /** Quién recibe un aviso de ese tipo ahora mismo: fuera quien lo tiene
  *  desactivado y, salvo lo urgente, quien está en su horario de silencio. */
-export async function filtrarPorPreferencias(userIds: string[], tipo: TipoAviso, ahora = new Date()): Promise<{ destinatarios: string[]; silenciados: string[] }> {
+export async function filtrarPorPreferencias(userIds: string[], tipo: TipoAviso, ahora = new Date()): Promise<{ destinatarios: string[]; silenciados: string[]; porCorreo: string[] }> {
   const prefs = await prefsDe(userIds);
   const pref: TipoPref = tipo === 'chat_dm' ? 'chat' : tipo;
   const destinatarios: string[] = [];
   const silenciados: string[] = [];
+  const porCorreo: string[] = [];
   for (const id of userIds) {
     const p = prefs.get(id)!;
-    if (!p.tipos[pref]) continue;
+    if (!p.tipos[pref] && !p.email[pref]) continue;
+    // El silencio vale para los dos canales (los plazos silenciados se
+    // reintentan después: así tampoco llegan dos correos del mismo aviso).
     if (!SIEMPRE.includes(tipo) && enSilencio(p, ahora)) { silenciados.push(id); continue; }
-    destinatarios.push(id);
+    if (p.tipos[pref]) destinatarios.push(id);
+    if (p.email[pref]) porCorreo.push(id);
   }
-  return { destinatarios, silenciados };
+  return { destinatarios, silenciados, porCorreo };
 }

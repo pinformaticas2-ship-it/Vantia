@@ -88,6 +88,25 @@ test('preferencias: guardar, normalizar y que un tipo desactivado no llegue', { 
   assert.deepEqual(r.destinatarios, ['pa_eva']);
 });
 
+test('avisos por correo: solo los activados, nunca "correo", y el silencio también vale', { skip }, async () => {
+  const c = await import('../src/controllers/pushController');
+  const put = await call(c.putAvisoPrefs, 'pa_eva', { body: { prefs: { tipos: { plazo: false }, email: { plazo: true, correo: true } } } });
+  assert.equal(put.status, 200);
+  assert.equal(put.body.data.prefs.email.plazo, true);
+  assert.equal(put.body.data.prefs.email.correo, false, 'un correo para avisar de un correo, no');
+  assert.equal(put.body.data.prefs.email.chat, false, 'por defecto, ninguno por correo');
+  assert.equal(put.body.data.cuentaCorreo, null, 'sin cuenta de correo propia conectada');
+  const { filtrarPorPreferencias } = await import('../src/utils/avisoPreferencias');
+  const dia = await filtrarPorPreferencias(['pa_eva', 'pa_ana'], 'plazo', madrid('2026-10-14T10:00:00'));
+  assert.deepEqual(dia.destinatarios, ['pa_ana'], 'Eva quitó el push de plazos');
+  assert.deepEqual(dia.porCorreo, ['pa_eva'], 'pero lo quiere por correo');
+  const noche = await filtrarPorPreferencias(['pa_eva'], 'plazo', madrid('2026-10-14T23:00:00'));
+  assert.deepEqual(noche.porCorreo, [], 'en silencio no sale el correo');
+  assert.deepEqual(noche.silenciados, ['pa_eva'], 'y se reintenta como un push silenciado');
+  // Se deja como estaba para los demás tests
+  await call(c.putAvisoPrefs, 'pa_eva', { body: { prefs: {} } });
+});
+
 test('chat: no llega push a quien está en "No molestar" / "En juicio"', { skip }, async () => {
   const chat = await import('../src/controllers/chatController');
   await call(chat.updateMyStatus, 'pa_eva', { body: { status: 'en_juicio' } });

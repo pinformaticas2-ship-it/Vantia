@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { pushEnabled, vapidPublicKey, sendPushToUser } from '../utils/webPush';
 import { prefsDe, normalizarPrefs, enSilencio } from '../utils/avisoPreferencias';
+import { cuentaEnvioAvisos } from '../utils/avisoCorreo';
 
 export async function getPushConfig(_req: Request, res: Response) {
   return res.json({ data: { enabled: pushEnabled(), publicKey: vapidPublicKey() } });
@@ -84,7 +85,7 @@ export async function getAvisoPrefs(req: Request, res: Response) {
   if (!userId) return res.status(401).json({ error: 'No autenticado' });
   try {
     const prefs = (await prefsDe([userId])).get(userId)!;
-    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs) } });
+    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs), cuentaCorreo: (await cuentaEnvioAvisos(userId))?.email || null } });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
@@ -100,7 +101,7 @@ export async function putAvisoPrefs(req: Request, res: Response) {
        ON CONFLICT (user_id) DO UPDATE SET prefs = EXCLUDED.prefs, updated_at = NOW()`,
       [userId, JSON.stringify(prefs)],
     );
-    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs) } });
+    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs), cuentaCorreo: (await cuentaEnvioAvisos(userId))?.email || null } });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

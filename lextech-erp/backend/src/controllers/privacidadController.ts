@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
-import { logActivityForReq } from './activityController';
+import { logActivityForReq, getClerk } from './activityController';
 
 // ── Datos y privacidad (14/10/2026) ──────────────────────────────────────────
 // Ajustes → Despacho → Datos y privacidad (solo propietario/administradores):
@@ -125,5 +125,89 @@ export const exportarDatos = async (req: Request, res: Response) => {
     res.send(JSON.stringify({ exportado: new Date().toISOString(), organizacion: org[0] || { id: organizacionId }, resumen, datos }, null, 2));
   } catch (e: any) {
     res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+// ── Mis datos (cada persona, 16/10/2026) ─────────────────────────────────────
+// Derecho de acceso (art. 15 RGPD): lo que Vantia guarda de quien lo pide, en
+// todas sus organizaciones. Se recorren todas las tablas con columna user_id
+// (así no se queda fuera ninguna nueva), sin contraseñas ni tokens.
+const TABLAS_NO_PERSONALES = /^(misc_uploads|firma_imagenes)$/;
+const MAX_FILAS_POR_TABLA = 20000;
+/** Además de las de siempre: las claves de cifrado de las suscripciones push. */
+const OCULTAS_MIS_DATOS = /^(auth|p256dh)$/;
+
+export const exportarMisDatos = async (req: Request, res: Response) => {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const { rows: tablas } = await pool.query(
+      `SELECT table_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND column_name = 'user_id' ORDER BY table_name`,
+    );
+    const datos: Record<string, any[]> = {};
+    for (const { table_name: t } of tablas) {
+      if (TABLAS_NO_PERSONALES.test(t)) continue;
+      const { rows } = await pool.query(`SELECT * FROM "${t}" WHERE user_id = $1 LIMIT ${MAX_FILAS_POR_TABLA}`, [userId]).catch(() => ({ rows: [] as any[] }));
+      if (rows.length) datos[t] = rows.map((r: any) => Object.fromEntries(Object.entries(r).filter(([k]) => !COLUMNAS_OCULTAS.test(k) && !OCULTAS_MIS_DATOS.test(k))));
+    }
+    let perfil: any = { id: userId };
+    try {
+      const u = await getClerk().users.getUser(userId);
+      perfil = {
+        id: u.id, nombre: u.firstName, apellidos: u.lastName, creado: new Date(u.createdAt).toISOString(),
+        ultimo_acceso: u.lastSignInAt ? new Date(u.lastSignInAt).toISOString() : null,
+        correos: u.emailAddresses.map((e) => e.emailAddress), telefonos: u.phoneNumbers.map((p) => p.phoneNumber),
+        verificacion_en_dos_pasos: u.twoFactorEnabled,
+      };
+    } catch { /* sin Clerk: solo el id */ }
+    await logActivityForReq(req, 'Descarga de sus datos personales', 'USUARIO', userId, undefined, 'EXPORT').catch(() => {});
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="vantia-mis-datos-${new Date().toISOString().slice(0, 10)}.json"`);
+    res.send(JSON.stringify({
+      exportado: new Date().toISOString(),
+      aviso: 'Datos personales que Vantia guarda de ti. Lo que creas dentro de un despacho (clientes, expedientes, documentos...) es del despacho: pídeselo a su propietario.',
+      perfil, datos,
+    }, null, 2));
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+// ── Eliminar mi cuenta (16/10/2026) ──────────────────────────────────────────
+// Borra el usuario de Clerk (ya no puede entrar) y lo saca de sus despachos.
+// Lo que hizo dentro de cada despacho se queda: es del despacho. Quien es
+// propietario de alguno tiene que transferirlo o eliminarlo antes, para no
+// dejar un despacho sin dueño.
+export const eliminarMiCuenta = async (req: Request, res: Response) => {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  if (String(req.body?.confirmacion || '').trim().toUpperCase() !== 'ELIMINAR') {
+    return res.status(400).json({ success: false, error: 'Escribe ELIMINAR para confirmar.' });
+  }
+  try {
+    const { rows: propias } = await pool.query(
+      `SELECT o.nombre FROM organizacion_miembros m JOIN organizaciones o ON o.id = m.organizacion_id
+        WHERE m.user_id = $1 AND m.rol = 'propietario'`,
+      [userId],
+    );
+    if (propias.length) {
+      return res.status(409).json({
+        success: false,
+        error: `Eres propietario de ${propias.map((r: any) => `«${r.nombre}»`).join(', ')}. Transfiere la propiedad a otra persona o elimina el despacho (Ajustes → Mi Despacho) antes de eliminar tu cuenta.`,
+      });
+    }
+    await logActivityForReq(req, 'Eliminó su cuenta de Vantia', 'USUARIO', userId, undefined, 'DELETE').catch(() => {});
+    await getClerk().users.deleteUser(userId);
+    for (const sql of [
+      `UPDATE email_accounts SET active = false WHERE user_id = $1`,
+      `DELETE FROM push_subscriptions WHERE user_id = $1`,
+      `DELETE FROM aviso_preferencias WHERE user_id = $1`,
+      `DELETE FROM user_preferences WHERE user_id = $1`,
+      `DELETE FROM organizacion_miembros WHERE user_id = $1`,
+    ]) await pool.query(sql, [userId]).catch((e) => console.error('[eliminar cuenta]', sql, e?.message));
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.errors?.[0]?.longMessage || pgErr(e) });
   }
 };

@@ -1,6 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 
 const srcPath = fileURLToPath(new URL("./src", import.meta.url));
 
@@ -11,6 +14,7 @@ export default defineConfig({
     // navegador), así que hay que capturarlo aquí y "quemarlo" en el bundle en build time.
     __APP_COMMIT__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA || "dev"),
     __APP_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __APP_VERSION__: JSON.stringify(pkg.version || ""),
   },
   resolve: {
     alias: {

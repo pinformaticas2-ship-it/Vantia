@@ -16,10 +16,19 @@ export interface Preferencias {
   atajos: boolean;
   cargo: string;
   telefono: string;
+  texto: TamanoTexto;
 }
 
+export type TamanoTexto = 'normal' | 'grande' | 'muy_grande';
+/** Tamaño de la letra base: todo lo demás va en rem y crece con ella. */
+export const TAMANOS_TEXTO: { valor: TamanoTexto; label: string; px: number }[] = [
+  { valor: 'normal', label: 'Normal', px: 16 },
+  { valor: 'grande', label: 'Grande', px: 17.5 },
+  { valor: 'muy_grande', label: 'Muy grande', px: 19 },
+];
+
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
-  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '',
+  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal',
 };
 
 export const PAGINAS_INICIO: { path: string; label: string }[] = [
@@ -45,6 +54,7 @@ function normalizar(raw: any): Preferencias {
     atajos: p.atajos !== false,
     cargo: typeof p.cargo === 'string' ? p.cargo : '',
     telefono: typeof p.telefono === 'string' ? p.telefono : '',
+    texto: p.texto === 'grande' || p.texto === 'muy_grande' ? p.texto : 'normal',
   };
 }
 
@@ -88,8 +98,14 @@ export function aplicarModo(modo: Modo) {
   else html.setAttribute('data-modo', nuevo);
 }
 
-// Lo antes posible (al importar el módulo): el modo guardado, sin parpadeo.
-if (typeof document !== 'undefined') aplicarModo(leerCache().modo);
+export function aplicarTexto(texto: TamanoTexto) {
+  const px = TAMANOS_TEXTO.find((t) => t.valor === texto)?.px ?? 16;
+  document.documentElement.style.fontSize = px === 16 ? '' : `${px}px`;
+  document.documentElement.style.setProperty('--escala-texto', String(px / 16));
+}
+
+// Lo antes posible (al importar el módulo): el modo y el tamaño guardados, sin parpadeo.
+if (typeof document !== 'undefined') { aplicarModo(leerCache().modo); aplicarTexto(leerCache().texto); }
 
 /** Primer día de la semana para la Agenda (lectura directa, sin contexto). */
 export function primerDiaSemana(): 'lunes' | 'domingo' {
@@ -117,6 +133,7 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
     setPrefs(p);
     try { localStorage.setItem(CLAVE, JSON.stringify(p)); } catch { /* sin almacenamiento */ }
     aplicarModo(p.modo);
+    aplicarTexto(p.texto);
   }, []);
 
   useEffect(() => {

@@ -4,8 +4,8 @@ import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
@@ -16,7 +16,7 @@ import AutomatizacionesPanel from './AutomatizacionesPanel';
 import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
-import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, IntegracionesPropias } from '../components/AjustesPaneles';
+import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
 import { usePreferencias, esOscuro } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
@@ -98,8 +98,8 @@ const PALETTES: {
   },
 ];
 
-const SECCIONES_VALIDAS: string[] = ['apariencia', 'perfil', 'preferencias', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'privacidad', 'usuarios'];
-type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'privacidad' | 'usuarios';
+const SECCIONES_VALIDAS: string[] = ['apariencia', 'perfil', 'preferencias', 'manual', 'misdatos', 'ayuda', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'privacidad', 'usuarios'];
+type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'misdatos' | 'ayuda' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'privacidad' | 'usuarios';
 
 // 14/10/2026: Ajustes en dos grupos -- lo tuyo (Mi cuenta) y lo del despacho.
 const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
@@ -108,7 +108,9 @@ const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
   { key: 'preferencias',  label: 'Preferencias de trabajo',  icon: SlidersHorizontal },
   { key: 'notificaciones', label: 'Notificaciones',          icon: Bell },
   { key: 'seguridad',     label: 'Seguridad',                icon: ShieldCheck },
+  { key: 'misdatos',      label: 'Mis datos y privacidad',   icon: Lock },
   { key: 'manual',        label: 'Manual de usuario',        icon: BookOpen },
+  { key: 'ayuda',         label: 'Ayuda e información',      icon: Info },
 ];
 const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGestor?: boolean }[] = [
   { key: 'despacho',        label: 'Mi Despacho',          icon: Building2 },
@@ -2040,6 +2042,7 @@ function ConfigInput({ label, value, onChange, placeholder }: {
 type TipoPrefAviso = 'chat' | 'correo' | 'whatsapp' | 'plazo' | 'vista' | 'soporte';
 interface AvisoPrefs {
   tipos: Record<TipoPrefAviso, boolean>;
+  email?: Record<TipoPrefAviso, boolean>;
   silencio: { activo: boolean; desde: string; hasta: string; finDeSemana: boolean };
 }
 
@@ -2051,6 +2054,8 @@ function NotificacionesPanel() {
   // Se guardan en el servidor, valen para todos tus dispositivos.
   const [prefs, setPrefs] = useState<AvisoPrefs | null>(null);
   const [enSilencioAhora, setEnSilencioAhora] = useState(false);
+  // Cuenta de correo propia desde la que salen los avisos por correo (o null).
+  const [cuentaCorreo, setCuentaCorreo] = useState<string | null | undefined>(undefined);
   const [guardado, setGuardado] = useState<'' | 'guardando' | 'ok' | 'error'>('');
   const [prueba, setPrueba] = useState<'' | 'enviando' | 'ok' | string>('');
   const guardarTimer = useRef<number | null>(null);
@@ -2062,7 +2067,7 @@ function NotificacionesPanel() {
         const token = await getToken();
         const res = await fetch('/api/push/preferencias', { headers: { Authorization: `Bearer ${token}` } });
         const d = await res.json().catch(() => null);
-        if (!cancelled && res.ok && d?.data?.prefs) { setPrefs(d.data.prefs); setEnSilencioAhora(Boolean(d.data.enSilencioAhora)); }
+        if (!cancelled && res.ok && d?.data?.prefs) { setPrefs(d.data.prefs); setEnSilencioAhora(Boolean(d.data.enSilencioAhora)); setCuentaCorreo(d.data.cuentaCorreo ?? null); }
       } catch { /* se queda sin cargar */ }
     })();
     return () => { cancelled = true; };
@@ -2187,9 +2192,21 @@ function NotificacionesPanel() {
             {guardado === 'guardando' ? 'Guardando…' : guardado === 'ok' ? 'Guardado' : guardado === 'error' ? 'No se pudo guardar' : 'Para todos tus dispositivos'}
           </span>
         </div>
+        <div className="mb-2 flex justify-end gap-3 pr-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <span className="w-9 text-center">Aviso</span>
+          <span className="w-9 text-center">Correo</span>
+        </div>
         <div className="space-y-3">
           {EVENTS.map((e) => {
             const on = prefs ? prefs.tipos[e.key] : true;
+            const porCorreo = Boolean(prefs?.email?.[e.key]);
+            const interruptor = (activo: boolean, etiqueta: string, onClick: () => void, deshabilitado = false) => (
+              <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} disabled={!prefs || deshabilitado} onClick={onClick}
+                title={deshabilitado ? 'Un correo para avisar de un correo no tiene sentido' : undefined}
+                className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${activo ? 'bg-red-600' : 'bg-slate-300'}`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            );
             return (
               <div key={e.key} className="flex items-start gap-3">
                 <e.icon size={16} className="text-slate-400 mt-0.5 shrink-0" />
@@ -2197,15 +2214,22 @@ function NotificacionesPanel() {
                   <p className="text-sm font-medium text-slate-700">{e.label}</p>
                   <p className="text-xs text-slate-500">{e.desc}</p>
                 </div>
-                <button type="button" role="switch" aria-checked={on} aria-label={e.label} disabled={!prefs}
-                  onClick={() => prefs && cambiarPrefs({ ...prefs, tipos: { ...prefs.tipos, [e.key]: !on } })}
-                  className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-red-600' : 'bg-slate-300'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </button>
+                {interruptor(on, `${e.label}: aviso en el navegador`,
+                  () => prefs && cambiarPrefs({ ...prefs, tipos: { ...prefs.tipos, [e.key]: !on } }))}
+                {interruptor(porCorreo, `${e.label}: por correo`,
+                  () => prefs && cambiarPrefs({ ...prefs, email: { ...(prefs.email || {} as Record<TipoPrefAviso, boolean>), [e.key]: !porCorreo } }),
+                  e.key === 'correo')}
               </div>
             );
           })}
         </div>
+        <p className="mt-4 text-xs text-slate-500">
+          {cuentaCorreo
+            ? <>Los avisos por correo salen de tu cuenta <span className="font-semibold text-slate-700">{cuentaCorreo}</span> y te llegan a tu correo de acceso. El chat y WhatsApp, como mucho uno cada 15 minutos.</>
+            : cuentaCorreo === null
+              ? <span className="text-amber-700">Para recibir avisos por correo necesitas una cuenta de correo conectada en <Link to="/dashboard/correo" className="font-semibold underline">Correo</Link>: los avisos salen desde ella.</span>
+              : null}
+        </p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -2240,7 +2264,7 @@ function NotificacionesPanel() {
               Y todo el fin de semana
             </label>
             <p className="mt-3 text-xs text-slate-500">
-              Los mensajes directos del chat y las vistas llegan siempre: son lo urgente. Los plazos que caigan en silencio se avisan al terminar.
+              Vale para el aviso y para el correo. Los mensajes directos del chat y las vistas llegan siempre: son lo urgente. Los plazos que caigan en silencio se avisan al terminar.
               {prefs.silencio.activo && enSilencioAhora && <span className="ml-1 font-semibold text-slate-700">Ahora mismo estás en silencio.</span>}
             </p>
           </div>
@@ -2352,6 +2376,9 @@ export default function Configuracion() {
               {/* Claro / oscuro / como el sistema */}
               <SelectorModo />
 
+              {/* Tamaño del texto (accesibilidad) */}
+              <SelectorTexto />
+
               {/* Tema del sistema */}
               <section className="mb-10">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tema del Entorno de Trabajo</h3>
@@ -2377,6 +2404,10 @@ export default function Configuracion() {
             <ManualPanel />
           ) : activeSection === 'despacho' ? (
             <><DespachoPanel /><PlantillasNubeConfig /></>
+          ) : activeSection === 'misdatos' ? (
+            <MisDatosPanel />
+          ) : activeSection === 'ayuda' ? (
+            <AyudaPanel />
           ) : activeSection === 'perfil' ? (
             <PerfilPanel />
           ) : activeSection === 'preferencias' ? (
