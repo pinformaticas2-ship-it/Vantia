@@ -287,13 +287,15 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Vista previa · {tab === 'aceptar' ? 'al aceptar' : 'al rechazar'}</h3>
               {previewLoading && <Loader2 size={12} className="animate-spin text-slate-400" />}
             </div>
-            <div className="flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
+            {/* La tarjeta ocupa todo el alto de la columna (que es el del formulario)
+                y el correo, todo lo que queda: sin hueco en blanco debajo. */}
+            <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className="shrink-0 border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
                 <p><span className="text-slate-400">Para:</span> procurador@ejemplo.es</p>
                 <p><span className="text-slate-400">Asunto:</span> <b className="text-slate-700">{actual?.asunto || '…'}</b></p>
               </div>
               <iframe title="Vista previa del correo" sandbox="" srcDoc={actual ? `<!doctype html><meta charset="utf-8"><body style="margin:16px">${actual.html}</body>` : ''}
-                className="h-[min(420px,50vh)] w-full" />
+                className="min-h-[min(420px,50vh)] w-full flex-1" />
             </div>
             <p className="mt-2 text-[11px] text-slate-400">Datos de ejemplo. En cada vista se usan los reales.</p>
           </div>
