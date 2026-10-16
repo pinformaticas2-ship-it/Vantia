@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, ReactNode, useContext } from "react";
 import { SidebarContext } from "../layouts/DashboardLayout";
 import { Spinner } from "../components/Spinner";
+import { HalloweenDecor } from "../components/HalloweenDecor";
 import { createPortal } from "react-dom";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import {
@@ -1601,7 +1602,7 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
 
       {/* CABECERA */}
       <div className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 anim-fade-up">
@@ -1783,6 +1784,7 @@ export default function DashboardHome() {
           onDelete={() => deleteEmailMsg({ id: previewEmailId, is_read: true })}
         />
       )}
+      <HalloweenDecor />
     </div>
   );
 }
