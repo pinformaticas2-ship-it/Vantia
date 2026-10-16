@@ -1,25 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Decoración temporal de Halloween para el dashboard: telaraña en la esquina
 // y una araña colgando de su hilo. Deja de mostrarse a partir del 2 de noviembre.
-// 16/10/2026: se puede tirar de la araña (ratón o dedo): el hilo se estira y,
-// al soltarla, vuelve rebotando como un muelle.
+// 16/10/2026: se puede tirar de la araña (ratón o dedo), sin límite de
+// distancia: el hilo se estira y, al soltarla, vuelve rebotando como un muelle.
+// Por eso la araña y su hilo van en una capa por encima de toda la pantalla
+// (si no, el panel del dashboard la recortaría al sacarla de él), enganchada
+// a la telaraña. Colgando quieta se recorta como si siguiera dentro del panel.
 const HALLOWEEN_END = new Date(2026, 10, 2); // 2 nov 2026, 00:00 (hora local)
 
 export function isHalloweenActive(now = new Date()): boolean {
   return now < HALLOWEEN_END;
 }
 
-// Punto donde cuelga el hilo y posición de la araña en reposo (unidades del SVG = px)
-const ANCLA = { x: 70, y: -40 };
-const REPOSO = { x: 70, y: 160 };
-// Hasta dónde se puede estirar (respecto al reposo)
-const LIMITE = { izq: -140, der: 80, arriba: -110, abajo: 320 };
+// Punto de la telaraña del que cuelga el hilo y largo del hilo en reposo (px)
+const ANCLA_EN_TELA = { x: 70, y: 0 };
+const LARGO_HILO = 160;
 // Muelle: rigidez y amortiguación (por fotograma a 60 fps)
 const RIGIDEZ = 0.06;
 const AMORTIGUACION = 0.88;
 
-const limitar = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+/** Contenedor que recorta al dashboard (el primero con scroll u overflow oculto). */
+function contenedorQueRecorta(el: Element | null): Element | null {
+  for (let n = el?.parentElement; n; n = n.parentElement) {
+    const o = getComputedStyle(n);
+    if (/(auto|scroll|hidden|clip)/.test(o.overflow + o.overflowX + o.overflowY)) return n;
+  }
+  return null;
+}
 
 export function HalloweenDecor() {
   // Desplazamiento de la araña respecto al reposo
@@ -31,8 +40,43 @@ export function HalloweenDecor() {
   const ultimo = useRef({ x: 0, y: 0, t: 0 });
   const raf = useRef<number | null>(null);
   const grupoBajada = useRef<SVGGElement>(null);
+  const tela = useRef<SVGSVGElement>(null);
+  // Dónde está, en pantalla, el punto del que cuelga, y el recorte del panel
+  const [ancla, setAncla] = useState<{ x: number; y: number } | null>(null);
+  const [recorte, setRecorte] = useState("none");
 
   useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
+
+  // Sigue a la telaraña al hacer scroll, cambiar el tamaño o plegar la barra lateral
+  useLayoutEffect(() => {
+    if (!isHalloweenActive()) return;
+    let pendiente = 0;
+    const medir = () => {
+      pendiente = 0;
+      const r = tela.current?.getBoundingClientRect();
+      if (!r) return;
+      const n = { x: r.left + ANCLA_EN_TELA.x, y: r.top + ANCLA_EN_TELA.y };
+      setAncla((a) => (a && Math.abs(a.x - n.x) < 0.5 && Math.abs(a.y - n.y) < 0.5 ? a : n));
+      const c = contenedorQueRecorta(tela.current)?.getBoundingClientRect();
+      setRecorte(c
+        ? `inset(${Math.max(0, c.top)}px ${Math.max(0, window.innerWidth - c.right)}px ${Math.max(0, window.innerHeight - c.bottom)}px ${Math.max(0, c.left)}px)`
+        : "none");
+    };
+    const programar = () => { if (!pendiente) pendiente = requestAnimationFrame(medir); };
+    medir();
+    window.addEventListener("scroll", programar, true);
+    window.addEventListener("resize", programar);
+    const ro = new ResizeObserver(programar);
+    ro.observe(document.body);
+    const c = contenedorQueRecorta(tela.current);
+    if (c) ro.observe(c);
+    return () => {
+      window.removeEventListener("scroll", programar, true);
+      window.removeEventListener("resize", programar);
+      ro.disconnect();
+      if (pendiente) cancelAnimationFrame(pendiente);
+    };
+  }, []);
 
   if (!isHalloweenActive()) return null;
 
@@ -79,8 +123,8 @@ export function HalloweenDecor() {
   const onPointerMove = (e: React.PointerEvent<SVGGElement>) => {
     if (!inicio.current) return;
     const nuevo = {
-      x: limitar(inicio.current.x + e.clientX - inicio.current.px, LIMITE.izq, LIMITE.der),
-      y: limitar(inicio.current.y + e.clientY - inicio.current.py, LIMITE.arriba, LIMITE.abajo),
+      x: inicio.current.x + e.clientX - inicio.current.px,
+      y: inicio.current.y + e.clientY - inicio.current.py,
     };
     // Velocidad con la que se suelta (px por fotograma), para que salga lanzada
     const ahora = performance.now();
@@ -100,9 +144,58 @@ export function HalloweenDecor() {
 
   // Mientras se tira de ella o rebota, sin el balanceo automático
   const enMovimiento = agarrada || rebotando;
-  const arana = { x: REPOSO.x + desp.x, y: REPOSO.y + desp.y };
+  const a = ancla || { x: 0, y: 0 };
+  const arana = { x: a.x + desp.x, y: a.y + LARGO_HILO + desp.y };
   // La araña se inclina hacia donde tira el hilo
-  const giro = (Math.atan2(arana.x - ANCLA.x, arana.y - ANCLA.y) * -180) / Math.PI;
+  const giro = (Math.atan2(arana.x - a.x, arana.y - a.y) * -180) / Math.PI;
+
+  const capaArana = ancla && createPortal(
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-[45] select-none text-slate-400/70"
+      width="100%" height="100%" fill="none" stroke="currentColor" strokeLinecap="round"
+      // Quieta, se recorta como si siguiera dentro del panel; al tirar, por toda la pantalla
+      style={{ clipPath: enMovimiento ? "none" : recorte }}
+    >
+      <g className={enMovimiento ? undefined : "vantia-spider-sway"} style={{ transformOrigin: `${a.x}px ${a.y}px` }}>
+        <g ref={grupoBajada} className={enMovimiento ? undefined : "vantia-spider-drop"}>
+          <line x1={a.x} y1={a.y} x2={arana.x} y2={arana.y - 10} strokeWidth="0.8" />
+          <g
+            transform={`translate(${arana.x} ${arana.y}) rotate(${enMovimiento ? giro : 0})`}
+            className="vantia-spider text-slate-800"
+            stroke="currentColor"
+            fill="currentColor"
+            style={{ pointerEvents: "auto" }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            {/* Zona para agarrarla más fácil que el propio dibujo */}
+            <circle cx="0" cy="2" r="24" fill="transparent" stroke="none" />
+            {/* Patas */}
+            <g strokeWidth="1.6" fill="none">
+              <path d="M-5 -2 Q-14 -12 -20 -6" />
+              <path d="M-5 1 Q-16 -3 -22 4" />
+              <path d="M-5 4 Q-15 6 -20 14" />
+              <path d="M-4 6 Q-11 12 -14 20" />
+              <path d="M5 -2 Q14 -12 20 -6" />
+              <path d="M5 1 Q16 -3 22 4" />
+              <path d="M5 4 Q15 6 20 14" />
+              <path d="M4 6 Q11 12 14 20" />
+            </g>
+            {/* Cuerpo */}
+            <ellipse cx="0" cy="4" rx="7" ry="8.5" stroke="none" />
+            <circle cx="0" cy="-6" r="4.5" stroke="none" />
+            {/* Ojos */}
+            <circle cx="-1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
+            <circle cx="1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
+          </g>
+        </g>
+      </g>
+    </svg>,
+    document.body,
+  );
 
   return (
     <div
@@ -119,7 +212,7 @@ export function HalloweenDecor() {
           0%, 100% { transform: rotate(-3deg); }
           50%      { transform: rotate(3deg); }
         }
-        .vantia-spider-sway { transform-origin: 70px 0; animation: vantia-spider-sway 5s ease-in-out infinite; }
+        .vantia-spider-sway { animation: vantia-spider-sway 5s ease-in-out infinite; }
         .vantia-spider-drop { animation: vantia-spider-drop 4s ease-in-out infinite; }
         .vantia-spider { cursor: grab; touch-action: none; }
         .vantia-spider:active { cursor: grabbing; }
@@ -128,7 +221,7 @@ export function HalloweenDecor() {
         }
       `}</style>
 
-      <svg width="170" height="230" viewBox="0 0 170 230" fill="none" stroke="currentColor" strokeLinecap="round" style={{ overflow: "visible" }}>
+      <svg ref={tela} width="170" height="230" viewBox="0 0 170 230" fill="none" stroke="currentColor" strokeLinecap="round">
         {/* Telaraña anclada en la esquina superior derecha */}
         <g strokeWidth="1">
           {/* Radios */}
@@ -154,45 +247,8 @@ export function HalloweenDecor() {
             return <path key={i} d={d} strokeWidth={i === 3 ? 1.1 : 0.9} />;
           })}
         </g>
-
-        {/* Araña colgando: se puede agarrar y estirar del hilo */}
-        <g className={enMovimiento ? undefined : "vantia-spider-sway"}>
-          <g ref={grupoBajada} className={enMovimiento ? undefined : "vantia-spider-drop"}>
-            <line x1={ANCLA.x} y1={ANCLA.y} x2={arana.x} y2={arana.y - 10} strokeWidth="0.8" />
-            <g
-              transform={`translate(${arana.x} ${arana.y}) rotate(${enMovimiento ? giro : 0})`}
-              className="vantia-spider text-slate-800"
-              stroke="currentColor"
-              fill="currentColor"
-              style={{ pointerEvents: "auto" }}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-            >
-              {/* Zona para agarrarla más fácil que el propio dibujo */}
-              <circle cx="0" cy="2" r="24" fill="transparent" stroke="none" />
-              {/* Patas */}
-              <g strokeWidth="1.6" fill="none">
-                <path d="M-5 -2 Q-14 -12 -20 -6" />
-                <path d="M-5 1 Q-16 -3 -22 4" />
-                <path d="M-5 4 Q-15 6 -20 14" />
-                <path d="M-4 6 Q-11 12 -14 20" />
-                <path d="M5 -2 Q14 -12 20 -6" />
-                <path d="M5 1 Q16 -3 22 4" />
-                <path d="M5 4 Q15 6 20 14" />
-                <path d="M4 6 Q11 12 14 20" />
-              </g>
-              {/* Cuerpo */}
-              <ellipse cx="0" cy="4" rx="7" ry="8.5" stroke="none" />
-              <circle cx="0" cy="-6" r="4.5" stroke="none" />
-              {/* Ojos */}
-              <circle cx="-1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
-              <circle cx="1.7" cy="-6.5" r="1.1" fill="#ef4444" stroke="none" />
-            </g>
-          </g>
-        </g>
       </svg>
+      {capaArana}
     </div>
   );
 }
