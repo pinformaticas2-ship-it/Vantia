@@ -2,7 +2,7 @@ import { Response } from 'express';
 import path from 'path';
 import { rutaPlantillaOrg, nombrePlantillaOrg } from './filesController';
 import { camposDePlantilla, rellenarPlantilla, leerComoDocx, claveCanonica } from '../services/plantillasWord';
-import { contextoPlantilla, valorVantia, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho } from '../services/plantillasDatos';
+import { contextoPlantilla, valorVantia, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho, logoDespachoConAviso } from '../services/plantillasDatos';
 import { logActivityForReq } from './activityController';
 
 // ── Rellenar plantillas Word (15/10/2026) ───────────────────────────────────
@@ -36,7 +36,7 @@ export const camposPlantilla = async (req: any, res: Response) => {
     if (expedienteId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
     if (clienteId && !(ctx as any).clienteEncontrado) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
-    const logo = nombres.some(esCampoLogo) ? await logoDespacho(req.organizacionId) : null;
+    const { logo, aviso: avisoLogo } = nombres.some(esCampoLogo) ? await logoDespachoConAviso(req.organizacionId) : { logo: null, aviso: null };
     const campos = nombres.map((nombre) => {
       const clave = claveCanonica(nombre);
       // El logo es una imagen: sale de Mi Despacho, no se escribe.
@@ -44,7 +44,7 @@ export const camposPlantilla = async (req: any, res: Response) => {
         return {
           nombre, clave, etiqueta: etiquetaDe(nombre), grupo: grupoDe(clave).grupo,
           valor: logo ? 'Logo de Mi Despacho' : '', origen: logo ? 'vantia' : 'vacio',
-          conoceVantia: true, deDespacho: true, imagen: true, imagenUrl: logo?.url || null,
+          conoceVantia: true, deDespacho: true, imagen: true, imagenUrl: logo?.url || null, avisoImagen: avisoLogo,
         };
       }
       const deVantia = valorVantia(nombre, ctx);

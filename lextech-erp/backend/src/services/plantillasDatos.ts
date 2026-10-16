@@ -1,5 +1,8 @@
+import fs from 'fs';
+import path from 'path';
 import pool from '../config/database';
-import { claveCanonica } from './plantillasWord';
+import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
+import { claveCanonica, medidasImagen } from './plantillasWord';
 
 // ── Datos de Vantia para los campos de MN Program (15/10/2026) ───────────────
 // Traduce cada campo de las plantillas («Contrario_Principal_Nombre»,
@@ -399,15 +402,28 @@ export const esCampoLogo = (nombre: string) => {
   return c.includes('LOGO') && grupoDe(c).grupo === 'Despacho';
 };
 
-/** El logo de Mi Despacho (guardado en misc_uploads), o null si no hay. */
-export async function logoDespacho(organizacionId: string): Promise<{ buffer: Buffer; mime: string; url: string } | null> {
+export interface LogoDespacho { buffer: Buffer; mime: string; url: string }
+
+/** El logo de Mi Despacho listo para Word, o el motivo por el que no se puede
+ *  poner (no hay, el archivo se perdió, o es WebP/SVG/BMP y Word no lo pinta). */
+export async function logoDespachoConAviso(organizacionId: string): Promise<{ logo: LogoDespacho | null; aviso: string | null }> {
   const { rows } = await pool.query(`SELECT logo_url FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
   const url: string | undefined = rows[0]?.logo_url;
-  if (!url) return null;
-  const archivo = url.split('/').pop() || '';
+  if (!url) return { logo: null, aviso: 'sin_logo' };
+  const archivo = path.basename(url.split('?')[0]);
   const { rows: m } = await pool.query(
     `SELECT mimetype, data FROM misc_uploads WHERE filename = $1 AND kind = 'org_logo'`, [archivo],
   ).catch(() => ({ rows: [] as any[] }));
-  if (m[0]?.data) return { buffer: Buffer.from(m[0].data), mime: m[0].mimetype || 'image/png', url };
-  return null;
+  let buffer: Buffer | null = m[0]?.data ? Buffer.from(m[0].data) : null;
+  // Logos subidos antes de guardarse en la base de datos: siguen en disco.
+  if (!buffer) buffer = await fs.promises.readFile(path.join(UPLOADS_ORG_LOGOS_ROOT, archivo)).catch(() => null);
+  if (!buffer) return { logo: null, aviso: 'perdido' };
+  const medidas = medidasImagen(buffer);
+  if (!medidas) return { logo: null, aviso: 'formato' };
+  return { logo: { buffer, mime: `image/${medidas.ext}`, url }, aviso: null };
+}
+
+/** El logo de Mi Despacho listo para Word, o null si no se puede poner. */
+export async function logoDespacho(organizacionId: string): Promise<LogoDespacho | null> {
+  return (await logoDespachoConAviso(organizacionId)).logo;
 }

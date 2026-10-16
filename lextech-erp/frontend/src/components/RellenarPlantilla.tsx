@@ -23,6 +23,8 @@ interface Campo {
   /** El logo: una imagen que sale de Ajustes → Mi Despacho (no se escribe). */
   imagen?: boolean;
   imagenUrl?: string | null;
+  /** Por qué no se puede poner: sin_logo | perdido | formato. */
+  avisoImagen?: string | null;
 }
 
 const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
@@ -179,7 +181,10 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                         </div>
                       ) : (
                         <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-                          El despacho no tiene logo: súbelo en <Link to="/dashboard/config?section=despacho" className="font-semibold underline">Ajustes → Mi Despacho</Link> y saldrá en todos los documentos.
+                          {c.avisoImagen === 'formato' ? 'El logo del despacho está en un formato que Word no muestra (usa PNG o JPG): vuelve a subirlo en '
+                            : c.avisoImagen === 'perdido' ? 'No se encuentra el archivo del logo del despacho: vuelve a subirlo en '
+                            : 'El despacho no tiene logo: súbelo en '}
+                          <Link to="/dashboard/config?section=despacho" className="font-semibold underline">Ajustes → Mi Despacho</Link> y saldrá en todos los documentos.
                         </p>
                       )
                     ) : largo ? (
