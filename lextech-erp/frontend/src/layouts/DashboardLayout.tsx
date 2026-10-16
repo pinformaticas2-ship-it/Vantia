@@ -31,6 +31,7 @@ import { usePushNotifications, soltarPushDeEsteNavegador } from "../lib/usePushN
 import { useVistasStatus } from "../lib/useVistasStatus";
 import { useAparienciaClerk } from "../lib/preferencias";
 import { suscribirTiempoReal } from "../lib/realtime";
+import { PumpkinShape, isHalloweenActive } from "../components/HalloweenDecor";
 
 // Días entre hoy y una fecha, contados en el calendario de Madrid (antes en
 // la hora local del navegador y con redondeos: de noche decía "Vence hoy"
@@ -372,6 +373,7 @@ function friendlyVantiaError(raw: string): string {
 
 function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
+  const halloween = isHalloweenActive();
   const [everOpened, setEverOpened] = useState(false);
   // "Brillito" que avisa de una respuesta lista mientras el chat está
   // cerrado -- openRef existe porque send()/retryLast()/regenerate() son
@@ -940,7 +942,9 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           } ${
             open
               ? "bg-neutral-800 shadow-neutral-900/30 rotate-90"
-              : "bg-red-600 shadow-red-700/30 group-hover:shadow-red-700/50"
+              : halloween
+                ? "bg-transparent shadow-none"
+                : "bg-red-600 shadow-red-700/30 group-hover:shadow-red-700/50"
           }`}
         >
           {!open && loading && (
@@ -954,7 +958,9 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             </span>
           )}
 
-          <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""}`}>
+          {!open && halloween && <PumpkinShape className="absolute -inset-1 h-16 w-16" />}
+
+          <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""} ${!open && halloween ? "translate-y-1" : ""}`}>
             {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
           </span>
         </button>

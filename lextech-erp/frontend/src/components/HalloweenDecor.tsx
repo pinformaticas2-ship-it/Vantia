@@ -252,3 +252,22 @@ export function HalloweenDecor() {
     </div>
   );
 }
+
+// Fondo con forma de calabaza para el botón del asistente IA durante Halloween.
+export function PumpkinShape({ className = "" }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 56 56" className={`drop-shadow-lg ${className}`}>
+      {/* Tallo */}
+      <path d="M27 11 Q26 5 31 2 L33 4.5 Q30 7 30.5 11 Z" fill="#3f6212" />
+      <path d="M31 6 Q37 4 39 8" stroke="#4d7c0f" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      {/* Gajos */}
+      <ellipse cx="15" cy="32" rx="13" ry="19" fill="#c2410c" />
+      <ellipse cx="41" cy="32" rx="13" ry="19" fill="#c2410c" />
+      <ellipse cx="21" cy="32" rx="11" ry="20" fill="#ea580c" />
+      <ellipse cx="35" cy="32" rx="11" ry="20" fill="#ea580c" />
+      <ellipse cx="28" cy="32" rx="10" ry="21" fill="#f97316" />
+      {/* Brillo */}
+      <ellipse cx="22" cy="21" rx="3" ry="6" fill="#fff" opacity="0.18" />
+    </svg>
+  );
+}
