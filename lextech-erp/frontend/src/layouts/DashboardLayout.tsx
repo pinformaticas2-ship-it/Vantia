@@ -29,6 +29,7 @@ import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadC
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 import { usePushNotifications, soltarPushDeEsteNavegador } from "../lib/usePushNotifications";
 import { useVistasStatus } from "../lib/useVistasStatus";
+import { useAparienciaClerk } from "../lib/preferencias";
 import { suscribirTiempoReal } from "../lib/realtime";
 
 // Días entre hoy y una fecha, contados en el calendario de Madrid (antes en
@@ -1715,6 +1716,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   onToggleCollapse?: () => void;
 }) {
   const { user } = useUser();
+  const aparienciaClerk = useAparienciaClerk();
   const { totalUnread } = useChatUnread();
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
@@ -2150,11 +2152,11 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-3" : "px-3 pb-3"}`}>
         {collapsed ? (
           <div className="flex justify-center">
-            <UserButton afterSignOutUrl="/" />
+            <UserButton afterSignOutUrl="/" appearance={aparienciaClerk} userProfileProps={{ appearance: aparienciaClerk }} />
           </div>
         ) : (
           <div className="erp-sidebar-user flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
-            <UserButton afterSignOutUrl="/" />
+            <UserButton afterSignOutUrl="/" appearance={aparienciaClerk} userProfileProps={{ appearance: aparienciaClerk }} />
             <div className="flex-1 min-w-0">
               <p className="erp-sidebar-username text-[13px] font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
               <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>

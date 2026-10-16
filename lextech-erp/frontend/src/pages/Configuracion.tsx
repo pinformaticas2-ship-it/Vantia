@@ -17,7 +17,7 @@ import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
-import { usePreferencias, esOscuro } from '../lib/preferencias';
+import { usePreferencias, esOscuro, useAparienciaClerk } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
@@ -233,7 +233,7 @@ function PaletteCard({ p, active, onClick }: {
             <p className="text-xs text-slate-400 leading-snug mt-0.5 truncate">{p.description}</p>
           </div>
         </div>
-        <span className={`shrink-0 text-[11px] font-bold transition-colors ${active ? '' : 'text-slate-300 group-hover:text-slate-400'}`} style={active ? { color: p.accent } : undefined}>
+        <span className={`shrink-0 text-[11px] font-bold transition-colors ${active ? '' : 'text-slate-300 group-hover:text-slate-400'}`} style={active ? { color: oscuro ? `color-mix(in srgb, ${p.accent} 55%, white)` : p.accent } : undefined}>
           {active ? 'En uso' : 'Aplicar'}
         </span>
       </div>
@@ -1407,6 +1407,13 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
 
 function SeguridadPanel() {
   const navigate = useNavigate();
+  const apariencia = useAparienciaClerk({
+    elements: {
+      formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
+      badge: 'bg-red-50 text-[#ab0433]',
+    },
+    variables: { colorPrimary: '#ab0433' },
+  });
 
   return (
     <div className="space-y-6">
@@ -1422,13 +1429,7 @@ function SeguridadPanel() {
         <div className="mx-auto max-w-3xl flex justify-center">
           <UserProfile
             routing="hash"
-            appearance={{
-              elements: {
-                formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
-                badge: 'bg-red-50 text-[#ab0433]',
-              },
-              variables: { colorPrimary: '#ab0433' },
-            }}
+            appearance={apariencia}
           />
         </div>
       </div>

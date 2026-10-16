@@ -172,3 +172,25 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
 export function usePreferencias() {
   return useContext(PreferenciasContext);
 }
+
+/** Colores para los componentes de Clerk (Seguridad, menú del usuario): no
+ *  usan las clases de la app, así que el modo oscuro hay que pasárselo. Los
+ *  mismos grises que lib/temasExtra.css. */
+export function useAparienciaClerk(base: { variables?: Record<string, string>; elements?: Record<string, any> } = {}) {
+  const { prefs } = usePreferencias();
+  if (!esOscuro(prefs.modo)) return base;
+  return {
+    ...base,
+    variables: {
+      ...base.variables,
+      colorBackground: '#1a1d22',
+      colorText: '#eef0f3',
+      colorTextSecondary: '#aeb5bf',
+      colorInputBackground: '#262a31',
+      colorInputText: '#eef0f3',
+      colorNeutral: '#eef0f3',
+      colorTextOnPrimaryBackground: '#ffffff',
+      colorShimmer: 'rgba(255,255,255,0.08)',
+    },
+  };
+}
