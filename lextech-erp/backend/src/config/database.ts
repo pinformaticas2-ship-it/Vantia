@@ -38,8 +38,15 @@ const pool = new Pool({
   ...(connectionFamily ? { family: connectionFamily } : {}),
   ...(lookup ? { lookup } : {}),
   ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
-  max: isSupabasePooler ? 5 : 20,
-  idleTimeoutMillis: isSupabasePooler ? 10_000 : 30_000,
+  // 19/10/2026: con 5 conexiones (y cerrándolas a los 10 s sin uso) la app
+  // hacía cola: una consulta suelta tardaba de 1 a 6 s en producción. Cada
+  // conexión nueva al pooler de Supabase (Irlanda) cuesta varios viajes de ida
+  // y vuelta (TCP, TLS, contraseña), así que se mantienen abiertas más tiempo.
+  // PG_POOL_MAX permite ajustarlo sin tocar el código (no pasar del "pool size" del
+  // pooler de Supabase en modo sesión, contando con que al desplegar conviven
+  // dos instancias un momento).
+  max: Number(process.env.PG_POOL_MAX) || (isSupabasePooler ? 8 : 20),
+  idleTimeoutMillis: isSupabasePooler ? 5 * 60_000 : 30_000,
   connectionTimeoutMillis: 15_000,
   allowExitOnIdle: false,
   keepAlive: true,

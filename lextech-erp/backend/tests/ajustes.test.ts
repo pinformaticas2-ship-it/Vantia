@@ -51,13 +51,16 @@ after(async () => { if (pool) await pool.end(); });
 test('preferencias personales: por defecto, cambios parciales y valores no válidos', { skip }, async () => {
   const p = await import('../src/controllers/preferencesController');
   const ini = await call(p.getMyExtras, 'aj_miembro');
-  assert.deepEqual(ini.body.data, { modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '' });
+  assert.deepEqual(ini.body.data, { modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal' });
   await call(p.updateMyExtras, 'aj_miembro', { body: { modo: 'oscuro', inicio: '/dashboard/agenda' } });
   const r = await call(p.updateMyExtras, 'aj_miembro', { body: { cargo: '  Abogada  ', telefono: '+34 600 <b>11 22 33', inicio: 'https://malo.example', modo: 'neón' } });
   assert.equal(r.body.data.modo, 'oscuro', 'un valor no válido no pisa el guardado');
   assert.equal(r.body.data.inicio, '/dashboard/agenda', 'solo páginas de la lista');
   assert.equal(r.body.data.cargo, 'Abogada');
   assert.equal(r.body.data.telefono, '+34 600 11 22 33');
+  // Tamaño del texto: solo los de la lista
+  assert.equal((await call(p.updateMyExtras, 'aj_miembro', { body: { texto: 'grande' } })).body.data.texto, 'grande');
+  assert.equal((await call(p.updateMyExtras, 'aj_miembro', { body: { texto: 'enorme' } })).body.data.texto, 'grande');
 });
 
 test('datos y privacidad: solo propietario/admin; retención borra lo antiguo', { skip }, async () => {

@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { tomarTurno, soltarTurno } from '../utils/turnos';
 import {
   RETENCION_DIAS, AVISO_DIAS_ANTES, buildTicketsCsv, sendOrgEmail, getSoporteEmail,
   emailLayout, escapeHtml, fmtFecha, ticketRef,
@@ -142,22 +143,19 @@ async function borrarCaducados(): Promise<void> {
 }
 
 export async function runSoporteRetencion(): Promise<void> {
-  // Lock de sesión: si hubiera más de una instancia del backend, solo una
-  // hace la pasada (evita avisos duplicados).
-  const lockClient = await pool.connect();
+  // Turno (utils/turnos.ts): si hubiera más de una instancia del backend,
+  // solo una hace la pasada (evita avisos duplicados), sin retener una
+  // conexión del pool mientras tanto.
   try {
-    const { rows } = await lockClient.query(`SELECT pg_try_advisory_lock(hashtext($1)) AS ok`, [LOCK_KEY]);
-    if (!rows[0]?.ok) return;
+    if (!(await tomarTurno(LOCK_KEY, 30 * 60 * 1000))) return;
     try {
       await avisarPendientes();
       await borrarCaducados();
     } finally {
-      await lockClient.query(`SELECT pg_advisory_unlock(hashtext($1))`, [LOCK_KEY]).catch(() => {});
+      await soltarTurno(LOCK_KEY);
     }
   } catch (e) {
     console.error('[soporte] runSoporteRetencion:', e);
-  } finally {
-    lockClient.release();
   }
 }
 

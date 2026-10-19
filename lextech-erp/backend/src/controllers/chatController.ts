@@ -513,17 +513,24 @@ export async function sendMensaje(req: Request, res: Response) {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
     `, [id, userId, userName, avatarUrl, (contenido || '').trim() || fallbackContent, normalizedType, reply_to_id || null, gif_url || null, image_url || null, file_url || null, file_name || null, file_mime || null]);
     const msg: any = { ...rows[0], reacciones: null, reply_to: null };
-    if (reply_to_id) {
-      const { rows: r } = await pool.query(`SELECT * FROM chat_mensajes WHERE id = $1`, [reply_to_id]);
-      msg.reply_to = r[0] || null;
-    }
-    // Actualizar last_read_at del propio autor
-    await pool.query(`UPDATE chat_miembros SET last_read_at = NOW() WHERE canal_id = $1 AND user_id = $2`, [id, userId]);
-    await pool.query(`DELETE FROM chat_typing_status WHERE canal_id = $1 AND user_id = $2`, [id, userId]);
-    // Actualizar avatar en miembros
-    await pool.query(`UPDATE chat_miembros SET avatar_url = COALESCE($1, avatar_url), user_name = $2 WHERE canal_id = $3 AND user_id = $4`,
-      [avatarUrl, userName, id, userId]);
-    await pool.query(`UPDATE chat_canales SET updated_at = NOW() WHERE id = $1`, [id]);
+    // 19/10/2026: lo que va después del mensaje, en un solo viaje a la base de
+    // datos (antes eran cuatro seguidos, y cada uno cuesta un viaje de ida y
+    // vuelta al servidor de Supabase): leído y avatar del autor, fuera su
+    // "escribiendo..." y el canal sube en la lista.
+    const [replyRows] = await Promise.all([
+      reply_to_id ? pool.query(`SELECT * FROM chat_mensajes WHERE id = $1`, [reply_to_id]).then((r) => r.rows) : Promise.resolve([]),
+      pool.query(
+        `WITH autor AS (
+           UPDATE chat_miembros SET last_read_at = NOW(), avatar_url = COALESCE($1, avatar_url), user_name = $2
+            WHERE canal_id = $3 AND user_id = $4 RETURNING 1
+         ), escribiendo AS (
+           DELETE FROM chat_typing_status WHERE canal_id = $3 AND user_id = $4 RETURNING 1
+         )
+         UPDATE chat_canales SET updated_at = NOW() WHERE id = $3`,
+        [avatarUrl, userName, id, userId],
+      ),
+    ]);
+    msg.reply_to = replyRows[0] || null;
 
     // Push a los demás miembros del canal (nunca al propio autor). No se
     // espera (fire-and-forget): si falla o tarda, no debe retrasar la

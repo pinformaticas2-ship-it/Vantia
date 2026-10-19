@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import pool from '../config/database';
+import { tomarTurno, renovarTurno, soltarTurno } from '../utils/turnos';
 import {
   syncImapAccountRecord,
   syncGmailProfileRecord,
@@ -1295,10 +1296,12 @@ async function sendDueReminders(): Promise<void> {
 
 // ── Programador ──────────────────────────────────────────────────────────────
 
-// Clave fija para pg_try_advisory_lock: si hay más de una instancia del
-// backend (o una pasada se alarga más que el intervalo), solo una procesa a
-// la vez y nunca se crean dos solicitudes ni se avisa dos veces.
-const ADVISORY_LOCK_KEY = 74_810_233;
+// Turno (utils/turnos.ts): si hay más de una instancia del backend, solo una
+// procesa a la vez y nunca se crean dos solicitudes ni se avisa dos veces.
+// 19/10/2026: antes era pg_try_advisory_lock, que retenía una conexión del
+// pool durante toda la pasada (y el pool de Supabase es pequeño).
+const TURNO = 'vistas';
+const TURNO_MS = 5 * 60 * 1000;
 let running = false;
 // Organizaciones con correo nuevo avisado (IMAP IDLE) mientras ya había una
 // pasada en marcha: se procesan justo al terminarla, sin esperar al minuto.
@@ -1316,13 +1319,10 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
   running = true;
   for (const id of onlyOrgIds || []) pendingOrgs.delete(id);
   if (!onlyOrgIds) pendingOrgs.clear();
-  const client = await pool.connect().catch(() => null);
-  if (!client) { running = false; return; }
   await heartbeatStart('vistas');
   let hbOrgs = 0;
   try {
-    const { rows: lock } = await client.query(`SELECT pg_try_advisory_lock($1) AS ok`, [ADVISORY_LOCK_KEY]);
-    if (!lock[0]?.ok) return;
+    if (!(await tomarTurno(TURNO, TURNO_MS))) return;
     try {
       const { rows: orgs } = await pool.query(
         `SELECT id, nombre, vistas_auto_config, vistas_auto_activated_at
@@ -1333,6 +1333,7 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
       );
       hbOrgs = orgs.length;
       for (const org of orgs) {
+        await renovarTurno(TURNO, TURNO_MS);
         let lastError: string | null = null;
         try {
           lastError = await processOrganizacion(org);
@@ -1347,12 +1348,11 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
       }
       await sendDueReminders();
     } finally {
-      await client.query(`SELECT pg_advisory_unlock($1)`, [ADVISORY_LOCK_KEY]).catch(() => {});
+      await soltarTurno(TURNO);
     }
   } catch (e) {
     console.error('[vistas] runVistasTick:', e);
   } finally {
-    client.release();
     running = false;
     await heartbeatEnd('vistas', { organizaciones: hbOrgs, soloOrgs: onlyOrgIds?.length || null });
     if (pendingOrgs.size) setImmediate(() => void runVistasTick([...pendingOrgs]));

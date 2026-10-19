@@ -3,6 +3,7 @@ import { syncImapAccountAllFolders, probeImapAccount } from '../controllers/emai
 import { emitEmailEvent } from '../utils/emailSSE';
 import { withTimeout } from '../utils/imap';
 import { heartbeatStart, heartbeatEnd } from '../utils/heartbeat';
+import { tomarTurno, renovarTurno, soltarTurno } from '../utils/turnos';
 
 // Tope por cuenta: aunque cada conexión/carpeta ya tiene su límite, una cuenta
 // nunca puede retener la pasada (antes una cuenta que no respondía dejaba sin
@@ -19,9 +20,11 @@ const ACCOUNT_TIMEOUT_MS = 5 * 60 * 1000;
 // (evento SSE 'messageNew').
 
 const INTERVAL_MS = 5 * 60 * 1000;
-// Clave fija para pg_try_advisory_lock: con varias instancias del backend,
-// solo una recorre las cuentas a la vez.
-const ADVISORY_LOCK_KEY = 74_810_234;
+// Con varias instancias del backend, solo una recorre las cuentas a la vez
+// (utils/turnos.ts: sin retener una conexión del pool durante la pasada).
+const TURNO = 'imap-auto-sync';
+// Lo que puede durar una cuenta (sondeo + sincronización) y un margen
+const TURNO_MS = 2 * ACCOUNT_TIMEOUT_MS + 60_000;
 let running = false;
 
 export async function runImapAutoSync(): Promise<void> {
@@ -30,17 +33,15 @@ export async function runImapAutoSync(): Promise<void> {
   const resumen = { cuentas: 0, ok: 0, conError: 0, nuevos: 0, sondeadas: 0, sinLock: false };
   let fallo: string | null = null;
   await heartbeatStart('imap-auto-sync');
-  const client = await pool.connect().catch(() => null);
-  if (!client) { running = false; return; }
   try {
-    const { rows: lock } = await client.query(`SELECT pg_try_advisory_lock($1) AS ok`, [ADVISORY_LOCK_KEY]);
-    if (!lock[0]?.ok) { resumen.sinLock = true; return; }
+    if (!(await tomarTurno(TURNO, TURNO_MS))) { resumen.sinLock = true; return; }
     try {
       const { rows: accounts } = await pool.query(
         `SELECT * FROM email_accounts WHERE active = true AND COALESCE(protocol, 'imap') = 'imap' ORDER BY last_sync_at ASC NULLS FIRST`,
       );
       resumen.cuentas = accounts.length;
       for (const acc of accounts) {
+        await renovarTurno(TURNO, TURNO_MS);
         try {
           // Sondeo completo (estructura + estado de cada carpeta) y reparación
           // de las atrasadas, como mucho una vez al día por cuenta -- deja el
@@ -62,13 +63,12 @@ export async function runImapAutoSync(): Promise<void> {
         }
       }
     } finally {
-      await client.query(`SELECT pg_advisory_unlock($1)`, [ADVISORY_LOCK_KEY]).catch(() => {});
+      await soltarTurno(TURNO);
     }
   } catch (e: any) {
     fallo = e?.message || String(e);
     console.error('[imap-auto] runImapAutoSync:', e);
   } finally {
-    client.release();
     running = false;
     await heartbeatEnd('imap-auto-sync', resumen, fallo);
   }
