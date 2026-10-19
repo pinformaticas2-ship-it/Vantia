@@ -9,7 +9,15 @@ function userName(req: Request) { return (req as any).auth?.firstName || (req as
 const ok  = (res: Response, data: any) => res.json({ success: true, data });
 const err = (res: Response, msg: string, s = 500) => res.status(s).json({ success: false, error: msg });
 
-async function ensureTable() {
+// 19/10/2026: una sola vez por arranque (antes, 4 consultas en cada visita
+// al formulario, una de ellas bloqueando la tabla con ALTER TABLE).
+let tablaLista: Promise<void> | null = null;
+function ensureTable(): Promise<void> {
+  tablaLista ??= crearTabla().catch((e) => { tablaLista = null; throw e; });
+  return tablaLista;
+}
+
+async function crearTabla() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS client_invite_links (
       id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
