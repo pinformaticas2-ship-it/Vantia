@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback, useMemo, useRef, useContext } from "react";
+import ClaudeExpediente from "../components/ClaudeExpediente";
 import { SidebarContext } from "../layouts/DashboardLayout";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
@@ -5888,6 +5889,7 @@ export default function ExpedienteDetail() {
           >
             <Mic size={14} className="text-slate-400" /> Plaud
           </button>
+          <ClaudeExpediente expedienteId={exp.id} referencia={`${exp.anio}/${exp.num_exp}`} />
           <BackButton onClick={() => navigate("/dashboard/expedientes")} />
           {editing ? (
             <>

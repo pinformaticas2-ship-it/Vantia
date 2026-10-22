@@ -37,6 +37,7 @@ import {
 import { getEmailsByExpediente } from '../controllers/emailController';
 import { getConversacionesExpediente } from '../controllers/chatController';
 import noteRoutes from './noteRoutes';
+import { getDosierClaude } from '../controllers/dosierClaudeController';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 
 const router = Router();
@@ -59,6 +60,7 @@ router.post('/imports', requireAuth, createImportBatch);
 router.patch('/imports/:id', requireAuth, updateImportBatch);
 router.post('/',      requireAuth, createExpediente);
 router.get('/:id/historial', requireAuth, getExpedienteHistorial);
+router.get('/:id/dosier-claude', requireAuth, getDosierClaude);
 router.get('/:id',    requireAuth, getExpediente);
 router.put('/:id',    requireAuth, updateExpediente);
 router.patch('/:id/cliente', requireAuth, linkExpedienteCliente);
