@@ -1136,6 +1136,17 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
       if (previewSourcePath === filePath) {
         const converterScript = path.join(tempDir, `client_doc_to_docx_${fileId}.py`);
         const converterCode = `import sys, os, subprocess, shutil
+import tempfile, pathlib
+
+def soffice_run(cmd, timeout, capture_output=True):
+    # Perfil propio por conversion (23/10/2026): si una conversion se cuelga,
+    # soffice.bin sobrevive al timeout con el perfil compartido bloqueado y
+    # todas las siguientes esperaban hasta agotar su tiempo.
+    prof = tempfile.mkdtemp(prefix='vantia_lo_')
+    try:
+        return subprocess.run([cmd[0], '-env:UserInstallation=' + pathlib.Path(prof).as_uri()] + cmd[1:], timeout=timeout, capture_output=capture_output)
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
 
 doc_path = sys.argv[1]
 out_path = sys.argv[2]
@@ -1188,7 +1199,7 @@ if not converted:
     out_dir = os.path.dirname(out_path)
     for soffice in soffice_paths:
         try:
-            r = subprocess.run(
+            r = soffice_run(
                 [soffice, '--headless', '--convert-to', 'docx', '--outdir', out_dir, doc_path],
                 timeout=60, capture_output=True
             )
@@ -2051,6 +2062,17 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
 
     const converterScript = path.join(tempDir, `word_to_pdf_${cacheKey}.py`);
     const converterCode = `import sys, os, subprocess, shutil
+import tempfile, pathlib
+
+def soffice_run(cmd, timeout, capture_output=True):
+    # Perfil propio por conversion (23/10/2026): si una conversion se cuelga,
+    # soffice.bin sobrevive al timeout con el perfil compartido bloqueado y
+    # todas las siguientes esperaban hasta agotar su tiempo.
+    prof = tempfile.mkdtemp(prefix='vantia_lo_')
+    try:
+        return subprocess.run([cmd[0], '-env:UserInstallation=' + pathlib.Path(prof).as_uri()] + cmd[1:], timeout=timeout, capture_output=capture_output)
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
 
 source_path = sys.argv[1]
 output_pdf = sys.argv[2]
@@ -2118,7 +2140,7 @@ if not converted:
                     os.remove(candidate)
             except Exception:
                 pass
-            r = subprocess.run(
+            r = soffice_run(
                 [soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, source_path],
                 timeout=90, capture_output=True
             )
@@ -2760,6 +2782,17 @@ except Exception as e:
     // Convertir .doc → .docx usando un script Python (win32com → PowerShell → LibreOffice)
     const converterScript = path.join(tempDir, `converter_${scriptId2}.py`);
     const converterCode = `import sys, os, subprocess, shutil
+import tempfile, pathlib
+
+def soffice_run(cmd, timeout, capture_output=True):
+    # Perfil propio por conversion (23/10/2026): si una conversion se cuelga,
+    # soffice.bin sobrevive al timeout con el perfil compartido bloqueado y
+    # todas las siguientes esperaban hasta agotar su tiempo.
+    prof = tempfile.mkdtemp(prefix='vantia_lo_')
+    try:
+        return subprocess.run([cmd[0], '-env:UserInstallation=' + pathlib.Path(prof).as_uri()] + cmd[1:], timeout=timeout, capture_output=capture_output)
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
 
 doc_path = sys.argv[1]
 out_path = sys.argv[2]
@@ -2815,7 +2848,7 @@ if not converted:
     out_dir = os.path.dirname(out_path)
     for soffice in soffice_paths:
         try:
-            r = subprocess.run(
+            r = soffice_run(
                 [soffice, '--headless', '--convert-to', 'docx', '--outdir', out_dir, doc_path],
                 timeout=60, capture_output=True
             )
@@ -3005,6 +3038,17 @@ export const previewTemplateAsPdf = async (req: any, res: Response) => {
 
     const converterScript = path.join(tempDir, `tpl_word_to_pdf_${cacheKey}.py`);
     const converterCode = `import sys, os, subprocess, shutil
+import tempfile, pathlib
+
+def soffice_run(cmd, timeout, capture_output=True):
+    # Perfil propio por conversion (23/10/2026): si una conversion se cuelga,
+    # soffice.bin sobrevive al timeout con el perfil compartido bloqueado y
+    # todas las siguientes esperaban hasta agotar su tiempo.
+    prof = tempfile.mkdtemp(prefix='vantia_lo_')
+    try:
+        return subprocess.run([cmd[0], '-env:UserInstallation=' + pathlib.Path(prof).as_uri()] + cmd[1:], timeout=timeout, capture_output=capture_output)
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
 
 source_path = sys.argv[1]
 output_pdf = sys.argv[2]
@@ -3072,7 +3116,7 @@ if not converted:
                     os.remove(candidate)
             except Exception:
                 pass
-            r = subprocess.run(
+            r = soffice_run(
                 [soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, source_path],
                 timeout=90, capture_output=True
             )

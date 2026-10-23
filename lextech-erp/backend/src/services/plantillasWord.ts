@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { execFile } from 'child_process';
+import { pathToFileURL } from 'url';
 
 // ── Plantillas Word con campos de MN Program (15/10/2026) ───────────────────
 // Las plantillas del despacho (DocPlant) vienen de MN Program y marcan los
@@ -272,9 +273,12 @@ export async function leerComoDocx(ruta: string): Promise<Buffer> {
   const origen = path.join(trabajo, 'plantilla.doc');
   await fs.promises.copyFile(ruta, origen);
   let ultimoError: any = null;
+  // Perfil propio por conversión (23/10/2026): con el perfil compartido, una
+  // conversión colgada dejaba bloqueadas todas las siguientes.
+  const perfil = `-env:UserInstallation=${pathToFileURL(path.join(trabajo, 'perfil')).href}`;
   for (const bin of soffice()) {
     try {
-      await new Promise<void>((ok, ko) => execFile(bin, ['--headless', '--norestore', '--convert-to', 'docx', '--outdir', trabajo, origen],
+      await new Promise<void>((ok, ko) => execFile(bin, [perfil, '--headless', '--norestore', '--convert-to', 'docx', '--outdir', trabajo, origen],
         { timeout: 90_000, env: { ...process.env, HOME: process.env.HOME || os.tmpdir() } }, (err) => (err ? ko(err) : ok())));
       const convertido = path.join(trabajo, 'plantilla.docx');
       if (fs.existsSync(convertido)) {
