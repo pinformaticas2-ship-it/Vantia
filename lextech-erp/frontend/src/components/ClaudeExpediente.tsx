@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Check, Copy, Download, ExternalLink, Loader2, ShieldAlert, Sparkles, X } from "lucide-react";
 import { apiFetch } from "../lib/api";
@@ -67,8 +68,10 @@ export default function ClaudeExpediente({ expedienteId, referencia }: { expedie
         <Sparkles size={14} className="text-slate-400" /> Claude
       </button>
 
-      {abierto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setAbierto(false)}>
+      {abierto && createPortal(
+        // Fuera de la ficha (tiene animación de entrada, y con ella "fixed" se
+        // medía respecto a la ficha: la ventana quedaba bajo la cabecera).
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setAbierto(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="claude-exp-titulo" onClick={(e) => e.stopPropagation()}
             className="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
@@ -144,7 +147,8 @@ export default function ClaudeExpediente({ expedienteId, referencia }: { expedie
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
