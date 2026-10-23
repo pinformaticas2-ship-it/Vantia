@@ -12,7 +12,7 @@ import { Clock,
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown, ShieldCheck, UserRound, ArrowRight,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck, UserX,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck, UserX, HeartHandshake,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -55,6 +55,7 @@ import type { Modulo } from "../lib/useOrganizacion";
 // matriz, se ven siempre.
 const NAV_MODULE_MAP: Record<string, Modulo> = {
   Clientes: "clientes",
+  CRM: "clientes",
   Procuradores: "directorio",
   Abogados: "directorio",
   "Partes contrarias": "directorio",
@@ -78,7 +79,7 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
   "Conexión Quipu": "facturacion",
 };
 function moduloForPath(path: string): Modulo | null {
-  if (path.startsWith("/dashboard/clientes")) return "clientes";
+  if (path.startsWith("/dashboard/clientes") || path.startsWith("/dashboard/crm")) return "clientes";
   if (path.startsWith("/dashboard/procuradores") || path.startsWith("/dashboard/abogados") || path.startsWith("/dashboard/contrarios")) return "directorio";
   if (path.startsWith("/dashboard/expedientes")) return "expedientes";
   if (path.startsWith("/dashboard/agenda")) return "agenda";
@@ -98,6 +99,7 @@ const MODULES = [
   { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: "Gestión de expedientes" },
   { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: "Base de datos de clientes" },
   { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
+  { name: "CRM",            path: "/dashboard/crm",          icon: HeartHandshake,       desc: "Clientes potenciales: oportunidades y seguimiento" },
   { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: "Directorio de procuradores" },
   { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: "Directorio de abogados" },
   { name: "Partes contrarias", path: "/dashboard/contrarios", icon: UserX,         desc: "Partes contrarias habituales: correo y datos básicos" },
@@ -129,6 +131,7 @@ type NavItem  = { name: string; href?: string; icon: React.ComponentType<{ class
 const NAV_ITEMS: NavItem[] = [
   { name: "Dashboard",    href: "/dashboard",             icon: LayoutDashboard },
   { name: "Expedientes",  href: "/dashboard/expedientes", icon: Briefcase },
+  { name: "CRM",          href: "/dashboard/crm",         icon: HeartHandshake },
   {
     name: "Directorio",
     icon: Users,
@@ -168,7 +171,7 @@ const NAV_ITEMS: NavItem[] = [
 const NAV_GROUPS = [
   {
     label: "Principal",
-    items: ["Dashboard", "Expedientes", "Directorio", "Agenda", "Tareas"],
+    items: ["Dashboard", "Expedientes", "CRM", "Directorio", "Agenda", "Tareas"],
   },
   {
     label: "Comunicación",

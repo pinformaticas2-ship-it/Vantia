@@ -25,6 +25,7 @@ import ExpedienteList from './pages/ExpedienteList';
 import ExpedienteDetail from './pages/ExpedienteDetail';
 import Agenda from './pages/Agenda';
 import Tareas from './pages/Tareas';
+import Crm from './pages/Crm';
 import Chat   from './pages/Chat';
 import Email  from './pages/Email';
 import Vistas from './pages/Vistas';
@@ -90,6 +91,7 @@ export default function App() {
             <Route path="trazabilidad" element={<Navigate to="/dashboard/config?section=trazabilidad" replace />} />
             <Route path="agenda" element={<RequireModuleAccess modulo="agenda"><Agenda /></RequireModuleAccess>} />
             <Route path="tareas" element={<RequireModuleAccess modulo="tareas"><Tareas /></RequireModuleAccess>} />
+            <Route path="crm" element={<RequireModuleAccess modulo="clientes"><Crm /></RequireModuleAccess>} />
             <Route path="chat"   element={<RequireModuleAccess modulo="chat"><Chat /></RequireModuleAccess>} />
             <Route path="whatsapp" element={<RequireModuleAccess modulo="whatsapp"><WhatsApp /></RequireModuleAccess>} />
             <Route path="correo" element={<RequireModuleAccess modulo="correo"><Email /></RequireModuleAccess>} />

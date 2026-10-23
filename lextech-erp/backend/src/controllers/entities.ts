@@ -201,7 +201,7 @@ export const setEntitiesCounterConfig = async (req: any, res: Response) => {
 // Calcula el proximo internal_number a usar segun la config (mismo criterio
 // que getEntitiesCounterConfig) y, si viene de un override de un solo uso,
 // lo consume (lo borra) para que el siguiente cliente vuelva al modo normal.
-async function resolveNextInternalNumber(dbClient: any, organizacionId: string): Promise<number> {
+export async function resolveNextInternalNumber(dbClient: any, organizacionId: string): Promise<number> {
   const { rows: cfgRows } = await dbClient.query(
     `SELECT min_num, auto_fill, override_next FROM client_counter_config WHERE id = 1`
   );

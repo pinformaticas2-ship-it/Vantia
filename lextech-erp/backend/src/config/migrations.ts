@@ -3124,6 +3124,54 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  firma_imagenes:', e?.message || e);
     }
 
+    // ── CRM: oportunidades de clientes potenciales (23/10/2026) ──
+    // Del primer contacto hasta que se hace cliente (o se pierde), con su
+    // historial de llamadas, notas y cambios de etapa (controllers/crmController.ts).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS crm_oportunidades (
+          id                  UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id     UUID          NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nombre              VARCHAR(200)  NOT NULL,
+          telefono            VARCHAR(40),
+          email               VARCHAR(200),
+          origen              VARCHAR(30)   NOT NULL DEFAULT 'otro',
+          asunto              TEXT,
+          area                VARCHAR(120),
+          etapa               VARCHAR(30)   NOT NULL DEFAULT 'contacto'
+                              CHECK (etapa IN ('contacto','consulta_agendada','consulta_hecha','propuesta_enviada','ganada','perdida')),
+          valor_estimado      NUMERIC(12,2),
+          responsable_user_id VARCHAR(150),
+          responsable_nombre  VARCHAR(200),
+          proxima_accion      TEXT,
+          proxima_accion_at   TIMESTAMPTZ,
+          motivo_perdida      TEXT,
+          cliente_id          UUID          REFERENCES entities(id) ON DELETE SET NULL,
+          expediente_id       UUID          REFERENCES expedientes(id) ON DELETE SET NULL,
+          created_by          VARCHAR(150),
+          created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+          updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+          cerrada_at          TIMESTAMPTZ
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS crm_actividades (
+          id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+          oportunidad_id  UUID          NOT NULL REFERENCES crm_oportunidades(id) ON DELETE CASCADE,
+          organizacion_id UUID          NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          tipo            VARCHAR(20)   NOT NULL DEFAULT 'nota',
+          texto           TEXT          NOT NULL,
+          user_id         VARCHAR(150),
+          user_name       VARCHAR(200),
+          created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_org_etapa ON crm_oportunidades (organizacion_id, etapa, updated_at DESC)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_actividades_oportunidad ON crm_actividades (oportunidad_id, created_at DESC)`);
+    } catch (e: any) {
+      console.warn('⚠️  crm:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,
