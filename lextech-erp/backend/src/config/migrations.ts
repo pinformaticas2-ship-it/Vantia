@@ -3168,6 +3168,56 @@ export async function runMigrations(): Promise<void> {
       `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_org_etapa ON crm_oportunidades (organizacion_id, etapa, updated_at DESC)`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_actividades_oportunidad ON crm_actividades (oportunidad_id, created_at DESC)`);
+
+      // 23/10/2026: estructura como la del CRM de GoHighLevel del despacho --
+      // embudos con sus etapas (y reglas por etapa), estado aparte de la
+      // etapa, etiquetas y un cuestionario de captación configurable.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS crm_embudos (
+          id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID          NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nombre          VARCHAR(120)  NOT NULL,
+          orden           INTEGER       NOT NULL DEFAULT 0,
+          created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS crm_etapas (
+          id                 UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+          embudo_id          UUID          NOT NULL REFERENCES crm_embudos(id) ON DELETE CASCADE,
+          organizacion_id    UUID          NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nombre             VARCHAR(120)  NOT NULL,
+          orden              INTEGER       NOT NULL DEFAULT 0,
+          tipo               VARCHAR(20)   NOT NULL DEFAULT 'abierta' CHECK (tipo IN ('abierta','ganada','perdida')),
+          color              VARCHAR(20),
+          aviso_responsable  BOOLEAN       NOT NULL DEFAULT false,
+          accion_texto       VARCHAR(300),
+          accion_horas       INTEGER,
+          mover_horas        INTEGER,
+          mover_a_etapa_id   UUID          REFERENCES crm_etapas(id) ON DELETE SET NULL
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS crm_campos (
+          id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID          NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nombre          VARCHAR(300)  NOT NULL,
+          tipo            VARCHAR(20)   NOT NULL DEFAULT 'opcion' CHECK (tipo IN ('opcion','texto','fecha','numero')),
+          opciones        JSONB         NOT NULL DEFAULT '[]',
+          carpeta         VARCHAR(80)   NOT NULL DEFAULT 'Formulario',
+          orden           INTEGER       NOT NULL DEFAULT 0
+        )
+      `);
+      for (const col of [
+        `embudo_id   UUID REFERENCES crm_embudos(id) ON DELETE SET NULL`,
+        `etapa_id    UUID REFERENCES crm_etapas(id) ON DELETE SET NULL`,
+        `estado      VARCHAR(20) NOT NULL DEFAULT 'abierta'`,
+        `etiquetas   TEXT[] NOT NULL DEFAULT '{}'`,
+        `campos      JSONB NOT NULL DEFAULT '{}'`,
+        `etapa_desde TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+      ]) await client.query(`ALTER TABLE crm_oportunidades ADD COLUMN IF NOT EXISTS ${col}`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_etapas_embudo ON crm_etapas (embudo_id, orden)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_crm_oportunidades_etapa ON crm_oportunidades (etapa_id, estado)`);
     } catch (e: any) {
       console.warn('⚠️  crm:', e?.message || e);
     }

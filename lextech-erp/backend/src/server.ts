@@ -31,6 +31,7 @@ import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
 import privacidadRoutes     from './routes/privacidad';
 import crmRoutes            from './routes/crm';
+import { startCrmReglas } from './controllers/crmController';
 import erroresClienteRoutes from './routes/erroresCliente';
 import docsBaseRoutes from './routes/docsBase';
 import plantillasRoutes from './routes/plantillas';
@@ -419,6 +420,7 @@ runMigrations().then(() => {
     // Automatización de vistas por correo (solo actúa en las organizaciones
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
+    startCrmReglas();
     // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
     startVistasIdle();
 
