@@ -20,6 +20,7 @@ import BackButton from "../components/BackButton";
 import { primerDiaSemana } from "../lib/preferencias";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
 import { useAvisoSalida } from "../lib/borradores";
+import "./agenda.css";
 
 // ── Google Calendar Types ─────────────────────────────────────────────────────
 interface GCalEvent {
@@ -132,6 +133,14 @@ function getEventColor(ev: { color?: string | null; type: string }): string {
   return (EVENT_TYPES[ev.type] || EVENT_TYPES.otro).hex;
 }
 
+// Clase y color de un evento pintado en la rejilla (ver agenda.css).
+function evEstilo(ev: { color?: string | null; type: string; status?: string | null }) {
+  return {
+    className: `agenda-ev es-${ev.status || "pendiente"}`,
+    style: { "--ev": getEventColor(ev) } as React.CSSProperties,
+  };
+}
+
 const STATUS_OPTS = [
   { value: "pendiente",  label: "Pendiente",  cls: "bg-amber-50 text-amber-700 border-amber-200" },
   { value: "completado", label: "Completado", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -241,10 +250,7 @@ const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function fmtHour(h: number): string {
-  if (h === 0)  return "12 AM";
-  if (h < 12)   return `${h} AM`;
-  if (h === 12) return "12 PM";
-  return `${h - 12} PM`;
+  return `${String(h).padStart(2, "0")}:00`;
 }
 
 // Cuando varios eventos del día se solapan en el tiempo, antes se dibujaban
@@ -2424,19 +2430,23 @@ function TimeGridView({
           const dow = d.getDay();
           const dayLabel = DIAS[dow === 0 ? 6 : dow - 1];
           const isToday = dateStr === todayStr;
+          const nEventos = (eventsByDay[dateStr] || []).length;
           return (
             <div
               key={dateStr}
-              className="flex-1 py-3 text-center border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              className={`flex-1 py-2.5 text-center border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${days.length === 1 ? "" : isToday ? "agenda-col-hoy" : dow === 0 || dow === 6 ? "agenda-col-finde" : ""}`}
               onClick={() => onDayHeaderClick(dateStr)}
             >
-              <div className={`text-[11px] font-medium uppercase tracking-wider ${isToday ? "text-blue-600" : "text-gray-500"}`}>
+              <div className={`text-[11px] font-bold uppercase tracking-wider ${isToday ? "text-red-600" : "text-gray-400"}`}>
                 {dayLabel}
               </div>
-              <div className={`mx-auto mt-1 h-10 w-10 flex items-center justify-center rounded-full text-xl font-normal ${
-                isToday ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-100"
+              <div className={`mx-auto mt-1 h-9 w-9 flex items-center justify-center rounded-full text-lg ${
+                isToday ? "bg-red-600 text-white font-bold shadow-sm shadow-red-600/30" : "text-gray-800 font-semibold hover:bg-gray-100"
               }`}>
                 {d.getDate()}
+              </div>
+              <div className={`mt-1 h-3.5 text-[10px] font-semibold ${nEventos ? "text-gray-400" : "text-transparent"}`}>
+                {nEventos === 1 ? "1 evento" : `${nEventos} eventos`}
               </div>
             </div>
           );
@@ -2446,7 +2456,9 @@ function TimeGridView({
       {/* Banda de eventos de todo el día */}
       <div
         className="grid shrink-0 border-b border-gray-200 bg-white"
-        style={{ gridTemplateColumns: `4rem repeat(${days.length}, 1fr)` }}
+        // Filas explícitas: sin ellas "-1" apunta a la primera línea y las
+        // barras de varios días se montan encima de los eventos sueltos.
+        style={{ gridTemplateColumns: `4rem repeat(${days.length}, 1fr)`, gridTemplateRows: `repeat(${spanLaneCount + 1}, auto)` }}
       >
         <div
           className="border-r border-gray-100 flex items-end justify-end pr-2 pb-1"
@@ -2461,15 +2473,15 @@ function TimeGridView({
             key={bar.ev.id}
             onClick={e => onEventClick(bar.ev, { x: e.clientX, y: e.clientY })}
             title={bar.ev.title}
-            className="mx-0.5 my-[1px] flex min-w-0 items-center gap-1 truncate rounded px-2 py-0.5 text-[11px] font-medium text-white cursor-pointer select-none"
+            className={`${evEstilo(bar.ev).className} mx-0.5 my-[1px] flex min-w-0 items-center gap-1 truncate rounded px-2 py-0.5 text-[11px] font-semibold cursor-pointer select-none`}
             style={{
+              ...evEstilo(bar.ev).style,
               gridColumn: `${bar.startCol + 2} / ${bar.endCol + 3}`,
               gridRow: bar.lane + 1,
-              backgroundColor: getEventColor(bar.ev),
             }}
           >
             {bar.continuesBefore && <span className="shrink-0 opacity-70">◀</span>}
-            <span className="truncate">{bar.ev.title}</span>
+            <span className="agenda-ev-titulo truncate">{bar.ev.title}</span>
             {bar.continuesAfter && <span className="shrink-0 opacity-70">▶</span>}
           </div>
         ))}
@@ -2498,10 +2510,10 @@ function TimeGridView({
                       allDayDragDisplayRef.current = initAllDay;
                       setAllDayDragDisplay(initAllDay);
                     }}
-                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
-                    style={{ backgroundColor: getEventColor(ev) }}
+                    className={`${evEstilo(ev).className} text-[11px] font-semibold truncate px-2 py-0.5 rounded select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
+                    style={evEstilo(ev).style}
                   >
-                    {ev.title}
+                    <span className="agenda-ev-titulo">{ev.title}</span>
                   </div>
                 );
               })}
@@ -2576,7 +2588,7 @@ function TimeGridView({
               }),
             ]);
             return (
-              <div key={dateStr} ref={el => { columnRefsMap.current.set(dateStr, el); }} className="flex-1 border-r border-gray-200 relative">
+              <div key={dateStr} ref={el => { columnRefsMap.current.set(dateStr, el); }} className={`flex-1 border-r border-gray-200 relative ${days.length === 1 ? "" : isToday ? "agenda-col-hoy" : [0, 6].includes(new Date(dateStr + "T12:00:00").getDay()) ? "agenda-col-finde" : ""}`}>
                 {/* Celdas de hora (clic o arrastre para crear) */}
                 {HOURS.map(h => (
                   <div
@@ -2715,7 +2727,6 @@ function TimeGridView({
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.25);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
-                  const evColor = getEventColor(ev);
                   const { col, colCount, span } = overlapLayout.get(`own-${ev.id}`) || { col: 0, colCount: 1, span: 1 };
                   const leftPct = (col / colCount) * 100;
                   const widthPct = (span / colCount) * 100;
@@ -2742,23 +2753,34 @@ function TimeGridView({
                         dragDisplayRef.current = initDd;
                         setDragDisplay(initDd);
                       }}
-                      className={`absolute rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                      className={`${evEstilo(ev).className} absolute rounded-md px-2 py-1 text-[11px] font-medium overflow-hidden group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "shadow-lg" : "hover:shadow-md"} transition-shadow duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                       style={{
-                        top: topPx, height: heightPx, zIndex: isResizing ? 30 : (10 + col), backgroundColor: evColor,
-                        left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`,
+                        ...evEstilo(ev).style,
+                        top: topPx, height: heightPx, zIndex: isResizing ? 30 : (10 + col),
+                        left: `calc(${leftPct}% + 2px)`, width: `calc(${widthPct}% - 4px)`,
                       }}
                     >
                       {isResizing ? (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-                          <span className="bg-black/30 text-white text-[10px] font-bold rounded px-1.5 py-0.5 truncate max-w-full">
+                          <span className="bg-slate-900/70 text-white text-[10px] font-bold rounded px-1.5 py-0.5 truncate max-w-full">
                             {fmtTime(ev.start_at)} – {fmtTime(resizingDisplay!.endAt)}
                           </span>
                         </div>
+                      ) : heightPx < 40 ? (
+                        // Eventos cortos (≤ 30 min): título y hora en una línea, si no la hora queda cortada.
+                        <div className="flex items-baseline gap-1 min-w-0 leading-tight">
+                          <span className="agenda-ev-titulo font-semibold truncate">{ev.title}</span>
+                          <span className="agenda-ev-sub text-[10px] shrink-0">{fmtTime(ev.start_at)}</span>
+                        </div>
                       ) : (
                         <>
-                          <div className="font-semibold truncate leading-tight">{ev.title}</div>
-                          <div className="text-[10px] leading-tight text-white/80">
+                          <div className="agenda-ev-titulo font-semibold leading-tight line-clamp-2 break-words">
+                            {ev.status === "completado" && <CheckCircle2 size={10} className="inline -mt-0.5 mr-0.5" />}
+                            {ev.title}
+                          </div>
+                          <div className="agenda-ev-sub text-[10px] leading-tight mt-0.5 truncate">
                             {fmtTime(ev.start_at)}{effectiveEndAt ? ` – ${fmtTime(effectiveEndAt)}` : ""}
+                            {ev.location ? ` · ${ev.location}` : ""}
                           </div>
                         </>
                       )}
@@ -2773,7 +2795,7 @@ function TimeGridView({
                           setResizingDisplay({ id: ev.id, endAt: ev.end_at || new Date(start.getTime() + 3600000).toISOString() });
                         }}
                       >
-                        <div className="w-8 h-1 rounded-full bg-white/50 hover:bg-white/90 transition-colors" />
+                        <div className="w-8 h-1 rounded-full bg-current opacity-30 hover:opacity-70 transition-opacity" />
                       </div>
                     </div>
                   );
@@ -2835,6 +2857,32 @@ export default function Agenda() {
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
+  // Tipos que el usuario ha ocultado desde la leyenda (se recuerda en este navegador).
+  const [tiposOcultos, setTiposOcultos] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("vantia.agenda.tiposOcultos") || "[]")); }
+    catch { return new Set(); }
+  });
+  const alternarTipo = useCallback((tipo: string) => {
+    setTiposOcultos(prev => {
+      const next = new Set(prev);
+      if (next.has(tipo)) next.delete(tipo); else next.add(tipo);
+      try { localStorage.setItem("vantia.agenda.tiposOcultos", JSON.stringify([...next])); } catch { /* sin almacenamiento */ }
+      return next;
+    });
+  }, []);
+  const eventosVisibles = useMemo(
+    () => tiposOcultos.size ? events.filter(ev => !tiposOcultos.has(EVENT_TYPES[ev.type] ? ev.type : "otro")) : events,
+    [events, tiposOcultos],
+  );
+  // Leyenda: los tipos que hay en los eventos cargados, con cuántos de cada uno.
+  const leyendaTipos = useMemo(() => {
+    const cuenta = new Map<string, number>();
+    for (const ev of events) {
+      const t = EVENT_TYPES[ev.type] ? ev.type : "otro";
+      cuenta.set(t, (cuenta.get(t) || 0) + 1);
+    }
+    return Object.keys(EVENT_TYPES).filter(t => cuenta.has(t)).map(t => ({ tipo: t, n: cuenta.get(t)! }));
+  }, [events]);
   const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
   const [movingEventId, setMovingEventId] = useState<string | null>(null);
@@ -3299,13 +3347,13 @@ export default function Agenda() {
   // Índice de eventos por día
   const eventsByDay = useMemo(() => {
     const map: Record<string, AgendaEvent[]> = {};
-    for (const ev of events) {
+    for (const ev of eventosVisibles) {
       const key = localDateKey(ev.start_at);
       if (!map[key]) map[key] = [];
       map[key].push(ev);
     }
     return map;
-  }, [events]);
+  }, [eventosVisibles]);
 
   // Eventos del día seleccionado
   const dayEvents = useMemo(() =>
@@ -3333,7 +3381,7 @@ export default function Agenda() {
       if (!realIdxs.length) return [];
       const rangeStart = weekKeys[realIdxs[0]]!;
       const rangeEnd = weekKeys[realIdxs[realIdxs.length - 1]]!;
-      const raw = events
+      const raw = eventosVisibles
         .filter(ev => ev.all_day && isSpanning(ev))
         .map(ev => {
           const startKey = localDateKey(ev.start_at);
@@ -3359,7 +3407,7 @@ export default function Agenda() {
         return { ...bar, lane };
       });
     });
-  }, [calWeeks, events]);
+  }, [calWeeks, eventosVisibles]);
 
   // Días de la semana activa (para vista semana)
   const weekDays = useMemo(() => {
@@ -3756,7 +3804,7 @@ export default function Agenda() {
         {/* Acciones derecha */}
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-2.5">
           {/* Toasts inline (en pantallas pequeñas no caben al lado de los botones) */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className={`${smoothGcalError || smoothGcalNotice ? "lg:flex" : ""} hidden items-center gap-2`}>
             <span className={`max-w-xs overflow-hidden rounded-lg border px-2 py-1 text-xs text-red-600 transition-all duration-300 ${smoothGcalError ? "translate-y-0 border-red-200 bg-red-50 opacity-100" : "pointer-events-none -translate-y-1 border-transparent bg-transparent opacity-0"}`} title={smoothGcalError || ""}>
               ⚠ {gcalError}
             </span>
@@ -3886,6 +3934,38 @@ export default function Agenda() {
         </button>
       </div>
 
+      {/* ── Leyenda de tipos (clic para ocultar/mostrar) ─────── */}
+      {leyendaTipos.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto px-4 sm:px-6 py-2 border-b border-slate-100 bg-white shrink-0">
+          {leyendaTipos.map(({ tipo, n }) => {
+            const conf = EVENT_TYPES[tipo];
+            const oculto = tiposOcultos.has(tipo);
+            return (
+              <button
+                key={tipo}
+                onClick={() => alternarTipo(tipo)}
+                title={oculto ? `Mostrar ${conf.label.toLowerCase()}` : `Ocultar ${conf.label.toLowerCase()}`}
+                aria-pressed={!oculto}
+                className={`agenda-tipo ${oculto ? "apagado" : ""} shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors`}
+                style={{ "--ev": conf.hex } as React.CSSProperties}
+              >
+                <span className="agenda-punto h-2 w-2 rounded-full" />
+                <span className={oculto ? "line-through" : ""}>{conf.label}</span>
+                <span className="tabular-nums opacity-60">{n}</span>
+              </button>
+            );
+          })}
+          {tiposOcultos.size > 0 && (
+            <button
+              onClick={() => { setTiposOcultos(new Set()); try { localStorage.removeItem("vantia.agenda.tiposOcultos"); } catch { /* sin almacenamiento */ } }}
+              className="shrink-0 ml-1 text-[11px] font-semibold text-red-600 hover:underline"
+            >
+              Mostrar todos
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Cuerpo ────────────────────────────────────────────── */}
       {view !== "month" ? (
         <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -3896,7 +3976,7 @@ export default function Agenda() {
           ) : (
             <TimeGridView
               days={view === "week" ? weekDays : [selectedDay]}
-              allEvents={events}
+              allEvents={eventosVisibles}
               eventsByDay={eventsByDay}
               gcalEventsByDay={gcalEventsByDay}
               selectedDay={selectedDay}
@@ -3942,7 +4022,9 @@ export default function Agenda() {
                   return (
                     <div key={weekIdx} className="flex-1 relative flex flex-col">
                       {/* ── Celdas de días ── */}
-                      <div className="grid grid-cols-7 flex-1" style={{ gridAutoRows: "min-content" }}>
+                      {/* Filas explícitas (número, un carril por barra, lista): sin ellas
+                          "-1" apuntaba a la primera línea y los eventos tapaban el número del día. */}
+                      <div className="grid grid-cols-7 flex-1" style={{ gridTemplateRows: `auto ${"auto ".repeat(laneCount)}1fr` }}>
                         {week.map((date, colIdx) => {
                           if (!date) {
                             return (
@@ -3985,10 +4067,11 @@ export default function Agenda() {
                                   if (window.innerWidth < 1024) { setView("day"); return; }
                                   openNew(key, e);
                                 }}
-                                className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
+                                className={`border-b border-r border-slate-200/70 min-h-[96px] p-1.5 cursor-pointer transition-all ${
                                   dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
-                                  : isSel   ? "bg-red-50/60"
-                                  : isToday ? "bg-amber-50/40"
+                                  : isSel   ? "bg-red-50/60 ring-1 ring-inset ring-red-200"
+                                  : isToday ? "agenda-col-hoy"
+                                  : date.getDay() === 0 || date.getDay() === 6 ? "agenda-col-finde hover:bg-slate-50"
                                   : "hover:bg-slate-50"
                                 }`}
                                 style={{ gridColumn: colIdx + 1, gridRow: "1 / -1" }}
@@ -4000,7 +4083,7 @@ export default function Agenda() {
                                 style={{ gridColumn: colIdx + 1, gridRow: 1, alignSelf: "start" }}
                               >
                                 <span className={`pointer-events-auto text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
-                                  isToday ? "bg-red-600 text-white" : isSel ? "text-red-600" : "text-slate-600"
+                                  isToday ? "bg-red-600 text-white shadow-sm shadow-red-600/30" : isSel ? "text-red-600" : "text-slate-700"
                                 }`}>
                                   {date.getDate()}
                                 </span>
@@ -4018,7 +4101,7 @@ export default function Agenda() {
                                 style={{ gridColumn: colIdx + 1, gridRow: `${2 + laneCount} / -1`, alignSelf: "start" }}
                               >
                                 {lexShow.map(ev => {
-                                  const evColor = getEventColor(ev);
+                                  const est = evEstilo(ev);
                                   return (
                                     <div
                                       key={ev.id}
@@ -4027,15 +4110,14 @@ export default function Agenda() {
                                       onDragEnd={() => { setDraggingEventId(null); setDragOverDay(null); }}
                                       onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
                                       onDoubleClick={e => { e.stopPropagation(); }}
-                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all text-white ${
-                                        movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm"
-                                        : ev.status === "cancelado" ? "opacity-40 line-through" : "hover:brightness-110"
+                                      className={`${est.className} flex items-center gap-1 px-1.5 py-[3px] rounded text-[11px] font-semibold truncate cursor-move transition-all ${
+                                        movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm" : ""
                                       }`}
-                                      style={{ backgroundColor: evColor }}
+                                      style={est.style}
                                       title="Arrastra para mover a otro día"
                                     >
-                                      {!ev.all_day && <span className="opacity-75 shrink-0">{fmtTime(ev.start_at)}</span>}
-                                      <span className="truncate">{ev.title}</span>
+                                      {!ev.all_day && <span className="agenda-ev-sub shrink-0 tabular-nums">{fmtTime(ev.start_at)}</span>}
+                                      <span className="agenda-ev-titulo truncate">{ev.title}</span>
                                       {isSpanning(ev) && <span className="opacity-80 shrink-0">→</span>}
                                       {ev.external_provider === "google" && (
                                         <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2.5 h-2.5 shrink-0" />
@@ -4073,15 +4155,15 @@ export default function Agenda() {
                             key={bar.ev.id}
                             onClick={e => { e.stopPropagation(); const d = week[bar.startCol]; if (d) setSelectedDay(isoDate(d)); openViewPopover(bar.ev, { x: e.clientX, y: e.clientY }); }}
                             title={bar.ev.title}
-                            className="mx-0.5 flex min-w-0 items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold text-white cursor-pointer select-none"
+                            className={`${evEstilo(bar.ev).className} mx-1 mb-0.5 flex min-w-0 items-center gap-1 truncate rounded px-1.5 py-[3px] text-[11px] font-semibold cursor-pointer select-none`}
                             style={{
+                              ...evEstilo(bar.ev).style,
                               gridColumn: `${bar.startCol + 1} / ${bar.endCol + 2}`,
                               gridRow: 2 + bar.lane,
-                              backgroundColor: getEventColor(bar.ev),
                             }}
                           >
                             {bar.continuesBefore && <span className="shrink-0 opacity-70">◀</span>}
-                            <span className="truncate">{bar.ev.title}</span>
+                            <span className="agenda-ev-titulo truncate">{bar.ev.title}</span>
                             {bar.continuesAfter && <span className="shrink-0 opacity-70">▶</span>}
                           </div>
                         ))}
@@ -4143,7 +4225,7 @@ export default function Agenda() {
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        <div className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getEventColor(ev) }} />
+                        <div className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: getEventColor(ev) }} />
                         <div className="flex-1 min-w-0">
                           <p className={`text-xs font-semibold text-slate-800 truncate ${ev.status === "cancelado" ? "line-through" : ""}`}>
                             {ev.title}

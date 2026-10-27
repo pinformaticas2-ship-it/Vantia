@@ -1,0 +1,53 @@
+/* ── Agenda: eventos con el tinte de su propio color ──────────────────────
+   En vez de bloques sólidos saturados (todo pesaba igual), cada evento lleva
+   un fondo suave de su color, un filete a la izquierda y el texto en un tono
+   oscuro del mismo color. El color llega por la variable --ev (style).
+   Completados: apagados. Cancelados: tachados y rayados. ── */
+.agenda-ev {
+  --ev: #94a3b8;
+  background: color-mix(in srgb, var(--ev) 15%, #fff);
+  color: color-mix(in srgb, var(--ev) 55%, #0f172a);
+  border-left: 3px solid var(--ev);
+}
+.agenda-ev:hover { background: color-mix(in srgb, var(--ev) 24%, #fff); }
+.agenda-ev .agenda-ev-sub { color: color-mix(in srgb, var(--ev) 40%, #64748b); }
+.agenda-ev.es-completado { opacity: 0.62; }
+.agenda-ev.es-completado .agenda-ev-titulo { text-decoration: line-through; text-decoration-thickness: 1px; }
+.agenda-ev.es-cancelado {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ev) 9%, #fff) 0 6px, #fff 6px 12px);
+  color: #94a3b8;
+  border-left-style: dashed;
+}
+.agenda-ev.es-cancelado .agenda-ev-titulo { text-decoration: line-through; }
+.agenda-ev.es-cancelado .agenda-ev-sub { color: #94a3b8; }
+
+/* Punto de color (leyenda, listas) */
+.agenda-punto { background: var(--ev); }
+
+/* Columna de hoy y fines de semana en semana/día */
+.agenda-col-hoy { background: rgba(var(--tema-rgb, 239, 68, 68), 0.035); }
+.agenda-col-finde { background: #f8fafc; }
+
+/* Leyenda / filtro por tipo */
+.agenda-tipo { border-color: color-mix(in srgb, var(--ev) 30%, #e2e8f0); }
+.agenda-tipo:hover { background: color-mix(in srgb, var(--ev) 8%, #fff); }
+.agenda-tipo.apagado { border-color: #e2e8f0; color: #94a3b8; }
+.agenda-tipo.apagado .agenda-punto { background: transparent; box-shadow: inset 0 0 0 1.5px #cbd5e1; }
+
+html[data-modo="oscuro"] .agenda-ev {
+  background: color-mix(in srgb, var(--ev) 22%, var(--o-superficie));
+  color: color-mix(in srgb, var(--ev) 38%, #fff);
+}
+html[data-modo="oscuro"] .agenda-ev:hover { background: color-mix(in srgb, var(--ev) 32%, var(--o-superficie)); }
+html[data-modo="oscuro"] .agenda-ev .agenda-ev-sub { color: color-mix(in srgb, var(--ev) 25%, var(--o-texto-3)); }
+html[data-modo="oscuro"] .agenda-ev.es-cancelado {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ev) 12%, var(--o-superficie)) 0 6px, var(--o-superficie) 6px 12px);
+  color: var(--o-texto-4);
+}
+html[data-modo="oscuro"] .agenda-ev.es-cancelado .agenda-ev-sub { color: var(--o-texto-4); }
+html[data-modo="oscuro"] .agenda-col-hoy { background: rgba(var(--tema-rgb, 239, 68, 68), 0.06); }
+html[data-modo="oscuro"] .agenda-col-finde { background: rgba(255, 255, 255, 0.015); }
+html[data-modo="oscuro"] .agenda-tipo { border-color: color-mix(in srgb, var(--ev) 35%, var(--o-borde)); color: var(--o-texto-2); }
+html[data-modo="oscuro"] .agenda-tipo:hover { background: color-mix(in srgb, var(--ev) 12%, var(--o-superficie)); }
+html[data-modo="oscuro"] .agenda-tipo.apagado { border-color: var(--o-borde); color: var(--o-texto-4); }
+html[data-modo="oscuro"] .agenda-tipo.apagado .agenda-punto { box-shadow: inset 0 0 0 1.5px var(--o-borde-fuerte); }
