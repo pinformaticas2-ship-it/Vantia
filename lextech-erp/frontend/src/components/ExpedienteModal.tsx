@@ -474,6 +474,56 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
   );
 }
 
+// ── Indicadores del expediente (mismos datos que el panel de la ficha) ──
+function IndicadoresModal({ expedienteId }: { expedienteId: string }) {
+  const { getToken } = useAuth();
+  const [ind, setInd] = useState<any>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/tasks/indicators/expediente/${expedienteId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await safeJson(res);
+        if (!vivo) return;
+        if (res.ok) setInd(data.data);
+        else setError(data.error || "Error");
+      } catch { if (vivo) setError("Error de conexión"); }
+    })();
+    return () => { vivo = false; };
+  }, [expedienteId, getToken]);
+
+  if (error) return <p className="px-4 py-3 text-xs text-red-400">{error}</p>;
+  if (!ind) return <div className="px-4 py-4 flex justify-center"><Spinner size="sm" /></div>;
+
+  const euros = (v: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(v ?? 0);
+  const filas: [string, string, string][] = [
+    ["Días sin actuaciones", ind.dias_sin_actuacion == null ? "—" : `${ind.dias_sin_actuacion} días`,
+      ind.dias_sin_actuacion > 30 ? "text-amber-600" : "text-slate-700"],
+    ["Días abierto",         ind.dias_desde_apertura == null ? "—" : `${ind.dias_desde_apertura} días`, "text-slate-700"],
+    ["Tareas pendientes",    String(ind.tareas_pendientes), ind.tareas_pendientes > 0 ? "text-amber-600" : "text-slate-700"],
+    ["Tareas vencidas",      String(ind.tareas_vencidas), ind.tareas_vencidas > 0 ? "text-rose-600" : "text-slate-700"],
+    ["Archivos",             String(ind.total_archivos), "text-slate-700"],
+    ["Actuaciones",          String(ind.total_actuaciones), ind.total_actuaciones > 0 ? "text-blue-600" : "text-slate-700"],
+    ["Total cobrado",        euros(ind.total_cobrado), "text-emerald-600"],
+    ["Pendiente de cobro",   euros(ind.saldo), ind.saldo > 0 ? "text-amber-600" : "text-slate-700"],
+  ];
+  return (
+    <div className="px-4 py-2">
+      {filas.map(([label, value, color]) => (
+        <div key={label} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+          <span className="text-xs text-slate-500">{label}</span>
+          <span className={`text-xs font-bold ${color}`}>{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Modal de alta / edición ───────────────────────────────────
 export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving, onClienteCreated, error }: {
   initial: typeof EXP_EMPTY;
@@ -1056,22 +1106,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                   <Activity size={13} className="text-slate-400" />
                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Indicadores</span>
                 </div>
-                <div className="px-4 py-2">
-                  {([
-                    ["Días sin actuaciones", "0 días", "text-slate-700"],
-                    ["Total cobrado",        "0 €",    "text-emerald-600"],
-                    ["Imp. Cobros Pdtes.",   "0 €",    "text-amber-600"],
-                    ["Total Prov. Recibidas","0 €",    "text-slate-600"],
-                    ["Nº Exptes Relac.",     "0",      "text-blue-600"],
-                    ["Saldo Total Exp",      "0 €",    "text-slate-700"],
-                    ["Pdte. Facturar",       "0 €",    "text-red-600"],
-                  ] as [string, string, string][]).map(([label, value, color]) => (
-                    <div key={label} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
-                      <span className="text-xs text-slate-500">{label}</span>
-                      <span className={`text-xs font-bold ${color}`}>{value}</span>
-                    </div>
-                  ))}
-                </div>
+                <IndicadoresModal expedienteId={editId} />
               </div>
             )}
           </div>
