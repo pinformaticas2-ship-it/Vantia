@@ -3222,6 +3222,32 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  crm:', e?.message || e);
     }
 
+    // ── Dosier para Claude (27/10/2026): texto ya leído de cada adjunto (para
+    // no volver a leer PDF y Word en cada dosier) y cuándo se descargó cada
+    // dosier (para avisar de lo que ha llegado después).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS documento_textos (
+          file_id     UUID PRIMARY KEY REFERENCES client_files(id) ON DELETE CASCADE,
+          stored_name VARCHAR(300) NOT NULL,
+          texto       TEXT,
+          aviso       TEXT,
+          updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS dosier_claude_descargas (
+          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          expediente_id   UUID NOT NULL,
+          organizacion_id UUID NOT NULL,
+          user_id         VARCHAR(150) NOT NULL,
+          user_name       VARCHAR(200),
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_dosier_claude_exp ON dosier_claude_descargas (expediente_id, organizacion_id, created_at DESC)`);
+    } catch (e: any) {
+      console.warn('⚠️  dosier claude:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

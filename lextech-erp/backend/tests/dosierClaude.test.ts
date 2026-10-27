@@ -24,11 +24,18 @@ let otraOrg: string;
 let exp: string;
 let expAjeno: string;
 
-function call(handler: any, params: any, organizacionId: string): Promise<{ status: number; body: any }> {
+function call(handler: any, params: any, organizacionId: string, query: any = {}): Promise<{ status: number; body: any; headers: Record<string, string> }> {
   return new Promise((resolve) => {
     let status = 200;
-    const res: any = { status(s: number) { status = s; return res; }, json(b: any) { resolve({ status, body: b }); return res; } };
-    Promise.resolve(handler({ headers: {}, socket: {}, query: {}, params, body: {}, auth: { userId: 'dc_ana' }, organizacionId }, res));
+    const headers: Record<string, string> = {};
+    const res: any = {
+      headersSent: false,
+      status(s: number) { status = s; return res; },
+      setHeader(k: string, v: string) { headers[k.toLowerCase()] = v; },
+      json(b: any) { resolve({ status, body: b, headers }); return res; },
+      send(b: any) { resolve({ status, body: b, headers }); return res; },
+    };
+    Promise.resolve(handler({ headers: {}, socket: {}, query, params, body: {}, auth: { userId: 'dc_ana' }, organizacionId }, res));
   });
 }
 
@@ -96,8 +103,11 @@ test('dosier: datos del expediente y texto de sus PDF y Word', { skip }, async (
   assert.match(d.contenido, /\*\*Nº de autos:\*\* 123\/2026/);
   assert.match(d.contenido, /4\.500 euros por intereses usurarios/, 'texto del PDF');
   assert.match(d.contenido, /TAE del 26,82 %/, 'texto del Word');
-  assert.match(d.contenido, /foto\.png \(imagen \(sin texto\)\)/, 'la imagen sale como sin texto');
-  assert.deepEqual(d.documentos, { total: 3, conTexto: 2, sinTexto: 1 });
+  assert.match(d.contenido, /Van como archivo aparte[\s\S]*- foto\.png/, 'la imagen va como original, Claude la lee');
+  assert.deepEqual(d.documentos, { total: 3, conTexto: 2, sinTexto: 0, originales: 1, omitidos: 0 });
+  assert.deepEqual(d.originales.map((o: any) => o.nombre), ['foto.png']);
+  assert.equal(d.novedades, null, 'aún no se ha descargado nunca');
+  assert.ok(d.preguntas.length >= 4);
   assert.match(d.instrucciones, /expediente 2026\/7 «Aimar VS Wizink»/);
   assert.match(d.instrucciones, /Expediente 2026-7\.md/);
 });
@@ -106,4 +116,49 @@ test('dosier: nunca el de otro despacho', { skip }, async () => {
   const { getDosierClaude } = await import('../src/controllers/dosierClaudeController');
   assert.equal((await call(getDosierClaude, { id: expAjeno }, org)).status, 404);
   assert.equal((await call(getDosierClaude, { id: 'no-es-un-id' }, org)).status, 400);
+});
+
+test('dosier: el texto de los documentos se guarda y no se vuelve a leer', { skip }, async () => {
+  const { getDosierClaude } = await import('../src/controllers/dosierClaudeController');
+  const guardados = (await pool.query(
+    `SELECT f.original_name, t.texto IS NOT NULL AS con_texto FROM documento_textos t JOIN client_files f ON f.id = t.file_id WHERE f.client_id = $1 ORDER BY 1`, [exp],
+  )).rows;
+  assert.deepEqual(guardados.map((g: any) => [g.original_name, g.con_texto]), [['contrato.docx', true], ['demanda.pdf', true], ['foto.png', false]]);
+  // Si se pierde el archivo en disco, el texto guardado sigue sirviendo
+  const f = (await pool.query(`SELECT stored_name FROM client_files WHERE client_id = $1 AND original_name = 'demanda.pdf'`, [exp])).rows[0];
+  const ruta = path.join(UPLOADS, 'clients', exp, f.stored_name);
+  const copia = fs.readFileSync(ruta);
+  fs.unlinkSync(ruta);
+  try {
+    const r = await call(getDosierClaude, { id: exp }, org);
+    assert.match(r.body.data.contenido, /4\.500 euros por intereses usurarios/);
+  } finally {
+    fs.writeFileSync(ruta, copia);
+  }
+});
+
+test('dosier: el .zip lleva el Markdown y los escaneados/imágenes; se recuerda la descarga', { skip }, async () => {
+  const { getDosierClaude, descargarDosierClaude } = await import('../src/controllers/dosierClaudeController');
+  const r = await call(descargarDosierClaude, { id: exp }, org, { formato: 'zip' });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers['content-type'], 'application/zip');
+  const AdmZip = require('adm-zip');
+  const nombres = new AdmZip(r.body).getEntries().map((x: any) => x.entryName).sort();
+  assert.deepEqual(nombres, ['Expediente 2026-7.md', 'foto.png']);
+
+  const md = await call(descargarDosierClaude, { id: exp }, org, { formato: 'md' });
+  assert.match(md.headers['content-type'], /text\/markdown/);
+  assert.match(String(md.body), /# Expediente 2026\/7/);
+
+  // Lo que llega después de la descarga sale como novedad
+  await adjuntar(exp, 'sentencia.pdf', 'application/pdf', await pdf('Se estima la demanda'));
+  const v = (await call(getDosierClaude, { id: exp }, org)).body.data;
+  assert.equal(v.novedades.documentos, 1);
+  assert.equal(v.novedades.por, 'dc_ana');
+  assert.match(v.contenido, /Se estima la demanda/);
+});
+
+test('dosier: la descarga tampoco sirve para otro despacho', { skip }, async () => {
+  const { descargarDosierClaude } = await import('../src/controllers/dosierClaudeController');
+  assert.equal((await call(descargarDosierClaude, { id: expAjeno }, org, { formato: 'zip' })).status, 404);
 });
