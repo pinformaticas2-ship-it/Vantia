@@ -4065,8 +4065,14 @@ export default function Agenda() {
                                   setSelectedDay(key);
                                   // Sin sitio para el panel del día (pantallas < 1024px): se abre la vista de ese día.
                                   if (window.innerWidth < 1024) { setView("day"); return; }
+                                }}
+                                // Un clic selecciona el día (panel lateral); doble clic crea un evento en él.
+                                onDoubleClick={e => {
+                                  if (draggingEventId || window.innerWidth < 1024) return;
+                                  setSelectedDay(key);
                                   openNew(key, e);
                                 }}
+                                title="Doble clic para crear un evento"
                                 className={`border-b border-r border-slate-200/70 min-h-[96px] p-1.5 cursor-pointer transition-all ${
                                   dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
                                   : isSel   ? "bg-red-50/60 ring-1 ring-inset ring-red-200"
