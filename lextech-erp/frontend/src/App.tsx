@@ -41,6 +41,7 @@ import ChatIA from './pages/ChatIA';
 import DirectorioProfesionales from './pages/DirectorioProfesionales';
 import DirectorioProfesionalForm from './pages/DirectorioProfesionalForm';
 import DropboxOAuthCallback from './pages/DropboxOAuthCallback';
+import { Terminos, Privacidad } from './pages/Legal';
 import { useOrganizacion, Modulo } from './lib/useOrganizacion';
 
 // Sin sesión (se cerró desde el menú de usuario, caducó...), este navegador
@@ -111,6 +112,9 @@ export default function App() {
           <Route path="/reservar/:token" element={<AgendaBookingPublic />} />
           {/* Aterrizaje del popup de OAuth de Dropbox -- no necesita layout ni sesión propia */}
           <Route path="/dropbox-oauth-callback" element={<DropboxOAuthCallback />} />
+          {/* Términos y privacidad públicos (los exige TikTok para conectar cuentas) */}
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
 
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -127,6 +131,8 @@ export default function App() {
           <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
           <Route path="/reservar/:token" element={<AgendaBookingPublic />} />
           <Route path="/dropbox-oauth-callback" element={<DropboxOAuthCallback />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
           <Route path="*" element={<PublicLanding />} />
         </Routes>
       </SignedOut>
