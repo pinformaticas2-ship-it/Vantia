@@ -9,6 +9,7 @@ import { requireFilesPermission } from '../middleware/requireFilesPermission';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 import { getFileAsPdf, runPdfTool } from '../controllers/pdfToolController';
 import { camposPlantilla, generarPlantilla } from '../controllers/plantillasController';
+import { onlyofficeStatus, getEditorConfig, editorCallback } from '../controllers/onlyofficeController';
 const router = Router();
 const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 
@@ -37,6 +38,11 @@ router.get('/dl/:token/bridge',       officeBridgePage);
 router.get('/dl/:token',              downloadByToken);
 router.put('/dl/:token/sync',         rawBinary, syncClientFileByToken);
 
+// ── Editor ONLYOFFICE (controllers/onlyofficeController.ts) ──────
+// El callback lo llama el Document Server: se autentica con su JWT, no con Clerk.
+router.post('/onlyoffice/callback/:clientId/:fileId', editorCallback);
+router.get('/onlyoffice/status',      requireAuth, onlyofficeStatus);
+
 // ── Rutas de plantillas (ANTES de las rutas dinámicas) ──────────
 router.get('/templates',              requireAuth, listTemplates);
 router.get('/templates/preview-pdf',  requireAuth, previewTemplateAsPdf);
@@ -61,6 +67,7 @@ router.post('/:clientId/create-blank',              ...filesGate, createBlankDoc
 // Herramienta PDF: fusionar y retocar páginas (controllers/pdfToolController.ts)
 router.post('/:clientId/pdf-tool',                  ...filesGate, runPdfTool);
 router.get('/:clientId/:fileId/as-pdf',             ...filesGate, getFileAsPdf);
+router.get('/:clientId/:fileId/onlyoffice',         ...filesGate, getEditorConfig);
 router.get('/:clientId',                            ...filesGate, listFiles);
 router.post('/:clientId',                           ...filesGate, upload.array('files', 50), uploadFiles);
 router.put('/:clientId/:fileId',                    ...filesGate, updateFileMetadata);

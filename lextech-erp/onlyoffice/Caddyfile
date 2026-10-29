@@ -1,0 +1,5 @@
+{$DOMINIO} {
+	reverse_proxy onlyoffice:80 {
+		header_up X-Forwarded-Proto https
+	}
+}

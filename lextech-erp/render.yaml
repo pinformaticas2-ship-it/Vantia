@@ -45,3 +45,7 @@ services:
         sync: false
       - key: DOCPLANT_PATH
         sync: false
+      - key: ONLYOFFICE_URL
+        sync: false
+      - key: ONLYOFFICE_JWT_SECRET
+        sync: false

@@ -64,6 +64,9 @@ export async function requireFilesPermission(req: Request, res: Response, next: 
       });
       return;
     }
+    // El editor ONLYOFFICE se pide con GET (lectura) pero decide si abre en
+    // modo edición según este nivel.
+    (req as any).filesPuedeEditar = nivelCubre(nivel, 'edicion');
     next();
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Error comprobando permisos.' });

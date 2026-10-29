@@ -19,5 +19,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Editor de documentos en el navegador (Word/Excel/PowerPoint) -- ver onlyoffice/README.md
+  # En local: ONLYOFFICE_URL=http://localhost:8080 y ONLYOFFICE_BACKEND_URL=http://host.docker.internal:<PORT del backend>
+  onlyoffice:
+    container_name: lextech_onlyoffice
+    image: onlyoffice/documentserver:8.2
+    ports:
+      - "8080:80"
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-cambia-este-secreto-en-local}
+      ALLOW_PRIVATE_IP_ADDRESS: "true" # para que pueda descargar del backend en localhost
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+    restart: unless-stopped
+
 volumes:
   postgres_data: # Definición del volumen persistente
+  onlyoffice_data:

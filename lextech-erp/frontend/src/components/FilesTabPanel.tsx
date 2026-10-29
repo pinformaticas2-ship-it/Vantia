@@ -6,7 +6,7 @@ import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
   ChevronDown, ChevronRight, X, Search, Copy, Clipboard, Cloud, Check,
-  Combine,
+  Combine, PenLine,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -17,6 +17,7 @@ import { useOrganizacion } from "../lib/useOrganizacion";
 import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 import { aviso } from "../lib/avisos";
 import RellenarPlantilla from './RellenarPlantilla';
+import OnlyOfficeEditor, { isOnlyOfficeCompatible, useOnlyOfficeEnabled } from './OnlyOfficeEditor';
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -85,6 +86,8 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   const [files, setFiles]           = useState<any[]>([]);
   // Herramienta PDF (fusionar / editar páginas): ids con los que se abre.
   const [pdfTool, setPdfTool]       = useState<string[] | null>(null);
+  const [editorFile, setEditorFile] = useState<{ id: string; original_name: string } | null>(null);
+  const onlyofficeEnabled = useOnlyOfficeEnabled();
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [uploading, setUploading]   = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1120,6 +1123,13 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                 {richPreviewLoading === f.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
                               </button>
                             )}
+                            {onlyofficeEnabled && isOnlyOfficeCompatible(f) && (
+                              <button onClick={(e) => { e.stopPropagation(); setEditorFile({ id: f.id, original_name: f.original_name }); }}
+                                title={locked ? "Ver en el navegador" : "Editar en el navegador"}
+                                className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+                                <PenLine size={14} />
+                              </button>
+                            )}
                             {!locked && isPdfToolCompatible(f) && (
                               <button onClick={(e) => { e.stopPropagation(); setPdfTool([f.id]); }} title="Editar páginas / fusionar con otros"
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
@@ -1825,6 +1835,21 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       {pdfTool && (
         <PdfToolModal entityId={entityId} files={files} initialFileIds={pdfTool}
           onClose={() => setPdfTool(null)} onDone={() => { void loadFiles(true); }} />
+      )}
+      {editorFile && (
+        <OnlyOfficeEditor entityId={entityId} file={editorFile} readOnly={locked}
+          onClose={(huboEdicion) => {
+            const fileId = editorFile.id;
+            setEditorFile(null);
+            if (!huboEdicion) return;
+            // El Document Server guarda unos segundos después de cerrar: se
+            // recarga la lista y se tira la vista previa cacheada.
+            setTimeout(() => {
+              revokePreviewEntry(fileId);
+              openUrlCache.current.delete(fileId);
+              void loadFiles(true);
+            }, 12_000);
+          }} />
       )}
     </div>
   );

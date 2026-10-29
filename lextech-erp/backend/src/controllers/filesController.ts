@@ -514,9 +514,7 @@ const isOfficeOpenable = (fileName?: string | null, mimeType?: string | null) =>
 export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
-    const token = crypto.randomUUID();
-    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
-    res.json({ success: true, token });
+    res.json({ success: true, token: issueTempToken(clientId, fileId) });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -551,6 +549,84 @@ export const downloadByToken = async (req: any, res: Response) => {
   }
 };
 
+/** Emite un token temporal de descarga (/api/files/dl/:token) para un adjunto. */
+export function issueTempToken(clientId: string, fileId: string): string {
+  const token = crypto.randomUUID();
+  _tempTokens.set(token, { clientId, fileId, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
+  return token;
+}
+
+// Sobrescribe el contenido de un adjunto (disco + Drive/Dropbox si aplica) y
+// deja constancia en el historial. La usan tanto la sincronización desde
+// Word/Excel de escritorio como el guardado del editor ONLYOFFICE.
+export async function overwriteClientFileContent(
+  fileId: string,
+  fallbackClientId: string,
+  body: Buffer,
+  origen: { userId: string; userName: string; label: string },
+): Promise<{ status: number; error?: string; updated_at?: string; size_bytes?: number }> {
+  const result = await pool.query(
+    `SELECT stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id
+     FROM client_files
+     WHERE id = $1
+     LIMIT 1`,
+    [fileId]
+  );
+  if (!result.rows.length) return { status: 404, error: 'Archivo no encontrado.' };
+
+  const { stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
+  const realClientId = client_id || fallbackClientId;
+  const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
+  if (!fs.existsSync(filePath)) return { status: 404, error: 'Archivo no encontrado en disco.' };
+
+  fs.writeFileSync(filePath, body);
+  const stat = fs.statSync(filePath);
+
+  await pool.query(
+    `UPDATE client_files
+     SET size_bytes = $1,
+         updated_at = NOW()
+     WHERE id = $2 AND client_id = $3`,
+    [stat.size, fileId, realClientId]
+  );
+
+  // Si el adjunto vive en Drive/Dropbox, se sobrescribe el mismo archivo
+  // con el contenido recién guardado (mismo id, sin duplicar).
+  if (storage_provider === 'drive' && drive_file_id) {
+    const ctx = await getExpedienteDriveContext(realClientId);
+    if (ctx) {
+      try {
+        await updateDriveFileContent(ctx.organizacionId, drive_file_id, body, mimetype);
+        await clearDriveError(ctx.organizacionId);
+      } catch (driveErr: any) {
+        await recordDriveError(ctx.organizacionId, driveErr);
+      }
+    }
+  } else if (storage_provider === 'dropbox' && dropbox_file_id) {
+    const ctx = await getExpedienteDriveContext(realClientId);
+    if (ctx) {
+      try {
+        await updateDropboxFileContent(ctx.organizacionId, dropbox_file_id, body);
+        await clearDropboxError(ctx.organizacionId);
+      } catch (dbxErr: any) {
+        await recordDropboxError(ctx.organizacionId, dbxErr);
+      }
+    }
+  }
+
+  await logActivity(
+    origen.userId,
+    origen.userName,
+    `Adjunto actualizado desde ${origen.label}: ${original_name}`,
+    'CLIENT',
+    realClientId,
+    original_name,
+    { eventType: 'UPDATE' }
+  );
+
+  return { status: 200, updated_at: stat.mtime.toISOString(), size_bytes: stat.size };
+}
+
 export const syncClientFileByToken = async (req: any, res: Response) => {
   const { token } = req.params;
   const data = _tempTokens.get(token);
@@ -558,76 +634,15 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
     return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
   }
 
+  const body = req.body as Buffer | undefined;
+  if (!body || !Buffer.isBuffer(body) || body.length === 0) {
+    return res.status(400).json({ success: false, error: 'No se recibió contenido para sincronizar.' });
+  }
+
   try {
-    const result = await pool.query(
-      `SELECT stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id
-       FROM client_files
-       WHERE id = $1
-       LIMIT 1`,
-      [data.fileId]
-    );
-    if (!result.rows.length) {
-      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    }
-
-    const { stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
-    const realClientId = client_id || data.clientId;
-    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
-    }
-
-    const body = req.body as Buffer | undefined;
-    if (!body || !Buffer.isBuffer(body) || body.length === 0) {
-      return res.status(400).json({ success: false, error: 'No se recibió contenido para sincronizar.' });
-    }
-
-    fs.writeFileSync(filePath, body);
-    const stat = fs.statSync(filePath);
-
-    await pool.query(
-      `UPDATE client_files
-       SET size_bytes = $1,
-           updated_at = NOW()
-       WHERE id = $2 AND client_id = $3`,
-      [stat.size, data.fileId, realClientId]
-    );
-
-    // Si el adjunto vive en Drive/Dropbox, se sobrescribe el mismo archivo
-    // con el contenido recién guardado desde Word/Excel (mismo id, sin duplicar).
-    if (storage_provider === 'drive' && drive_file_id) {
-      const ctx = await getExpedienteDriveContext(realClientId);
-      if (ctx) {
-        try {
-          await updateDriveFileContent(ctx.organizacionId, drive_file_id, body, mimetype);
-          await clearDriveError(ctx.organizacionId);
-        } catch (driveErr: any) {
-          await recordDriveError(ctx.organizacionId, driveErr);
-        }
-      }
-    } else if (storage_provider === 'dropbox' && dropbox_file_id) {
-      const ctx = await getExpedienteDriveContext(realClientId);
-      if (ctx) {
-        try {
-          await updateDropboxFileContent(ctx.organizacionId, dropbox_file_id, body);
-          await clearDropboxError(ctx.organizacionId);
-        } catch (dbxErr: any) {
-          await recordDropboxError(ctx.organizacionId, dbxErr);
-        }
-      }
-    }
-
-    await logActivity(
-      'SYSTEM',
-      'Sistema',
-      `Adjunto actualizado desde Office: ${original_name}`,
-      'CLIENT',
-      realClientId,
-      original_name,
-      { eventType: 'UPDATE' }
-    );
-
-    res.json({ success: true, updated_at: stat.mtime.toISOString(), size_bytes: stat.size });
+    const r = await overwriteClientFileContent(data.fileId, data.clientId, body, { userId: 'SYSTEM', userName: 'Sistema', label: 'Office' });
+    if (r.status !== 200) return res.status(r.status).json({ success: false, error: r.error });
+    res.json({ success: true, updated_at: r.updated_at, size_bytes: r.size_bytes });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
