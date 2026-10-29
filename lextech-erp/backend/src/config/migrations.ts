@@ -3248,6 +3248,39 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  dosier claude:', e?.message || e);
     }
 
+    // ── TikTok (Comunicación Externa): una cuenta por organización, con los
+    // tokens cifrados como Dropbox, y los "state" pendientes del OAuth (el
+    // callback de TikTok llega sin sesión y por ellos sabe de qué
+    // organización y usuario es).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_cuentas (
+          organizacion_id   UUID PRIMARY KEY,
+          open_id           VARCHAR(100) NOT NULL,
+          display_name      TEXT,
+          username          TEXT,
+          avatar_url        TEXT,
+          scopes            TEXT,
+          access_token_enc  TEXT NOT NULL,
+          refresh_token_enc TEXT NOT NULL,
+          token_expiry      TIMESTAMPTZ,
+          refresh_expiry    TIMESTAMPTZ,
+          connected_by      VARCHAR(150),
+          connected_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS tiktok_oauth_states (
+          state           VARCHAR(64) PRIMARY KEY,
+          organizacion_id UUID NOT NULL,
+          user_id         VARCHAR(150) NOT NULL,
+          return_origin   TEXT NOT NULL,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    } catch (e: any) {
+      console.warn('⚠️  tiktok:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useIsMobile } from "../lib/useIsMobile";
+import TikTokPanel, { TikTokIcon } from "../components/TikTokPanel";
 
 interface WhatsAppContact {
   id: string;
@@ -124,10 +125,13 @@ export default function WhatsApp() {
   const [error, setError] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
-  // Comunicación externa: de momento solo WhatsApp está realmente conectado.
+  // Comunicación externa: WhatsApp y TikTok conectados de verdad.
   // Instagram queda como pestaña visible pero deshabilitada hasta tener
   // cuenta de Instagram Business y el permiso de mensajería aprobado por Meta.
-  const [channel, setChannel] = useState<"whatsapp" | "instagram">("whatsapp");
+  // ?canal=tiktok abre directamente TikTok (así vuelve el backend tras conectar).
+  const [channel, setChannel] = useState<"whatsapp" | "instagram" | "tiktok">(
+    searchParams.get("canal") === "tiktok" ? "tiktok" : "whatsapp",
+  );
 
   const apiGet = useCallback(async (path: string) => {
     const token = await getToken({ skipCache: true });
@@ -257,7 +261,7 @@ export default function WhatsApp() {
     }
   };
 
-  if (loading) {
+  if (loading && channel === "whatsapp") {
     return (
       <div className="flex h-[60vh] items-center justify-center text-slate-400">
         <div className="flex items-center gap-3">
@@ -267,7 +271,7 @@ export default function WhatsApp() {
     );
   }
 
-  if (error && contacts.length === 0 && !status) {
+  if (error && contacts.length === 0 && !status && channel === "whatsapp") {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
@@ -297,10 +301,21 @@ export default function WhatsApp() {
           <Instagram size={13} /> Instagram
           <span className="ml-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Próximamente</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setChannel("tiktok")}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            channel === "tiktok" ? "bg-slate-900 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          }`}
+        >
+          <TikTokIcon size={13} /> TikTok
+        </button>
       </div>
 
       {channel === "instagram" ? (
         <InstagramComingSoon />
+      ) : channel === "tiktok" ? (
+        <TikTokPanel />
       ) : (
       <div className="flex flex-1 min-h-0 overflow-hidden">
       <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-white border-r border-slate-200`}>
