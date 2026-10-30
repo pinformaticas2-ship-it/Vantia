@@ -1507,6 +1507,25 @@ export const getChatHistory = async (req: Request, res: Response) => {
   }
 };
 
+// ── GET /api/vantia/chat/documentos?moduleId= ── documentos que la IA ha
+// creado en esa conversación (botón "Documentos" de la cabecera de Chat IA).
+export const getChatDocumentos = async (req: any, res: Response) => {
+  const moduleId = String(req.query.moduleId || '');
+  const userId = req.auth?.userId;
+  if (!moduleId || !userId) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, titulo, created_at FROM documentos
+        WHERE organizacion_id=$1 AND chat_module_id=$2 AND created_by=$3
+        ORDER BY created_at`,
+      [req.organizacionId, moduleId, userId],
+    );
+    res.json({ success: true, data: rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error interno del servidor.' });
+  }
+};
+
 // ── DELETE /api/vantia/chat/history ── vacía la conversación del widget
 // flotante para el módulo actual (a diferencia de deleteConversation, que
 // borra por id de fila y solo se usa desde el listado de Chat IA) ──────────
@@ -1840,6 +1859,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         if (name === 'crear_documento' && (result as any)?.creado) {
           const d = { id: (result as any).id, titulo: (result as any).titulo };
           documentosCreados.push(d);
+          pool.query(`UPDATE documentos SET chat_module_id=$1 WHERE id=$2 AND organizacion_id=$3`, [moduleId, d.id, req.organizacionId]).catch(() => {});
           emit({ type: 'document_created', ...d });
         }
       }

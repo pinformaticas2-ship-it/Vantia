@@ -3324,6 +3324,9 @@ export async function runMigrations(): Promise<void> {
         )`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_documentos_org ON documentos (organizacion_id, updated_at DESC)`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_documentos_exp ON documentos (expediente_id)`);
+      // Conversación de Chat IA en la que la IA creó el documento (para abrirlo desde ese chat).
+      await client.query(`ALTER TABLE documentos ADD COLUMN IF NOT EXISTS chat_module_id VARCHAR(255)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_documentos_chat ON documentos (organizacion_id, chat_module_id)`);
     } catch (e: any) {
       console.warn('⚠️  documentos/skills:', e?.message || e);
     }

@@ -299,10 +299,32 @@ export default function ChatIA() {
 
   const [conversations,  setConversations]  = useState<Conversation[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  useEffect(() => {
+    setDocsChat([]); setVerDocsChat(false); setDocAbierto(null);
+    if (!activeModuleId) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const token = await getToken();
+        const r = await fetch(resolveApiUrl(`/api/vantia/chat/documentos?moduleId=${encodeURIComponent(activeModuleId)}`), { headers: { Authorization: `Bearer ${token}` } });
+        const d = await safeJson(r);
+        if (vivo && d?.success) {
+          const delServidor: DocumentoCreado[] = (d.data || []).map((x: any) => ({ id: x.id, titulo: x.titulo }));
+          // Se mezcla con lo que haya llegado mientras tanto por el chat.
+          setDocsChat(prev => [...delServidor, ...prev.filter(p => !delServidor.some(x => x.id === p.id))]);
+        }
+      } catch { /* sin lista: quedan las tarjetas de los mensajes */ }
+    })();
+    return () => { vivo = false; };
+  }, [activeModuleId, getToken]);
   const [activeId,       setActiveId]       = useState<string | null>(null);
   const [messages,       setMessages]       = useState<Message[]>([]);
   // Documento abierto en el panel lateral (lo crea la IA con crear_documento).
   const [docAbierto, setDocAbierto] = useState<string | null>(null);
+  // Todos los documentos creados en esta conversación (botón de la cabecera),
+  // aunque la tarjeta del mensaje no esté a la vista.
+  const [docsChat, setDocsChat] = useState<DocumentoCreado[]>([]);
+  const [verDocsChat, setVerDocsChat] = useState(false);
   const isMobile = useIsMobile();
   const [input,          setInput]          = useState('');
   const [sending,        setSending]        = useState(false);
@@ -447,6 +469,7 @@ export default function ChatIA() {
               ? { ...m, documentos: [...(m.documentos || []), d] }
               : m)));
             setDocAbierto(d.id);
+            setDocsChat(prev => (prev.some(x => x.id === d.id) ? prev : [...prev, d]));
           } else if (evt.type === 'action_proposal') {
             const { type: _t, ...proposal } = evt;
             setMessages(prev => prev.map((m, i) => (i === targetIdx
@@ -972,15 +995,45 @@ export default function ChatIA() {
                   className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Copiar chat</span>
+                  <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>Copiar chat</span>
                 </button>
+              )}
+              {docsChat.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setVerDocsChat(v => !v)}
+                    className={`flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg transition-all active:scale-95 ${verDocsChat || docAbierto ? 'border-[#ab0433]/40 bg-red-50 text-[#ab0433]' : 'text-slate-500 hover:text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+                    title="Documentos creados en esta conversación"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Documentos</span>
+                    <span className="rounded-full bg-white/80 px-1.5 text-[10px] font-bold">{docsChat.length}</span>
+                  </button>
+                  {verDocsChat && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setVerDocsChat(false)} />
+                      <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                        <p className="border-b border-slate-100 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Documentos de este chat</p>
+                        <div className="max-h-72 overflow-y-auto py-1">
+                          {docsChat.map(d => (
+                            <button key={d.id} onClick={() => { setDocAbierto(d.id); setVerDocsChat(false); }}
+                              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50 ${docAbierto === d.id ? 'bg-red-50/60 font-semibold text-[#ab0433]' : 'text-slate-700'}`}>
+                              <FileText className="h-4 w-4 shrink-0 text-[#ab0433]" />
+                              <span className="truncate">{d.titulo}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
               <button
                 onClick={() => setShowHistory(true)}
                 className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
               >
                 <History className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Historial</span>
+                <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>Historial</span>
               </button>
               <div className="relative" ref={topMenuRef}>
                 <button
