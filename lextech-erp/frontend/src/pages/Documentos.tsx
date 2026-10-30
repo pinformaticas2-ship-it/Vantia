@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -6,7 +6,8 @@ import {
   ArrowLeft, Briefcase, Check, CheckCircle2, Download, FileText, FolderInput, Loader2, Plus, Printer,
   Search, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
-import { apiFetch, safeJson } from "../lib/api";
+import { apiFetch } from "../lib/api";
+import { SIN_TITULO, useDocumento } from "../lib/useDocumento";
 import { useIsMobile } from "../lib/useIsMobile";
 import { Spinner } from "../components/Spinner";
 import { BarraEditor, HojaEditor, contarPalabras, useEditorTexto } from "../components/EditorTexto";
@@ -26,9 +27,6 @@ interface DocResumen {
   actualizadoPor: string | null;
   extracto: string;
 }
-interface Doc extends Omit<DocResumen, "extracto"> {
-  contenido: string;
-}
 interface Skill {
   id: string;
   nombre: string;
@@ -44,7 +42,6 @@ interface ExpedienteOption {
   cliente_nombre: string | null;
 }
 
-const SIN_TITULO = "Documento sin título";
 const fechaCorta = (iso: string) => {
   const d = new Date(iso);
   const hoy = new Date();
@@ -68,73 +65,28 @@ export default function Documentos() {
   const [cargandoLista, setCargandoLista] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [doc, setDoc] = useState<Doc | null>(null);
-  const [cargandoDoc, setCargandoDoc] = useState(false);
-  const [titulo, setTitulo] = useState("");
-  const [estadoGuardado, setEstadoGuardado] = useState<"guardado" | "pendiente" | "guardando" | "error">("guardado");
   const [aviso, setAviso] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
   const [iaAbierta, setIaAbierta] = useState(Boolean(estadoNav.abrirIa));
   const skillInicial = estadoNav.skillId || "";
   const [selectorExp, setSelectorExp] = useState<null | "vincular" | "guardar">(null);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
-  const [exportando, setExportando] = useState(false);
 
-  const pendiente = useRef<{ titulo?: string; contenido?: string }>({});
-  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const docIdRef = useRef<string | null>(null);
-  // Id del documento cuyo texto ya está en el editor. Hasta entonces se
-  // ignoran los cambios: al abrir, el editor emite un cambio "vacío" propio
-  // que, si se guardaba, machacaba el documento con <p></p>.
-  const cargadoPara = useRef<string | null>(null);
-
-  // ── Guardado automático ───────────────────────────────────────────────
-  const guardarYa = useCallback(async () => {
-    if (temporizador.current) { clearTimeout(temporizador.current); temporizador.current = null; }
-    const docId = docIdRef.current;
-    const cambios = pendiente.current;
-    if (!docId || !Object.keys(cambios).length) return;
-    pendiente.current = {};
-    setEstadoGuardado("guardando");
-    try {
-      const r = await apiFetch(`/api/documentos/${docId}`, { getToken, method: "PUT", body: JSON.stringify(cambios) });
-      if (r?.success === false) throw new Error(r.error);
-      setEstadoGuardado(Object.keys(pendiente.current).length ? "pendiente" : "guardado");
-      const d: Doc = r.data;
-      setLista((prev) => {
-        const resto = prev.filter((x) => x.id !== d.id);
-        const extracto = (cambios.contenido ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
-        const anterior = prev.find((x) => x.id === d.id);
-        return [{ ...d, extracto: cambios.contenido !== undefined ? extracto : anterior?.extracto || "" }, ...resto];
-      });
-    } catch {
-      pendiente.current = { ...cambios, ...pendiente.current };
-      setEstadoGuardado("error");
-    }
-  }, [getToken]);
-
-  const programarGuardado = useCallback((cambios: { titulo?: string; contenido?: string }) => {
-    pendiente.current = { ...pendiente.current, ...cambios };
-    setEstadoGuardado("pendiente");
-    if (temporizador.current) clearTimeout(temporizador.current);
-    temporizador.current = setTimeout(() => { void guardarYa(); }, 900);
-  }, [guardarYa]);
-
-  const editor = useEditorTexto({
-    contenido: "",
-    onChange: (html) => {
-      if (!docIdRef.current || cargadoPara.current !== docIdRef.current) return;
-      programarGuardado({ contenido: html });
-    },
+  // Carga y guardado automático del documento abierto (lib/useDocumento).
+  const {
+    doc, setDoc, cargando: cargandoDoc, error: errorDoc, titulo, cambiarTitulo, estadoGuardado, editor, guardarYa,
+    descargarWord: descargarWordDoc, exportando, descartarCambios,
+  } = useDocumento(id, {
+    onGuardado: (d, cambios) => setLista((prev) => {
+      const resto = prev.filter((x) => x.id !== d.id);
+      const anterior = prev.find((x) => x.id === d.id);
+      const extracto = cambios.contenido !== undefined
+        ? cambios.contenido.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160)
+        : anterior?.extracto || "";
+      return [{ ...d, extracto }, ...resto];
+    }),
   });
+  useEffect(() => { setConfirmarBorrar(false); }, [id]);
 
-  // Al salir de la página o cerrar la pestaña con cambios sin guardar.
-  useEffect(() => {
-    const antesDeSalir = (e: BeforeUnloadEvent) => {
-      if (Object.keys(pendiente.current).length) { void guardarYa(); e.preventDefault(); }
-    };
-    window.addEventListener("beforeunload", antesDeSalir);
-    return () => { window.removeEventListener("beforeunload", antesDeSalir); void guardarYa(); };
-  }, [guardarYa]);
 
   // ── Carga ─────────────────────────────────────────────────────────────
   const cargarLista = useCallback(async (q = "") => {
@@ -156,33 +108,6 @@ export default function Documentos() {
     apiFetch("/api/skills", { getToken }).then((r) => setSkills((r?.data?.skills || []).filter((s: Skill) => s.activa))).catch(() => {});
   }, [getToken]);
 
-  useEffect(() => {
-    if (!id) { docIdRef.current = null; setDoc(null); return; }
-    let vivo = true;
-    void guardarYa();
-    cargadoPara.current = null;
-    docIdRef.current = id;
-    setCargandoDoc(true);
-    setConfirmarBorrar(false);
-    apiFetch(`/api/documentos/${id}`, { getToken })
-      .then((r) => {
-        if (!vivo) return;
-        if (r?.success === false) throw new Error(r.error);
-        setDoc(r.data);
-        setTitulo(r.data.titulo);
-        setEstadoGuardado("guardado");
-      })
-      .catch((e) => { if (vivo) { setDoc(null); setAviso({ tono: "error", texto: e.message || "No se pudo abrir el documento." }); } })
-      .finally(() => { if (vivo) setCargandoDoc(false); });
-    return () => { vivo = false; };
-  }, [id, getToken, guardarYa]);
-
-  // Pasa el contenido al editor sin disparar el guardado.
-  useEffect(() => {
-    if (!editor || !doc) return;
-    editor.commands.setContent(doc.contenido || "", { emitUpdate: false });
-    cargadoPara.current = doc.id;
-  }, [editor, doc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Acciones ──────────────────────────────────────────────────────────
   const crear = useCallback(async (opciones: { skillId?: string; expedienteId?: string | null } = {}) => {
@@ -208,10 +133,6 @@ export default function Documentos() {
     void crear({ expedienteId, skillId: skillId ?? "" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cambiarTitulo = (t: string) => {
-    setTitulo(t);
-    programarGuardado({ titulo: t.trim() || SIN_TITULO });
-  };
 
   const vincularExpediente = async (exp: ExpedienteOption | null) => {
     if (!doc) return;
@@ -223,25 +144,8 @@ export default function Documentos() {
   };
 
   const descargarWord = async () => {
-    if (!doc) return;
-    setExportando(true);
-    try {
-      await guardarYa();
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/documentos/${doc.id}/docx`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error((await safeJson(res))?.error || "No se pudo exportar a Word.");
-      const blob = await res.blob();
-      const disp = res.headers.get("Content-Disposition") || "";
-      const nombre = decodeURIComponent(/filename\*=UTF-8''([^;]+)/.exec(disp)?.[1] || "documento.docx");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e: any) {
-      setAviso({ tono: "error", texto: e.message });
-    } finally {
-      setExportando(false);
-    }
+    const fallo = await descargarWordDoc();
+    if (fallo) setAviso({ tono: "error", texto: fallo });
   };
 
   const imprimir = () => {
@@ -281,7 +185,7 @@ export default function Documentos() {
 
   const borrar = async () => {
     if (!doc) return;
-    pendiente.current = {};
+    descartarCambios();
     const r = await apiFetch(`/api/documentos/${doc.id}`, { getToken, method: "DELETE" }).catch(() => null);
     if (!r?.success) { setAviso({ tono: "error", texto: r?.error || "No se pudo borrar." }); return; }
     setLista((prev) => prev.filter((x) => x.id !== doc.id));
@@ -350,7 +254,7 @@ export default function Documentos() {
         ) : cargandoDoc && !doc ? (
           <div className="flex flex-1 items-center justify-center"><Spinner size="md" muted label="Abriendo documento..." /></div>
         ) : !doc ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-sm text-slate-500">{aviso?.texto || "Documento no encontrado."}</div>
+          <div className="flex flex-1 items-center justify-center p-6 text-sm text-slate-500">{errorDoc || "Documento no encontrado."}</div>
         ) : (
           <>
             <div className="border-b border-slate-200 bg-white px-3 py-2.5 sm:px-5">

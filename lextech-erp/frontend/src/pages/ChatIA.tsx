@@ -8,6 +8,8 @@ import { Menu,
 import { resolveApiUrl, safeJson } from '../lib/api';
 import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand, VantiaModelPickerPanel } from '../components/VantiaModelPicker';
 import { VantiaHistoryModal } from '../components/VantiaHistoryPanel';
+import PanelDocumento from '../components/PanelDocumento';
+import { useIsMobile } from '../lib/useIsMobile';
 
 // ─── Keyframe styles ──────────────────────────────────────────────────────────
 
@@ -92,6 +94,34 @@ interface Message {
   actionProposals?: ActionProposal[]; // ídem, acciones pendientes de confirmar
   attachmentName?: string;        // solo mensajes de usuario con archivo adjunto
   linkedExpediente?: LinkedExpedienteRef; // solo mensajes de usuario con expediente vinculado
+  documentos?: DocumentoCreado[];  // documentos que la IA ha guardado en Documentos
+}
+
+interface DocumentoCreado { id: string; titulo: string }
+
+// Tarjeta bajo la respuesta cuando la IA guarda un documento: al pulsarla se
+// abre el editor de Documentos en el panel lateral.
+function DocumentoCard({ doc, abierto, onAbrir }: { doc: DocumentoCreado; abierto: boolean; onAbrir: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      className={`group/doc flex w-full max-w-sm items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition ${
+        abierto ? 'border-[#ab0433]/40 bg-red-50/60' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+      }`}
+    >
+      <span className="flex h-10 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">
+        <FileText className="h-4 w-4 text-[#ab0433]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-slate-800">{doc.titulo}</span>
+        <span className="block text-[11px] text-slate-400">{abierto ? 'Abierto en el editor' : 'Documento · Clic para abrir en el editor'}</span>
+      </span>
+      <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${abierto ? 'bg-[#ab0433] text-white' : 'bg-slate-100 text-slate-600 group-hover/doc:bg-slate-200'}`}>
+        {abierto ? 'Abierto' : 'Abrir'}
+      </span>
+    </button>
+  );
 }
 
 function ActionProposalCard({ proposal, onConfirm, onCancel }: {
@@ -271,6 +301,9 @@ export default function ChatIA() {
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [activeId,       setActiveId]       = useState<string | null>(null);
   const [messages,       setMessages]       = useState<Message[]>([]);
+  // Documento abierto en el panel lateral (lo crea la IA con crear_documento).
+  const [docAbierto, setDocAbierto] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   const [input,          setInput]          = useState('');
   const [sending,        setSending]        = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -408,6 +441,12 @@ export default function ChatIA() {
             setMessages(prev => prev.map((m, i) => (i === targetIdx
               ? { ...m, toolEvents: (m.toolEvents || []).map(te => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
               : m)));
+          } else if (evt.type === 'document_created') {
+            const d: DocumentoCreado = { id: evt.id, titulo: evt.titulo };
+            setMessages(prev => prev.map((m, i) => (i === targetIdx
+              ? { ...m, documentos: [...(m.documentos || []), d] }
+              : m)));
+            setDocAbierto(d.id);
           } else if (evt.type === 'action_proposal') {
             const { type: _t, ...proposal } = evt;
             setMessages(prev => prev.map((m, i) => (i === targetIdx
@@ -506,8 +545,9 @@ export default function ChatIA() {
       );
       const data  = await res.json();
       if (data.success) {
-        setMessages((data.history as {role:string;text:string}[]).map(h => ({
+        setMessages((data.history as {role:string;text:string;documentos?:DocumentoCreado[]}[]).map(h => ({
           role: h.role as 'user'|'model', text: h.text, ts: new Date(),
+          ...(Array.isArray(h.documentos) && h.documentos.length ? { documentos: h.documentos } : {}),
         })));
       }
     } catch { /**/ } finally { setHistoryLoading(false); }
@@ -667,7 +707,8 @@ export default function ChatIA() {
       : messages;
 
     const isNew         = cleanMessages.length === 0;
-    const historyToSend = cleanMessages.map(m => ({ role: m.role, text: m.text }));
+    // Los documentos creados viajan con el historial para que la tarjeta siga ahí al volver a la conversación.
+    const historyToSend = cleanMessages.map(m => ({ role: m.role, text: m.text, ...(m.documentos?.length ? { documentos: m.documentos } : {}) }));
 
     // Lo que se manda a Vantia puede incluir el contenido del archivo adjunto;
     // el usuario en pantalla solo ve su texto + una chip con el nombre del fichero.
@@ -784,7 +825,7 @@ export default function ChatIA() {
         <aside
           // Al elegir una conversación o empezar una nueva, el panel móvil se cierra.
           onClick={(e) => { if ((e.target as HTMLElement).closest('button')) setConvsAbiertas(false); }}
-          className={`${convsAbiertas ? "absolute inset-y-0 left-0 z-40 flex shadow-2xl" : "hidden"} md:static md:z-auto md:flex md:shadow-none w-72 max-w-[85%] md:w-64 md:max-w-none shrink-0 flex-col border-r border-slate-100 bg-slate-50 cia-sidebar`}>
+          className={`${convsAbiertas ? "absolute inset-y-0 left-0 z-40 flex shadow-2xl" : "hidden"} md:static md:z-auto ${docAbierto ? "md:hidden 2xl:flex" : "md:flex"} md:shadow-none w-72 max-w-[85%] md:w-64 md:max-w-none shrink-0 flex-col border-r border-slate-100 bg-slate-50 cia-sidebar`}>
           {/* Brand header */}
           <div className="px-4 pt-5 pb-4">
             <div className="flex items-center gap-2.5 mb-4">
@@ -1055,6 +1096,13 @@ export default function ChatIA() {
                         {msg.text
                           ? renderMd(msg.text)
                           : (sending && idx === messages.length - 1 ? <TypingDots /> : null)}
+                        {msg.documentos && msg.documentos.length > 0 && (
+                          <div className="mt-3 flex flex-col gap-2">
+                            {msg.documentos.map(d => (
+                              <DocumentoCard key={d.id} doc={d} abierto={docAbierto === d.id} onAbrir={() => setDocAbierto(d.id)} />
+                            ))}
+                          </div>
+                        )}
                         {msg.actionProposals && msg.actionProposals.length > 0 && (
                           <div className="mt-2 flex flex-col gap-2 max-w-sm">
                             {msg.actionProposals.map(a => (
@@ -1266,6 +1314,7 @@ export default function ChatIA() {
           </div>
 
         </div>
+        {docAbierto && <PanelDocumento key={docAbierto} id={docAbierto} movil={isMobile} onCerrar={() => setDocAbierto(null)} />}
       </div>
 
       {showHistory && <VantiaHistoryModal getToken={getToken} onClose={() => setShowHistory(false)} />}

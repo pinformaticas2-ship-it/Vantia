@@ -575,6 +575,7 @@ const TOOLS = [{
 // ── Etiquetas en español de cada herramienta, para mostrar en el frontend
 // mientras Vantia está consultando datos reales (p.ej. "Buscando clientes…") ──
 const TOOL_LABELS: Record<string, string> = {
+  crear_documento:        'Creando el documento…',
   estadisticas_generales: 'Consultando estadísticas del despacho…',
   buscar_clientes:        'Buscando clientes…',
   listar_clientes:        'Consultando listado de clientes…',
@@ -1775,6 +1776,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     ];
 
     let fullReply = '';
+    const documentosCreados: { id: string; titulo: string }[] = [];
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
     // Google no da un endpoint de "cuota restante" consultable con una API
@@ -1833,6 +1835,13 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         if ((result as any)?.accion_pendiente && (result as any)?.token) {
           emit({ type: 'action_proposal', ...(result as any) });
         }
+        // Documento guardado en Documentos: el chat lo enseña como tarjeta
+        // debajo de la respuesta (y lo abre en el editor lateral).
+        if (name === 'crear_documento' && (result as any)?.creado) {
+          const d = { id: (result as any).id, titulo: (result as any).titulo };
+          documentosCreados.push(d);
+          emit({ type: 'document_created', ...d });
+        }
       }
 
       contents.push({ role: 'model', parts: roundParts.length ? roundParts : [{ text: '' }] });
@@ -1879,7 +1888,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
       [userId, moduleId, JSON.stringify([
         ...history,
         { role: 'user',  text: message },
-        { role: 'model', text: fullReply },
+        { role: 'model', text: fullReply, ...(documentosCreados.length ? { documentos: documentosCreados } : {}) },
       ]), fallbackTitle]
     ).then(() => {
       if (!isFirstMessage) return;
