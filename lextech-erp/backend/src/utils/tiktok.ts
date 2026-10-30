@@ -189,6 +189,10 @@ export interface PublishOptions {
   disableStitch: boolean;
   brandContent: boolean;
   brandOrganic: boolean;
+  /** Etiqueta de TikTok "Contenido generado por IA". */
+  isAigc: boolean;
+  /** Fotograma (ms desde el inicio) que TikTok usa como portada. */
+  coverMs?: number;
 }
 
 // Tamaño de trozo para subir el vídeo: TikTok pide trozos de 5 a 64 MB; un
@@ -199,22 +203,38 @@ const CHUNK = 10 * 1024 * 1024;
 
 /** Publica directamente (FILE_UPLOAD) y devuelve el publish_id para seguir el estado. */
 export async function publishTikTokVideo(token: string, filePath: string, mimetype: string, opts: PublishOptions): Promise<string> {
+  const post_info: Record<string, any> = {
+    title: opts.title,
+    privacy_level: opts.privacyLevel,
+    disable_comment: opts.disableComment,
+    disable_duet: opts.disableDuet,
+    disable_stitch: opts.disableStitch,
+    brand_content_toggle: opts.brandContent,
+    brand_organic_toggle: opts.brandOrganic,
+    is_aigc: opts.isAigc,
+  };
+  if (typeof opts.coverMs === 'number' && opts.coverMs >= 0) post_info.video_cover_timestamp_ms = Math.round(opts.coverMs);
+  return uploadTikTokVideo(token, '/v2/post/publish/video/init/', filePath, mimetype, { post_info });
+}
+
+/**
+ * Envía el vídeo a los borradores de la app de TikTok (scope video.upload):
+ * al usuario le llega una notificación y lo termina allí (música, efectos,
+ * texto, portada, privacidad), cosas que la API no permite hacer.
+ */
+export async function sendTikTokDraft(token: string, filePath: string, mimetype: string): Promise<string> {
+  return uploadTikTokVideo(token, '/v2/post/publish/inbox/video/init/', filePath, mimetype, {});
+}
+
+async function uploadTikTokVideo(token: string, initPath: string, filePath: string, mimetype: string, extra: Record<string, any>): Promise<string> {
   const size = fs.statSync(filePath).size;
   const chunkSize = size <= MAX_SINGLE_CHUNK ? size : CHUNK;
   const totalChunks = size <= MAX_SINGLE_CHUNK ? 1 : Math.floor(size / CHUNK);
 
-  const init = await tiktokFetch('/v2/post/publish/video/init/', {
+  const init = await tiktokFetch(initPath, {
     token,
     body: {
-      post_info: {
-        title: opts.title,
-        privacy_level: opts.privacyLevel,
-        disable_comment: opts.disableComment,
-        disable_duet: opts.disableDuet,
-        disable_stitch: opts.disableStitch,
-        brand_content_toggle: opts.brandContent,
-        brand_organic_toggle: opts.brandOrganic,
-      },
+      ...extra,
       source_info: { source: 'FILE_UPLOAD', video_size: size, chunk_size: chunkSize, total_chunk_count: totalChunks },
     },
   });

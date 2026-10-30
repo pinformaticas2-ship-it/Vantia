@@ -5,7 +5,7 @@ import pool from '../config/database';
 import {
   TIKTOK_AUTHORIZE_URL, TIKTOK_SCOPES, TikTokError, tiktokClientKey, tiktokRedirectUri,
   exchangeTikTokCode, saveTikTokTokens, getTikTokAccessToken, revokeTikTokToken,
-  getTikTokUser, listTikTokVideos, getTikTokCreatorInfo, publishTikTokVideo, getTikTokPublishStatus,
+  getTikTokUser, listTikTokVideos, getTikTokCreatorInfo, publishTikTokVideo, sendTikTokDraft, getTikTokPublishStatus,
 } from '../utils/tiktok';
 
 // Comunicación Externa → TikTok. Conectar la cuenta va por redirección de
@@ -193,12 +193,17 @@ export async function getTikTokCreator(req: Request, res: Response) {
 }
 
 // POST /api/tiktok/publish (multipart: video + campos)
+// modo=borrador → a los borradores de la app de TikTok (sin más campos).
 export async function publishToTikTok(req: Request, res: Response) {
   const file = (req as any).file as Express.Multer.File | undefined;
   try {
     const { organizacionId } = ctx(req);
     if (!file) return res.status(400).json({ success: false, error: 'Falta el vídeo.' });
     const b = req.body || {};
+    if (b.modo === 'borrador') {
+      const token = await getTikTokAccessToken(organizacionId);
+      return ok(res, { publishId: await sendTikTokDraft(token, file.path, file.mimetype) });
+    }
     const title = String(b.title || '').slice(0, 2200);
     const privacyLevel = String(b.privacyLevel || '');
     if (!privacyLevel) return res.status(400).json({ success: false, error: 'Elige quién puede ver el vídeo.' });
@@ -209,6 +214,8 @@ export async function publishToTikTok(req: Request, res: Response) {
       title, privacyLevel,
       disableComment: flag(b.disableComment), disableDuet: flag(b.disableDuet), disableStitch: flag(b.disableStitch),
       brandContent: flag(b.brandContent), brandOrganic: flag(b.brandOrganic),
+      isAigc: flag(b.isAigc),
+      coverMs: b.coverMs !== undefined && b.coverMs !== '' && Number.isFinite(Number(b.coverMs)) ? Number(b.coverMs) : undefined,
     });
     return ok(res, { publishId });
   } catch (e) {

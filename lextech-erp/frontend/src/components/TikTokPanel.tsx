@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, CheckCircle2, ExternalLink, Eye, Heart, Loader2, MessageSquare,
+  AlertTriangle, CheckCircle2, ExternalLink, Eye, Heart, Image as ImageIcon, Loader2, MessageSquare,
   Plus, RefreshCw, Share2, Unplug, Upload, Users, Video,
 } from "lucide-react";
 import { Spinner } from "./Spinner";
@@ -354,6 +354,13 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
   const [commercial, setCommercial] = useState(false);
   const [brandOrganic, setBrandOrganic] = useState(false);
   const [brandContent, setBrandContent] = useState(false);
+  const [isAigc, setIsAigc] = useState(false);
+  // Fotograma de portada (segundos); null = el que elija TikTok.
+  const [coverSec, setCoverSec] = useState<number | null>(null);
+  // "directo": se publica ya desde Vantia. "borrador": va a los borradores de la
+  // app de TikTok para terminarlo allí (música, efectos, texto...).
+  const [modo, setModo] = useState<"directo" | "borrador">("directo");
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<"idle" | "uploading" | "processing">("idle");
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -367,6 +374,7 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
   const pickFile = (f: File | null) => {
     setError(null);
     setDuration(null);
+    setCoverSec(null);
     if (preview) URL.revokeObjectURL(preview);
     setFile(f);
     setPreview(f ? URL.createObjectURL(f) : null);
@@ -376,7 +384,9 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
   const privacyOptions = (creator?.privacyOptions || []).filter((p) => !(brandContent && p === "SELF_ONLY"));
   const tooLong = Boolean(duration && creator?.maxDurationSec && duration > creator.maxDurationSec);
   const commercialIncomplete = commercial && !brandOrganic && !brandContent;
-  const canPublish = Boolean(file && privacy && creator && !tooLong && !commercialIncomplete && phase === "idle");
+  const canPublish = modo === "borrador"
+    ? Boolean(file && creator && !tooLong && phase === "idle")
+    : Boolean(file && privacy && creator && !tooLong && !commercialIncomplete && phase === "idle");
 
   const publish = async () => {
     if (!file || !canPublish) return;
@@ -385,6 +395,9 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
     try {
       const form = new FormData();
       form.append("video", file);
+      form.append("modo", modo);
+      form.append("isAigc", String(isAigc));
+      if (coverSec !== null) form.append("coverMs", String(Math.round(coverSec * 1000)));
       form.append("title", title);
       form.append("privacyLevel", privacy);
       form.append("disableComment", String(!allowComment));
@@ -403,13 +416,19 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 3000));
         const s = await api(`/api/tiktok/publish/${encodeURIComponent(publishId)}`);
+        if (s.status === "SEND_TO_USER_INBOX") {
+          onPublished("Vídeo enviado a los borradores de TikTok. Te llegará una notificación en la app para terminarlo y publicarlo.");
+          return;
+        }
         if (s.status === "PUBLISH_COMPLETE") {
           onPublished(privacy === "SELF_ONLY" ? "Vídeo publicado en TikTok (privado, solo lo ves tú)." : "Vídeo publicado en TikTok.");
           return;
         }
         if (s.status === "FAILED") throw new Error(`TikTok no ha podido publicar el vídeo${s.failReason ? ` (${s.failReason})` : ""}.`);
       }
-      onPublished("Vídeo enviado a TikTok. Puede tardar unos minutos en aparecer.");
+      onPublished(modo === "borrador"
+        ? "Vídeo enviado a TikTok. Aparecerá en tus borradores de la app en unos minutos."
+        : "Vídeo enviado a TikTok. Puede tardar unos minutos en aparecer.");
     } catch (e: any) {
       setError(e.message);
       setPhase("idle");
@@ -436,7 +455,7 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
           <button type="button" onClick={onClose} disabled={phase !== "idle"} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">Cancelar</button>
           <button type="button" onClick={publish} disabled={!canPublish} className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
             {phase !== "idle" && <Loader2 size={14} className="animate-spin" />}
-            {phase === "uploading" ? "Subiendo vídeo..." : phase === "processing" ? "TikTok lo está procesando..." : "Publicar"}
+            {phase === "uploading" ? "Subiendo vídeo..." : phase === "processing" ? "TikTok lo está procesando..." : modo === "borrador" ? "Enviar a borradores" : "Publicar"}
           </button>
         </div>
       }
@@ -451,7 +470,30 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
             <input ref={fileInput} type="file" accept="video/mp4,video/quicktime,video/webm" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] || null)} />
             {preview ? (
               <div className="space-y-2">
-                <video src={preview} controls className="aspect-[9/16] w-full rounded-2xl bg-black object-contain" onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)} />
+                <video ref={videoRef} src={preview} controls className="aspect-[9/16] w-full rounded-2xl bg-black object-contain" onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)} />
+                {modo === "directo" && duration ? (
+                  <div className="rounded-xl border border-slate-200 p-2">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                      <span className="inline-flex items-center gap-1"><ImageIcon size={11} /> Portada</span>
+                      {coverSec !== null
+                        ? <button type="button" onClick={() => setCoverSec(null)} className="text-slate-400 hover:text-slate-600">Automática</button>
+                        : <span className="text-slate-300">Automática</span>}
+                    </div>
+                    <input
+                      type="range" min={0} max={duration} step={0.1} value={coverSec ?? 0}
+                      onChange={(e) => {
+                        const t = Number(e.target.value);
+                        setCoverSec(t);
+                        if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = t; }
+                      }}
+                      className="mt-1 w-full accent-black"
+                      aria-label="Fotograma de portada"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      {coverSec === null ? "Mueve la barra para elegir el fotograma de portada." : `Portada en el segundo ${coverSec.toFixed(1)}`}
+                    </p>
+                  </div>
+                ) : null}
                 <button type="button" onClick={() => fileInput.current?.click()} disabled={phase !== "idle"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">Cambiar vídeo</button>
               </div>
             ) : (
@@ -465,6 +507,34 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
           </div>
 
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+              {([
+                ["directo", "Publicar ahora", "Desde Vantia, con todas las opciones"],
+                ["borrador", "Enviar a borradores", "Para añadir música o efectos en la app"],
+              ] as const).map(([valor, titulo, ayuda]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setModo(valor)}
+                  disabled={phase !== "idle"}
+                  className={`rounded-lg px-3 py-2 text-left transition ${modo === valor ? "bg-white shadow-sm" : "hover:bg-white/60"}`}
+                >
+                  <span className={`block text-xs font-bold ${modo === valor ? "text-slate-900" : "text-slate-500"}`}>{titulo}</span>
+                  <span className="block text-[10px] text-slate-400">{ayuda}</span>
+                </button>
+              ))}
+            </div>
+
+            {modo === "borrador" ? (
+              <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
+                <p className="font-semibold text-slate-800">El vídeo llegará a la app de TikTok como borrador</p>
+                <p>
+                  Te aparecerá una notificación en TikTok (en el móvil de la cuenta conectada). Desde ahí puedes añadir
+                  música, efectos, filtros, texto, stickers o voz, elegir la portada y la privacidad, y publicarlo.
+                </p>
+                <p className="text-slate-400">Úsalo cuando quieras editar con las herramientas de la app, que la API de TikTok no deja usar desde fuera.</p>
+              </div>
+            ) : (<>
             <div>
               <label className="text-xs font-semibold text-slate-500">Texto del vídeo</label>
               <textarea value={title} onChange={(e) => setTitle(e.target.value.slice(0, 2200))} rows={4} placeholder="Descripción, #hashtags..." className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400" />
@@ -506,12 +576,21 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
               )}
             </div>
 
+            <label className="flex items-start gap-2 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
+              <input type="checkbox" checked={isAigc} onChange={(e) => setIsAigc(e.target.checked)} className="mt-0.5 h-4 w-4" />
+              <span>
+                <span className="font-medium">Contenido generado por IA</span>
+                <span className="block text-[11px] text-slate-400">TikTok lo etiquetará así. Obligatorio si el vídeo tiene imágenes o voces realistas creadas con IA.</span>
+              </span>
+            </label>
+
             <p className="text-[11px] leading-relaxed text-slate-400">
               Al publicar aceptas la{" "}
               {brandContent && (<><a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noreferrer" className="underline">Branded Content Policy</a> y la{" "}</>)}
               <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer" className="underline">Music Usage Confirmation</a> de TikTok.
               Después de publicar, TikTok puede tardar unos minutos en procesar el vídeo.
             </p>
+            </>)}
             {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           </div>
         </div>
