@@ -180,7 +180,7 @@ export function HalloweenDecor() {
               </clipPath>
             </defs>
             <image
-              href="/halloween-arana.jpg"
+              href="/halloween-arana.jpg?v=2"
               x="-20" y="-18" width="40" height="40"
               preserveAspectRatio="xMidYMid slice"
               clipPath="url(#vantia-spider-foto)"
