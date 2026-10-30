@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, CheckCircle2, ExternalLink, Eye, Heart, Image as ImageIcon, Loader2, MessageSquare,
-  Plus, RefreshCw, Share2, Unplug, Upload, Users, Video,
+  AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Eye, Heart, Image as ImageIcon, Loader2, MessageSquare,
+  Plus, RefreshCw, Search, Share2, Unplug, Upload, Video,
 } from "lucide-react";
 import { Spinner } from "./Spinner";
 import { Modal } from "./Modal";
 import { safeJson } from "../lib/api";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // Comunicación Externa → TikTok: conectar la cuenta del despacho, ver sus
 // vídeos con estadísticas y publicar. La conexión va por redirección completa
@@ -53,6 +54,8 @@ interface TikTokVideo {
   like_count?: number;
   comment_count?: number;
   share_count?: number;
+  duration?: number;
+  embed_link?: string;
 }
 
 const fmt = (n?: number) => (typeof n === "number" ? n.toLocaleString("es-ES") : "—");
@@ -69,7 +72,6 @@ export default function TikTokPanel() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
 
   const api = useCallback(async (path: string, init: RequestInit = {}) => {
@@ -138,7 +140,6 @@ export default function TikTokPanel() {
   const disconnect = async () => {
     try {
       await api("/api/tiktok", { method: "DELETE" });
-      setConfirmDisconnect(false);
       setVideos([]);
       setNotice({ tone: "ok", text: "Cuenta de TikTok desconectada." });
       loadStatus();
@@ -156,6 +157,35 @@ export default function TikTokPanel() {
   }
 
   const acc = status?.account;
+
+  if (status?.connected) {
+    return (
+      <>
+        <BandejaTikTok
+          acc={acc}
+          accountError={status.accountError}
+          videos={videos}
+          loadingVideos={loadingVideos}
+          hasMore={hasMore}
+          onLoadMore={() => loadVideos(cursor)}
+          onRefresh={() => loadStatus()}
+          onDisconnect={disconnect}
+          onPublish={() => setPublishOpen(true)}
+          notice={notice}
+          error={error}
+          onDismissNotice={() => setNotice(null)}
+        />
+        {publishOpen && (
+          <PublishModal
+            api={api}
+            getToken={getToken}
+            onClose={() => setPublishOpen(false)}
+            onPublished={(text) => { setPublishOpen(false); setNotice({ tone: "ok", text }); loadVideos(); }}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-y-auto bg-[#fafafa]">
@@ -202,103 +232,7 @@ export default function TikTokPanel() {
             )}
             <p className="text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectar la cuenta.</p>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center">
-              <div className="flex min-w-0 flex-1 items-center gap-4">
-                {acc?.avatarUrl
-                  ? <img src={acc.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
-                  : <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-black"><TikTokIcon size={24} className="text-white" /></div>}
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 truncate text-base font-bold text-slate-900">
-                    {acc?.displayName || "Cuenta de TikTok"}
-                    {acc?.isVerified && <CheckCircle2 size={15} className="text-sky-500" />}
-                  </p>
-                  {acc?.username && <p className="text-sm text-slate-500">@{acc.username}</p>}
-                  {acc?.bio && <p className="mt-1 line-clamp-2 text-xs text-slate-400">{acc.bio}</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                {[
-                  { label: "Seguidores", value: acc?.followers, icon: Users },
-                  { label: "Me gusta", value: acc?.likes, icon: Heart },
-                  { label: "Vídeos", value: acc?.videos, icon: Video },
-                ].map(({ label, value, icon: Icon }) => (
-                  <div key={label} className="rounded-2xl bg-slate-50 px-3 py-2">
-                    <p className="flex items-center justify-center gap-1 text-sm font-bold text-slate-800"><Icon size={13} className="text-slate-400" />{fmt(value)}</p>
-                    <p className="text-[11px] text-slate-400">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {status.accountError && (
-              <p className="rounded-2xl bg-amber-50 px-4 py-2 text-xs text-amber-700">{status.accountError}</p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="mr-auto text-sm font-bold text-slate-800">Vídeos publicados</h3>
-              <button type="button" onClick={() => loadStatus()} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                <RefreshCw size={13} /> Actualizar
-              </button>
-              {acc?.profileUrl && (
-                <a href={acc.profileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                  <ExternalLink size={13} /> Ver perfil
-                </a>
-              )}
-              {confirmDisconnect ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <button type="button" onClick={disconnect} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700">Sí, desconectar</button>
-                  <button type="button" onClick={() => setConfirmDisconnect(false)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">Cancelar</button>
-                </span>
-              ) : (
-                <button type="button" onClick={() => setConfirmDisconnect(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                  <Unplug size={13} /> Desconectar
-                </button>
-              )}
-              <button type="button" onClick={() => setPublishOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-neutral-800">
-                <Plus size={13} /> Publicar vídeo
-              </button>
-            </div>
-
-            {videos.length === 0 && !loadingVideos ? (
-              <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-400">
-                Todavía no hay vídeos públicos en esta cuenta.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                {videos.map((v) => (
-                  <a key={v.id} href={v.share_url} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:shadow-md">
-                    <div className="relative aspect-[9/16] bg-slate-100">
-                      {v.cover_image_url && <img src={v.cover_image_url} alt="" className="h-full w-full object-cover" loading="lazy" />}
-                      <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white">
-                        <Eye size={11} /> {fmt(v.view_count)}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5 p-2.5">
-                      <p className="line-clamp-2 text-xs font-medium text-slate-700">{v.title || v.video_description || "Sin título"}</p>
-                      <div className="flex items-center gap-2.5 text-[11px] text-slate-400">
-                        <span className="inline-flex items-center gap-0.5"><Heart size={11} />{fmt(v.like_count)}</span>
-                        <span className="inline-flex items-center gap-0.5"><MessageSquare size={11} />{fmt(v.comment_count)}</span>
-                        <span className="inline-flex items-center gap-0.5"><Share2 size={11} />{fmt(v.share_count)}</span>
-                      </div>
-                      {v.create_time && (
-                        <p className="text-[10px] text-slate-300">{new Date(v.create_time * 1000).toLocaleDateString("es-ES")}</p>
-                      )}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
-            {loadingVideos && <div className="flex justify-center py-4"><Spinner size="sm" muted /></div>}
-            {hasMore && !loadingVideos && (
-              <div className="flex justify-center">
-                <button type="button" onClick={() => loadVideos(cursor)} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                  Cargar más
-                </button>
-              </div>
-            )}
-          </>
-        )}
+        ) : null}
       </div>
 
       {publishOpen && (
@@ -309,6 +243,281 @@ export default function TikTokPanel() {
           onPublished={(text) => { setPublishOpen(false); setNotice({ tone: "ok", text }); loadVideos(); }}
         />
       )}
+    </div>
+  );
+}
+
+const fmtFecha = (t?: number) => (t ? new Date(t * 1000).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "");
+const tituloVideo = (v: TikTokVideo) => v.title || v.video_description || "Sin título";
+
+// Bandeja de TikTok con la misma forma que la de WhatsApp: a la izquierda la
+// cuenta y sus vídeos (como si fueran conversaciones); a la derecha el vídeo
+// elegido con su reproductor, estadísticas y el hilo de comentarios.
+function BandejaTikTok({
+  acc, accountError, videos, loadingVideos, hasMore, onLoadMore, onRefresh, onDisconnect, onPublish,
+  notice, error, onDismissNotice,
+}: {
+  acc?: Account;
+  accountError?: string | null;
+  videos: TikTokVideo[];
+  loadingVideos: boolean;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  onRefresh: () => void;
+  onDisconnect: () => void;
+  onPublish: () => void;
+  notice: { tone: "ok" | "error"; text: string } | null;
+  error: string | null;
+  onDismissNotice: () => void;
+}) {
+  const isMobile = useIsMobile();
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+
+  const filtered = videos.filter((v) => !query.trim() || tituloVideo(v).toLowerCase().includes(query.trim().toLowerCase()));
+  // En escritorio se abre el más reciente; en móvil se empieza por la lista.
+  const selected = videos.find((v) => v.id === selectedId) || (isMobile ? null : filtered[0] || null);
+
+  return (
+    <div className="flex flex-1 min-h-0 overflow-hidden">
+      <aside className={`${isMobile && selected ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white`}>
+        <div className="border-b border-slate-100 px-5 py-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Bandeja del equipo</p>
+              <h1 className="mt-1 text-base font-bold text-slate-900">TikTok</h1>
+            </div>
+            <button
+              type="button"
+              onClick={onPublish}
+              className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-black px-3.5 text-xs font-semibold text-white transition hover:bg-neutral-800"
+            >
+              <Plus size={14} /> Publicar
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+            {acc?.avatarUrl
+              ? <img src={acc.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+              : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black"><TikTokIcon size={18} className="text-white" /></div>}
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1 truncate text-sm font-bold text-slate-800">
+                {acc?.displayName || "Cuenta de TikTok"}
+                {acc?.isVerified && <CheckCircle2 size={13} className="shrink-0 text-sky-500" />}
+              </p>
+              <p className="truncate text-[11px] text-slate-500">
+                {acc?.username ? `@${acc.username} · ` : ""}{fmt(acc?.followers)} seguidores · {fmt(acc?.likes)} me gusta
+              </p>
+            </div>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Conectada" />
+          </div>
+          {accountError && <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-700">{accountError}</p>}
+
+          <div className="mt-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <Search size={15} className="text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar vídeo..."
+              className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {filtered.length === 0 && !loadingVideos ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <Video size={22} className="text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-600">{query.trim() ? "Sin resultados" : "Sin vídeos todavía"}</p>
+                <p className="mt-1 max-w-[220px] text-xs text-slate-400">
+                  {query.trim() ? "Ningún vídeo coincide con la búsqueda." : "Los vídeos públicos de la cuenta aparecerán aquí. Publica el primero desde Vantia."}
+                </p>
+              </div>
+            </div>
+          ) : filtered.map((v) => {
+            const isSel = v.id === selected?.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setSelectedId(v.id)}
+                className={`relative flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors ${isSel ? "bg-red-50/60" : "bg-white hover:bg-slate-50"}`}
+              >
+                {isSel && <span className="absolute bottom-0 left-0 top-0 w-1 bg-red-500" />}
+                <div className="relative h-[68px] w-[40px] shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                  {v.cover_image_url && <img src={v.cover_image_url} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`line-clamp-2 text-sm leading-5 ${isSel ? "font-bold text-red-700" : "font-semibold text-slate-800"}`}>{tituloVideo(v)}</p>
+                  </div>
+                  <p className={`mt-0.5 text-[11px] ${isSel ? "text-red-500" : "text-slate-400"}`}>{fmtFecha(v.create_time)}</p>
+                  <div className="mt-1 flex items-center gap-2.5 text-[11px] text-slate-500">
+                    <span className="inline-flex items-center gap-0.5"><Eye size={11} />{fmt(v.view_count)}</span>
+                    <span className="inline-flex items-center gap-0.5"><Heart size={11} />{fmt(v.like_count)}</span>
+                    <span className="inline-flex items-center gap-0.5"><MessageSquare size={11} />{fmt(v.comment_count)}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {loadingVideos && <div className="flex justify-center py-4"><Spinner size="sm" muted /></div>}
+          {hasMore && !loadingVideos && (
+            <div className="flex justify-center p-3">
+              <button type="button" onClick={onLoadMore} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                Cargar más
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <section className={`${isMobile && !selected ? "hidden" : "flex"} min-w-0 flex-1 flex-col bg-[#f6f8fc] md:flex`}>
+        <div className="border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              {isMobile && (
+                <button type="button" onClick={() => setSelectedId("")} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500" title="Volver a la lista">
+                  <ArrowLeft size={16} />
+                </button>
+              )}
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-bold text-slate-900">{selected ? tituloVideo(selected) : "Panel de TikTok"}</h2>
+                <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  {selected ? `Publicado el ${fmtFecha(selected.create_time)}` : "Selecciona un vídeo para ver sus estadísticas."}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {selected?.share_url && (
+                <a href={selected.share_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                  <ExternalLink size={14} /> Abrir en TikTok
+                </a>
+              )}
+              <button type="button" onClick={onRefresh} className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                <RefreshCw size={14} /> Actualizar
+              </button>
+              {confirmDisconnect ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <button type="button" onClick={() => { setConfirmDisconnect(false); onDisconnect(); }} className="rounded-2xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-red-700">Sí, desconectar</button>
+                  <button type="button" onClick={() => setConfirmDisconnect(false)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600">Cancelar</button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => setConfirmDisconnect(true)} title="Desconectar la cuenta de TikTok" className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-red-600">
+                  <Unplug size={15} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          {(notice || error) && (
+            <div className={`mb-4 flex items-start gap-2 rounded-2xl border px-4 py-3 text-sm ${
+              notice?.tone === "ok" && !error ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
+            }`}>
+              {notice?.tone === "ok" && !error ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="mt-0.5 shrink-0" />}
+              <span className="flex-1">{error || notice?.text}</span>
+              {notice && !error && <button type="button" onClick={onDismissNotice} className="text-xs font-semibold opacity-60 hover:opacity-100">Cerrar</button>}
+            </div>
+          )}
+
+          {!selected ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="max-w-md rounded-[28px] border border-dashed border-slate-200 bg-white px-8 py-10 text-center">
+                <TikTokIcon size={28} className="mx-auto text-slate-300" />
+                <p className="mt-4 text-base font-semibold text-slate-700">{videos.length ? "Selecciona un vídeo" : "Publica tu primer vídeo"}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  {videos.length
+                    ? "Aquí verás el vídeo, sus visualizaciones, me gusta, comentarios y compartidos."
+                    : "Súbelo desde Vantia o mándalo a los borradores de la app para editarlo allí."}
+                </p>
+                {!videos.length && (
+                  <button type="button" onClick={onPublish} className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">
+                    <Plus size={14} /> Publicar vídeo
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[300px_1fr]">
+              <div className="mx-auto w-full max-w-[300px]">
+                <div className="overflow-hidden rounded-[24px] bg-black shadow-lg shadow-slate-300/60">
+                  {selected.embed_link ? (
+                    <iframe
+                      key={selected.id}
+                      src={selected.embed_link}
+                      title={tituloVideo(selected)}
+                      className="aspect-[9/16] w-full"
+                      allow="encrypted-media; fullscreen; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="relative aspect-[9/16] w-full">
+                      {selected.cover_image_url && <img src={selected.cover_image_url} alt="" className="h-full w-full object-cover" />}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-w-0 space-y-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    { label: "Visualizaciones", value: selected.view_count, icon: Eye },
+                    { label: "Me gusta", value: selected.like_count, icon: Heart },
+                    { label: "Comentarios", value: selected.comment_count, icon: MessageSquare },
+                    { label: "Compartidos", value: selected.share_count, icon: Share2 },
+                  ].map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400"><Icon size={12} />{label}</p>
+                      <p className="mt-1 text-xl font-bold tabular-nums text-slate-900">{fmt(value)}</p>
+                    </div>
+                  ))}
+                </div>
+                {selected.view_count ? (
+                  <p className="text-xs text-slate-500">
+                    Interacción: <span className="font-bold text-slate-700">
+                      {(((selected.like_count || 0) + (selected.comment_count || 0) + (selected.share_count || 0)) / selected.view_count * 100).toLocaleString("es-ES", { maximumFractionDigits: 1 })} %
+                    </span> de las visualizaciones (me gusta + comentarios + compartidos).
+                  </p>
+                ) : null}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Texto del vídeo</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{selected.video_description || selected.title || "Sin texto."}</p>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <p className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                      <MessageSquare size={15} className="text-slate-400" /> Comentarios
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{fmt(selected.comment_count)}</span>
+                    </p>
+                  </div>
+                  <div className="space-y-3 bg-slate-50 px-4 py-6 text-center">
+                    <p className="text-sm font-semibold text-slate-600">Leer y responder comentarios desde Vantia</p>
+                    <p className="mx-auto max-w-md text-xs leading-5 text-slate-400">
+                      TikTok solo da acceso a los comentarios a través de su API for Business, con una cuenta de empresa.
+                      En cuanto el despacho la active, aquí aparecerá el hilo de comentarios para contestar sin salir del ERP.
+                      Mientras tanto, puedes verlos en TikTok.
+                    </p>
+                    {selected.share_url && (
+                      <a href={selected.share_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                        <ExternalLink size={12} /> Ver comentarios en TikTok
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
