@@ -1,0 +1,47 @@
+/* ── Editor de texto (Documentos) ─────────────────────────────────────────
+   Aspecto de documento: Times 12, interlineado cómodo, títulos sobrios.
+   Lo mismo que sale al exportar a Word. ── */
+.vt-editor .tiptap {
+  outline: none;
+  min-height: 60vh;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #0f172a;
+  caret-color: #ab0433;
+}
+.vt-editor .tiptap > * + * { margin-top: 0.75em; }
+.vt-editor .tiptap h1 { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin-top: 1.2em; }
+.vt-editor .tiptap h2 { font-size: 1.25em; font-weight: 700; line-height: 1.3; margin-top: 1.1em; }
+.vt-editor .tiptap h3 { font-size: 1.05em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; margin-top: 1em; }
+.vt-editor .tiptap > :first-child { margin-top: 0; }
+.vt-editor .tiptap ul { list-style: disc; padding-left: 1.6em; }
+.vt-editor .tiptap ol { list-style: decimal; padding-left: 1.6em; }
+.vt-editor .tiptap li + li { margin-top: 0.25em; }
+.vt-editor .tiptap li > p { margin: 0; }
+.vt-editor .tiptap blockquote { border-left: 3px solid #cbd5e1; padding-left: 1em; color: #475569; font-style: italic; }
+.vt-editor .tiptap hr { border: none; border-top: 1px solid #cbd5e1; margin: 1.5em 0; }
+.vt-editor .tiptap a { color: #ab0433; text-decoration: underline; }
+.vt-editor .tiptap mark { background: #fef08a; color: inherit; padding: 0 0.1em; border-radius: 2px; }
+.vt-editor .tiptap table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 1em 0; }
+.vt-editor .tiptap th, .vt-editor .tiptap td { border: 1px solid #cbd5e1; padding: 0.4em 0.6em; vertical-align: top; position: relative; }
+.vt-editor .tiptap th { background: #f1f5f9; font-weight: 700; text-align: left; }
+.vt-editor .tiptap th > p, .vt-editor .tiptap td > p { margin: 0; }
+.vt-editor .tiptap .selectedCell::after { content: ""; position: absolute; inset: 0; background: rgba(171, 4, 51, 0.08); pointer-events: none; }
+.vt-editor .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Texto que acaba de escribir la IA: un destello suave para que se vea dónde. */
+.vt-editor .tiptap ::selection { background: rgba(171, 4, 51, 0.16); }
+
+html[data-modo="oscuro"] .vt-hoja { background: var(--o-superficie) !important; box-shadow: 0 0 0 1px var(--o-borde) !important; }
+html[data-modo="oscuro"] .vt-editor .tiptap { color: var(--o-texto); }
+html[data-modo="oscuro"] .vt-editor .tiptap blockquote { color: var(--o-texto-3); border-left-color: var(--o-borde-fuerte); }
+html[data-modo="oscuro"] .vt-editor .tiptap th, html[data-modo="oscuro"] .vt-editor .tiptap td { border-color: var(--o-borde-fuerte); }
+html[data-modo="oscuro"] .vt-editor .tiptap th { background: var(--o-elevado); }
+html[data-modo="oscuro"] .vt-editor .tiptap hr { border-top-color: var(--o-borde-fuerte); }
+html[data-modo="oscuro"] .vt-editor .tiptap mark { background: rgba(250, 204, 21, 0.35); }

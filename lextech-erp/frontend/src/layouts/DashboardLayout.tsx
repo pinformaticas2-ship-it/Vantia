@@ -66,6 +66,7 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
   "Comunicación Externa": "whatsapp",
   Correo: "correo",
   Documental: "documental",
+  Documentos: "documental",
   // Todas las pestañas de Tesorería son en realidad la misma página --
   // comparten el mismo módulo de permisos.
   "Facturación": "facturacion",
@@ -110,6 +111,7 @@ const MODULES = [
   { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "Mensajería con clientes por los canales conectados (WhatsApp…)" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
   { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: "Vistas recibidas por correo pendientes de confirmar" },
+  { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: "Editor de texto con IA: escritos, cartas y contratos" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
   { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Vista general de tesorería" },
   { name: "Analítica",      path: "/dashboard/facturacion?tab=analitica",     icon: BarChart3,  desc: "Analítica financiera" },
@@ -149,6 +151,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Comunicación Externa", href: "/dashboard/whatsapp", icon: MessageCircle },
   { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
   { name: "Vistas",       href: "/dashboard/vistas",      icon: CalendarCheck },
+  { name: "Documentos",   href: "/dashboard/documentos",  icon: FileText },
   { name: "Documental",   href: "/dashboard/documental",  icon: Library },
   {
     name: "Tesorería",
@@ -180,7 +183,7 @@ const NAV_GROUPS = [
   {
     label: "Gestión",
     // Trazabilidad está en Configuración (14/10/2026).
-    items: ["Tesorería", "Documental", "Chat IA"],
+    items: ["Tesorería", "Documentos", "Documental", "Chat IA"],
   },
 ];
 
@@ -2729,6 +2732,7 @@ export default function DashboardLayout() {
       '/dashboard/vistas',
     ].includes(location.pathname) ||
     location.pathname.startsWith('/dashboard/facturacion') ||
+    location.pathname.startsWith('/dashboard/documentos') ||
     location.pathname.startsWith('/dashboard/expedientes/') ||
     location.pathname.startsWith('/dashboard/clientes/') ||
     location.pathname.startsWith('/dashboard/procuradores/') ||

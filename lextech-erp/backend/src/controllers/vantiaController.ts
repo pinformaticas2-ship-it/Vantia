@@ -4,6 +4,8 @@ import pool from '../config/database';
 import { performDeleteFile, performRenameFile, performMoveFile, ensureFileOnDisk } from './filesController';
 import { logActivityForReq, resolveUserName } from './activityController';
 import { extractTextFromFile, type DocFile } from '../utils/docExtract';
+import { bloqueSkillsParaChat } from './skillsController';
+import { crearDocumentoDesdeChat } from './documentosController';
 
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
@@ -36,7 +38,7 @@ ADEMÁS, tienes acceso en tiempo real a la base de datos de ESTE despacho: clien
 CÓMO DEBES COMPORTARTE:
 - Responde SIEMPRE en español con naturalidad, precisión y el tono adecuado al contexto (formal si es jurídico, conversacional si es casual).
 - Si te preguntan algo de conocimiento general, cultura, ciencia, historia, tecnología, o cualquier tema → responde directamente y en profundidad, sin buscar en la base de datos.
-- Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
+- Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional. Si es un documento (no un simple mensaje), guárdalo además con crear_documento para que lo tengan en el editor de Documentos, listo para revisar, exportar a Word o guardar en el expediente.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
 - Puedes LEER el contenido de los documentos adjuntos a un expediente (PDF, Word, texto e incluso imágenes escaneadas vía OCR) con leer_archivo_expediente, no solo ver su nombre. Úsala en cuanto el usuario pida analizar, resumir, revisar o preguntar algo sobre el contenido de un documento concreto — no te quedes solo con el nombre del archivo cuando lo que hace falta es lo que dice dentro. Tarda algo más que el resto de herramientas (sobre todo si hay que hacer OCR), así que puedes avisar de que estás leyéndolo si la respuesta se demora.
 - Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, crear notas internas sobre un cliente o un expediente, crear y actualizar tareas/actuaciones (incluido marcarlas completadas o borrarlas), y crear citas en la agenda. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota / preparar_crear_tarea / preparar_actualizar_estado_tarea / preparar_eliminar_tarea / preparar_crear_cita. También tienes herramientas de solo lectura para el detalle completo de un cliente o expediente (detalle_cliente, detalle_expediente), el directorio de profesionales externos (listar_profesionales) y correos (buscar_correos) — estas no necesitan confirmación. Cada herramienta que usas, sea de lectura o de propuesta, queda registrada en un historial de Vantia que el despacho puede consultar; si te preguntan "qué has hecho" o "qué has consultado", diles que pueden verlo ahí. IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Ejemplo concreto de lo que NO hay que hacer: si te piden "sugiéreme un nombre para este archivo y cámbialo", NO respondas "te sugiero llamarlo X, ¿te parece bien?" y esperes -- decide el nombre y llama a preparar_renombrado_archivo en ese mismo turno; la tarjeta de confirmación ya cumple el papel de "¿te parece bien?". Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
@@ -431,6 +433,19 @@ const TOOLS = [{
           nueva_descripcion: { type: 'string', description: 'Nueva descripción del expediente' },
         },
         required: ['expediente_id', 'nueva_descripcion'],
+      },
+    },
+    {
+      name: 'crear_documento',
+      description: 'Guarda en el módulo Documentos de Vantia un documento que has redactado (demanda, burofax, contrato, carta, informe...), para que el usuario lo abra en el editor, lo revise, lo exporte a Word o lo guarde en el expediente. Úsala cuando el usuario pida redactar o generar un documento (o pida "guárdalo como documento"). No hace falta confirmación: solo crea un borrador editable. Después dile que lo tiene en Documentos con el título que le has puesto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          titulo:        { type: 'string', description: 'Título del documento' },
+          contenido_html: { type: 'string', description: 'El documento completo en HTML sencillo: h1, h2, h3, p, strong, em, u, ul, ol, li, blockquote, table, tr, th, td. Párrafos de escritos jurídicos con style="text-align: justify". Datos que falten como [●].' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16) al que pertenece, si lo hay' },
+        },
+        required: ['titulo', 'contenido_html'],
       },
     },
     {
@@ -1168,6 +1183,19 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         };
       }
 
+      case 'crear_documento': {
+        const titulo = String(args.titulo || '').trim();
+        const html = String(args.contenido_html || '').trim();
+        if (!html) return { error: 'Falta el contenido del documento.' };
+        let expId: string | null = null;
+        if (args.expediente_id) {
+          const r = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('id' in r) expId = r.id;
+        }
+        const doc = await crearDocumentoDesdeChat(organizacionId, userId, titulo, html, expId);
+        return { creado: true, ...doc, mensaje: `Documento «${doc.titulo}» guardado en Documentos${doc.expedienteVinculado ? ' y vinculado al expediente' : ''}.` };
+      }
+
       case 'preparar_crear_nota': {
         const clienteId = String(args.cliente_id || '');
         const expedienteIdArg = String(args.expediente_id || '');
@@ -1523,7 +1551,8 @@ export const chatVantia = async (req: any, res: Response) => {
     const fullSystemPrompt =
       BASE_PROMPT +
       '\n\n' + moduleInstructions(moduleId) +
-      entityCtx;
+      entityCtx +
+      await bloqueSkillsParaChat(req.organizacionId);
 
     // Gemini exige turnos alternados user/model y que el primero sea user.
     // Eliminamos turnos model del inicio del historial guardado (ej: saludo inicial).
@@ -1732,7 +1761,8 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
   try {
     const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
-    const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx;
+    const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx
+      + await bloqueSkillsParaChat(req.organizacionId);
 
     const cleanHistory: any[] = [...history];
     while (cleanHistory.length > 0 && cleanHistory[0].role === 'model') cleanHistory.shift();

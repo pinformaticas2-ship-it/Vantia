@@ -4,7 +4,7 @@ import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Sparkles, Trash2, UsersRound, X, Zap } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -13,6 +13,7 @@ import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api'
 import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
+import SkillsPanel from './SkillsPanel';
 import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
@@ -99,8 +100,8 @@ const PALETTES: {
   },
 ];
 
-const SECCIONES_VALIDAS: string[] = ['apariencia', 'perfil', 'preferencias', 'manual', 'misdatos', 'ayuda', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'privacidad', 'usuarios'];
-type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'misdatos' | 'ayuda' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'privacidad' | 'usuarios';
+const SECCIONES_VALIDAS: string[] = ['apariencia', 'perfil', 'preferencias', 'manual', 'misdatos', 'ayuda', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'skills', 'trazabilidad', 'privacidad', 'usuarios'];
+type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'misdatos' | 'ayuda' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'skills' | 'trazabilidad' | 'privacidad' | 'usuarios';
 
 // 14/10/2026: Ajustes en dos grupos -- lo tuyo (Mi cuenta) y lo del despacho.
 const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
@@ -117,6 +118,7 @@ const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGesto
   { key: 'despacho',        label: 'Mi Despacho',          icon: Building2 },
   { key: 'integraciones',   label: 'Integraciones',        icon: Plug },
   { key: 'automatizaciones', label: 'Automatizaciones',    icon: Zap, soloGestor: true },
+  { key: 'skills',          label: 'Skills de la IA',      icon: Sparkles },
   { key: 'trazabilidad',    label: 'Trazabilidad',         icon: History },
   { key: 'privacidad',      label: 'Datos y privacidad',   icon: Database, soloGestor: true },
   { key: 'usuarios',        label: 'Gestión de Usuarios',  icon: UsersRound, soloGestor: true },
@@ -128,6 +130,7 @@ const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any 
   { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
   { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
   { key: 'automatizaciones', label: 'Automatizaciones',    desc: 'Flujos automáticos de la organización, como las vistas recibidas por correo.', icon: Zap },
+  { key: 'skills',         label: 'Skills de la IA',       desc: 'Instrucciones del despacho que la IA sigue al redactar documentos.',     icon: Sparkles },
   // Antes en el menú lateral (14/10/2026): es auditoría, no trabajo del día a día.
   { key: 'trazabilidad',   label: 'Trazabilidad',          desc: 'Historial de accesos y acciones de todo el despacho.',                      icon: History },
   { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
@@ -2488,6 +2491,8 @@ export default function Configuracion() {
             <IntegracionesPanel canManage={myRol === 'propietario' || myRol === 'admin'} />
           ) : activeSection === 'automatizaciones' && (myRol === 'propietario' || myRol === 'admin') ? (
             <AutomatizacionesPanel />
+          ) : activeSection === 'skills' ? (
+            <SkillsPanel />
           ) : activeSection === 'trazabilidad' ? (
             <div className="h-full min-h-[520px] overflow-hidden">
               <Trazabilidad />

@@ -3281,6 +3281,53 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  tiktok:', e?.message || e);
     }
 
+    // ── Documentos (editor de texto) y skills de la IA (30/10/2026) ──
+    // documentos: textos del despacho escritos en el editor de Vantia (HTML
+    // de TipTap), opcionalmente ligados a un expediente. ia_skills:
+    // instrucciones reutilizables que la IA sigue al redactar (en el editor y
+    // en Chat IA); cada despacho tiene las suyas, sembradas la primera vez.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ia_skills (
+          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID NOT NULL,
+          nombre          VARCHAR(120) NOT NULL,
+          descripcion     VARCHAR(400),
+          instrucciones   TEXT NOT NULL DEFAULT '',
+          categoria       VARCHAR(40) NOT NULL DEFAULT 'documento',
+          activa          BOOLEAN NOT NULL DEFAULT TRUE,
+          en_chat         BOOLEAN NOT NULL DEFAULT TRUE,
+          created_by      VARCHAR(150),
+          updated_by_name VARCHAR(200),
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_ia_skills_org ON ia_skills (organizacion_id, nombre)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS ia_skills_sembradas (
+          organizacion_id UUID PRIMARY KEY,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS documentos (
+          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID NOT NULL,
+          titulo          VARCHAR(300) NOT NULL DEFAULT 'Documento sin título',
+          contenido       TEXT NOT NULL DEFAULT '',
+          expediente_id   UUID REFERENCES expedientes(id) ON DELETE SET NULL,
+          skill_id        UUID REFERENCES ia_skills(id) ON DELETE SET NULL,
+          created_by      VARCHAR(150),
+          created_by_name VARCHAR(200),
+          updated_by_name VARCHAR(200),
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_documentos_org ON documentos (organizacion_id, updated_at DESC)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_documentos_exp ON documentos (expediente_id)`);
+    } catch (e: any) {
+      console.warn('⚠️  documentos/skills:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

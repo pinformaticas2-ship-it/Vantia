@@ -25,6 +25,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "hpp": "^0.2.3",
+    "html-to-docx": "1.8.0",
     "imapflow": "^1.0.181",
     "mailparser": "^3.9.14",
     "mammoth": "1.13.0",
