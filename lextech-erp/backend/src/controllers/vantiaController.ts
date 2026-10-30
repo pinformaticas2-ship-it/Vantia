@@ -437,7 +437,7 @@ const TOOLS = [{
     },
     {
       name: 'crear_documento',
-      description: 'Guarda en el módulo Documentos de Vantia un documento que has redactado (demanda, burofax, contrato, carta, informe...), para que el usuario lo abra en el editor, lo revise, lo exporte a Word o lo guarde en el expediente. Úsala cuando el usuario pida redactar o generar un documento (o pida "guárdalo como documento"). No hace falta confirmación: solo crea un borrador editable. Después dile que lo tiene en Documentos con el título que le has puesto.',
+      description: 'Guarda en el módulo Documentos de Vantia un documento que has redactado (demanda, burofax, contrato, carta, informe...), para que el usuario lo abra en el editor, lo revise, lo exporte a Word o lo guarde en el expediente. Úsala cuando el usuario pida redactar o generar un documento (o pida "guárdalo como documento"). No hace falta confirmación: solo crea un borrador editable. Después dile que lo tiene en Documentos con el título que le has puesto. NUNCA digas que has creado o guardado un documento si no has llamado a esta herramienta en este mismo turno: si te piden otro documento, vuelve a llamarla.',
       parameters: {
         type: 'object',
         properties: {
