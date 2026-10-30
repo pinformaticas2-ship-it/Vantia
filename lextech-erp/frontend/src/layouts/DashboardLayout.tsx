@@ -107,7 +107,7 @@ const MODULES = [
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
   { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
-  { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "WhatsApp e Instagram — mensajería con clientes fuera de la app" },
+  { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "Mensajería con clientes por los canales conectados (WhatsApp…)" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
   { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: "Vistas recibidas por correo pendientes de confirmar" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },

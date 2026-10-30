@@ -19,6 +19,7 @@ import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
 import { usePreferencias, esOscuro, useAparienciaClerk } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
+import { TikTokIcon } from '../components/TikTokPanel';
 
 const PALETTES: {
   id: AppTheme;
@@ -1479,6 +1480,27 @@ interface WhatsAppIntegrationStatus {
 // mensajería todavía (ver [[project_vantia_pending_user_actions]]).
 function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
+  // TikTok: la cuenta se conecta aquí y se usa desde Comunicación Externa.
+  const [tiktok, setTiktok] = useState<{ configured: boolean; connected: boolean; account?: { displayName?: string } } | null>(null);
+  const [tiktokConnecting, setTiktokConnecting] = useState(false);
+  const [tiktokError, setTiktokError] = useState('');
+  useEffect(() => {
+    apiFetch('/api/tiktok/status', { getToken })
+      .then((d) => { if (d?.success) setTiktok(d.data); })
+      .catch(() => { /* sin estado: la tarjeta queda como pendiente */ });
+  }, [getToken]);
+  const connectTiktok = async () => {
+    setTiktokConnecting(true); setTiktokError('');
+    try {
+      const d = await apiFetch('/api/tiktok/connect', { method: 'POST', getToken });
+      if (!d?.success || !d.data?.url) throw new Error(d?.error || 'No se pudo iniciar la conexión con TikTok.');
+      window.location.href = d.data.url;
+    } catch (e: any) {
+      setTiktokError(e.message || 'No se pudo iniciar la conexión con TikTok.');
+      setTiktokConnecting(false);
+    }
+  };
   const { organizacion, reload: reloadOrganizacion } = useOrganizacion();
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveError, setDriveError] = useState('');
@@ -1738,6 +1760,49 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
             <Link2 size={13} /> Conectar
           </button>
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black">
+                <TikTokIcon size={20} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">TikTok</p>
+                <p className="text-xs text-slate-400 truncate">{tiktok?.connected && tiktok.account?.displayName ? tiktok.account.displayName : 'Vídeos y estadísticas'}</p>
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${tiktok?.connected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {!tiktok ? '…' : tiktok.connected ? 'Conectado' : 'Pendiente'}
+            </span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Conecta la cuenta del despacho para ver tus vídeos con sus visualizaciones y publicar vídeos nuevos desde
+            Comunicación Externa.
+            {tiktok && !tiktok.configured && ' Falta configurar TikTok en el servidor.'}
+          </p>
+          {tiktokError && <p className="mt-2 text-[11px] text-red-600">{tiktokError}</p>}
+          {tiktok?.connected ? (
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard/whatsapp?canal=tiktok')}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Link2 size={13} /> Gestionar
+            </button>
+          ) : canManage ? (
+            <button
+              type="button"
+              onClick={connectTiktok}
+              disabled={tiktokConnecting || !tiktok?.configured}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {tiktokConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Conectar
+            </button>
+          ) : (
+            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectarlo.</p>
+          )}
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
@@ -2445,3 +2510,4 @@ export default function Configuracion() {
     </div>
   );
 }
+

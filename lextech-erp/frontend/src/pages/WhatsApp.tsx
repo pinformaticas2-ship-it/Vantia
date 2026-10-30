@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
-  Instagram,
   Loader2,
   MessageCircle,
   Phone,
@@ -15,7 +14,6 @@ import {
   Search,
   Send,
   Settings2,
-  Sparkles,
   UserRound,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
@@ -125,13 +123,16 @@ export default function WhatsApp() {
   const [error, setError] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
-  // Comunicación externa: WhatsApp y TikTok conectados de verdad.
-  // Instagram queda como pestaña visible pero deshabilitada hasta tener
-  // cuenta de Instagram Business y el permiso de mensajería aprobado por Meta.
+  // Comunicación externa solo enseña los canales conectados (se conectan en
+  // Configuración → Integraciones). Instagram y Facebook aún no se pueden conectar.
   // ?canal=tiktok abre directamente TikTok (así vuelve el backend tras conectar).
-  const [channel, setChannel] = useState<"whatsapp" | "instagram" | "tiktok">(
+  const [channel, setChannel] = useState<"whatsapp" | "tiktok">(
     searchParams.get("canal") === "tiktok" ? "tiktok" : "whatsapp",
   );
+  const [tiktokConectado, setTiktokConectado] = useState(false);
+  // Al volver de TikTok (?tiktok=ok|error) se enseña su pestaña aunque la
+  // conexión haya fallado, para que se vea el aviso con el motivo.
+  const volviendoDeTikTok = searchParams.has("tiktok");
 
   const apiGet = useCallback(async (path: string) => {
     const token = await getToken({ skipCache: true });
@@ -162,9 +163,13 @@ export default function WhatsApp() {
     try {
       setLoading(true);
       setError(null);
+      const tiktok = apiGet("/api/tiktok/status")
+        .then((res) => setTiktokConectado(Boolean(res.data?.connected)))
+        .catch(() => setTiktokConectado(false));
       const [statusRes, contactsRes] = await Promise.all([
         apiGet("/api/whatsapp/status"),
         apiGet("/api/whatsapp/contacts"),
+        tiktok,
       ]);
       setStatus(statusRes.data || null);
       setContacts(contactsRes.data || []);
@@ -261,7 +266,13 @@ export default function WhatsApp() {
     }
   };
 
-  if (loading && channel === "whatsapp") {
+  const canales: ("whatsapp" | "tiktok")[] = [
+    ...(status?.configured ? ["whatsapp" as const] : []),
+    ...(tiktokConectado || volviendoDeTikTok ? ["tiktok" as const] : []),
+  ];
+  const canal = canales.includes(channel) ? channel : canales[0];
+
+  if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-slate-400">
         <div className="flex items-center gap-3">
@@ -271,7 +282,7 @@ export default function WhatsApp() {
     );
   }
 
-  if (error && contacts.length === 0 && !status && channel === "whatsapp") {
+  if (error && contacts.length === 0 && !status && !tiktokConectado) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
@@ -279,42 +290,38 @@ export default function WhatsApp() {
     );
   }
 
+  if (!canal) {
+    return <SinCanales onConfigurar={() => navigate("/dashboard/config?section=integraciones")} />;
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
-        <button
-          type="button"
-          onClick={() => setChannel("whatsapp")}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-            channel === "whatsapp" ? "bg-[#25D366]/15 text-[#1a9e4f]" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          }`}
-        >
-          <MessageCircle size={13} /> WhatsApp
-        </button>
-        <button
-          type="button"
-          onClick={() => setChannel("instagram")}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-            channel === "instagram" ? "bg-fuchsia-50 text-fuchsia-600" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          }`}
-        >
-          <Instagram size={13} /> Instagram
-          <span className="ml-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Próximamente</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setChannel("tiktok")}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-            channel === "tiktok" ? "bg-slate-900 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          }`}
-        >
-          <TikTokIcon size={13} /> TikTok
-        </button>
+        {canales.includes("whatsapp") && (
+          <button
+            type="button"
+            onClick={() => setChannel("whatsapp")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              canal === "whatsapp" ? "bg-[#25D366]/15 text-[#1a9e4f]" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            }`}
+          >
+            <MessageCircle size={13} /> WhatsApp
+          </button>
+        )}
+        {canales.includes("tiktok") && (
+          <button
+            type="button"
+            onClick={() => setChannel("tiktok")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              canal === "tiktok" ? "bg-slate-900 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            }`}
+          >
+            <TikTokIcon size={13} /> TikTok
+          </button>
+        )}
       </div>
 
-      {channel === "instagram" ? (
-        <InstagramComingSoon />
-      ) : channel === "tiktok" ? (
+      {canal === "tiktok" ? (
         <TikTokPanel />
       ) : (
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -334,28 +341,13 @@ export default function WhatsApp() {
               <Settings2 size={16} />
             </button>
           </div>
-          {status?.configured ? (
-            <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Canal Business autenticado
-              </div>
-              <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
+          <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Canal Business autenticado
             </div>
-          ) : (
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                Canal sin configurar
-              </div>
-              <p className="mt-1 text-xs text-amber-600/80">
-                Conéctalo desde{" "}
-                <button type="button" onClick={() => navigate("/dashboard/config?section=integraciones")} className="font-semibold underline">
-                  Configuración → Integraciones
-                </button>.
-              </p>
-            </div>
-          )}
+            <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
+          </div>
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <Search size={15} className="text-slate-400" />
             <input
@@ -582,25 +574,26 @@ export default function WhatsApp() {
   );
 }
 
-function InstagramComingSoon() {
+function SinCanales({ onConfigurar }: { onConfigurar: () => void }) {
   return (
-    <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 bg-[#fafafa] px-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-fuchsia-500 via-pink-500 to-amber-400 shadow-lg shadow-fuchsia-200">
-        <Instagram size={28} className="text-white" />
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-[#fafafa] px-6 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100">
+        <MessageCircle size={28} className="text-slate-400" />
       </div>
       <div>
-        <h2 className="text-base font-bold text-slate-800">Instagram — próximamente</h2>
+        <h2 className="text-base font-bold text-slate-800">No hay ningún canal conectado</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-          Aquí podrás gestionar los mensajes directos de Instagram junto con WhatsApp, en la misma bandeja.
+          Conecta WhatsApp o TikTok en Integraciones y aparecerán aquí. Instagram y Facebook se añadirán a esta
+          misma bandeja cuando estén disponibles.
         </p>
       </div>
-      <div className="mt-2 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs text-slate-500 space-y-2">
-        <p className="flex items-center gap-2 font-semibold text-slate-700"><Sparkles size={13} className="text-fuchsia-500" /> Para activarlo hace falta:</p>
-        <ul className="space-y-1.5 pl-1">
-          <li className="flex gap-2"><span className="text-slate-300">·</span> Una cuenta de Instagram Business o Creator (no hace falta vincularla a ninguna página de Facebook con la API de Instagram con inicio de sesión de Instagram).</li>
-          <li className="flex gap-2"><span className="text-slate-300">·</span> Añadirla como "Instagram tester" en la app de Meta del despacho, o el permiso de mensajería aprobado por Meta si se necesita para más cuentas.</li>
-        </ul>
-      </div>
+      <button
+        type="button"
+        onClick={onConfigurar}
+        className="mt-1 inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#92042c]"
+      >
+        <Settings2 size={15} /> Ir a Integraciones
+      </button>
     </div>
   );
 }
