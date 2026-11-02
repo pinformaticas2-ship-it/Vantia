@@ -37,7 +37,6 @@ import crmRoutes            from './routes/crm';
 import documentosRoutes     from './routes/documentos';
 import skillsRoutes         from './routes/skills';
 import { startCrmReglas } from './controllers/crmController';
-import { startRenovacionInstagram } from './utils/instagram';
 import erroresClienteRoutes from './routes/erroresCliente';
 import docsBaseRoutes from './routes/docsBase';
 import plantillasRoutes from './routes/plantillas';
@@ -433,7 +432,6 @@ runMigrations().then(() => {
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
     startCrmReglas();
-    startRenovacionInstagram();
     // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
     startVistasIdle();
 

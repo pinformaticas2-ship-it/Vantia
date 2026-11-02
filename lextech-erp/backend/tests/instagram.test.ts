@@ -12,8 +12,9 @@ const skip = !TEST_DB && 'TEST_DATABASE_URL no definida (base de datos de prueba
 if (TEST_DB) {
   process.env.DATABASE_URL = TEST_DB;
   process.env.PGSSL = process.env.PGSSL || 'false';
-  process.env.INSTAGRAM_APP_ID = 'app_test';
-  process.env.INSTAGRAM_APP_SECRET = 'secreto_test';
+  process.env.META_APP_ID = 'app_test';
+  process.env.META_APP_SECRET = 'secreto_test';
+  process.env.INSTAGRAM_CONFIG_ID = 'config_test';
   process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN = 'verifica_test';
 }
 
@@ -54,8 +55,8 @@ before(async () => {
   (act.getClerk().users as any).getUser = async (id: string) => ({ id, firstName: 'Ana', lastName: 'Test', emailAddresses: [] });
   ig = await import('../src/controllers/instagramController');
   utils = await import('../src/utils/instagram');
-  await utils.guardarCuentaInstagram(org, 'ig_ana', { accessToken: 'tok_org', expiresIn: 5184000, permisos: 'x' }, { user_id: '1784000', username: 'despacho' });
-  await utils.guardarCuentaInstagram(otraOrg, 'ig_ana', { accessToken: 'tok_otra', expiresIn: 5184000, permisos: 'x' }, { user_id: '1785000', username: 'otro' });
+  await utils.guardarCuentaInstagram(org, 'ig_ana', { accessToken: 'tok_org', expiresIn: 5184000, clientBusinessId: 'bm' }, { id: '1784000', username: 'despacho' });
+  await utils.guardarCuentaInstagram(otraOrg, 'ig_ana', { accessToken: 'tok_otra', expiresIn: 5184000, clientBusinessId: 'bm' }, { id: '1785000', username: 'otro' });
 });
 
 after(async () => { if (pool) await pool.end(); });
@@ -110,7 +111,7 @@ test('instagram: responder desde Vantia', { skip }, async () => {
     const r = await call(ig.enviarMensaje, { params: { igsid: 'cliente1' }, body: { texto: 'Buenos días, Marta. ¿Cuándo te viene bien hablar?' } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(r.body.data.enviado_por, 'Ana Test');
-    assert.match(llamadas[0].url, /graph\.instagram\.com\/v\d+\.0\/1784000\/messages/);
+    assert.match(llamadas[0].url, /graph\.facebook\.com\/v\d+\.0\/1784000\/messages/);
     assert.equal(llamadas[0].init.headers.Authorization, 'Bearer tok_org');
     assert.deepEqual(JSON.parse(llamadas[0].init.body), { recipient: { id: 'cliente1' }, message: { text: 'Buenos días, Marta. ¿Cuándo te viene bien hablar?' } });
     // El eco que manda Meta después no se duplica
@@ -138,17 +139,18 @@ test('instagram: solo gestores conectan; una cuenta no puede estar en dos despac
   const r = await call(ig.startInstagramConnect, { headers: { origin: 'https://app.vantia.test' } });
   assert.equal(r.status, 200);
   const url = new URL(r.body.data.url);
-  assert.equal(url.origin + url.pathname, 'https://www.instagram.com/oauth/authorize');
-  assert.match(url.searchParams.get('scope')!, /instagram_business_manage_messages/);
-  assert.match(url.searchParams.get('scope')!, /instagram_business_content_publish/);
+  assert.equal(url.origin + url.pathname, 'https://www.facebook.com/v26.0/dialog/oauth');
+  assert.equal(url.searchParams.get('config_id'), 'config_test');
+  assert.equal(url.searchParams.get('response_type'), 'code');
   const state = url.searchParams.get('state')!;
   // Simula que la otra organización conecta la cuenta que ya tiene este despacho
   await pool.query(`UPDATE instagram_oauth_states SET organizacion_id=$1 WHERE state=$2`, [otraOrg, state]);
   const realFetch = global.fetch;
   (global as any).fetch = async (u: string) => {
-    if (u.includes('api.instagram.com/oauth/access_token')) return new Response(JSON.stringify({ data: [{ access_token: 'corto', user_id: '1784000', permissions: 'instagram_business_basic' }] }), { status: 200 });
-    if (u.includes('ig_exchange_token')) return new Response(JSON.stringify({ access_token: 'largo', expires_in: 5184000 }), { status: 200 });
-    return new Response(JSON.stringify({ user_id: '1784000', username: 'despacho' }), { status: 200 });
+    if (u.includes('/oauth/access_token')) return new Response(JSON.stringify({ access_token: 'suat', token_type: 'bearer' }), { status: 200 });
+    if (u.includes('me?fields=id,client_business_id')) return new Response(JSON.stringify({ id: 'su1', client_business_id: 'bm1' }), { status: 200 });
+    if (u.includes('assigned_instagram_accounts')) return new Response(JSON.stringify({ data: [{ id: '1784000', username: 'despacho' }] }), { status: 200 });
+    return new Response(JSON.stringify({ id: '1784000', username: 'despacho' }), { status: 200 });
   };
   let destino = '';
   try {

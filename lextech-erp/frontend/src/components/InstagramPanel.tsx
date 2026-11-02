@@ -19,9 +19,10 @@ interface Status {
   connected: boolean;
   webhookUrl: string;
   verifyTokenConfigurado: boolean;
+  faltaConfig?: string[];
   webhookOk?: boolean;
   webhookError?: string | null;
-  account?: { username?: string; name?: string; picture?: string; followers?: number; media?: number; accountType?: string };
+  account?: { username?: string; name?: string; picture?: string; followers?: number; media?: number };
   accountError?: string | null;
 }
 interface Conversacion {
@@ -136,7 +137,7 @@ export default function InstagramPanel() {
             </div>
             {status && !status.configured ? (
               <p className="max-w-md rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                Falta configurar Instagram en el servidor (INSTAGRAM_APP_ID e INSTAGRAM_APP_SECRET).
+                Falta configurar Instagram en el servidor ({(status.faltaConfig?.length ? status.faltaConfig : ["META_APP_ID", "META_APP_SECRET", "INSTAGRAM_CONFIG_ID"]).join(", ")}).
               </p>
             ) : (
               <button type="button" onClick={conectar} disabled={conectando} className={`inline-flex items-center gap-2 rounded-xl ${GRADIENTE} px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60`}>

@@ -3306,6 +3306,7 @@ export async function runMigrations(): Promise<void> {
           updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_instagram_cuentas_ig ON instagram_cuentas (ig_user_id)`);
+      await client.query(`ALTER TABLE instagram_cuentas ADD COLUMN IF NOT EXISTS client_business_id VARCHAR(64)`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS instagram_oauth_states (
           state           VARCHAR(64) PRIMARY KEY,

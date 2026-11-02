@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { resolveUserName } from './activityController';
 import {
-  INSTAGRAM_AUTHORIZE_URL, INSTAGRAM_SCOPES, InstagramError, instagramAppId, instagramConfigurado, instagramRedirectUri,
+  InstagramError, instagramConfigurado, instagramFaltaConfig, urlAutorizacionInstagram, cuentasCompartidasInstagram,
   instagramPublicBase, instagramVerifyToken, canjearCodigoInstagram, perfilInstagram, suscribirWebhooksInstagram,
   guardarCuentaInstagram, cuentaInstagram, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
   crearContenedorInstagram, estadoContenedorInstagram, publicarContenedorInstagram, comentariosInstagram,
@@ -41,16 +41,16 @@ export async function getInstagramStatus(req: Request, res: Response) {
       `SELECT ig_user_id, username, name, profile_picture, scopes, token_expiry, webhook_ok, webhook_error, connected_at
          FROM instagram_cuentas WHERE organizacion_id=$1`, [org],
     );
-    const base = { configured, webhookUrl, verifyTokenConfigurado: Boolean(instagramVerifyToken()) };
+    const base = { configured, faltaConfig: instagramFaltaConfig(), webhookUrl, verifyTokenConfigurado: Boolean(instagramVerifyToken()) };
     if (!rows.length) return ok(res, { ...base, connected: false });
     const r = rows[0];
     let account: any = { username: r.username, name: r.name, picture: r.profile_picture };
     let accountError: string | null = null;
     try {
       const c = await cuentaInstagram(org);
-      const p = await perfilInstagram(c.token);
+      const p = await perfilInstagram(c.token, c.igUserId);
       account = {
-        username: p.username, name: p.name, picture: p.profile_picture_url, accountType: p.account_type,
+        username: p.username, name: p.name, picture: p.profile_picture_url,
         followers: p.followers_count, follows: p.follows_count, media: p.media_count,
       };
       await pool.query(
@@ -82,9 +82,7 @@ export async function startInstagramConnect(req: Request, res: Response) {
       `INSERT INTO instagram_oauth_states (state, organizacion_id, user_id, return_origin) VALUES ($1,$2,$3,$4)`,
       [state, org, userId, returnOrigin],
     );
-    const url = `${INSTAGRAM_AUTHORIZE_URL}?client_id=${encodeURIComponent(instagramAppId())}`
-      + `&redirect_uri=${encodeURIComponent(instagramRedirectUri())}&response_type=code`
-      + `&scope=${encodeURIComponent(INSTAGRAM_SCOPES)}&state=${state}&enable_fb_login=false&force_reauth=true`;
+    const url = urlAutorizacionInstagram(state);
     return ok(res, { url });
   } catch (e) { return err(res, e); }
 }
@@ -113,17 +111,25 @@ export async function instagramCallback(req: Request, res: Response) {
   if (!code) return back('error', 'Instagram no ha devuelto el código de autorización.');
   try {
     const t = await canjearCodigoInstagram(code);
-    const perfil = await perfilInstagram(t.accessToken);
-    if (!perfil?.user_id && !t.userId) throw new InstagramError('No se pudo leer la cuenta de Instagram.');
-    if (!perfil.user_id) perfil.user_id = t.userId;
+    const { clientBusinessId, cuentas } = await cuentasCompartidasInstagram(t.accessToken);
+    if (!cuentas.length) {
+      throw new InstagramError('Meta no ha compartido ninguna cuenta de Instagram con Vantia. Vuelve a conectar y, al entrar, elige la cuenta profesional del despacho.');
+    }
+    // Si el portfolio comparte varias, la primera que no esté ya en otro despacho.
+    const { rows: ocupadas } = await pool.query(
+      `SELECT ig_user_id FROM instagram_cuentas WHERE ig_user_id = ANY($1) AND organizacion_id<>$2`, [cuentas.map((c) => c.id), pending.organizacion_id],
+    );
+    const elegida = cuentas.find((c) => !ocupadas.some((o: any) => o.ig_user_id === c.id)) || cuentas[0];
+    const perfil = await perfilInstagram(t.accessToken, elegida.id).catch(() => ({ id: elegida.id, username: elegida.username }));
+    perfil.id = elegida.id;
     // Una cuenta de Instagram solo puede estar en un despacho (los mensajes se reparten por ella).
     const { rows: otra } = await pool.query(
-      `SELECT organizacion_id FROM instagram_cuentas WHERE ig_user_id=$1 AND organizacion_id<>$2`, [String(perfil.user_id), pending.organizacion_id],
+      `SELECT organizacion_id FROM instagram_cuentas WHERE ig_user_id=$1 AND organizacion_id<>$2`, [elegida.id, pending.organizacion_id],
     );
     if (otra.length) return back('error', 'Esa cuenta de Instagram ya está conectada en otro despacho de Vantia.');
-    await guardarCuentaInstagram(pending.organizacion_id, pending.user_id, t, perfil);
+    await guardarCuentaInstagram(pending.organizacion_id, pending.user_id, { ...t, clientBusinessId }, perfil);
     try {
-      await suscribirWebhooksInstagram(t.accessToken);
+      await suscribirWebhooksInstagram({ igUserId: elegida.id, token: t.accessToken });
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=TRUE, webhook_error=NULL WHERE organizacion_id=$1`, [pending.organizacion_id]);
     } catch (e: any) {
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=FALSE, webhook_error=$1 WHERE organizacion_id=$2`, [e?.message || String(e), pending.organizacion_id]);
@@ -142,7 +148,7 @@ export async function reintentarWebhook(req: Request, res: Response) {
     if (!esGestor(rol)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
     const c = await cuentaInstagram(org);
     try {
-      await suscribirWebhooksInstagram(c.token);
+      await suscribirWebhooksInstagram(c);
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=TRUE, webhook_error=NULL WHERE organizacion_id=$1`, [org]);
       return ok(res, { webhookOk: true });
     } catch (e: any) {
@@ -426,7 +432,7 @@ export async function estadoPublicacion(req: Request, res: Response) {
 async function medioPropio(org: string, mediaId: string) {
   const c = await cuentaInstagram(org);
   const { igUserId } = c;
-  const r = await fetch(`https://graph.instagram.com/v26.0/${encodeURIComponent(mediaId)}?fields=owner,username`, { headers: { Authorization: `Bearer ${c.token}` } });
+  const r = await fetch(`https://graph.facebook.com/v26.0/${encodeURIComponent(mediaId)}?fields=owner,username`, { headers: { Authorization: `Bearer ${c.token}` } });
   const d: any = await r.json().catch(() => ({}));
   if (!r.ok || (d?.owner?.id && String(d.owner.id) !== igUserId)) throw new InstagramError('Publicación no encontrada.', 'not_found', 404);
   return c;

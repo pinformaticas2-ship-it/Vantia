@@ -2,44 +2,51 @@ import crypto from 'crypto';
 import pool from '../config/database';
 import { encryptPassword, decryptPassword } from './emailCrypto';
 
-// ── Instagram (API de Instagram con inicio de sesión de Instagram) ──────────
-// graph.instagram.com, sin página de Facebook. Una cuenta profesional
-// (empresa o creador) por despacho. Hace falta en el entorno del backend:
-//   INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET  (Meta → la app → Instagram →
-//     "Configuración de la API con inicio de sesión de Instagram")
-//   INSTAGRAM_REDIRECT_URI  (dada de alta en "Configuración del inicio de
-//     sesión empresarial"; por defecto la de producción)
+// ── Instagram (API de Instagram con inicio de sesión unificado) ────────────
+// Meta ya no ofrece el "inicio de sesión de Instagram" a las apps nuevas: se
+// entra con Facebook Login for Business y una configuración del caso de uso
+// "API de Instagram". Todo va por graph.facebook.com; no hace falta página de
+// Facebook. Una cuenta profesional (empresa o creador) por despacho.
+// Hace falta en el entorno del backend:
+//   META_APP_ID / META_APP_SECRET  (Meta → la app → Configuración de la app →
+//     Básica; también valen INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET)
+//   INSTAGRAM_CONFIG_ID  (identificador de la configuración creada en
+//     "API setup with Unified login" → "Crear nueva configuración")
+//   INSTAGRAM_REDIRECT_URI  (la URL de redirección de esa configuración; por
+//     defecto la de producción)
 //   INSTAGRAM_WEBHOOK_VERIFY_TOKEN  (el mismo texto que se pone al configurar
 //     el webhook en Meta)
 //   INSTAGRAM_PUBLIC_BASE_URL  (URL pública del backend desde la que Meta
 //     descarga los vídeos e imágenes que se publican; por defecto producción)
-// El token largo dura 60 días; se renueva solo (ver renovarTokensInstagram).
+// El token es de un usuario del sistema del portfolio del cliente: no caduca
+// mientras no se quite la app o se cambie la cuenta de portfolio.
 
-const API = 'https://graph.instagram.com';
+const API = 'https://graph.facebook.com';
 export const IG_VERSION = 'v26.0';
-export const INSTAGRAM_AUTHORIZE_URL = 'https://www.instagram.com/oauth/authorize';
-export const INSTAGRAM_SCOPES = [
-  'instagram_business_basic',
-  'instagram_business_manage_messages',
-  'instagram_business_manage_comments',
-  'instagram_business_content_publish',
-].join(',');
+export const INSTAGRAM_AUTHORIZE_URL = `https://www.facebook.com/${IG_VERSION}/dialog/oauth`;
 
 const env = (k: string) => (process.env[k] || '').trim();
+const appId = () => env('META_APP_ID') || env('INSTAGRAM_APP_ID');
+const appSecret = () => env('META_APP_SECRET') || env('INSTAGRAM_APP_SECRET');
 
+/** Lo que falta en el entorno para poder conectar (vacío = todo listo). */
+export function instagramFaltaConfig(): string[] {
+  const f: string[] = [];
+  if (!appId()) f.push('META_APP_ID');
+  if (!appSecret()) f.push('META_APP_SECRET');
+  if (!env('INSTAGRAM_CONFIG_ID')) f.push('INSTAGRAM_CONFIG_ID');
+  return f;
+}
 export function instagramConfigurado(): boolean {
-  return Boolean(env('INSTAGRAM_APP_ID') && env('INSTAGRAM_APP_SECRET'));
+  return instagramFaltaConfig().length === 0;
 }
-export function instagramAppId(): string {
-  const v = env('INSTAGRAM_APP_ID');
-  if (!v) throw new InstagramError('INSTAGRAM_APP_ID no está configurado en el backend', 'no_config', 503);
+function requerido(v: string, nombre: string): string {
+  if (!v) throw new InstagramError(`${nombre} no está configurado en el backend`, 'no_config', 503);
   return v;
 }
-function instagramAppSecret(): string {
-  const v = env('INSTAGRAM_APP_SECRET');
-  if (!v) throw new InstagramError('INSTAGRAM_APP_SECRET no está configurado en el backend', 'no_config', 503);
-  return v;
-}
+export const instagramAppId = () => requerido(appId(), 'META_APP_ID');
+const instagramAppSecret = () => requerido(appSecret(), 'META_APP_SECRET');
+export const instagramConfigId = () => requerido(env('INSTAGRAM_CONFIG_ID'), 'INSTAGRAM_CONFIG_ID');
 export function instagramRedirectUri(): string {
   return env('INSTAGRAM_REDIRECT_URI') || 'https://vantia.up.railway.app/api/instagram/callback';
 }
@@ -56,7 +63,7 @@ export class InstagramError extends Error {
 
 // Mensajes en castellano para los errores que puede ver un usuario.
 function mensajeError(code: any, subcode: any, msg: string): string {
-  if (code === 190) return 'La conexión con Instagram ha caducado. Vuelve a conectar la cuenta.';
+  if (code === 190 || code === 102) return 'La conexión con Instagram ha caducado o se ha retirado. Vuelve a conectar la cuenta.';
   // Antes que el de permisos: comparte el código 10.
   if ((code === 10 && subcode === 2534022) || /outside of allowed window/i.test(msg)) {
     return 'Han pasado más de 24 horas desde el último mensaje de esta persona: Instagram no deja contestar hasta que vuelva a escribir.';
@@ -81,63 +88,72 @@ async function igFetch(url: string, opts: { token?: string; method?: string; bod
   const res = await fetch(url, { method: opts.method || (body ? 'POST' : 'GET'), headers, body });
   const data: any = await res.json().catch(() => ({}));
   const e = data?.error;
-  if (!res.ok || e || data?.error_type) {
+  if (!res.ok || e) {
     const code = e?.code ?? data?.code;
-    const msg = e?.message || data?.error_message || `Error de Instagram (${res.status})`;
-    throw new InstagramError(mensajeError(code, e?.error_subcode, msg), code, code === 190 ? 401 : (res.status >= 500 ? 502 : 400));
+    const msg = e?.message || `Error de Instagram (${res.status})`;
+    throw new InstagramError(mensajeError(code, e?.error_subcode, msg), code, code === 190 || code === 102 ? 401 : (res.status >= 500 ? 502 : 400));
   }
   return data;
 }
 
 const g = (path: string) => `${API}/${IG_VERSION}/${path.replace(/^\/+/, '')}`;
-const unwrap = (d: any) => (Array.isArray(d?.data) && d.data.length === 1 && !d.paging ? d.data[0] : d);
 
 // ── Inicio de sesión ──────────────────────────────────────────────────────
 
-/** code → token corto (1 h) → token largo (60 días). */
-export async function canjearCodigoInstagram(code: string) {
-  const corto = unwrap(await igFetch('https://api.instagram.com/oauth/access_token', {
-    form: {
-      client_id: instagramAppId(),
-      client_secret: instagramAppSecret(),
-      grant_type: 'authorization_code',
-      redirect_uri: instagramRedirectUri(),
-      code: code.replace(/#_$/, ''),
-    },
-  }));
-  if (!corto?.access_token) throw new InstagramError('Instagram no ha devuelto el token.');
-  const largo = await igFetch(
-    `${API}/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(instagramAppSecret())}&access_token=${encodeURIComponent(corto.access_token)}`,
-  );
-  return {
-    accessToken: String(largo.access_token),
-    expiresIn: Number(largo.expires_in || 5184000),
-    userId: String(corto.user_id || ''),
-    permisos: String(corto.permissions || ''),
-  };
+export function urlAutorizacionInstagram(state: string): string {
+  const q = new URLSearchParams({
+    client_id: instagramAppId(),
+    config_id: instagramConfigId(),
+    redirect_uri: instagramRedirectUri(),
+    response_type: 'code',
+    state,
+  });
+  return `${INSTAGRAM_AUTHORIZE_URL}?${q.toString()}`;
 }
 
-export async function perfilInstagram(token: string) {
-  const d = unwrap(await igFetch(g(`me?fields=user_id,username,name,account_type,profile_picture_url,followers_count,follows_count,media_count&access_token=${encodeURIComponent(token)}`)));
-  return d;
+/** code → token del usuario del sistema del portfolio del cliente. */
+export async function canjearCodigoInstagram(code: string) {
+  const q = new URLSearchParams({
+    client_id: instagramAppId(),
+    client_secret: instagramAppSecret(),
+    redirect_uri: instagramRedirectUri(),
+    code: code.replace(/#_$/, ''),
+  });
+  const d = await igFetch(g(`oauth/access_token?${q.toString()}`));
+  if (!d?.access_token) throw new InstagramError('Meta no ha devuelto el token.');
+  const expiresIn = Number(d.expires_in || 0);
+  return { accessToken: String(d.access_token), expiresIn: expiresIn > 0 ? expiresIn : null };
+}
+
+/** Portfolio del cliente y cuentas de Instagram que ha compartido con la app. */
+export async function cuentasCompartidasInstagram(token: string) {
+  const yo = await igFetch(g('me?fields=id,client_business_id'), { token });
+  const d = await igFetch(g('me/assigned_instagram_accounts?fields=id,username'), { token });
+  const cuentas: { id: string; username?: string }[] = (d?.data || []).map((a: any) => ({ id: String(a.id), username: a.username }));
+  return { clientBusinessId: yo?.client_business_id ? String(yo.client_business_id) : null, cuentas };
+}
+
+export async function perfilInstagram(token: string, igUserId: string) {
+  return igFetch(g(`${igUserId}?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count`), { token });
 }
 
 /** Activa los avisos (webhook) de mensajes y comentarios para la cuenta. */
-export async function suscribirWebhooksInstagram(token: string) {
-  await igFetch(g(`me/subscribed_apps?subscribed_fields=messages,comments&access_token=${encodeURIComponent(token)}`), { method: 'POST' });
+export async function suscribirWebhooksInstagram(c: { igUserId: string; token: string }) {
+  await igFetch(g(`${c.igUserId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,comments' } });
 }
 
-export async function guardarCuentaInstagram(org: string, userId: string, t: { accessToken: string; expiresIn: number; permisos: string }, perfil: any) {
+export async function guardarCuentaInstagram(org: string, userId: string,
+  t: { accessToken: string; expiresIn: number | null; clientBusinessId: string | null }, perfil: any) {
   await pool.query(
-    `INSERT INTO instagram_cuentas (organizacion_id, ig_user_id, username, name, profile_picture, scopes, access_token_enc,
+    `INSERT INTO instagram_cuentas (organizacion_id, ig_user_id, username, name, profile_picture, client_business_id, access_token_enc,
                                     token_expiry, token_refreshed_at, connected_by, connected_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,NOW(),NOW())
      ON CONFLICT (organizacion_id) DO UPDATE SET
        ig_user_id=EXCLUDED.ig_user_id, username=EXCLUDED.username, name=EXCLUDED.name, profile_picture=EXCLUDED.profile_picture,
-       scopes=EXCLUDED.scopes, access_token_enc=EXCLUDED.access_token_enc, token_expiry=EXCLUDED.token_expiry,
+       client_business_id=EXCLUDED.client_business_id, access_token_enc=EXCLUDED.access_token_enc, token_expiry=EXCLUDED.token_expiry,
        token_refreshed_at=NOW(), connected_by=EXCLUDED.connected_by, connected_at=NOW(), updated_at=NOW()`,
-    [org, String(perfil.user_id || perfil.id), perfil.username || null, perfil.name || null, perfil.profile_picture_url || null,
-      t.permisos, encryptPassword(t.accessToken), new Date(Date.now() + t.expiresIn * 1000), userId],
+    [org, String(perfil.id), perfil.username || null, perfil.name || null, perfil.profile_picture_url || null,
+      t.clientBusinessId, encryptPassword(t.accessToken), t.expiresIn ? new Date(Date.now() + t.expiresIn * 1000) : null, userId],
   );
 }
 
@@ -154,36 +170,13 @@ export async function cuentaInstagram(org: string): Promise<CuentaInstagram> {
   return { igUserId: rows[0].ig_user_id, token: decryptPassword(rows[0].access_token_enc), username: rows[0].username };
 }
 
-/** Renueva los tokens que caducan en menos de 15 días (y tienen más de 24 h). */
-export async function renovarTokensInstagram(): Promise<number> {
-  const { rows } = await pool.query(
-    `SELECT organizacion_id, access_token_enc FROM instagram_cuentas
-      WHERE token_expiry < NOW() + INTERVAL '15 days' AND token_expiry > NOW()
-        AND COALESCE(token_refreshed_at, connected_at) < NOW() - INTERVAL '25 hours'`,
-  );
-  let n = 0;
-  for (const r of rows) {
-    try {
-      const d = await igFetch(`${API}/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(decryptPassword(r.access_token_enc))}`);
-      await pool.query(
-        `UPDATE instagram_cuentas SET access_token_enc=$1, token_expiry=$2, token_refreshed_at=NOW(), updated_at=NOW() WHERE organizacion_id=$3`,
-        [encryptPassword(d.access_token), new Date(Date.now() + Number(d.expires_in || 5184000) * 1000), r.organizacion_id],
-      );
-      n++;
-    } catch (e: any) {
-      console.warn('[instagram] no se pudo renovar el token:', r.organizacion_id, e?.message || e);
-    }
-  }
-  return n;
-}
-
 // ── Webhook ────────────────────────────────────────────────────────────────
 
 /** Firma X-Hub-Signature-256 (HMAC-SHA256 del cuerpo con el secreto de la app). */
 export function firmaValida(cuerpo: Buffer, cabecera: string | undefined): boolean {
   if (!cabecera || !cabecera.startsWith('sha256=')) return false;
-  // Vale el secreto de la app de Instagram o, si se configuró, el de la app de Meta.
-  const secretos = [env('INSTAGRAM_APP_SECRET'), env('META_APP_SECRET')].filter(Boolean);
+  // El secreto de la app de Meta (con cualquiera de los dos nombres).
+  const secretos = [env('META_APP_SECRET'), env('INSTAGRAM_APP_SECRET')].filter(Boolean);
   const recibida = Buffer.from(cabecera.slice(7), 'hex');
   return secretos.some((s) => {
     const esperada = crypto.createHmac('sha256', s).update(cuerpo).digest();
@@ -194,7 +187,7 @@ export function firmaValida(cuerpo: Buffer, cabecera: string | undefined): boole
 // ── Mensajes ───────────────────────────────────────────────────────────────
 
 export async function perfilRemitente(token: string, igsid: string) {
-  return unwrap(await igFetch(g(`${igsid}?fields=name,username,profile_pic`), { token }));
+  return igFetch(g(`${igsid}?fields=name,username,profile_pic`), { token });
 }
 
 export async function enviarMensajeInstagram(c: CuentaInstagram, destino: { igsid?: string; commentId?: string }, texto: string) {
@@ -255,16 +248,4 @@ export async function ocultarComentarioInstagram(c: CuentaInstagram, commentId: 
 }
 export async function borrarComentarioInstagram(c: CuentaInstagram, commentId: string) {
   return igFetch(g(commentId), { token: c.token, method: 'DELETE' });
-}
-
-/** Revisa cada 12 h los tokens de Instagram y renueva los que van a caducar. */
-export function startRenovacionInstagram(): void {
-  const pasada = async () => {
-    const { tomarTurno, soltarTurno } = await import('./turnos');
-    if (!(await tomarTurno('instagram-tokens', 11 * 3600_000).catch(() => false))) return;
-    try { await renovarTokensInstagram(); }
-    catch (e: any) { console.error('[instagram] renovar tokens:', e?.message || e); }
-    finally { await soltarTurno('instagram-tokens').catch(() => {}); }
-  };
-  setTimeout(() => { void pasada(); setInterval(() => void pasada(), 12 * 3600_000); }, 5 * 60_000);
 }
