@@ -134,10 +134,11 @@ export default function WhatsApp() {
   const [tiktokConectado, setTiktokConectado] = useState(false);
   const [instagramConectado, setInstagramConectado] = useState(false);
   const [instagramNoLeidos, setInstagramNoLeidos] = useState(0);
-  const volviendoDeInstagram = searchParams.has("instagram");
-  // Al volver de TikTok (?tiktok=ok|error) se enseña su pestaña aunque la
-  // conexión haya fallado, para que se vea el aviso con el motivo.
-  const volviendoDeTikTok = searchParams.has("tiktok");
+  // Al volver de TikTok o Instagram (?tiktok=ok|error, ?instagram=ok|error) se
+  // enseña su pestaña aunque la conexión haya fallado, para que se vea el aviso
+  // con el motivo. Se fija al entrar: el panel quita el parámetro de la URL.
+  const [volviendoDeInstagram] = useState(() => searchParams.has("instagram"));
+  const [volviendoDeTikTok] = useState(() => searchParams.has("tiktok"));
 
   const apiGet = useCallback(async (path: string) => {
     const token = await getToken({ skipCache: true });
