@@ -1493,6 +1493,26 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       .then((d) => { if (d?.success) setTiktok(d.data); })
       .catch(() => { /* sin estado: la tarjeta queda como pendiente */ });
   }, [getToken]);
+  // Instagram: se conecta aquí o en Comunicación Externa; mensajes, comentarios y publicaciones van allí.
+  const [instagram, setInstagram] = useState<{ configured: boolean; connected: boolean; account?: { username?: string }; webhookOk?: boolean } | null>(null);
+  const [instagramConnecting, setInstagramConnecting] = useState(false);
+  const [instagramError, setInstagramError] = useState('');
+  useEffect(() => {
+    apiFetch('/api/instagram/status', { getToken })
+      .then((d) => { if (d?.success) setInstagram(d.data); })
+      .catch(() => { /* sin estado: la tarjeta queda como pendiente */ });
+  }, [getToken]);
+  const connectInstagram = async () => {
+    setInstagramConnecting(true); setInstagramError('');
+    try {
+      const d = await apiFetch('/api/instagram/connect', { method: 'POST', getToken });
+      if (!d?.success || !d.data?.url) throw new Error(d?.error || 'No se pudo iniciar la conexión con Instagram.');
+      window.location.href = d.data.url;
+    } catch (e: any) {
+      setInstagramError(e.message || 'No se pudo iniciar la conexión con Instagram.');
+      setInstagramConnecting(false);
+    }
+  };
   const connectTiktok = async () => {
     setTiktokConnecting(true); setTiktokError('');
     try {
@@ -1730,17 +1750,30 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">Instagram</p>
-                <p className="text-xs text-slate-400 truncate">Mensajes directos</p>
+                <p className="text-xs text-slate-400 truncate">{instagram?.connected && instagram.account?.username ? `@${instagram.account.username}` : 'Mensajes, comentarios y publicaciones'}</p>
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${instagram?.connected ? (instagram.webhookOk === false ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600') : 'bg-slate-100 text-slate-400'}`}>
+              {!instagram ? '…' : instagram.connected ? (instagram.webhookOk === false ? 'Sin mensajes' : 'Conectado') : 'Pendiente'}
+            </span>
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Requiere una cuenta de Instagram Business/Creator añadida como probadora en la app de Meta del despacho.
+            Recibe y contesta los mensajes directos, responde comentarios y publica reels, fotos e historias desde Comunicación Externa.
+            Hace falta una cuenta profesional (empresa o creador).
+            {instagram && !instagram.configured && ' Falta configurar Instagram en el servidor.'}
           </p>
-          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} /> Conectar
-          </button>
+          {instagramError && <p className="mt-2 text-[11px] text-red-600">{instagramError}</p>}
+          {instagram?.connected ? (
+            <button type="button" onClick={() => navigate('/dashboard/whatsapp?canal=instagram')} className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50">
+              <Link2 size={13} /> Gestionar
+            </button>
+          ) : canManage ? (
+            <button type="button" onClick={connectInstagram} disabled={instagramConnecting || !instagram?.configured} className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+              {instagramConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Conectar
+            </button>
+          ) : (
+            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectarlo.</p>
+          )}
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">

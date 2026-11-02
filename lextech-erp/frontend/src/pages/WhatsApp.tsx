@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
+  Instagram,
   Loader2,
   MessageCircle,
   Phone,
@@ -19,6 +20,7 @@ import {
 import { safeJson } from "../lib/api";
 import { useIsMobile } from "../lib/useIsMobile";
 import TikTokPanel, { TikTokIcon } from "../components/TikTokPanel";
+import InstagramPanel from "../components/InstagramPanel";
 
 interface WhatsAppContact {
   id: string;
@@ -126,10 +128,13 @@ export default function WhatsApp() {
   // Comunicación externa solo enseña los canales conectados (se conectan en
   // Configuración → Integraciones). Instagram y Facebook aún no se pueden conectar.
   // ?canal=tiktok abre directamente TikTok (así vuelve el backend tras conectar).
-  const [channel, setChannel] = useState<"whatsapp" | "tiktok">(
-    searchParams.get("canal") === "tiktok" ? "tiktok" : "whatsapp",
+  const [channel, setChannel] = useState<"whatsapp" | "tiktok" | "instagram">(
+    searchParams.get("canal") === "tiktok" ? "tiktok" : searchParams.get("canal") === "instagram" ? "instagram" : "whatsapp",
   );
   const [tiktokConectado, setTiktokConectado] = useState(false);
+  const [instagramConectado, setInstagramConectado] = useState(false);
+  const [instagramNoLeidos, setInstagramNoLeidos] = useState(0);
+  const volviendoDeInstagram = searchParams.has("instagram");
   // Al volver de TikTok (?tiktok=ok|error) se enseña su pestaña aunque la
   // conexión haya fallado, para que se vea el aviso con el motivo.
   const volviendoDeTikTok = searchParams.has("tiktok");
@@ -166,10 +171,14 @@ export default function WhatsApp() {
       const tiktok = apiGet("/api/tiktok/status")
         .then((res) => setTiktokConectado(Boolean(res.data?.connected)))
         .catch(() => setTiktokConectado(false));
+      const instagram = apiGet("/api/instagram/status")
+        .then((res) => { setInstagramConectado(Boolean(res.data?.connected)); setInstagramNoLeidos(res.data?.noLeidos || 0); })
+        .catch(() => setInstagramConectado(false));
       const [statusRes, contactsRes] = await Promise.all([
         apiGet("/api/whatsapp/status"),
         apiGet("/api/whatsapp/contacts"),
         tiktok,
+        instagram,
       ]);
       setStatus(statusRes.data || null);
       setContacts(contactsRes.data || []);
@@ -266,8 +275,9 @@ export default function WhatsApp() {
     }
   };
 
-  const canales: ("whatsapp" | "tiktok")[] = [
+  const canales: ("whatsapp" | "tiktok" | "instagram")[] = [
     ...(status?.configured ? ["whatsapp" as const] : []),
+    ...(instagramConectado || volviendoDeInstagram ? ["instagram" as const] : []),
     ...(tiktokConectado || volviendoDeTikTok ? ["tiktok" as const] : []),
   ];
   const canal = canales.includes(channel) ? channel : canales[0];
@@ -282,7 +292,7 @@ export default function WhatsApp() {
     );
   }
 
-  if (error && contacts.length === 0 && !status && !tiktokConectado) {
+  if (error && contacts.length === 0 && !status && !tiktokConectado && !instagramConectado) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
@@ -308,6 +318,18 @@ export default function WhatsApp() {
             <MessageCircle size={13} /> WhatsApp
           </button>
         )}
+        {canales.includes("instagram") && (
+          <button
+            type="button"
+            onClick={() => { setChannel("instagram"); setInstagramNoLeidos(0); }}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              canal === "instagram" ? "bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            }`}
+          >
+            <Instagram size={13} /> Instagram
+            {canal !== "instagram" && instagramNoLeidos > 0 && <span className="rounded-full bg-pink-500 px-1.5 text-[10px] font-bold text-white">{instagramNoLeidos}</span>}
+          </button>
+        )}
         {canales.includes("tiktok") && (
           <button
             type="button"
@@ -323,6 +345,8 @@ export default function WhatsApp() {
 
       {canal === "tiktok" ? (
         <TikTokPanel />
+      ) : canal === "instagram" ? (
+        <InstagramPanel />
       ) : (
       <div className="flex flex-1 min-h-0 overflow-hidden">
       <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-white border-r border-slate-200`}>
@@ -583,7 +607,7 @@ function SinCanales({ onConfigurar }: { onConfigurar: () => void }) {
       <div>
         <h2 className="text-base font-bold text-slate-800">No hay ningún canal conectado</h2>
         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-          Conecta WhatsApp o TikTok en Integraciones y aparecerán aquí. Instagram y Facebook se añadirán a esta
+          Conecta WhatsApp, Instagram o TikTok en Integraciones y aparecerán aquí. Facebook se añadirá a esta
           misma bandeja cuando estén disponibles.
         </p>
       </div>

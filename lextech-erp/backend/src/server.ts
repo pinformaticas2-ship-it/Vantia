@@ -20,6 +20,8 @@ import sharedTemplatesRoutes from './routes/sharedTemplates';
 import firmaImagenesRoutes, { servirFirmaImagen } from './routes/firmaImagenes';
 import whatsappRoutes       from './routes/whatsapp';
 import tiktokRoutes         from './routes/tiktok';
+import instagramRoutes      from './routes/instagram';
+import instagramWebhookRoutes from './routes/instagramWebhook';
 import documentImportRoutes from './routes/documentImport';
 import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
@@ -35,6 +37,7 @@ import crmRoutes            from './routes/crm';
 import documentosRoutes     from './routes/documentos';
 import skillsRoutes         from './routes/skills';
 import { startCrmReglas } from './controllers/crmController';
+import { startRenovacionInstagram } from './utils/instagram';
 import erroresClienteRoutes from './routes/erroresCliente';
 import docsBaseRoutes from './routes/docsBase';
 import plantillasRoutes from './routes/plantillas';
@@ -130,6 +133,8 @@ app.use(helmet({
 
 // EmailEngine webhooks sin auth — registrar antes de Clerk
 app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
+// Webhook de Instagram: antes del lector JSON (necesita el cuerpo en bruto para la firma).
+app.use('/api/instagram/webhook', instagramWebhookRoutes);
 
 app.use(clerkMiddleware());
 app.use(resolveOrg);
@@ -270,6 +275,7 @@ app.use('/api/firma-imagenes',    firmaImagenesRoutes);
 app.get('/api/public/firma-imagen/:file', servirFirmaImagen);
 app.use('/api/whatsapp',          whatsappRoutes);
 app.use('/api/tiktok',            tiktokRoutes);
+app.use('/api/instagram',         instagramRoutes);
 app.use('/api/documental',        documentalRoutes);
 app.use('/api/clientes/invites',  clientInviteRoutes);
 app.use('/api/facturacion',       facturacionRoutes);
@@ -427,6 +433,7 @@ runMigrations().then(() => {
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
     startCrmReglas();
+    startRenovacionInstagram();
     // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
     startVistasIdle();
 

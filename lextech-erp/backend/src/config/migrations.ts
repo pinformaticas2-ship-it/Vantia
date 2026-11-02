@@ -3281,6 +3281,87 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  tiktok:', e?.message || e);
     }
 
+    // ── Instagram (Comunicación Externa, 02/11/2026) ──
+    // API de Instagram con inicio de sesión de Instagram (graph.instagram.com):
+    // una cuenta profesional por despacho, sus conversaciones de mensajes
+    // directos (recibidas por webhook) y las publicaciones que se suben desde
+    // Vantia (el archivo se sirve en una URL pública temporal hasta que Meta
+    // lo descarga).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS instagram_cuentas (
+          organizacion_id   UUID PRIMARY KEY,
+          ig_user_id        VARCHAR(64) NOT NULL,
+          username          VARCHAR(200),
+          name              VARCHAR(300),
+          profile_picture   TEXT,
+          scopes            TEXT,
+          access_token_enc  TEXT NOT NULL,
+          token_expiry      TIMESTAMPTZ,
+          token_refreshed_at TIMESTAMPTZ,
+          webhook_ok        BOOLEAN NOT NULL DEFAULT FALSE,
+          webhook_error     TEXT,
+          connected_by      VARCHAR(150),
+          connected_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_instagram_cuentas_ig ON instagram_cuentas (ig_user_id)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS instagram_oauth_states (
+          state           VARCHAR(64) PRIMARY KEY,
+          organizacion_id UUID NOT NULL,
+          user_id         VARCHAR(150) NOT NULL,
+          return_origin   TEXT NOT NULL,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS instagram_contactos (
+          organizacion_id   UUID NOT NULL,
+          igsid             VARCHAR(64) NOT NULL,
+          username          VARCHAR(200),
+          name              VARCHAR(300),
+          profile_pic       TEXT,
+          client_id         UUID REFERENCES entities(id) ON DELETE SET NULL,
+          last_inbound_at   TIMESTAMPTZ,
+          last_message_at   TIMESTAMPTZ,
+          last_message_text TEXT,
+          no_leidos         INTEGER NOT NULL DEFAULT 0,
+          perfil_leido_at   TIMESTAMPTZ,
+          PRIMARY KEY (organizacion_id, igsid)
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_instagram_contactos_reciente ON instagram_contactos (organizacion_id, last_message_at DESC)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS instagram_mensajes (
+          id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID NOT NULL,
+          igsid           VARCHAR(64) NOT NULL,
+          mid             VARCHAR(400),
+          direccion       VARCHAR(10) NOT NULL,
+          texto           TEXT,
+          adjuntos        JSONB,
+          enviado_por     VARCHAR(200),
+          estado          VARCHAR(20) NOT NULL DEFAULT 'ok',
+          error           TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_instagram_mensajes_mid ON instagram_mensajes (organizacion_id, mid) WHERE mid IS NOT NULL`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_instagram_mensajes_hilo ON instagram_mensajes (organizacion_id, igsid, created_at)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS instagram_subidas (
+          token           VARCHAR(64) PRIMARY KEY,
+          organizacion_id UUID NOT NULL,
+          archivo         TEXT NOT NULL,
+          mimetype        VARCHAR(100) NOT NULL,
+          container_id    VARCHAR(64),
+          media_id        VARCHAR(64),
+          estado          VARCHAR(20) NOT NULL DEFAULT 'subiendo',
+          error           TEXT,
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    } catch (e: any) {
+      console.warn('⚠️  instagram:', e?.message || e);
+    }
+
     // ── Documentos (editor de texto) y skills de la IA (30/10/2026) ──
     // documentos: textos del despacho escritos en el editor de Vantia (HTML
     // de TipTap), opcionalmente ligados a un expediente. ia_skills:
