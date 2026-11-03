@@ -25,7 +25,7 @@ import { InstagramSimulado } from "./DemoInstagram";
 
 // TEMPORAL: mientras Instagram no esté conectado, su pestaña se enseña con datos
 // de ejemplo (para probarlo y grabarlo). Poner a false para volver a lo normal.
-const INSTAGRAM_DEMO = true;
+const INSTAGRAM_DEMO = false;
 
 interface WhatsAppContact {
   id: string;
