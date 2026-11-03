@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import VantiaBrand from "../components/VantiaBrand";
 
 // Páginas públicas de Términos y Privacidad. Vantia es un ERP privado, pero
-// TikTok (y en general cualquier OAuth de terceros) exige enlazar ambas desde
+// TikTok, Meta (y en general cualquier OAuth de terceros) exigen enlazar ambas desde
 // la ficha de la app. BORRADOR: el despacho debe revisar el texto legal.
 const RESPONSABLE = "Ferrández Piña";
-const ACTUALIZADO = "28 de octubre de 2026";
+const ACTUALIZADO = "3 de noviembre de 2026";
 
 function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -71,17 +71,45 @@ export function Privacidad() {
         <li>La lista de vídeos publicados y sus estadísticas (visualizaciones, me gusta, comentarios y compartidos).</li>
         <li>Los tokens de acceso necesarios para mantener la conexión, guardados cifrados.</li>
       </ul>
+      <h2>Datos que obtenemos de Instagram (Meta)</h2>
+      <p>
+        Si una organización conecta la cuenta profesional de Instagram de su despacho, y solo con los permisos que acepte, Vantia obtiene:
+      </p>
+      <ul>
+        <li>Datos de la cuenta conectada: identificador, nombre de usuario, nombre, foto de perfil y número de seguidores y publicaciones.</li>
+        <li>Los mensajes directos que otras personas envían a esa cuenta y las respuestas que se envían desde Vantia, junto con el nombre de usuario, nombre y foto de perfil de quien escribe.</li>
+        <li>Las publicaciones de la cuenta y sus comentarios (texto, autor y fecha).</li>
+        <li>El token de acceso necesario para mantener la conexión, guardado cifrado.</li>
+      </ul>
       <h2>Para qué los usamos</h2>
       <ul>
         <li>Mostrar a la organización su cuenta de TikTok y las estadísticas de sus vídeos dentro de Vantia.</li>
         <li>Publicar en TikTok el contenido que el propio usuario prepare y confirme desde Vantia.</li>
+        <li>Que el despacho lea y conteste desde Vantia los mensajes directos y comentarios que recibe en su cuenta de Instagram.</li>
+        <li>Publicar en Instagram los reels, fotos e historias que el propio usuario prepare y confirme desde Vantia, y moderar los comentarios (responder, ocultar o borrar).</li>
       </ul>
-      <p>No vendemos estos datos, no los cedemos a terceros ni los usamos para publicidad.</p>
+      <p>
+        No vendemos estos datos, no los cedemos a terceros ni los usamos para publicidad. Solo los ven los usuarios de la organización
+        que conectó la cuenta; cada organización está aislada de las demás.
+      </p>
       <h2>Conservación y eliminación</h2>
       <p>
         Los datos de TikTok se conservan mientras la cuenta siga conectada. Al desconectarla desde Vantia se revoca el acceso
         y se eliminan los tokens y los datos obtenidos de TikTok. También puede retirarse el permiso desde la configuración de la cuenta de TikTok.
       </p>
+      <p>
+        Al desconectar Instagram desde Vantia se elimina el token de acceso. Los mensajes y comentarios ya recibidos se conservan como parte
+        del historial de comunicaciones del despacho hasta que la organización los elimine o lo solicite. También puede retirarse el acceso
+        desde la configuración de la cuenta de Instagram o del portfolio empresarial de Meta.
+      </p>
+      <h2 id="eliminar-datos">Cómo solicitar la eliminación de sus datos</h2>
+      <p>
+        Cualquier persona (usuario de Vantia o alguien que haya escrito o comentado a una cuenta conectada) puede pedir que se borren sus datos:
+      </p>
+      <ul>
+        <li>Si es la organización que conectó la cuenta: desconéctela desde Ajustes → Integraciones en Vantia y pida el borrado del historial.</li>
+        <li>En cualquier caso: dirija la solicitud a {RESPONSABLE} indicando su nombre de usuario en Instagram o TikTok. Eliminaremos sus datos en un plazo máximo de 30 días y le confirmaremos el borrado.</li>
+      </ul>
       <h2>Derechos</h2>
       <p>
         Puede ejercer sus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad dirigiéndose a {RESPONSABLE},
