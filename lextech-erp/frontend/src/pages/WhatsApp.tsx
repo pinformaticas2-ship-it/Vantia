@@ -21,6 +21,11 @@ import { safeJson } from "../lib/api";
 import { useIsMobile } from "../lib/useIsMobile";
 import TikTokPanel, { TikTokIcon } from "../components/TikTokPanel";
 import InstagramPanel from "../components/InstagramPanel";
+import { InstagramSimulado } from "./DemoInstagram";
+
+// TEMPORAL: mientras Instagram no esté conectado, su pestaña se enseña con datos
+// de ejemplo (para probarlo y grabarlo). Poner a false para volver a lo normal.
+const INSTAGRAM_DEMO = true;
 
 interface WhatsAppContact {
   id: string;
@@ -278,7 +283,7 @@ export default function WhatsApp() {
 
   const canales: ("whatsapp" | "tiktok" | "instagram")[] = [
     ...(status?.configured ? ["whatsapp" as const] : []),
-    ...(instagramConectado || volviendoDeInstagram ? ["instagram" as const] : []),
+    ...(instagramConectado || volviendoDeInstagram || INSTAGRAM_DEMO ? ["instagram" as const] : []),
     ...(tiktokConectado || volviendoDeTikTok ? ["tiktok" as const] : []),
   ];
   const canal = canales.includes(channel) ? channel : canales[0];
@@ -347,7 +352,7 @@ export default function WhatsApp() {
       {canal === "tiktok" ? (
         <TikTokPanel />
       ) : canal === "instagram" ? (
-        <InstagramPanel />
+        INSTAGRAM_DEMO && !instagramConectado && !volviendoDeInstagram ? <InstagramSimulado /> : <InstagramPanel />
       ) : (
       <div className="flex flex-1 min-h-0 overflow-hidden">
       <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-white border-r border-slate-200`}>
