@@ -128,7 +128,25 @@ export async function canjearCodigoInstagram(code: string) {
   return { accessToken: String(d.access_token), expiresIn: expiresIn > 0 ? expiresIn : null };
 }
 
-type CuentaCompartida = { id: string; username?: string };
+/**
+ * Token de usuario de corta duración (configuración de Facebook Login con
+ * "token de acceso de usuario") → de 60 días. Los tokens de página que salen
+ * de uno de larga duración no caducan.
+ */
+export async function tokenLargaDuracion(token: string) {
+  const q = new URLSearchParams({
+    grant_type: 'fb_exchange_token',
+    client_id: instagramAppId(),
+    client_secret: instagramAppSecret(),
+    fb_exchange_token: token,
+  });
+  const d = await igFetch(g(`oauth/access_token?${q.toString()}`));
+  if (!d?.access_token) throw new InstagramError('Meta no ha devuelto el token.');
+  const expiresIn = Number(d.expires_in || 0);
+  return { accessToken: String(d.access_token), expiresIn: expiresIn > 0 ? expiresIn : null };
+}
+
+type CuentaCompartida ={ id: string; username?: string };
 
 /** Permisos concedidos al token y, por permiso, a qué activos (debug_token). */
 async function permisosDelToken(token: string) {

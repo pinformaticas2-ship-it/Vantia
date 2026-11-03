@@ -6,7 +6,7 @@ import { resolveUserName } from './activityController';
 import {
   InstagramError, instagramConfigurado, instagramFaltaConfig, urlAutorizacionInstagram, cuentasCompartidasInstagram,
   instagramPublicBase, instagramVerifyToken, canjearCodigoInstagram, perfilInstagram, suscribirWebhooksInstagram,
-  guardarCuentaInstagram, cuentaInstagram, paginaDeInstagram, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
+  guardarCuentaInstagram, cuentaInstagram, paginaDeInstagram, tokenLargaDuracion, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
   crearContenedorInstagram, estadoContenedorInstagram, publicarContenedorInstagram, comentariosInstagram,
   responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, type FormatoInstagram,
 } from '../utils/instagram';
@@ -110,11 +110,13 @@ export async function instagramCallback(req: Request, res: Response) {
   const code = String(req.query.code || '');
   if (!code) return back('error', 'Instagram no ha devuelto el código de autorización.');
   try {
-    const t = await canjearCodigoInstagram(code);
+    let t = await canjearCodigoInstagram(code);
+    // Con una configuración de token de usuario llega uno que caduca: se alarga.
+    if (t.expiresIn) t = await tokenLargaDuracion(t.accessToken).catch(() => t);
     const { clientBusinessId, cuentas, permisos } = await cuentasCompartidasInstagram(t.accessToken);
     if (!cuentas.length) {
       console.warn('[instagram] sin cuentas compartidas; portfolio', clientBusinessId, 'permisos', permisos.join(','));
-      const falta = permisos.length && !permisos.includes('business_management') ? ' Falta el permiso business_management en la configuración de Meta.' : '';
+      const falta = permisos.length && !permisos.includes('business_management') ? ' Falta el permiso business_management en la configuración de Meta (usa una configuración con «token de acceso de usuario» que incluya business_management y pages_show_list).' : '';
       throw new InstagramError(`Meta no ha compartido ninguna cuenta de Instagram con Vantia.${falta}`
         + (permisos.length ? ` Permisos concedidos: ${permisos.join(', ')}.` : ' Vuelve a conectar y, al entrar, elige la cuenta profesional del despacho.'));
     }
@@ -130,9 +132,12 @@ export async function instagramCallback(req: Request, res: Response) {
       `SELECT organizacion_id FROM instagram_cuentas WHERE ig_user_id=$1 AND organizacion_id<>$2`, [elegida.id, pending.organizacion_id],
     );
     if (otra.length) return back('error', 'Esa cuenta de Instagram ya está conectada en otro despacho de Vantia.');
-    await guardarCuentaInstagram(pending.organizacion_id, pending.user_id, { ...t, clientBusinessId }, perfil);
+    // Token de usuario: se guarda el de la página vinculada (no caduca).
+    const pagina = await paginaDeInstagram(t.accessToken, elegida.id);
+    const guardado = pagina ? { accessToken: pagina.pageToken, expiresIn: null } : t;
+    await guardarCuentaInstagram(pending.organizacion_id, pending.user_id, { ...guardado, clientBusinessId, pageId: pagina?.pageId }, perfil);
     try {
-      await suscribirWebhooksInstagram({ igUserId: elegida.id, token: t.accessToken });
+      await suscribirWebhooksInstagram({ igUserId: elegida.id, token: guardado.accessToken, pageId: pagina?.pageId });
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=TRUE, webhook_error=NULL WHERE organizacion_id=$1`, [pending.organizacion_id]);
     } catch (e: any) {
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=FALSE, webhook_error=$1 WHERE organizacion_id=$2`, [e?.message || String(e), pending.organizacion_id]);
