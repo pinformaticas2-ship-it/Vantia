@@ -68,6 +68,9 @@ function mensajeError(code: any, subcode: any, msg: string): string {
   if ((code === 10 && subcode === 2534022) || /outside of allowed window/i.test(msg)) {
     return 'Han pasado más de 24 horas desde el último mensaje de esta persona: Instagram no deja contestar hasta que vuelva a escribir.';
   }
+  if (subcode === 2534041 || /disabled access to Instagram Direct/i.test(msg)) {
+    return 'La cuenta de Instagram no deja leer los mensajes desde otras aplicaciones. En la app de Instagram: Configuración → Mensajes y respuestas a historias → Herramientas conectadas → activa «Permitir acceso a los mensajes».';
+  }
   if (code === 10 || code === 200) return 'Falta un permiso de Instagram. Vuelve a conectar la cuenta y acepta todos los permisos.';
   if (code === 4 || code === 17 || code === 32 || code === 613) return 'Instagram limita el número de peticiones. Espera un poco y vuelve a intentarlo.';
   if (code === 9 && subcode === 2207042) return 'Instagram no deja publicar más hoy desde esta cuenta (límite diario).';
@@ -176,37 +179,52 @@ export async function perfilInstagram(token: string, igUserId: string) {
   return igFetch(g(`${igUserId}?fields=id,username,name,profile_picture_url,followers_count,follows_count,media_count`), { token });
 }
 
+/**
+ * Página de Facebook vinculada a la cuenta y su token. Con un token de usuario
+ * (Facebook Login normal) los mensajes se mandan como la página; con el token
+ * del usuario del sistema (Unified Login) no hay página y devuelve null.
+ */
+export async function paginaDeInstagram(token: string, igUserId: string): Promise<{ pageId: string; pageToken: string } | null> {
+  try {
+    const d = await igFetch(g('me/accounts?fields=id,access_token,instagram_business_account{id}&limit=100'), { token });
+    const p = (d?.data || []).find((x: any) => String(x.instagram_business_account?.id || '') === igUserId && x.access_token);
+    return p ? { pageId: String(p.id), pageToken: String(p.access_token) } : null;
+  } catch { return null; }
+}
+
 /** Activa los avisos (webhook) de mensajes y comentarios para la cuenta. */
-export async function suscribirWebhooksInstagram(c: { igUserId: string; token: string }) {
+export async function suscribirWebhooksInstagram(c: { igUserId: string; token: string; pageId?: string | null }) {
   await igFetch(g(`${c.igUserId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,comments' } });
+  // Por Facebook Login, Meta solo manda los avisos si la app está instalada en la página.
+  if (c.pageId) await igFetch(g(`${c.pageId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,feed' } });
 }
 
 export async function guardarCuentaInstagram(org: string, userId: string,
-  t: { accessToken: string; expiresIn: number | null; clientBusinessId: string | null }, perfil: any) {
+  t: { accessToken: string; expiresIn: number | null; clientBusinessId: string | null; pageId?: string | null }, perfil: any) {
   await pool.query(
-    `INSERT INTO instagram_cuentas (organizacion_id, ig_user_id, username, name, profile_picture, client_business_id, access_token_enc,
+    `INSERT INTO instagram_cuentas (organizacion_id, ig_user_id, username, name, profile_picture, client_business_id, page_id, access_token_enc,
                                     token_expiry, token_refreshed_at, connected_by, connected_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,NOW(),NOW())
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),$10,NOW(),NOW())
      ON CONFLICT (organizacion_id) DO UPDATE SET
        ig_user_id=EXCLUDED.ig_user_id, username=EXCLUDED.username, name=EXCLUDED.name, profile_picture=EXCLUDED.profile_picture,
-       client_business_id=EXCLUDED.client_business_id, access_token_enc=EXCLUDED.access_token_enc, token_expiry=EXCLUDED.token_expiry,
-       token_refreshed_at=NOW(), connected_by=EXCLUDED.connected_by, connected_at=NOW(), updated_at=NOW()`,
+       client_business_id=EXCLUDED.client_business_id, page_id=EXCLUDED.page_id, access_token_enc=EXCLUDED.access_token_enc,
+       token_expiry=EXCLUDED.token_expiry, token_refreshed_at=NOW(), connected_by=EXCLUDED.connected_by, connected_at=NOW(), updated_at=NOW()`,
     [org, String(perfil.id), perfil.username || null, perfil.name || null, perfil.profile_picture_url || null,
-      t.clientBusinessId, encryptPassword(t.accessToken), t.expiresIn ? new Date(Date.now() + t.expiresIn * 1000) : null, userId],
+      t.clientBusinessId, t.pageId || null, encryptPassword(t.accessToken), t.expiresIn ? new Date(Date.now() + t.expiresIn * 1000) : null, userId],
   );
 }
 
-export interface CuentaInstagram { igUserId: string; token: string; username: string | null }
+export interface CuentaInstagram { igUserId: string; token: string; username: string | null; pageId: string | null }
 
 export async function cuentaInstagram(org: string): Promise<CuentaInstagram> {
   const { rows } = await pool.query(
-    `SELECT ig_user_id, username, access_token_enc, token_expiry FROM instagram_cuentas WHERE organizacion_id=$1`, [org],
+    `SELECT ig_user_id, username, page_id, access_token_enc, token_expiry FROM instagram_cuentas WHERE organizacion_id=$1`, [org],
   );
   if (!rows.length) throw new InstagramError('No hay ninguna cuenta de Instagram conectada.', 'not_connected', 404);
   if (rows[0].token_expiry && new Date(rows[0].token_expiry).getTime() < Date.now()) {
     throw new InstagramError('La conexión con Instagram ha caducado. Vuelve a conectar la cuenta.', 190, 401);
   }
-  return { igUserId: rows[0].ig_user_id, token: decryptPassword(rows[0].access_token_enc), username: rows[0].username };
+  return { igUserId: rows[0].ig_user_id, token: decryptPassword(rows[0].access_token_enc), username: rows[0].username, pageId: rows[0].page_id || null };
 }
 
 // ── Webhook ────────────────────────────────────────────────────────────────
@@ -231,7 +249,7 @@ export async function perfilRemitente(token: string, igsid: string) {
 
 export async function enviarMensajeInstagram(c: CuentaInstagram, destino: { igsid?: string; commentId?: string }, texto: string) {
   const recipient = destino.commentId ? { comment_id: destino.commentId } : { id: destino.igsid };
-  return igFetch(g(`${c.igUserId}/messages`), { token: c.token, body: { recipient, message: { text: texto } } });
+  return igFetch(g(`${c.pageId || c.igUserId}/messages`), { token: c.token, body: { recipient, message: { text: texto } } });
 }
 
 // ── Publicaciones ──────────────────────────────────────────────────────────

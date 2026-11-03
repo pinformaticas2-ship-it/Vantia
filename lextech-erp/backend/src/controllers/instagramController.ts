@@ -6,7 +6,7 @@ import { resolveUserName } from './activityController';
 import {
   InstagramError, instagramConfigurado, instagramFaltaConfig, urlAutorizacionInstagram, cuentasCompartidasInstagram,
   instagramPublicBase, instagramVerifyToken, canjearCodigoInstagram, perfilInstagram, suscribirWebhooksInstagram,
-  guardarCuentaInstagram, cuentaInstagram, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
+  guardarCuentaInstagram, cuentaInstagram, paginaDeInstagram, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
   crearContenedorInstagram, estadoContenedorInstagram, publicarContenedorInstagram, comentariosInstagram,
   responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, type FormatoInstagram,
 } from '../utils/instagram';
@@ -172,9 +172,12 @@ export async function conectarConToken(req: Request, res: Response) {
       `SELECT 1 FROM instagram_cuentas WHERE ig_user_id=$1 AND organizacion_id<>$2`, [igUserId, org],
     );
     if (otra.length) return res.status(409).json({ success: false, error: 'Esa cuenta de Instagram ya está conectada en otro despacho de Vantia.' });
-    await guardarCuentaInstagram(org, userId, { accessToken: token, expiresIn: null, clientBusinessId }, perfil);
+    // Con un token de usuario se guarda el de la página: no caduca si el de usuario era de larga duración.
+    const pagina = await paginaDeInstagram(token, igUserId);
+    const tokenCuenta = pagina?.pageToken || token;
+    await guardarCuentaInstagram(org, userId, { accessToken: tokenCuenta, expiresIn: null, clientBusinessId, pageId: pagina?.pageId }, perfil);
     let webhookError: string | null = null;
-    try { await suscribirWebhooksInstagram({ igUserId, token }); }
+    try { await suscribirWebhooksInstagram({ igUserId, token: tokenCuenta, pageId: pagina?.pageId }); }
     catch (e: any) { webhookError = e?.message || String(e); }
     await pool.query(`UPDATE instagram_cuentas SET webhook_ok=$1, webhook_error=$2 WHERE organizacion_id=$3`, [!webhookError, webhookError, org]);
     return ok(res, { username: perfil.username || null, webhookOk: !webhookError, webhookError });
