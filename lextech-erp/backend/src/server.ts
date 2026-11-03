@@ -22,6 +22,7 @@ import whatsappRoutes       from './routes/whatsapp';
 import tiktokRoutes         from './routes/tiktok';
 import instagramRoutes      from './routes/instagram';
 import instagramWebhookRoutes from './routes/instagramWebhook';
+import legalRoutes from './routes/legal';
 import documentImportRoutes from './routes/documentImport';
 import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
@@ -134,6 +135,8 @@ app.use(helmet({
 app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
 // Webhook de Instagram: antes del lector JSON (necesita el cuerpo en bruto para la firma).
 app.use('/api/instagram/webhook', instagramWebhookRoutes);
+// Política de privacidad pública (la piden Meta y TikTok; el frontend está protegido).
+app.use(legalRoutes);
 
 app.use(clerkMiddleware());
 app.use(resolveOrg);
