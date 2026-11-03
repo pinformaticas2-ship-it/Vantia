@@ -6,7 +6,7 @@ import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 import { TEMP_ROOT } from '../config/paths';
 import {
-  getInstagramStatus, startInstagramConnect, instagramCallback, disconnectInstagram, reintentarWebhook,
+  getInstagramStatus, startInstagramConnect, conectarConToken, instagramCallback, disconnectInstagram, reintentarWebhook,
   listarConversaciones, verConversacion, enviarMensaje, listarMedios, publicar, estadoPublicacion,
   listarComentarios, responderComentario, ocultarComentario, borrarComentario, servirArchivo,
 } from '../controllers/instagramController';
@@ -39,6 +39,7 @@ router.use(requireModulePermission('whatsapp'));
 
 router.get('/status', getInstagramStatus);
 router.post('/connect', startInstagramConnect);
+router.post('/conectar-token', conectarConToken);
 router.post('/webhook/reintentar', reintentarWebhook);
 router.delete('/', disconnectInstagram);
 

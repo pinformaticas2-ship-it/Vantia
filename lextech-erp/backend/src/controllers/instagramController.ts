@@ -144,6 +144,43 @@ export async function instagramCallback(req: Request, res: Response) {
   }
 }
 
+// POST /api/instagram/conectar-token { token, igUserId? } — vía de pruebas:
+// conecta con un identificador generado en el panel de Meta ("API setup with
+// Unified login" → generar identificador), sin pasar por la ventana de Facebook.
+export async function conectarConToken(req: Request, res: Response) {
+  try {
+    const { org, rol, userId } = ctx(req);
+    if (!esGestor(rol)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador pueden conectar Instagram.' });
+    const token = String(req.body?.token || '').trim();
+    let igUserId = String(req.body?.igUserId || '').trim();
+    if (token.length < 20) return res.status(400).json({ success: false, error: 'Pega el identificador de acceso completo.' });
+    if (igUserId && !/^\d{5,25}$/.test(igUserId)) return res.status(400).json({ success: false, error: 'El ID de la cuenta de Instagram son solo números.' });
+
+    let clientBusinessId: string | null = null;
+    if (!igUserId) {
+      const r = await cuentasCompartidasInstagram(token);
+      clientBusinessId = r.clientBusinessId;
+      if (!r.cuentas.length) {
+        return res.status(400).json({ success: false, error: 'Con ese identificador no se ve ninguna cuenta de Instagram. Escribe también el ID de la cuenta.' });
+      }
+      igUserId = r.cuentas[0].id;
+    }
+    // Comprueba que el identificador da acceso de verdad a esa cuenta.
+    const perfil = await perfilInstagram(token, igUserId);
+    perfil.id = igUserId;
+    const { rows: otra } = await pool.query(
+      `SELECT 1 FROM instagram_cuentas WHERE ig_user_id=$1 AND organizacion_id<>$2`, [igUserId, org],
+    );
+    if (otra.length) return res.status(409).json({ success: false, error: 'Esa cuenta de Instagram ya está conectada en otro despacho de Vantia.' });
+    await guardarCuentaInstagram(org, userId, { accessToken: token, expiresIn: null, clientBusinessId }, perfil);
+    let webhookError: string | null = null;
+    try { await suscribirWebhooksInstagram({ igUserId, token }); }
+    catch (e: any) { webhookError = e?.message || String(e); }
+    await pool.query(`UPDATE instagram_cuentas SET webhook_ok=$1, webhook_error=$2 WHERE organizacion_id=$3`, [!webhookError, webhookError, org]);
+    return ok(res, { username: perfil.username || null, webhookOk: !webhookError, webhookError });
+  } catch (e) { return err(res, e); }
+}
+
 // POST /api/instagram/webhook/reintentar — vuelve a activar los avisos de mensajes.
 export async function reintentarWebhook(req: Request, res: Response) {
   try {

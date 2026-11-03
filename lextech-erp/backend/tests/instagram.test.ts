@@ -189,3 +189,26 @@ test('instagram: si Meta no lista las cuentas, se sacan de los permisos del toke
     assert.equal(r.clientBusinessId, 'bm1');
   } finally { (global as any).fetch = realFetch; }
 });
+
+test('instagram: conectar con un identificador pegado (pruebas)', { skip }, async () => {
+  const nueva = (await pool.query(`INSERT INTO organizaciones (nombre) VALUES ('IG token') RETURNING id`)).rows[0].id;
+  assert.equal((await call(ig.conectarConToken, { org: nueva, rol: 'miembro', body: { token: 'x'.repeat(30) } })).status, 403);
+  assert.equal((await call(ig.conectarConToken, { org: nueva, body: { token: 'corto' } })).status, 400);
+  const realFetch = global.fetch;
+  const llamadas: string[] = [];
+  (global as any).fetch = async (u: string) => {
+    llamadas.push(u);
+    if (u.includes('subscribed_apps')) return new Response(JSON.stringify({ success: true }), { status: 200 });
+    return new Response(JSON.stringify({ id: '1787000', username: 'despacho.token' }), { status: 200 });
+  };
+  try {
+    const r = await call(ig.conectarConToken, { org: nueva, body: { token: 'EAA' + 'x'.repeat(40), igUserId: '1787000' } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.data.username, 'despacho.token');
+    assert.ok(llamadas.some((u) => u.includes('/1787000/subscribed_apps')));
+    // Una cuenta ya conectada en otro despacho no se puede volver a usar
+    assert.equal((await call(ig.conectarConToken, { org: nueva, body: { token: 'EAA' + 'x'.repeat(40), igUserId: '1784000' } })).status, 409);
+  } finally { (global as any).fetch = realFetch; }
+  const { rows } = await pool.query(`SELECT ig_user_id, webhook_ok FROM instagram_cuentas WHERE organizacion_id=$1`, [nueva]);
+  assert.deepEqual(rows[0], { ig_user_id: '1787000', webhook_ok: true });
+});
