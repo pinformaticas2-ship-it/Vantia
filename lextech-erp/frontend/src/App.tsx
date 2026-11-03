@@ -43,6 +43,7 @@ import DirectorioProfesionales from './pages/DirectorioProfesionales';
 import DirectorioProfesionalForm from './pages/DirectorioProfesionalForm';
 import DropboxOAuthCallback from './pages/DropboxOAuthCallback';
 import { Terminos, Privacidad } from './pages/Legal';
+import DemoInstagram from './pages/DemoInstagram';
 import { useOrganizacion, Modulo } from './lib/useOrganizacion';
 
 // Sin sesión (se cerró desde el menú de usuario, caducó...), este navegador
@@ -118,6 +119,7 @@ export default function App() {
           {/* Términos y privacidad públicos (los exige TikTok para conectar cuentas) */}
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/demo/instagram" element={<DemoInstagram />} />
 
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -136,6 +138,7 @@ export default function App() {
           <Route path="/dropbox-oauth-callback" element={<DropboxOAuthCallback />} />
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/demo/instagram" element={<DemoInstagram />} />
           <Route path="*" element={<PublicLanding />} />
         </Routes>
       </SignedOut>
