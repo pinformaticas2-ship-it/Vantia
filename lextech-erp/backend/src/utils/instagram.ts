@@ -125,12 +125,51 @@ export async function canjearCodigoInstagram(code: string) {
   return { accessToken: String(d.access_token), expiresIn: expiresIn > 0 ? expiresIn : null };
 }
 
-/** Portfolio del cliente y cuentas de Instagram que ha compartido con la app. */
+type CuentaCompartida = { id: string; username?: string };
+
+/** Permisos concedidos al token y, por permiso, a qué activos (debug_token). */
+async function permisosDelToken(token: string) {
+  const app = `${instagramAppId()}|${instagramAppSecret()}`;
+  const d = await igFetch(g(`debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(app)}`));
+  const datos = d?.data || {};
+  return {
+    scopes: (datos.scopes || []).map(String) as string[],
+    granular: (datos.granular_scopes || []) as { scope: string; target_ids?: string[] }[],
+  };
+}
+
+/**
+ * Portfolio del cliente y cuentas de Instagram que ha compartido con la app.
+ * La vía documentada es /me/assigned_instagram_accounts, pero devuelve [] si a
+ * la configuración le falta business_management; entonces se prueba con los
+ * activos del propio token, las cuentas del portfolio y las de sus páginas.
+ */
 export async function cuentasCompartidasInstagram(token: string) {
   const yo = await igFetch(g('me?fields=id,client_business_id'), { token });
-  const d = await igFetch(g('me/assigned_instagram_accounts?fields=id,username'), { token });
-  const cuentas: { id: string; username?: string }[] = (d?.data || []).map((a: any) => ({ id: String(a.id), username: a.username }));
-  return { clientBusinessId: yo?.client_business_id ? String(yo.client_business_id) : null, cuentas };
+  const clientBusinessId = yo?.client_business_id ? String(yo.client_business_id) : null;
+  const lista = (d: any): CuentaCompartida[] => (d?.data || []).map((a: any) => ({ id: String(a.id), username: a.username }));
+  const intentar = async (f: () => Promise<CuentaCompartida[]>) => { try { return await f(); } catch { return []; } };
+
+  let cuentas = await intentar(async () => lista(await igFetch(g('me/assigned_instagram_accounts?fields=id,username'), { token })));
+  let permisos: string[] = [];
+  if (!cuentas.length) {
+    const p = await permisosDelToken(token).catch(() => null);
+    permisos = p?.scopes || [];
+    const ids = new Set<string>();
+    for (const s of p?.granular || []) if (s.scope.startsWith('instagram_')) for (const id of s.target_ids || []) ids.add(String(id));
+    cuentas = [...ids].map((id) => ({ id }));
+  }
+  if (!cuentas.length && clientBusinessId) {
+    cuentas = await intentar(async () => lista(await igFetch(g(`${clientBusinessId}/owned_instagram_accounts?fields=id,username`), { token })));
+  }
+  if (!cuentas.length) {
+    cuentas = await intentar(async () => {
+      const d = await igFetch(g('me/accounts?fields=instagram_business_account{id,username}'), { token });
+      return (d?.data || []).filter((p: any) => p.instagram_business_account?.id)
+        .map((p: any) => ({ id: String(p.instagram_business_account.id), username: p.instagram_business_account.username }));
+    });
+  }
+  return { clientBusinessId, cuentas, permisos };
 }
 
 export async function perfilInstagram(token: string, igUserId: string) {

@@ -173,3 +173,19 @@ test('instagram: el archivo público solo se sirve mientras se publica', { skip 
   assert.equal((await call(ig.estadoPublicacion, { params: { token }, org: otraOrg })).status, 404);
   await espera(1);
 });
+
+test('instagram: si Meta no lista las cuentas, se sacan de los permisos del token', { skip }, async () => {
+  const realFetch = global.fetch;
+  (global as any).fetch = async (u: string) => {
+    if (u.includes('me?fields=id,client_business_id')) return new Response(JSON.stringify({ id: 'su1', client_business_id: 'bm1' }), { status: 200 });
+    if (u.includes('assigned_instagram_accounts')) return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    if (u.includes('debug_token')) return new Response(JSON.stringify({ data: { scopes: ['instagram_basic', 'instagram_manage_messages'], granular_scopes: [
+      { scope: 'instagram_basic', target_ids: ['1786000'] }, { scope: 'instagram_manage_messages', target_ids: ['1786000'] }] } }), { status: 200 });
+    return new Response(JSON.stringify({ error: { message: 'no', code: 100 } }), { status: 400 });
+  };
+  try {
+    const r = await utils.cuentasCompartidasInstagram('suat');
+    assert.deepEqual(r.cuentas, [{ id: '1786000' }]);
+    assert.equal(r.clientBusinessId, 'bm1');
+  } finally { (global as any).fetch = realFetch; }
+});

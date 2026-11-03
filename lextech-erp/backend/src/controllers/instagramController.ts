@@ -111,9 +111,12 @@ export async function instagramCallback(req: Request, res: Response) {
   if (!code) return back('error', 'Instagram no ha devuelto el código de autorización.');
   try {
     const t = await canjearCodigoInstagram(code);
-    const { clientBusinessId, cuentas } = await cuentasCompartidasInstagram(t.accessToken);
+    const { clientBusinessId, cuentas, permisos } = await cuentasCompartidasInstagram(t.accessToken);
     if (!cuentas.length) {
-      throw new InstagramError('Meta no ha compartido ninguna cuenta de Instagram con Vantia. Vuelve a conectar y, al entrar, elige la cuenta profesional del despacho.');
+      console.warn('[instagram] sin cuentas compartidas; portfolio', clientBusinessId, 'permisos', permisos.join(','));
+      const falta = permisos.length && !permisos.includes('business_management') ? ' Falta el permiso business_management en la configuración de Meta.' : '';
+      throw new InstagramError(`Meta no ha compartido ninguna cuenta de Instagram con Vantia.${falta}`
+        + (permisos.length ? ` Permisos concedidos: ${permisos.join(', ')}.` : ' Vuelve a conectar y, al entrar, elige la cuenta profesional del despacho.'));
     }
     // Si el portfolio comparte varias, la primera que no esté ya en otro despacho.
     const { rows: ocupadas } = await pool.query(
