@@ -18,6 +18,8 @@ import {
 
 const STATE_TTL_MIN = 15;
 const VENTANA_MS = 24 * 3600 * 1000;
+// Pasadas 24 h, una persona puede contestar hasta 7 días con la etiqueta HUMAN_AGENT.
+const VENTANA_AGENTE_MS = 7 * 24 * 3600 * 1000;
 
 const ok = (res: Response, data: any) => res.json({ success: true, data });
 function err(res: Response, e: any, fallback = 'Error con Instagram') {
@@ -312,7 +314,7 @@ export async function listarConversaciones(req: Request, res: Response) {
     return ok(res, rows.map((r) => ({
       igsid: r.igsid, username: r.username, nombre: r.name, foto: r.profile_pic, noLeidos: r.no_leidos,
       ultimoMensaje: r.last_message_text, ultimoMensajeAt: r.last_message_at,
-      ventanaAbierta: Boolean(r.last_inbound_at && Date.now() - new Date(r.last_inbound_at).getTime() < VENTANA_MS),
+      ventanaAbierta: Boolean(r.last_inbound_at && Date.now() - new Date(r.last_inbound_at).getTime() < VENTANA_AGENTE_MS),
       clienteId: r.client_id, cliente: r.client_id ? (r.commercial_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()) : null,
     })));
   } catch (e) { return err(res, e); }
@@ -331,10 +333,12 @@ export async function verConversacion(req: Request, res: Response) {
     );
     await pool.query(`UPDATE instagram_contactos SET no_leidos=0 WHERE organizacion_id=$1 AND igsid=$2`, [org, igsid]);
     const ultimo = c[0].last_inbound_at ? new Date(c[0].last_inbound_at).getTime() : 0;
+    const agenteHumano = Boolean(ultimo && Date.now() - ultimo >= VENTANA_MS);
     return ok(res, {
       mensajes: rows,
-      ventanaAbierta: Boolean(ultimo && Date.now() - ultimo < VENTANA_MS),
-      ventanaCierra: ultimo ? new Date(ultimo + VENTANA_MS).toISOString() : null,
+      ventanaAbierta: Boolean(ultimo && Date.now() - ultimo < VENTANA_AGENTE_MS),
+      ventanaCierra: ultimo ? new Date(ultimo + (agenteHumano ? VENTANA_AGENTE_MS : VENTANA_MS)).toISOString() : null,
+      agenteHumano,
     });
   } catch (e) { return err(res, e); }
 }
@@ -347,11 +351,16 @@ export async function enviarMensaje(req: Request, res: Response) {
     const texto = String(req.body?.texto || '').trim();
     if (!texto) return res.status(400).json({ success: false, error: 'Escribe el mensaje.' });
     if (Buffer.byteLength(texto, 'utf8') > 1000) return res.status(400).json({ success: false, error: 'El mensaje es demasiado largo para Instagram (máx. ~1.000 caracteres).' });
-    const { rows: c } = await pool.query(`SELECT 1 FROM instagram_contactos WHERE organizacion_id=$1 AND igsid=$2`, [org, igsid]);
+    const { rows: c } = await pool.query(`SELECT last_inbound_at FROM instagram_contactos WHERE organizacion_id=$1 AND igsid=$2`, [org, igsid]);
     if (!c.length) return res.status(404).json({ success: false, error: 'Conversación no encontrada.' });
+    const desde = c[0].last_inbound_at ? Date.now() - new Date(c[0].last_inbound_at).getTime() : Infinity;
+    if (desde >= VENTANA_AGENTE_MS) {
+      return res.status(400).json({ success: false, error: 'Han pasado más de 7 días desde su último mensaje: Instagram no deja contestar hasta que vuelva a escribir.' });
+    }
     const cuenta = await cuentaInstagram(org);
     const autor = await resolveUserName(userId).catch(() => null);
-    const r = await enviarMensajeInstagram(cuenta, { igsid }, texto);
+    // Solo lo envía una persona desde la bandeja: es el uso permitido de HUMAN_AGENT.
+    const r = await enviarMensajeInstagram(cuenta, { igsid }, texto, { agenteHumano: desde >= VENTANA_MS });
     const { rows } = await pool.query(
       `INSERT INTO instagram_mensajes (organizacion_id, igsid, mid, direccion, texto, enviado_por)
        VALUES ($1,$2,$3,'saliente',$4,$5)

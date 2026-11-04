@@ -278,7 +278,7 @@ function Mensajes({ api }: { api: (p: string, i?: RequestInit) => Promise<any> }
   const [cargando, setCargando] = useState(true);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState<string>("");
-  const [hilo, setHilo] = useState<{ mensajes: Mensaje[]; ventanaAbierta: boolean; ventanaCierra: string | null } | null>(null);
+  const [hilo, setHilo] = useState<{ mensajes: Mensaje[]; ventanaAbierta: boolean; ventanaCierra: string | null; agenteHumano?: boolean } | null>(null);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -393,7 +393,12 @@ function Mensajes({ api }: { api: (p: string, i?: RequestInit) => Promise<any> }
             <div className="border-t border-slate-200 bg-white py-3 pl-4 pr-16 sm:pr-20">
               {hilo && !hilo.ventanaAbierta && (
                 <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                  <Lock size={12} className="mt-0.5 shrink-0" /> Han pasado más de 24 horas desde su último mensaje: Instagram no deja contestar hasta que vuelva a escribir.
+                  <Lock size={12} className="mt-0.5 shrink-0" /> Han pasado más de 7 días desde su último mensaje: Instagram no deja contestar hasta que vuelva a escribir.
+                </p>
+              )}
+              {hilo?.ventanaAbierta && hilo.agenteHumano && (
+                <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                  <Clock size={12} className="mt-0.5 shrink-0" /> Han pasado más de 24 horas: la respuesta se envía como agente humano. Úsala solo para contestar a mano a lo que ha preguntado, nunca para promociones ni avisos automáticos.
                 </p>
               )}
               {hilo?.ventanaAbierta && hilo.ventanaCierra && (

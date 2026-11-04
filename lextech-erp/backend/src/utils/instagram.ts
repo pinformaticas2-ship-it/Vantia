@@ -270,9 +270,11 @@ export async function perfilRemitente(token: string, igsid: string) {
   return igFetch(g(`${igsid}?fields=name,username,profile_pic`), { token });
 }
 
-export async function enviarMensajeInstagram(c: CuentaInstagram, destino: { igsid?: string; commentId?: string }, texto: string) {
+export async function enviarMensajeInstagram(c: CuentaInstagram, destino: { igsid?: string; commentId?: string }, texto: string,
+  o: { agenteHumano?: boolean } = {}) {
   const recipient = destino.commentId ? { comment_id: destino.commentId } : { id: destino.igsid };
-  return igFetch(g(`${c.pageId || c.igUserId}/messages`), { token: c.token, body: { recipient, message: { text: texto } } });
+  const etiqueta = o.agenteHumano ? { messaging_type: 'MESSAGE_TAG', tag: 'HUMAN_AGENT' } : {};
+  return igFetch(g(`${c.pageId || c.igUserId}/messages`), { token: c.token, body: { recipient, message: { text: texto }, ...etiqueta } });
 }
 
 // ── Publicaciones ──────────────────────────────────────────────────────────

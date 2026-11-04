@@ -123,9 +123,26 @@ test('instagram: responder desde Vantia', { skip }, async () => {
 });
 
 test('instagram: ventana de 24 h cerrada y errores de Meta en castellano', { skip }, async () => {
-  await pool.query(`UPDATE instagram_contactos SET last_inbound_at = NOW() - INTERVAL '30 hours' WHERE organizacion_id=$1`, [org]);
-  assert.equal((await call(ig.verConversacion, { params: { igsid: 'cliente1' } })).body.data.ventanaAbierta, false);
   const realFetch = global.fetch;
+  // Entre 24 h y 7 días: se contesta como agente humano.
+  await pool.query(`UPDATE instagram_contactos SET last_inbound_at = NOW() - INTERVAL '30 hours' WHERE organizacion_id=$1`, [org]);
+  const h = (await call(ig.verConversacion, { params: { igsid: 'cliente1' } })).body.data;
+  assert.equal(h.ventanaAbierta, true);
+  assert.equal(h.agenteHumano, true);
+  const cuerpos: any[] = [];
+  (global as any).fetch = async (_u: string, init: any) => { cuerpos.push(JSON.parse(init.body)); return new Response(JSON.stringify({ message_id: 'm-agente' }), { status: 200 }); };
+  try {
+    assert.equal((await call(ig.enviarMensaje, { params: { igsid: 'cliente1' }, body: { texto: 'Ya tengo la respuesta del juzgado' } })).status, 200);
+    assert.equal(cuerpos[0].messaging_type, 'MESSAGE_TAG');
+    assert.equal(cuerpos[0].tag, 'HUMAN_AGENT');
+  } finally { (global as any).fetch = realFetch; }
+  // Más de 7 días: bloqueado sin llamar a Meta.
+  await pool.query(`UPDATE instagram_contactos SET last_inbound_at = NOW() - INTERVAL '8 days' WHERE organizacion_id=$1`, [org]);
+  assert.equal((await call(ig.verConversacion, { params: { igsid: 'cliente1' } })).body.data.ventanaAbierta, false);
+  const bloqueado = await call(ig.enviarMensaje, { params: { igsid: 'cliente1' }, body: { texto: 'Hola' } });
+  assert.equal(bloqueado.status, 400);
+  assert.match(bloqueado.body.error, /7 días/);
+  await pool.query(`UPDATE instagram_contactos SET last_inbound_at = NOW() - INTERVAL '30 hours' WHERE organizacion_id=$1`, [org]);
   (global as any).fetch = async () => new Response(JSON.stringify({ error: { message: 'This message is sent outside of allowed window.', code: 10, error_subcode: 2534022 } }), { status: 400 });
   try {
     const r = await call(ig.enviarMensaje, { params: { igsid: 'cliente1' }, body: { texto: 'Hola' } });
