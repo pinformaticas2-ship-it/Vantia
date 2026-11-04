@@ -215,7 +215,11 @@ export async function paginaDeInstagram(token: string, igUserId: string): Promis
 export async function suscribirWebhooksInstagram(c: { igUserId: string; token: string; pageId?: string | null }) {
   await igFetch(g(`${c.igUserId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,comments' } });
   // Por Facebook Login, Meta solo manda los avisos si la app está instalada en la página.
-  if (c.pageId) await igFetch(g(`${c.pageId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,feed' } });
+  // Pide pages_manage_metadata, que no siempre se puede añadir al ajuste: si falla, se sigue con la de la cuenta.
+  if (c.pageId) {
+    await igFetch(g(`${c.pageId}/subscribed_apps`), { token: c.token, form: { subscribed_fields: 'messages,feed' } })
+      .catch((e) => console.warn('[instagram] no se pudo suscribir la página', c.pageId, e?.message || e));
+  }
 }
 
 export async function guardarCuentaInstagram(org: string, userId: string,
