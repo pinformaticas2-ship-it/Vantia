@@ -166,7 +166,8 @@ async function permisosDelToken(token: string) {
  * activos del propio token, las cuentas del portfolio y las de sus páginas.
  */
 export async function cuentasCompartidasInstagram(token: string) {
-  const yo = await igFetch(g('me?fields=id,client_business_id'), { token });
+  // client_business_id solo existe en el usuario del sistema; con un token de usuario normal Meta da error.
+  const yo = await igFetch(g('me?fields=id,client_business_id'), { token }).catch(() => igFetch(g('me?fields=id'), { token }));
   const clientBusinessId = yo?.client_business_id ? String(yo.client_business_id) : null;
   const lista = (d: any): CuentaCompartida[] => (d?.data || []).map((a: any) => ({ id: String(a.id), username: a.username }));
   const intentar = async (f: () => Promise<CuentaCompartida[]>) => { try { return await f(); } catch { return []; } };
