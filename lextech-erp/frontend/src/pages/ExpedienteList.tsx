@@ -1838,7 +1838,7 @@ function CsvImportConfigureView({
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Avalentia</div>
+                <div className="col-span-5">Campo en Vantia</div>
                 <div className="col-span-4">Columna en tu CSV</div>
                 <div className="col-span-3 text-right">Ejemplo de tus datos</div>
               </div>
@@ -1864,7 +1864,7 @@ function CsvImportConfigureView({
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Avalentia</div>
+                <div className="col-span-5">Campo en Vantia</div>
                 <div className="col-span-4">Columna en tu CSV</div>
                 <div className="col-span-3 text-right">Ejemplo de tus datos</div>
               </div>

@@ -129,9 +129,11 @@ function getConfigStatus(config: WhatsAppConfig) {
   };
 }
 
-async function resolveClientByPhone(phone?: string | null) {
+// Siempre dentro de un despacho: sin él no se busca (antes buscaba en todos y
+// podía devolver el cliente de otra organización con el mismo teléfono).
+async function resolveClientByPhone(phone: string | null | undefined, organizacionId: string | null | undefined) {
   const normalized = normalizePhone(phone);
-  if (!normalized) return null;
+  if (!normalized || !organizacionId) return null;
   const local = normalized.replace(/^34/, '');
   const candidates = Array.from(new Set([normalized, local]));
 
@@ -147,11 +149,12 @@ async function resolveClientByPhone(phone?: string | null) {
             type,
             organizacion_id
      FROM entities
-     WHERE regexp_replace(COALESCE(phone_mobile, ''), '\D', '', 'g') = ANY($1)
-        OR regexp_replace(COALESCE(phone_1, ''), '\D', '', 'g') = ANY($1)
+     WHERE organizacion_id = $2
+       AND (regexp_replace(COALESCE(phone_mobile, ''), '\D', '', 'g') = ANY($1)
+        OR regexp_replace(COALESCE(phone_1, ''), '\D', '', 'g') = ANY($1))
      ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
      LIMIT 1`,
-    [candidates],
+    [candidates, organizacionId],
   );
 
   return result.rows[0] || null;
@@ -367,19 +370,19 @@ export async function getConversationByPhone(req: any, res: Response) {
   if (!phone) return res.status(400).json({ success: false, error: 'Teléfono inválido' });
 
   try {
-    // organizacion_id puede ser NULL (número todavía no vinculado a ningún
-    // cliente) -- esos mensajes se dejan ver a cualquier organización hasta
-    // que alguien los vincula, en vez de perderlos en un cajón que nadie ve.
+    // Solo los mensajes de este despacho. Antes también los que no tenían
+    // organización, que veía cualquier despacho (05/11/2026); ahora el
+    // webhook los asigna siempre por el número de WhatsApp que los recibe.
     const messagesRes = await pool.query(
       `SELECT *
        FROM whatsapp_messages
        WHERE (from_phone = $1 OR to_phone = $1) AND channel = 'whatsapp'
-         AND (organizacion_id = $2 OR organizacion_id IS NULL)
+         AND organizacion_id = $2
        ORDER BY created_at ASC`,
       [phone, req.organizacionId],
     );
 
-    const client = await resolveClientByPhone(phone);
+    const client = await resolveClientByPhone(phone, req.organizacionId);
     res.json({ success: true, data: { client, messages: messagesRes.rows } });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || 'No se pudo cargar la conversación' });
@@ -551,7 +554,8 @@ export async function receiveWebhook(req: Request, res: Response) {
             || message?.interactive?.button_reply?.title
             || message?.interactive?.list_reply?.title
             || null;
-          const client = await resolveClientByPhone(fromPhone);
+          // El cliente se busca solo en el despacho dueño del número que recibe el mensaje.
+          const client = await resolveClientByPhone(fromPhone, webhookOrgId);
           const contact = contacts.find((item: any) => normalizePhone(item?.wa_id || '') === fromPhone);
           const contactName = contact?.profile?.name || clientLabel(client);
 
@@ -577,7 +581,7 @@ export async function receiveWebhook(req: Request, res: Response) {
               contactName,
               body,
               JSON.stringify({ message, contact, metadata: value?.metadata || null }),
-              webhookOrgId || client?.organizacion_id || null,
+              webhookOrgId || null,
             ],
           );
 
@@ -594,7 +598,7 @@ export async function receiveWebhook(req: Request, res: Response) {
             tag: `whatsapp-${fromPhone}`,
             tipo: 'whatsapp' as const,
           };
-          const messageOrgId = webhookOrgId || client?.organizacion_id;
+          const messageOrgId = webhookOrgId;
           if (messageOrgId) void sendPushToOrgModule(messageOrgId, 'whatsapp', pushPayload);
         }
       }
