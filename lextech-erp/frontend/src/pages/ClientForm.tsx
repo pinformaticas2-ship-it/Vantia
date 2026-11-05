@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useCallback, useEffect } from "react";
+import { IDIOMAS, nombreIdioma } from "../lib/idiomas";
 import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
@@ -258,6 +259,7 @@ const EMPTY_FORM = {
   date_baja: "",
   lopd: "Pendiente",
   commercial_communications: "No",
+  idioma: "es",
   center: "",
   photo_url: "",
   observaciones: "",
@@ -387,6 +389,7 @@ export default function ClientForm() {
           date_baja:               toInputDate(d.date_baja),
           lopd:                    d.lopd                     || "Pendiente",
           commercial_communications: d.commercial_communications || "No",
+          idioma:                  d.idioma                   || "es",
           center:                  d.center                   || "",
           photo_url:               d.photo_url                || "",
           observaciones:           d.observaciones            || "",
@@ -455,6 +458,7 @@ export default function ClientForm() {
     date_baja: normalizeDateInput(form.date_baja),
     lopd: cleanOptionalValue(form.lopd) || "Pendiente",
     commercial_communications: cleanOptionalValue(form.commercial_communications) || "No",
+    idioma: form.idioma || "es",
     center: cleanOptionalValue(form.center),
     photo_url: cleanOptionalValue(form.photo_url),
   }), [form]);
@@ -1352,6 +1356,11 @@ export default function ClientForm() {
                   <option>No</option><option>Sí</option>
                 </S>
               </F>
+              <F label="Idioma de comunicación">
+                <S name="idioma" value={form.idioma} onChange={handleChange}>
+                  {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                </S>
+              </F>
             </Section>
 
             {filledFields.size > 0 && (
@@ -1668,6 +1677,13 @@ export default function ClientForm() {
                   <select name="commercial_communications" value={form.commercial_communications} onChange={handleChange} className={inputCls("commercial_communications")}>
                     <option>No</option><option>Sí</option>
                   </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Idioma de comunicación</label>
+                  <select name="idioma" value={form.idioma} onChange={handleChange} className={inputCls("idioma")}>
+                    {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                  </select>
+                  {form.idioma !== "es" && <span className="text-xs text-slate-500">Los correos que le escribáis se podrán mandar en español y en su idioma.</span>}
                 </div>
               </div>
             </div>

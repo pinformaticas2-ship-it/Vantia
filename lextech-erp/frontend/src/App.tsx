@@ -1,3 +1,4 @@
+import Calculadora from "./pages/Calculadora";
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
@@ -103,6 +104,7 @@ export default function App() {
             <Route path="documental" element={<RequireModuleAccess modulo="documental"><Documental /></RequireModuleAccess>} />
             {/* Una sola ruta con :id opcional: así la página no se monta de nuevo al abrir un documento. */}
             <Route path="documentos/:id?" element={<RequireModuleAccess modulo="documental"><Documentos /></RequireModuleAccess>} />
+            <Route path="calculadora" element={<Calculadora />} />
             <Route path="facturacion" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="facturacion/facturas/nueva" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="facturacion/facturas/:facturaId/editar" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />

@@ -38,6 +38,8 @@ import { Modal } from "../components/Modal";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { confirmar } from "../lib/avisos";
+import { ReciboAcciones, ReciboBadge, type ReciboEstado } from "../components/ReciboProcurador";
+import { useOrganizacion } from "../lib/useOrganizacion";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "analitica" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
@@ -128,7 +130,17 @@ type Gasto = {
   area: BillingArea;
   responsable: string;
   deducible: boolean;
+  formaPago: PaymentMethod | "";
+  procuradorId: string;
+  procuradorNombre: string;
+  procuradorEmail: string;
+  expedienteId: string;
+  expedienteRef: string;
+  concepto: string;
+  reciboEstado: ReciboEstado;
 };
+
+type ProcuradorOption = { id: string; label: string; email: string };
 
 type Presupuesto = {
   id: string;
@@ -222,6 +234,17 @@ type RawGasto = {
   area: BillingArea;
   responsable?: string | null;
   deducible?: boolean | null;
+  forma_pago?: string | null;
+  procurador_id?: string | null;
+  procurador_nombre?: string | null;
+  procurador_email?: string | null;
+  expediente_id?: string | null;
+  anio?: number | null;
+  num_exp?: number | null;
+  ref_expediente?: string | null;
+  ref_propia?: string | null;
+  concepto?: string | null;
+  recibo_estado?: string | null;
 };
 
 type RawPresupuesto = {
@@ -354,6 +377,14 @@ const mapGastoFromApi = (row: RawGasto): Gasto => ({
   area: row.area,
   responsable: row.responsable || "Despacho",
   deducible: Boolean(row.deducible),
+  formaPago: (row.forma_pago || "") as Gasto["formaPago"],
+  procuradorId: row.procurador_id || "",
+  procuradorNombre: row.procurador_nombre || "",
+  procuradorEmail: row.procurador_email || "",
+  expedienteId: row.expediente_id || "",
+  expedienteRef: buildExpedienteRef(row),
+  concepto: row.concepto || "",
+  reciboEstado: (row.recibo_estado || null) as ReciboEstado,
 });
 
 const mapPresupuestoFromApi = (row: RawPresupuesto): Presupuesto => ({
@@ -408,6 +439,10 @@ const buildPayloadForApi = (type: BillingFormType, payload: any) => {
       area: payload.area,
       responsable: payload.responsable,
       deducible: payload.deducible,
+      formaPago: payload.formaPago || null,
+      procuradorId: payload.procuradorId || null,
+      expedienteId: payload.expedienteId || null,
+      concepto: payload.concepto || null,
     };
   }
 
@@ -773,6 +808,7 @@ function StructuredBillingEditorModal({
   initialValues,
   clients,
   expedientes,
+  procuradores = [],
   onClose,
   onSave,
 }: {
@@ -780,6 +816,7 @@ function StructuredBillingEditorModal({
   initialValues?: any;
   clients: BillingClientOption[];
   expedientes: BillingExpedienteOption[];
+  procuradores?: ProcuradorOption[];
   onClose: () => void;
   onSave: (payload: any) => void;
 }) {
@@ -797,7 +834,9 @@ function StructuredBillingEditorModal({
     estado: initialValues?.estado ?? "pendiente",
     area: initialValues?.area ?? "procesal",
     responsable: initialValues?.responsable ?? "Despacho",
-    formaPago: initialValues?.formaPago ?? "transferencia",
+    formaPago: initialValues?.formaPago || (type === "gasto" ? "" : "transferencia"),
+    procuradorId: initialValues?.procuradorId ?? "",
+    concepto: initialValues?.concepto ?? "",
     serie: initialValues?.serie ?? "HON",
     tipoCliente: initialValues?.tipoCliente ?? "empresa",
     cat: initialValues?.cat ?? "Suministros",
@@ -817,6 +856,22 @@ function StructuredBillingEditorModal({
   );
   const selectedClient = useMemo(() => clients.find((item) => item.id === form.clientId) || null, [clients, form.clientId]);
   const selectedExpediente = useMemo(() => expedientes.find((item) => item.id === form.expedienteId) || null, [expedientes, form.expedienteId]);
+
+  // Pago a un procurador del Directorio: rellena proveedor y categoría.
+  const setProcurador = (procuradorId: string) => {
+    const nuevo = procuradores.find((p) => p.id === procuradorId);
+    setForm((current) => {
+      const anterior = procuradores.find((p) => p.id === current.procuradorId);
+      const proveedorEsDelAnterior = !current.proveedor.trim() || current.proveedor === anterior?.label;
+      return {
+        ...current,
+        procuradorId,
+        proveedor: nuevo && proveedorEsDelAnterior ? nuevo.label : current.proveedor,
+        cat: nuevo && (current.cat === "Suministros" || !current.cat.trim()) ? "Procurador" : current.cat,
+      };
+    });
+  };
+  const necesitaRecibo = isGasto && Boolean(form.procuradorId) && form.formaPago === "efectivo";
 
   const setClient = (clientId: string) => {
     const client = clients.find((item) => item.id === clientId) || null;
@@ -902,6 +957,41 @@ function StructuredBillingEditorModal({
               )}
             </div>
 
+            {isGasto && (
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pago a procurador (opcional)</p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Procurador</span>
+                    <select value={form.procuradorId} onChange={(e) => setProcurador(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                      <option value="">No es un pago a procurador</option>
+                      {procuradores.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    </select>
+                    {!procuradores.length && <span className="block text-xs text-slate-400">Da de alta a tus procuradores en Directorio → Procuradores.</span>}
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Expediente</span>
+                    <select value={form.expedienteId} onChange={(e) => setField("expedienteId", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                      <option value="">Sin expediente</option>
+                      {expedientes.map((expediente) => (
+                        <option key={expediente.id} value={expediente.id}>{expediente.label} · {expediente.description || expediente.clientLabel}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="block space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Concepto</span>
+                  <input value={form.concepto} onChange={(e) => setField("concepto", e.target.value)} placeholder="Ej.: provisión de fondos, derechos, suplidos…" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                </label>
+                {necesitaRecibo && (
+                  <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                    Pago en <strong>efectivo</strong>: al guardarlo quedará <strong>pendiente el recibo</strong> del procurador.
+                    Desde la lista de gastos podrás pedírselo por correo o imprimir uno para que lo firme ahora.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!isGasto && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
@@ -976,6 +1066,13 @@ function StructuredBillingEditorModal({
                 <label className="space-y-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
                   <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
+                  <select value={form.formaPago} onChange={(e) => setField("formaPago", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                    <option value="">Sin indicar</option>
+                    {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                  </select>
                 </label>
                 <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
                   <input type="checkbox" checked={form.deducible} onChange={(e) => setField("deducible", e.target.checked)} />
@@ -1561,6 +1658,8 @@ function FacturacionContent() {
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [clientes, setClientes] = useState<BillingClientOption[]>([]);
   const [expedientes, setExpedientes] = useState<BillingExpedienteOption[]>([]);
+  const [procuradores, setProcuradores] = useState<ProcuradorOption[]>([]);
+  const { organizacion } = useOrganizacion();
   const [search, setSearch] = useState("");
   const [filterResponsable, setFilterResponsable] = useState("todos");
   const [filterArea, setFilterArea] = useState<"todas" | BillingArea>("todas");
@@ -1632,6 +1731,15 @@ function FacturacionContent() {
       const data = response?.data || {};
       setFacturas(Array.isArray(data.facturas) ? data.facturas.map(mapFacturaFromApi) : []);
       setGastos(Array.isArray(data.gastos) ? data.gastos.map(mapGastoFromApi) : []);
+      setProcuradores(
+        Array.isArray(data.procuradores)
+          ? data.procuradores.map((p: any) => ({
+              id: p.id,
+              label: [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || p.despacho || "Procurador",
+              email: p.email || "",
+            }))
+          : [],
+      );
       setPresupuestos(Array.isArray(data.presupuestos) ? data.presupuestos.map(mapPresupuestoFromApi) : []);
       setClientes(
         Array.isArray(data.clientes)
@@ -1962,7 +2070,13 @@ function FacturacionContent() {
         setFacturas((current) => (isEditing ? current.map((item) => (item.id === next.id ? next : item)) : [next, ...current]));
         return next;
       } else if (type === "gasto") {
-        const next = mapGastoFromApi(saved);
+        const proc = procuradores.find((p) => p.id === saved?.procurador_id);
+        const next = {
+          ...mapGastoFromApi(saved),
+          procuradorNombre: proc?.label || "",
+          procuradorEmail: proc?.email || "",
+          expedienteRef: resolveExpedienteRef(saved?.expediente_id || ""),
+        };
         setGastos((current) => (isEditing ? current.map((item) => (item.id === next.id ? next : item)) : [next, ...current]));
         return next;
       } else {
@@ -3164,6 +3278,16 @@ function FacturacionContent() {
                 </TableShell>
               )}
 
+              {tab === "gastos" && gastos.some((g) => g.reciboEstado && g.reciboEstado !== "recibido") && (
+                <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                  <span>
+                    Hay <strong>{gastos.filter((g) => g.reciboEstado && g.reciboEstado !== "recibido").length}</strong> pago(s) en efectivo a procuradores sin recibo.
+                    Pídelo con el sobre o imprime uno para que lo firme, y márcalo con el ✓ cuando lo tengáis.
+                  </span>
+                </div>
+              )}
+
               {tab === "gastos" && (
                 <TableShell title="Gastos del despacho" count={`${filteredGastos.length} gastos`} headers={["Número", "Proveedor", "Categoría", "Área", "Responsable", "Fecha", "Total", "Estado", ""]}
                   mobileCards={filteredGastos.map((row) => (
@@ -3171,12 +3295,13 @@ function FacturacionContent() {
                       key={row.id}
                       num={row.num}
                       title={row.proveedor}
-                      subtitle={row.deducible ? "Deducible" : "No deducible"}
+                      subtitle={row.reciboEstado ? ({ pendiente: "Recibo pendiente", solicitado: "Recibo solicitado", recibido: "Recibo recibido" } as const)[row.reciboEstado] : row.deducible ? "Deducible" : "No deducible"}
                       meta={`${row.cat} · ${AREA_LABELS[row.area]} · ${fmtDate(row.fecha)}`}
                       amount={fmtEur(row.total)}
                       estado={row.estado}
                       actions={
                         <>
+                          <ReciboAcciones pago={row} despacho={organizacion?.nombre || "el despacho"} onActualizado={(fila) => setGastos((current) => current.map((g) => (g.id === fila.id ? { ...g, reciboEstado: (fila.recibo_estado || null) as ReciboEstado } : g)))} />
                           <ActionIconButton title="Editar gasto" onClick={() => openEditor("gasto", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
@@ -3193,7 +3318,17 @@ function FacturacionContent() {
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
                       <td className="px-5 py-3 text-sm text-slate-600">
                         <div className="font-medium text-slate-700">{row.proveedor}</div>
-                        <div className="text-xs text-slate-400">{row.deducible ? "Deducible" : "No deducible"}</div>
+                        <div className="text-xs text-slate-400">
+                          {row.procuradorId ? "Pago a procurador" : row.deducible ? "Deducible" : "No deducible"}
+                          {row.formaPago ? ` · ${PAYMENT_LABELS[row.formaPago as PaymentMethod] || row.formaPago}` : ""}
+                          {row.expedienteRef ? ` · ${row.expedienteRef}` : ""}
+                        </div>
+                        {row.reciboEstado && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <ReciboBadge estado={row.reciboEstado} />
+                            <ReciboAcciones compacto pago={row} despacho={organizacion?.nombre || "el despacho"} onActualizado={(fila) => setGastos((current) => current.map((g) => (g.id === fila.id ? { ...g, reciboEstado: (fila.recibo_estado || null) as ReciboEstado } : g)))} />
+                          </div>
+                        )}
                       </td>
                       <td className="px-5 py-3"><span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{row.cat}</span></td>
                       <td className="px-5 py-3 text-sm text-slate-500">{AREA_LABELS[row.area]}</td>
@@ -3285,6 +3420,7 @@ function FacturacionContent() {
           initialValues={editorRecord ?? undefined}
           clients={clientes}
           expedientes={expedientes}
+          procuradores={procuradores}
           onClose={closeEditor}
           onSave={saveRecord}
         />

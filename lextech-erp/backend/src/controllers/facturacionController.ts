@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
 import { syncQuipuForUserInternal, pushFacturaToQuipuInternal, getQuipuOrganizacion } from './quipuController';
 import { resolveUserOrgMemberships } from './organizacionesController';
+import { enviarCorreoDelDespacho, escaparHtml, SinCuentaCorreo } from '../utils/correoDespacho';
 
 const QUIPU_STALE_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -90,7 +91,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
   const organizacionId = req.organizacionId;
 
   try {
-    const [facturas, gastos, presupuestos, clientes, expedientes, misOrganizaciones] = await Promise.all([
+    const [facturas, gastos, presupuestos, clientes, expedientes, misOrganizaciones, procuradores] = await Promise.all([
       pool.query(`
         SELECT ff.*,
                e.anio,
@@ -106,9 +107,14 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         ORDER BY ff.fecha DESC, ff.created_at DESC
       `, [organizacionId]),
       pool.query(`
-        SELECT fg.*, o.nombre AS organizacion_nombre
+        SELECT fg.*, o.nombre AS organizacion_nombre,
+               NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), '') AS procurador_nombre,
+               p.email AS procurador_email,
+               e.anio, e.num_exp, e.ref_expediente, e.ref_propia, e.descripcion AS expediente_descripcion
         FROM facturacion_gastos fg
         LEFT JOIN organizaciones o ON o.id = fg.organizacion_id
+        LEFT JOIN directorio_profesionales p ON p.id = fg.procurador_id AND p.organizacion_id = fg.organizacion_id
+        LEFT JOIN expedientes e ON e.id = fg.expediente_id AND e.organizacion_id = fg.organizacion_id
         WHERE fg.organizacion_id = $1
         ORDER BY fg.fecha DESC, fg.created_at DESC
       `, [organizacionId]),
@@ -156,6 +162,12 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         ORDER BY ex.updated_at DESC NULLS LAST, ex.created_at DESC NULLS LAST
       `, [organizacionId]),
       resolveUserOrgMemberships(userId),
+      pool.query(`
+        SELECT id, first_name, last_name, email, despacho
+        FROM directorio_profesionales
+        WHERE organizacion_id = $1 AND tipo = 'PROCURADOR'
+        ORDER BY first_name ASC, last_name ASC
+      `, [organizacionId]).catch(() => ({ rows: [] as any[] })),
     ]);
 
     // Quipu pertenece a una organización: sus datos solo se mezclan aquí si es
@@ -224,6 +236,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       data: {
         facturas:          todasFacturas,
         gastos:            gastos.rows,
+        procuradores:      procuradores.rows,
         presupuestos:      presupuestos.rows,
         clientes:          clientes.rows,
         expedientes:       expedientes.rows,
@@ -397,6 +410,35 @@ export const deleteFactura = async (req: any, res: Response) => {
   }
 };
 
+const FORMAS_PAGO = ['transferencia', 'tarjeta', 'domiciliacion', 'bizum', 'efectivo'];
+
+// Datos de "pago a procurador" de un gasto, validados contra el despacho
+// activo (el procurador y el expediente tienen que ser suyos). Si es un pago
+// en efectivo a un procurador, el gasto necesita su recibo.
+async function datosPagoGasto(organizacionId: string, body: any) {
+  const formaPago = FORMAS_PAGO.includes(String(body.formaPago)) ? String(body.formaPago) : null;
+  let procuradorId: string | null = sanitizeText(body.procuradorId);
+  let expedienteId: string | null = sanitizeText(body.expedienteId);
+  if (procuradorId) {
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM directorio_profesionales WHERE id = $1 AND organizacion_id = $2 AND tipo = 'PROCURADOR'`,
+      [procuradorId, organizacionId],
+    ).catch(() => ({ rowCount: 0 }));
+    if (!rowCount) procuradorId = null;
+  }
+  if (expedienteId) {
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, organizacionId],
+    ).catch(() => ({ rowCount: 0 }));
+    if (!rowCount) expedienteId = null;
+  }
+  return {
+    formaPago, procuradorId, expedienteId,
+    concepto: sanitizeText(body.concepto),
+    necesitaRecibo: Boolean(procuradorId && formaPago === 'efectivo'),
+  };
+}
+
 export const createGasto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
@@ -410,10 +452,12 @@ export const createGasto = async (req: any, res: Response) => {
   }
 
   try {
+    const pago = await datosPagoGasto(organizacionId, req.body);
     const result = await pool.query(
       `INSERT INTO facturacion_gastos
-         (user_id, created_by, num, proveedor, fecha, total, categoria, estado, area, responsable, deducible, organizacion_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         (user_id, created_by, num, proveedor, fecha, total, categoria, estado, area, responsable, deducible, organizacion_id,
+          forma_pago, procurador_id, expediente_id, concepto, recibo_estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING *`,
       [
         userId,
@@ -428,6 +472,11 @@ export const createGasto = async (req: any, res: Response) => {
         sanitizeText(responsable) || userName,
         Boolean(deducible),
         organizacionId,
+        pago.formaPago,
+        pago.procuradorId,
+        pago.expedienteId,
+        pago.concepto,
+        pago.necesitaRecibo ? 'pendiente' : null,
       ],
     );
     await logActivityForReq(req, `Gasto creado: ${sanitizeText(num)}`, 'FACTURACION_GASTO', result.rows[0].id, sanitizeText(proveedor) || undefined, 'CREATE');
@@ -446,6 +495,7 @@ export const updateGasto = async (req: any, res: Response) => {
   const { num, proveedor, fecha, total, cat, estado, area, responsable, deducible } = req.body;
 
   try {
+    const pago = await datosPagoGasto(organizacionId, req.body);
     const result = await pool.query(
       `UPDATE facturacion_gastos
        SET num = $3,
@@ -457,10 +507,18 @@ export const updateGasto = async (req: any, res: Response) => {
            area = $9,
            responsable = $10,
            deducible = $11,
+           forma_pago = $12,
+           procurador_id = $13,
+           expediente_id = $14,
+           concepto = $15,
+           -- Si sigue siendo un pago en efectivo a un procurador se conserva
+           -- en qué punto está el recibo; si deja de serlo, ya no hace falta.
+           recibo_estado = CASE WHEN $16::boolean THEN COALESCE(recibo_estado, 'pendiente') ELSE NULL END,
            updated_at = NOW()
        WHERE id = $1 AND organizacion_id = $2
        RETURNING *`,
-      [id, organizacionId, sanitizeText(num), sanitizeText(proveedor), fecha || null, sanitizeAmount(total), sanitizeText(cat), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(deducible)],
+      [id, organizacionId, sanitizeText(num), sanitizeText(proveedor), fecha || null, sanitizeAmount(total), sanitizeText(cat), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(deducible),
+       pago.formaPago, pago.procuradorId, pago.expedienteId, pago.concepto, pago.necesitaRecibo],
     );
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Gasto no encontrado.' });
     await logActivityForReq(req, `Gasto actualizado: ${sanitizeText(num)}`, 'FACTURACION_GASTO', id, sanitizeText(proveedor) || undefined, 'UPDATE');
@@ -482,6 +540,82 @@ export const deleteGasto = async (req: any, res: Response) => {
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Gasto no encontrado.' });
     await logActivityForReq(req, `Gasto eliminado: ${result.rows[0].num}`, 'FACTURACION_GASTO', id, result.rows[0].proveedor, 'DELETE');
     res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: explainBillingError(error) });
+  }
+};
+
+const fmtEur = (n: any) => Number(n || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+const fmtFecha = (d: any) => (d ? new Date(d).toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' }) : '');
+
+// Pide por correo al procurador el recibo de un pago en efectivo.
+export const solicitarReciboGasto = async (req: any, res: Response) => {
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT g.*, p.first_name, p.last_name, p.email AS procurador_email, o.nombre AS despacho,
+              e.anio, e.num_exp, e.ref_expediente, e.descripcion AS expediente_descripcion
+       FROM facturacion_gastos g
+       JOIN directorio_profesionales p ON p.id = g.procurador_id AND p.organizacion_id = g.organizacion_id
+       JOIN organizaciones o ON o.id = g.organizacion_id
+       LEFT JOIN expedientes e ON e.id = g.expediente_id AND e.organizacion_id = g.organizacion_id
+       WHERE g.id = $1 AND g.organizacion_id = $2`,
+      [req.params.id, organizacionId],
+    );
+    const g = rows[0];
+    if (!g) return res.status(404).json({ success: false, error: 'Pago al procurador no encontrado.' });
+    if (!g.recibo_estado) return res.status(400).json({ success: false, error: 'Este gasto no necesita recibo (no es un pago en efectivo a un procurador).' });
+    const email = String(g.procurador_email || '').trim();
+    if (!email) return res.status(400).json({ success: false, error: 'El procurador no tiene correo en el Directorio. Añádeselo o imprime el recibo para que lo firme.' });
+
+    const nombre = [g.first_name, g.last_name].filter(Boolean).join(' ');
+    const expediente = g.expediente_id
+      ? [g.ref_expediente || (g.num_exp && g.anio ? `${g.num_exp}/${g.anio}` : ''), g.expediente_descripcion].filter(Boolean).join(' · ')
+      : '';
+    const html = `<p>Estimado/a ${escaparHtml(nombre)}:</p>
+<p>El ${escaparHtml(fmtFecha(g.fecha))} le abonamos <strong>en efectivo ${escaparHtml(fmtEur(g.total))}</strong>${g.concepto ? ` en concepto de ${escaparHtml(g.concepto)}` : ''}${expediente ? `, correspondiente al expediente ${escaparHtml(expediente)}` : ''}.</p>
+<p>Para nuestra contabilidad, le rogamos que nos remita el <strong>recibo firmado</strong> de dicho pago respondiendo a este correo.</p>
+<p>Muchas gracias. Un saludo,<br>${escaparHtml(g.despacho || '')}</p>`;
+    await enviarCorreoDelDespacho(organizacionId, {
+      to: [email],
+      subject: `Solicitud de recibo · pago en efectivo de ${fmtEur(g.total)}`,
+      html,
+    });
+    const upd = await pool.query(
+      `UPDATE facturacion_gastos SET recibo_estado = CASE WHEN recibo_estado = 'recibido' THEN recibo_estado ELSE 'solicitado' END,
+              recibo_solicitado_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND organizacion_id = $2 RETURNING *`,
+      [g.id, organizacionId],
+    );
+    await logActivityForReq(req, `Recibo solicitado al procurador ${nombre}`, 'FACTURACION_GASTO', g.id, nombre, 'UPDATE');
+    res.json({ success: true, data: upd.rows[0], enviadoA: email });
+  } catch (error: any) {
+    if (error instanceof SinCuentaCorreo) return res.status(400).json({ success: false, error: error.message });
+    console.warn('solicitarReciboGasto:', error?.message || error);
+    res.status(500).json({ success: false, error: 'No se pudo enviar el correo al procurador.' });
+  }
+};
+
+// Marca (o desmarca) que el recibo del procurador ya está en el despacho.
+export const marcarReciboGasto = async (req: any, res: Response) => {
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
+  const recibido = req.body?.recibido !== false;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE facturacion_gastos
+       SET recibo_estado = CASE WHEN $3::boolean THEN 'recibido'
+                                WHEN recibo_solicitado_at IS NOT NULL THEN 'solicitado' ELSE 'pendiente' END,
+           recibo_recibido_at = CASE WHEN $3::boolean THEN NOW() ELSE NULL END,
+           updated_at = NOW()
+       WHERE id = $1 AND organizacion_id = $2 AND recibo_estado IS NOT NULL
+       RETURNING *`,
+      [req.params.id, organizacionId, recibido],
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Pago al procurador no encontrado.' });
+    await logActivityForReq(req, recibido ? 'Recibo del procurador recibido' : 'Recibo del procurador marcado como pendiente', 'FACTURACION_GASTO', rows[0].id, rows[0].proveedor, 'UPDATE');
+    res.json({ success: true, data: rows[0] });
   } catch (error: any) {
     res.status(500).json({ success: false, error: explainBillingError(error) });
   }

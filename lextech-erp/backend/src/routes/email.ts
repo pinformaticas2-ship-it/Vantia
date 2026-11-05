@@ -4,6 +4,7 @@ import { requireModulePermission } from '../middleware/requireModulePermission';
 import { costlyActionLimiter } from '../middleware/rateLimits';
 import { verifyToken } from '@clerk/backend';
 import { addSSEClient } from '../utils/emailSSE';
+import { idiomasDestinatarios, traducirTexto } from '../controllers/idiomaController';
 import {
   getAccounts,
   getOAuthProfiles,
@@ -69,6 +70,10 @@ router.get('/events', async (req: Request, res: Response) => {
 
 router.use(requireAuth);
 router.use(requireModulePermission('correo'));
+
+// ── Correo bilingüe: idioma preferido de los destinatarios y traducción ──
+router.get('/idiomas-destinatarios', idiomasDestinatarios);
+router.post('/traducir', costlyActionLimiter, traducirTexto);
 
 // ── Cuentas ──────────────────────────────────────────────────────────────────
 router.get('/accounts',           getAccounts);

@@ -113,6 +113,7 @@ const MODULES = [
   { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: "Vistas recibidas por correo pendientes de confirmar" },
   { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: "Editor de texto con IA: escritos, cartas y contratos" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
+  { name: "Calculadora",    path: "/dashboard/calculadora",  icon: Calculator,      desc: "Honorarios, tasación de costas y jura de cuentas" },
   { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Vista general de tesorería" },
   { name: "Analítica",      path: "/dashboard/facturacion?tab=analitica",     icon: BarChart3,  desc: "Analítica financiera" },
   { name: "Facturas",       path: "/dashboard/facturacion?tab=facturas",      icon: FileText,   desc: "Facturas emitidas" },
@@ -168,6 +169,7 @@ const NAV_ITEMS: NavItem[] = [
       { name: "Conexión Quipu", href: "/dashboard/facturacion?tab=config",        icon: Settings },
     ],
   },
+  { name: "Calculadora",  href: "/dashboard/calculadora", icon: Calculator },
   { name: "Chat IA",      href: "/dashboard/chat-ia",     icon: Sparkles },
 ];
 
@@ -183,7 +185,7 @@ const NAV_GROUPS = [
   {
     label: "Gestión",
     // Trazabilidad está en Configuración (14/10/2026).
-    items: ["Tesorería", "Documentos", "Documental", "Chat IA"],
+    items: ["Tesorería", "Calculadora", "Documentos", "Documental", "Chat IA"],
   },
 ];
 

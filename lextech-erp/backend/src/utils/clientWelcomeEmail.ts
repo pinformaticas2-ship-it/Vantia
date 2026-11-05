@@ -2,6 +2,7 @@ import pool from '../config/database';
 import { decryptPassword } from './emailCrypto';
 import { dispatchEmail } from './mailer';
 import { SmtpConfig, MailMessage } from './smtp';
+import { htmlBilingue, normalizarIdioma, traducir } from './idiomas';
 
 // Correo de confirmación al dar de alta un cliente -- se dispara desde
 // cualquier vía que cree un cliente "de verdad" (alta manual, formulario
@@ -15,7 +16,7 @@ import { SmtpConfig, MailMessage } from './smtp';
 // se ha guardado y no debe depender de que el correo salga bien.
 export async function sendClientWelcomeEmail(
   organizacionId: string,
-  client: { email?: string | null; first_name: string; last_name?: string | null },
+  client: { email?: string | null; first_name: string; last_name?: string | null; idioma?: string | null },
 ): Promise<void> {
   if (!client.email?.trim()) return;
   try {
@@ -63,13 +64,26 @@ export async function sendClientWelcomeEmail(
     const signatureHtml = org.client_welcome_email_signature
       ? applyPlaceholders(org.client_welcome_email_signature).replace(/\n/g, '<br>')
       : '';
-    const html = signatureHtml ? `${bodyHtml}<br><br>${signatureHtml}` : bodyHtml;
+    let html = signatureHtml ? `${bodyHtml}<br><br>${signatureHtml}` : bodyHtml;
+    let asunto = subject;
+
+    // Cliente que prefiere otro idioma: el correo sale en español y en el
+    // suyo. La firma no se traduce (nombres, cargos, teléfonos). Si la
+    // traducción no está disponible, sale solo en español como siempre.
+    const idioma = normalizarIdioma(client.idioma);
+    if (idioma !== 'es') {
+      const [cuerpoT, asuntoT] = await Promise.all([traducir(bodyHtml, idioma, { html: true }), traducir(subject, idioma)]);
+      if (cuerpoT) {
+        html = htmlBilingue(bodyHtml, cuerpoT, idioma) + (signatureHtml ? `<br><br>${signatureHtml}` : '');
+        if (asuntoT) asunto = `${subject} / ${asuntoT}`;
+      }
+    }
 
     const msg: MailMessage = {
       from: acc.email,
       fromName: acc.label || undefined,
       to: [client.email.trim()],
-      subject,
+      subject: asunto,
       html,
     };
     await dispatchEmail(smtpCfg, msg);

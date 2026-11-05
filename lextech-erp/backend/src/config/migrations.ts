@@ -3424,6 +3424,40 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  documentos/skills:', e?.message || e);
     }
 
+    // ── Pago al procurador en efectivo → recibo ─────────────────────
+    // Un gasto puede ser un pago a un procurador del Directorio. Si se le paga
+    // en efectivo, el despacho necesita su recibo firmado: recibo_estado lo
+    // sigue (pendiente → solicitado → recibido). NULL = no hace falta recibo.
+    try {
+      for (const col of [
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS forma_pago VARCHAR(30)`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS procurador_id UUID REFERENCES directorio_profesionales(id) ON DELETE SET NULL`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS concepto VARCHAR(300)`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS recibo_estado VARCHAR(20)`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS recibo_solicitado_at TIMESTAMPTZ`,
+        `ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS recibo_recibido_at TIMESTAMPTZ`,
+      ]) await client.query(col);
+    } catch (e: any) {
+      console.warn('⚠️  facturacion_gastos (recibo procurador):', e?.message || e);
+    }
+
+    // ── Idioma de comunicación del cliente ─────────────────────────
+    // Código ISO 639-1 ('es', 'en', 'fr'...). Si no es español, los correos
+    // que el despacho le manda salen en los dos idiomas.
+    try {
+      await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS idioma VARCHAR(5) NOT NULL DEFAULT 'es'`);
+    } catch (e: any) {
+      console.warn('⚠️  entities.idioma:', e?.message || e);
+    }
+
+    // ── Escala de honorarios del despacho (calculadora) ────────────
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS escala_honorarios JSONB`);
+    } catch (e: any) {
+      console.warn('⚠️  organizaciones.escala_honorarios:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

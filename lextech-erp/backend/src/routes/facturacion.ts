@@ -7,6 +7,8 @@ import {
   createPresupuesto,
   deleteFactura,
   deleteGasto,
+  solicitarReciboGasto,
+  marcarReciboGasto,
   deletePresupuesto,
   getBillingBootstrap,
   updateFactura,
@@ -35,6 +37,8 @@ router.delete('/facturas/:id', requireAuth, deleteFactura);
 router.post('/gastos', requireAuth, createGasto);
 router.put('/gastos/:id', requireAuth, updateGasto);
 router.delete('/gastos/:id', requireAuth, deleteGasto);
+router.post('/gastos/:id/solicitar-recibo', requireAuth, solicitarReciboGasto);
+router.post('/gastos/:id/recibo', requireAuth, marcarReciboGasto);
 
 router.post('/presupuestos', requireAuth, createPresupuesto);
 router.put('/presupuestos/:id', requireAuth, updatePresupuesto);

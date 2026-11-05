@@ -1,4 +1,5 @@
 ﻿import React, { useContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { IDIOMAS, nombreIdioma } from "../lib/idiomas";
 import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -170,6 +171,7 @@ function TabPerfil({ client, formatDate, age }: any) {
         <Field label="Fecha baja"                 value={formatDate(client.date_baja)} />
         <Field label="LOPD"                       value={client.lopd} />
         <Field label="Comunicaciones comerciales" value={client.commercial_communications} />
+        <Field label="Idioma de comunicación"     value={nombreIdioma(client.idioma)} />
         <Field label="Centro"                     value={client.center} />
         <Field label="Alta por"                   value={client.created_by} />
         <Field label="Fecha registro"             value={formatDate(client.created_at)} />
@@ -3950,6 +3952,7 @@ export default function ClientDetail() {
       date_baja: client.date_baja ? client.date_baja.slice(0, 10) : "",
       lopd: client.lopd || "",
       commercial_communications: client.commercial_communications || "",
+      idioma: client.idioma || "es",
       center: client.center || "",
       iban: client.iban || "",
       bic: client.bic || "",
@@ -4022,6 +4025,7 @@ export default function ClientDetail() {
       date_baja: client.date_baja ? client.date_baja.slice(0, 10) : "",
       lopd: client.lopd || "",
       commercial_communications: client.commercial_communications || "",
+      idioma: client.idioma || "es",
       center: client.center || "",
       iban: client.iban || "",
       bic: client.bic || "",
@@ -4306,6 +4310,11 @@ export default function ClientDetail() {
                       <EF label="Fecha baja"><input type="date" value={editForm.date_baja} onChange={e => setEF("date_baja", e.target.value)} className={EI} /></EF>
                       <EF label="LOPD"><input value={editForm.lopd} onChange={e => setEF("lopd", e.target.value)} className={EI} /></EF>
                       <EF label="Comunicaciones comerciales"><input value={editForm.commercial_communications} onChange={e => setEF("commercial_communications", e.target.value)} className={EI} /></EF>
+                      <EF label="Idioma de comunicación">
+                        <select value={editForm.idioma} onChange={e => setEF("idioma", e.target.value)} className={EI}>
+                          {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
+                        </select>
+                      </EF>
                       <EF label="Centro"><input value={editForm.center} onChange={e => setEF("center", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>

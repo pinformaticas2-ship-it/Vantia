@@ -973,3 +973,56 @@ export async function resetMemberPermisos(req: Request, res: Response) {
     return err(res, pgErr(e));
   }
 }
+
+// ── Escala de honorarios del despacho (Calculadora) ───────────────────
+// Tramos acumulativos sobre la cuantía: [{ hasta: number|null, pct }],
+// el último con hasta = null ("resto"). Cada despacho guarda la de su Colegio.
+type TramoEscala = { hasta: number | null; pct: number };
+
+function limpiarEscala(raw: any): { tramos: TramoEscala[]; minimo: number; nombre: string } | null {
+  if (!raw || !Array.isArray(raw.tramos) || !raw.tramos.length || raw.tramos.length > 30) return null;
+  const tramos: TramoEscala[] = [];
+  let anterior = 0;
+  for (let i = 0; i < raw.tramos.length; i++) {
+    const t = raw.tramos[i];
+    const pct = Number(t?.pct);
+    const ultimo = i === raw.tramos.length - 1;
+    const hasta = ultimo ? null : Number(t?.hasta);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) return null;
+    if (!ultimo && (!Number.isFinite(hasta) || (hasta as number) <= anterior)) return null;
+    tramos.push({ hasta, pct });
+    if (hasta !== null) anterior = hasta;
+  }
+  const minimo = Math.max(0, Number(raw.minimo) || 0);
+  const nombre = String(raw.nombre || '').trim().slice(0, 150);
+  return { tramos, minimo, nombre };
+}
+
+// GET /api/organizacion/escala-honorarios
+export async function getEscalaHonorarios(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    const { rows } = await pool.query(`SELECT escala_honorarios FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    return ok(res, { escala: rows[0]?.escala_honorarios || null, puedeEditar: ctx.organizacionRol === 'propietario' || ctx.organizacionRol === 'admin' });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// PUT /api/organizacion/escala-honorarios  { tramos, minimo, nombre }
+export async function putEscalaHonorarios(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden cambiar la escala de honorarios.', 403);
+    }
+    const escala = limpiarEscala(req.body);
+    if (!escala) return err(res, 'La escala no es válida: cada tramo necesita un límite mayor que el anterior y un porcentaje entre 0 y 100.', 400);
+    await pool.query(`UPDATE organizaciones SET escala_honorarios = $2 WHERE id = $1`, [ctx.organizacionId, JSON.stringify(escala)]);
+    return ok(res, { escala });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}

@@ -26,6 +26,8 @@ import {
   updateDocumentStorageSettings,
   crearCodigoUnion,
   unirseConCodigo,
+  getEscalaHonorarios,
+  putEscalaHonorarios,
 } from '../controllers/organizacionesController';
 import { getPendientesOrgs } from '../controllers/pendientesOrgsController';
 
@@ -39,6 +41,8 @@ router.put('/', requireAuth, updateMyOrganizacion);
 router.post('/', requireAuth, createOrganizacion);
 router.post('/codigos', requireAuth, crearCodigoUnion);
 router.post('/unirse', requireAuth, unirseConCodigo);
+router.get('/escala-honorarios', requireAuth, getEscalaHonorarios);
+router.put('/escala-honorarios', requireAuth, putEscalaHonorarios);
 router.post('/logo', requireAuth, uploadOrgLogo.single('logo'), uploadOrganizacionLogo);
 router.delete('/logo', requireAuth, deleteOrganizacionLogo);
 router.post('/drive/exchange-code', requireAuth, exchangeGoogleDriveCode);

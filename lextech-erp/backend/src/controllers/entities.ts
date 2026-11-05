@@ -5,6 +5,7 @@ import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
+import { normalizarIdioma } from '../utils/idiomas';
 import { saveMiscUpload } from '../utils/miscUploads';
 
 /** Convierte strings vacíos/guiones a null (evita casts fallidos en PostgreSQL) */
@@ -277,11 +278,12 @@ export const getEntityById = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 // Datos bancarios / mandato SEPA y referencia del cliente (15/10/2026): se
 // guardan aparte para no tocar el alta/edición; solo los que vengan.
-const EXTRA_CLIENTE = ['iban', 'bic', 'mandato_numero', 'mandato_fecha', 'referencia_cliente'] as const;
+const EXTRA_CLIENTE = ['iban', 'bic', 'mandato_numero', 'mandato_fecha', 'referencia_cliente', 'idioma'] as const;
 async function guardarExtraCliente(id: string, organizacionId: string, body: any) {
   const presentes = EXTRA_CLIENTE.filter((k) => body && k in body);
   if (!presentes.length) return;
   const limpiar = (k: string, v: any) => {
+    if (k === 'idioma') return normalizarIdioma(v); // columna NOT NULL: por defecto 'es'
     const t = String(v ?? '').trim();
     if (!t) return null;
     return k === 'iban' ? t.replace(/\s+/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim() : t.slice(0, 200);
@@ -434,7 +436,7 @@ export const createEntity = async (req: any, res: Response) => {
       // en una importación CSV masiva (sería spam a clientes históricos).
       // Fire-and-forget: si falla o no hay cuenta configurada, no afecta al alta.
       if ((nullIfEmpty(type) || 'CLIENTE') === 'CLIENTE') {
-        void sendClientWelcomeEmail(req.organizacionId, { email, first_name, last_name });
+        void sendClientWelcomeEmail(req.organizacionId, { email, first_name, last_name, idioma: req.body?.idioma });
       }
     }
 

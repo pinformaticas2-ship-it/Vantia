@@ -3,6 +3,7 @@
  * OAuth Google para Gmail · IMAP para otras cuentas
  * El usuario autenticado (Clerk) se usa como identidad principal
  */
+import { CorreoBilingue } from "../components/CorreoBilingue";
 import { Spinner } from "../components/Spinner";
 import { useSidebar } from "../layouts/DashboardLayout";
 import React, {
@@ -1049,6 +1050,7 @@ function ComposeWindow({
               </div>
             </div>
           )}
+          <CorreoBilingue destinatarios={`${to},${cc},${bcc}`} getToken={getToken} bodyRef={bodyRef} subject={subject} setSubject={setSubject} />
           {/* Subject */}
           <div className="border-b border-gray-100 px-4">
             <input
