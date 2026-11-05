@@ -56,11 +56,15 @@ export function useOrganizacion() {
   const [permisos, setPermisos] = useState<Record<Modulo, NivelAcceso> | null>(null);
   const [organizaciones, setOrganizaciones] = useState<OrganizacionMembership[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  // El backend dice explícitamente que el usuario no pertenece a ningún despacho
+  // (no es lo mismo que "aún cargando" ni que "falló la petición").
+  const [sinOrganizacion, setSinOrganizacion] = useState(false);
 
   const reload = useCallback(async () => {
     try {
       const data = await apiFetch('/api/organizacion', { getToken });
       if (data?.success) {
+        setSinOrganizacion(Boolean(data.data.sinOrganizacion));
         orgResuelta = data.data.organizacion?.id || null;
         setOrganizacion(data.data.organizacion || null);
         setRol(data.data.rol || null);
@@ -108,6 +112,7 @@ export function useOrganizacion() {
     puede,
     organizaciones,
     isLoaded,
+    sinOrganizacion,
     reload,
     switchOrganizacion,
     activeOrganizacionId: getActiveOrganizacionId(),

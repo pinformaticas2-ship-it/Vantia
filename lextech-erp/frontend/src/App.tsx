@@ -13,6 +13,7 @@ import { AvisosHost } from './lib/avisos';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
+import { ConDespacho } from './components/SinDespacho';
 
 // Pages
 import PublicLanding from './pages/PublicLanding';
@@ -71,7 +72,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
           {/* Dashboard con layout compartido */}
-          <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<ConDespacho><DashboardLayout /></ConDespacho>}>
             <Route index element={<DashboardHome />} />
             <Route path="clientes" element={<RequireModuleAccess modulo="clientes"><ClientList /></RequireModuleAccess>} />
             <Route path="clientes/invitar" element={<RequireModuleAccess modulo="clientes"><AltaConEnlace /></RequireModuleAccess>} />

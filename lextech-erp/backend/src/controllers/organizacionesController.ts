@@ -43,46 +43,17 @@ async function fetchMemberships(userId: string): Promise<OrgMembership[]> {
   }));
 }
 
-// Autoprovisiona al usuario en la organización sembrada la primera vez que se
-// le ve (misma filosofía que resolveUserRole: nunca deja a un usuario
-// autenticado sin organización). El rol de Clerk publicMetadata (el único
-// control de acceso que existía antes de este cambio) se respeta al migrar:
-// si ya era 'admin' en Clerk, entra como 'propietario'/'admin' aquí; si no,
-// como 'miembro'.
-async function autoProvision(userId: string): Promise<OrgMembership[]> {
-  const { rows: orgRows } = await pool.query(
-    `SELECT id, nombre FROM organizaciones ORDER BY created_at ASC LIMIT 1`
-  );
-  if (orgRows.length === 0) return [];
-  const org = orgRows[0];
-
-  const { rows: existingAdmins } = await pool.query(
-    `SELECT 1 FROM organizacion_miembros WHERE organizacion_id = $1 AND rol IN ('propietario','admin') LIMIT 1`,
-    [org.id]
-  );
-  const clerkRole = await resolveUserRole(userId);
-  const rol: OrgRol = clerkRole === 'admin' ? (existingAdmins.length === 0 ? 'propietario' : 'admin') : 'miembro';
-
-  await pool.query(
-    `INSERT INTO organizacion_miembros (organizacion_id, user_id, rol)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (organizacion_id, user_id) DO NOTHING`,
-    [org.id, userId, rol]
-  );
-
-  return fetchMemberships(userId);
-}
-
+// Un usuario nuevo NO entra en ninguna organización por su cuenta: antes se
+// le metía en la primera de la BD y veía los datos de ese despacho. Ahora se
+// queda sin organización (ver exigirOrganizacion en middleware/resolveOrg.ts)
+// hasta que un propietario/admin lo añade o crea su propio despacho.
 export async function resolveUserOrgMemberships(userId: string): Promise<OrgMembership[]> {
   const hit = _membershipsCache.get(userId);
   if (hit && hit.exp > Date.now()) return hit.memberships;
 
-  let memberships = await fetchMemberships(userId);
-  if (memberships.length === 0) {
-    memberships = await autoProvision(userId);
-  }
-
-  _membershipsCache.set(userId, { memberships, exp: Date.now() + CACHE_TTL_MS });
+  const memberships = await fetchMemberships(userId);
+  // Sin organización no se guarda en caché: en cuanto lo añadan, entra.
+  if (memberships.length) _membershipsCache.set(userId, { memberships, exp: Date.now() + CACHE_TTL_MS });
   return memberships;
 }
 
@@ -111,6 +82,10 @@ function requireOrgContext(req: Request, res: Response): { organizacionId: strin
 // GET /api/organizacion — organización activa (con sus datos de personalización) + todas las del usuario
 export async function getMyOrganizacion(req: Request, res: Response) {
   try {
+    // Sin organización: el frontend muestra la pantalla de "aún no perteneces a ningún despacho".
+    if ((req as any).sinOrganizacion) {
+      return ok(res, { organizacion: null, rol: null, permisos: null, organizaciones: [], sinOrganizacion: true });
+    }
     const ctx = requireOrgContext(req, res);
     if (!ctx) return;
     const userId = (req as any).auth?.userId;

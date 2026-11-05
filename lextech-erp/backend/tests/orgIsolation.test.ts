@@ -113,3 +113,40 @@ test('firmas y plantillas de correo: cada organización las suyas', { skip }, as
   const { rows } = await pool.query(`SELECT is_default FROM shared_templates WHERE id = $1`, [id]);
   assert.equal(rows[0].is_default, true);
 });
+
+// Regresión del 05/11/2026: un usuario recién registrado entraba solo en la
+// primera organización de la BD y veía sus clientes y expedientes.
+test('un usuario nuevo no entra en ningún despacho ni ve sus datos', { skip }, async () => {
+  const { resolveOrg, exigirOrganizacion } = await import('../src/middleware/resolveOrg');
+  const { getMyOrganizacion, createOrganizacion } = await import('../src/controllers/organizacionesController');
+  const nuevo = `nuevo_${Date.now()}`;
+
+  const pasar = async (path: string) => {
+    const req: any = { path, headers: {}, auth: { userId: nuevo } };
+    await new Promise<void>((r) => resolveOrg(req, {} as any, () => r()));
+    let status = 200; let siguio = false;
+    const res: any = { status(s: number) { status = s; return res; }, json() { return res; } };
+    exigirOrganizacion(req, res, () => { siguio = true; });
+    return { req, status, siguio };
+  };
+
+  const datos = await pasar('/api/entities');
+  assert.equal(datos.req.organizacionId, undefined);
+  assert.equal(datos.siguio, false);
+  assert.equal(datos.status, 403);
+  assert.equal((await pasar('/api/expedientes/123')).status, 403);
+  assert.equal((await pool.query(`SELECT 1 FROM organizacion_miembros WHERE user_id=$1`, [nuevo])).rowCount, 0);
+
+  // Puede ver que no tiene despacho y crear el suyo.
+  const org = await pasar('/api/organizacion');
+  assert.equal(org.siguio, true);
+  const yo = await call(getMyOrganizacion, undefined as any, { auth: { userId: nuevo }, sinOrganizacion: true, organizacionRol: undefined });
+  assert.equal(yo.data.sinOrganizacion, true);
+  assert.equal(yo.data.organizaciones.length, 0);
+  const creada = await call(createOrganizacion, undefined as any, { auth: { userId: nuevo }, body: { nombre: 'Despacho Nuevo' } });
+  assert.equal(creada.data.rol, 'propietario');
+  const despues = await pasar('/api/entities');
+  assert.equal(despues.siguio, true);
+  assert.equal(despues.req.organizacionId, creada.data.id);
+  assert.notEqual(despues.req.organizacionId, orgA);
+});

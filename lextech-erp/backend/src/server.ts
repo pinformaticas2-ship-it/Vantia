@@ -49,7 +49,7 @@ import vistasRoutes         from './routes/vistas';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { syncAllOrganizacionesDriveChanges } from './utils/googleDriveSync';
 import { clerkMiddleware } from '@clerk/express';
-import { resolveOrg } from './middleware/resolveOrg';
+import { resolveOrg, exigirOrganizacion } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { startPlazoPushScheduler } from './services/plazoPushScheduler';
@@ -140,6 +140,7 @@ app.use(legalRoutes);
 
 app.use(clerkMiddleware());
 app.use(resolveOrg);
+app.use(exigirOrganizacion);
 // Enviar correo lleva los adjuntos en base64 (un tercio más que el archivo):
 // hasta ~25 MB de adjuntos, como Gmail. El resto de rutas, 10 MB.
 const jsonNormal = express.json({ limit: '10mb' });
