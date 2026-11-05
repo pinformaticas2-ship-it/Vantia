@@ -45,6 +45,7 @@ export async function resolveOrg(req: Request, res: Response, next: NextFunction
 // cliente, reservas) no lleva sesión y no pasa por aquí.
 const PERMITIDO_SIN_ORGANIZACION = [
   /^\/api\/organizacion\/?$/,
+  /^\/api\/organizacion\/unirse\/?$/,
   /^\/api\/preferences(\/|$)/,
   /^\/api\/privacidad\/(mis-datos|eliminar-cuenta)\/?$/,
   /^\/api\/errores-cliente(\/|$)/,

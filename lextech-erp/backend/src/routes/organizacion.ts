@@ -24,6 +24,8 @@ import {
   exchangeDropboxCode,
   disconnectDropbox,
   updateDocumentStorageSettings,
+  crearCodigoUnion,
+  unirseConCodigo,
 } from '../controllers/organizacionesController';
 import { getPendientesOrgs } from '../controllers/pendientesOrgsController';
 
@@ -35,6 +37,8 @@ router.get('/pendientes', requireAuth, getPendientesOrgs);
 router.get('/', requireAuth, getMyOrganizacion);
 router.put('/', requireAuth, updateMyOrganizacion);
 router.post('/', requireAuth, createOrganizacion);
+router.post('/codigos', requireAuth, crearCodigoUnion);
+router.post('/unirse', requireAuth, unirseConCodigo);
 router.post('/logo', requireAuth, uploadOrgLogo.single('logo'), uploadOrganizacionLogo);
 router.delete('/logo', requireAuth, deleteOrganizacionLogo);
 router.post('/drive/exchange-code', requireAuth, exchangeGoogleDriveCode);

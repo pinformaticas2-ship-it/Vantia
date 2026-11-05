@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
 import { getFullMatrix, setPermissionOverride, getMemberMatrix, setMemberPermissionOverride, clearMemberPermissionOverrides, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
@@ -385,6 +386,78 @@ export async function disconnectDropbox(req: Request, res: Response) {
 // Acepta ya de entrada los mismos datos de personalización que la edición
 // (salvo el logo, que necesita que la organización exista primero para
 // poder asociarle un fichero).
+// ── Códigos para unirse a un despacho ──────────────────────────────────────
+// Sin letras que se confundan (O/0, I/1/L). 8 caracteres de 31 posibles: ~8,5·10^11
+// combinaciones, y cada usuario solo puede fallar CODIGO_MAX_FALLOS veces cada 10 min.
+const CODIGO_ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODIGO_VIGENCIA_MIN = 10;
+const CODIGO_MAX_FALLOS = 10;
+const _fallosCodigo = new Map<string, { n: number; hasta: number }>();
+
+const normalizarCodigo = (c: string) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const hashCodigo = (c: string) => crypto.createHash('sha256').update(normalizarCodigo(c)).digest('hex');
+
+// POST /api/organizacion/codigos — genera un código de un solo uso (propietario/admin)
+export async function crearCodigoUnion(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden generar códigos.', 403);
+    }
+    const userId = (req as any).auth?.userId;
+    const codigo = Array.from({ length: 8 }, () => CODIGO_ALFABETO[crypto.randomInt(CODIGO_ALFABETO.length)]).join('');
+    const expiraAt = new Date(Date.now() + CODIGO_VIGENCIA_MIN * 60 * 1000);
+    await pool.query(`DELETE FROM organizacion_codigos WHERE expira_at < NOW() - INTERVAL '1 day'`);
+    await pool.query(
+      `INSERT INTO organizacion_codigos (organizacion_id, codigo_hash, creado_por, expira_at) VALUES ($1, $2, $3, $4)`,
+      [ctx.organizacionId, hashCodigo(codigo), userId, expiraAt],
+    );
+    return ok(res, { codigo: `${codigo.slice(0, 4)}-${codigo.slice(4)}`, expiraAt: expiraAt.toISOString() });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// POST /api/organizacion/unirse { codigo } — entra como miembro en el despacho del código
+export async function unirseConCodigo(req: Request, res: Response) {
+  try {
+    const userId = (req as any).auth?.userId;
+    if (!userId) return err(res, 'No autenticado', 401);
+    const f = _fallosCodigo.get(userId);
+    if (f && f.hasta > Date.now() && f.n >= CODIGO_MAX_FALLOS) {
+      return err(res, 'Demasiados intentos. Espera unos minutos y pide un código nuevo.', 429);
+    }
+    const codigo = normalizarCodigo(req.body?.codigo);
+    if (codigo.length !== 8) return err(res, 'El código tiene 8 caracteres.', 400);
+
+    // Se marca como usado en la misma sentencia: dos personas no pueden gastar el mismo código.
+    const { rows } = await pool.query(
+      `UPDATE organizacion_codigos SET usado_por = $2, usado_at = NOW()
+        WHERE codigo_hash = $1 AND usado_por IS NULL AND expira_at > NOW()
+        RETURNING organizacion_id`,
+      [hashCodigo(codigo), userId],
+    );
+    if (!rows.length) {
+      const prev = f && f.hasta > Date.now() ? f : { n: 0, hasta: Date.now() + CODIGO_VIGENCIA_MIN * 60 * 1000 };
+      _fallosCodigo.set(userId, { n: prev.n + 1, hasta: prev.hasta });
+      return err(res, 'Código no válido o caducado. Pide uno nuevo a tu despacho.', 400);
+    }
+    _fallosCodigo.delete(userId);
+    const organizacionId = rows[0].organizacion_id;
+    await pool.query(
+      `INSERT INTO organizacion_miembros (organizacion_id, user_id, rol) VALUES ($1, $2, 'miembro')
+       ON CONFLICT (organizacion_id, user_id) DO NOTHING`,
+      [organizacionId, userId],
+    );
+    invalidateUserCache(userId);
+    const { rows: org } = await pool.query(`SELECT nombre FROM organizaciones WHERE id = $1`, [organizacionId]);
+    return ok(res, { organizacionId, nombre: org[0]?.nombre || null });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
 export async function createOrganizacion(req: Request, res: Response) {
   try {
     const userId = (req as any).auth?.userId;

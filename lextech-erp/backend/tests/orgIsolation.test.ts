@@ -150,3 +150,31 @@ test('un usuario nuevo no entra en ningún despacho ni ve sus datos', { skip }, 
   assert.equal(despues.req.organizacionId, creada.data.id);
   assert.notEqual(despues.req.organizacionId, orgA);
 });
+
+test('unirse a un despacho con un código de un solo uso que caduca', { skip }, async () => {
+  const { crearCodigoUnion, unirseConCodigo, resolveUserOrgMemberships } = await import('../src/controllers/organizacionesController');
+  const gen = await call(crearCodigoUnion, orgA);
+  assert.match(gen.data.codigo, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.ok(new Date(gen.data.expiraAt).getTime() - Date.now() <= 10 * 60 * 1000);
+  // Un miembro normal no puede generarlos.
+  assert.equal((await call(crearCodigoUnion, orgA, { organizacionRol: 'miembro' })).success, false);
+
+  const nuevo = `cod_${Date.now()}`;
+  const unir = (userId: string, codigo: string) => call(unirseConCodigo, undefined as any, { auth: { userId }, body: { codigo } });
+  // Se acepta en minúsculas y sin guion.
+  const r = await unir(nuevo, gen.data.codigo.toLowerCase().replace('-', ''));
+  assert.equal(r.success, true, JSON.stringify(r));
+  assert.equal(r.data.organizacionId, orgA);
+  const m = await resolveUserOrgMemberships(nuevo);
+  assert.equal(m.length, 1);
+  assert.equal(m[0].rol, 'miembro');
+
+  // Un solo uso.
+  assert.equal((await unir(`otro_${Date.now()}`, gen.data.codigo)).success, false);
+  // Caducado.
+  const viejo = await call(crearCodigoUnion, orgA);
+  await pool.query(`UPDATE organizacion_codigos SET expira_at = NOW() - INTERVAL '1 second' WHERE usado_por IS NULL`);
+  assert.equal((await unir(`tarde_${Date.now()}`, viejo.data.codigo)).success, false);
+  // Inventado.
+  assert.equal((await unir(`x_${Date.now()}`, 'ABCD-EFGH')).success, false);
+});

@@ -876,6 +876,78 @@ function DespachoPanel() {
 
 interface Miembro { id: string; userId: string; nombre: string; email: string | null; rol: OrgRol; createdAt: string; }
 
+// Código de un solo uso para que alguien recién registrado se una al despacho
+// desde su pantalla "Todavía no perteneces a ningún despacho". Caduca a los 10 min.
+function CodigoInvitacion({ onUnido }: { onUnido: () => void }) {
+  const { getToken } = useAuth();
+  const [codigo, setCodigo] = useState<{ codigo: string; expiraAt: string } | null>(null);
+  const [ahora, setAhora] = useState(Date.now());
+  const [generando, setGenerando] = useState(false);
+  const [error, setError] = useState('');
+  const [copiado, setCopiado] = useState(false);
+
+  const restante = codigo ? Math.max(0, new Date(codigo.expiraAt).getTime() - ahora) : 0;
+  useEffect(() => {
+    if (!codigo || restante <= 0) return;
+    const t = setInterval(() => setAhora(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [codigo, restante > 0]);
+  // Al caducar se refresca la lista, por si alguien se unió con él mientras tanto.
+  useEffect(() => { if (codigo && restante <= 0) onUnido(); }, [codigo, restante <= 0]);
+
+  const generar = async () => {
+    setGenerando(true); setError(''); setCopiado(false);
+    try {
+      const data = await apiFetch('/api/organizacion/codigos', { method: 'POST', getToken });
+      if (!data?.success) throw new Error(data?.error || 'No se pudo generar el código.');
+      setCodigo(data.data); setAhora(Date.now());
+    } catch (e: any) {
+      setError(e.message || 'No se pudo generar el código.');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  const copiar = async () => {
+    if (!codigo) return;
+    try { await navigator.clipboard.writeText(codigo.codigo); setCopiado(true); } catch { /* sin portapapeles */ }
+  };
+
+  const mmss = `${Math.floor(restante / 60000)}:${String(Math.floor((restante % 60000) / 1000)).padStart(2, '0')}`;
+  const vigente = codigo && restante > 0;
+
+  return (
+    <section className="mb-8 max-w-2xl">
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Invitar con un código</h3>
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <p className="text-sm text-slate-600">
+          La persona se registra en Vantia, elige «Tengo un código» y escribe este código. Entra como miembro; luego puedes cambiarle el rol.
+        </p>
+        {vigente ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-2xl font-bold tracking-[0.2em] text-slate-900 select-all">{codigo!.codigo}</span>
+            <button onClick={copiar} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              {copiado ? <Check size={14} /> : <Link2 size={14} />}{copiado ? 'Copiado' : 'Copiar'}
+            </button>
+            <span className="inline-flex items-center gap-1 text-sm text-slate-500"><Clock3 size={14} /> Caduca en {mmss} · un solo uso</span>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button onClick={generar} disabled={generando}
+              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+              {generando ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+              {codigo ? 'Generar otro código' : 'Generar código'}
+            </button>
+            {codigo && <span className="text-sm text-slate-500">El código anterior ha caducado.</span>}
+          </div>
+        )}
+        {error && <p className="text-xs text-rose-600 mt-2">{error}</p>}
+        <p className="text-xs text-slate-400 mt-3">Caduca a los 10 minutos y solo sirve para una persona. No lo publiques: quien lo tenga entra en el despacho.</p>
+      </div>
+    </section>
+  );
+}
+
 function UsuariosPanel() {
   const { getToken } = useAuth();
   const { rol: myRol, organizacion } = useOrganizacion();
@@ -953,6 +1025,8 @@ function UsuariosPanel() {
         <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Gestión de Usuarios</h1>
         <p className="text-sm text-slate-500">Miembros de {organizacion?.nombre || 'esta organización'} y sus roles.</p>
       </div>
+
+      {canManage && <CodigoInvitacion onUnido={load} />}
 
       {canManage && (
         <section className="mb-8 max-w-2xl">

@@ -1685,6 +1685,21 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE task_etapas DROP CONSTRAINT IF EXISTS task_etapas_nombre_key;`);
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_task_etapas_org_nombre ON task_etapas (organizacion_id, nombre);`);
     } catch (_e: any) {}
+    // Códigos para unirse a un despacho (05/11/2026): los genera un
+    // propietario/admin, caducan a los 10 minutos y sirven una sola vez. Solo
+    // se guarda el hash, nunca el código.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizacion_codigos (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        codigo_hash     CHAR(64)     NOT NULL UNIQUE,
+        creado_por      VARCHAR(150) NOT NULL,
+        expira_at       TIMESTAMPTZ  NOT NULL,
+        usado_por       VARCHAR(150),
+        usado_at        TIMESTAMPTZ,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS organizacion_miembros (
