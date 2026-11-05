@@ -23,6 +23,7 @@ import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
+import { useOrganizacion } from "../lib/useOrganizacion";
 import { aviso } from "../lib/avisos";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3693,6 +3694,9 @@ export default function Chat() {
   const [mensajes, setMensajes]           = useState<Mensaje[]>([]);
   const [miembros, setMiembros]           = useState<Miembro[]>([]);
   const [sysUsers, setSysUsers]           = useState<SysUser[]>([]);
+  // true cuando el servidor ya ha devuelto la lista (aunque esté vacía: despacho de una sola persona).
+  const [sysUsersCargados, setSysUsersCargados] = useState(false);
+  const { organizacion } = useOrganizacion();
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [rightPanel, setRightPanel]       = useState<"members"|"pinned"|"favorites"|null>(null);
   const [sesionExpediente, setSesionExpediente] = useState<SesionExpediente|null>(null);
@@ -4116,6 +4120,7 @@ export default function Chat() {
           }
           return list;
         });
+        setSysUsersCargados(true);
         try {
           window.localStorage.setItem(cacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(list));
         } catch {
@@ -5184,11 +5189,11 @@ export default function Chat() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0 bg-white">
           <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-slate-100 rounded-xl px-2.5 py-2 transition-all duration-200 group">
             <div className="w-8 h-8 rounded-xl bg-[#dc2626] flex items-center justify-center shrink-0 text-white font-bold text-sm">
-              V
+              {(organizacion?.nombre || "V").trim().charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0 text-left">
               <div className="flex items-center gap-1">
-                <span className="text-slate-800 font-bold text-sm truncate leading-none">Despacho Principal</span>
+                <span className="text-slate-800 font-bold text-sm truncate leading-none">{organizacion?.nombre || "Despacho"}</span>
                 <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600 shrink-0"/>
               </div>
               {totalUnread > 0 && (
@@ -5317,7 +5322,7 @@ export default function Chat() {
               {secOpen.dms&&(
                 <div className="mt-1 space-y-1">
                   {dmConversationEntries.length===0 && dmProspectUsers.length===0 && (
-                    <p className="text-slate-600 text-xs px-4 py-1">Cargando usuarios…</p>
+                    <p className="text-slate-600 text-xs px-4 py-1">{sysUsersCargados ? "Aún no hay nadie más en el despacho." : "Cargando usuarios…"}</p>
                   )}
                   {dmConversationEntries.map(({ user: u, dmCanal, unreadCount })=>{
                     const isActivo = !!(dmCanal && canalActivo?.id===dmCanal.id);

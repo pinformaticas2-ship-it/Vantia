@@ -1405,13 +1405,27 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
   }
 };
 
+// Columnas del kanban para un despacho que todavía no tiene ninguna (uno
+// recién creado): genéricas, nunca copiadas de otro despacho.
+const ETAPAS_POR_DEFECTO = ['Sin iniciar', 'En curso', 'En espera', 'Revisar', 'Realizada', 'Cancelada'];
+
 // ── GET /api/tasks/etapas ── lista de etapas disponibles ───────
 export const getEtapas = async (req: any, res: Response) => {
   try {
-    const result = await pool.query(
+    const listar = () => pool.query(
       `SELECT id, nombre, orden FROM task_etapas WHERE organizacion_id = $1 ORDER BY orden ASC, nombre ASC`,
       [req.organizacionId]
     );
+    let result = await listar();
+    if (!result.rows.length && req.organizacionId) {
+      await pool.query(
+        `INSERT INTO task_etapas (nombre, orden, organizacion_id)
+         SELECT nombre, orden, $2 FROM unnest($1::text[]) WITH ORDINALITY AS e(nombre, orden)
+         ON CONFLICT (organizacion_id, nombre) DO NOTHING`,
+        [ETAPAS_POR_DEFECTO, req.organizacionId]
+      );
+      result = await listar();
+    }
     res.json({ data: result.rows });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

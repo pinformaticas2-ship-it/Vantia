@@ -798,21 +798,9 @@ export async function runMigrations(): Promise<void> {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_etapas_org_nombre
           ON task_etapas (organizacion_id, nombre);
       `);
-      // Las organizaciones que no eran la sembrada se quedan sin ninguna
-      // etapa tras el reparto de arriba -- se les copia el mismo juego de
-      // etapas por defecto para que su kanban no aparezca vacío.
-      const { rows: orgsSinEtapas } = await client.query(`
-        SELECT o.id FROM organizaciones o
-        WHERE NOT EXISTS (SELECT 1 FROM task_etapas t WHERE t.organizacion_id = o.id)
-      `);
-      for (const org of orgsSinEtapas) {
-        await client.query(`
-          INSERT INTO task_etapas (nombre, orden, organizacion_id)
-          SELECT nombre, orden, $1 FROM task_etapas
-          WHERE organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
-          ON CONFLICT (organizacion_id, nombre) DO NOTHING
-        `, [org.id]);
-      }
+      // Las organizaciones sin etapas reciben unas genéricas la primera vez
+      // que abren Tareas (getEtapas en tasksController). Antes se les copiaban
+      // aquí las de la organización más antigua, que son propias de ese despacho.
     } catch (_e: any) {}
 
     // ── Tabla agenda_events ───────────────────────────────────────────────────
@@ -1689,6 +1677,13 @@ export async function runMigrations(): Promise<void> {
         SELECT 'Despacho principal'
         WHERE NOT EXISTS (SELECT 1 FROM organizaciones)
       `);
+    } catch (_e: any) {}
+    // En una instalación desde cero, task_etapas se crea (más arriba) antes que
+    // organizaciones y su organizacion_id no llega a añadirse: Tareas daba 500.
+    try {
+      await client.query(`ALTER TABLE task_etapas ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`ALTER TABLE task_etapas DROP CONSTRAINT IF EXISTS task_etapas_nombre_key;`);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_task_etapas_org_nombre ON task_etapas (organizacion_id, nombre);`);
     } catch (_e: any) {}
 
     await client.query(`
