@@ -151,7 +151,7 @@ export default function WhatsApp() {
       headers: { Authorization: `Bearer ${token}` },
     });
     const json = await safeJson(response);
-    if (!response.ok) throw new Error(json.error || "No se pudo cargar WhatsApp Business");
+    if (!response.ok) throw new Error(json.error || "No se pudo cargar Comunicación Externa");
     return json;
   }, [getToken]);
 
@@ -166,7 +166,7 @@ export default function WhatsApp() {
       body: JSON.stringify(body),
     });
     const json = await safeJson(response);
-    if (!response.ok) throw new Error(json.error || "No se pudo guardar en WhatsApp Business");
+    if (!response.ok) throw new Error(json.error || "No se pudo guardar el mensaje");
     return json;
   }, [getToken]);
 
@@ -189,7 +189,7 @@ export default function WhatsApp() {
       setStatus(statusRes.data || null);
       setContacts(contactsRes.data || []);
     } catch (err: any) {
-      setError(err.message || "No se pudo cargar el módulo de WhatsApp");
+      setError(err.message || "No se pudo cargar Comunicación Externa");
     } finally {
       setLoading(false);
     }
@@ -288,11 +288,31 @@ export default function WhatsApp() {
   ];
   const canal = canales.includes(channel) ? channel : canales[0];
 
+  // Mientras se averigua qué canales hay conectados: la silueta de la bandeja,
+  // sin texto ni nombre de canal (antes decía "WhatsApp Business" aunque el
+  // despacho solo tuviera Instagram). Aparece con retraso para que en una
+  // carga rápida no llegue a verse nada.
   if (loading) {
     return (
-      <div className="flex h-[60vh] items-center justify-center text-slate-400">
-        <div className="flex items-center gap-3">
-          <Spinner size="md" label="Cargando módulo de WhatsApp Business..." />
+      <div className="flex h-full flex-col overflow-hidden bg-white anim-fade-in" style={{ animationDelay: "250ms" }} aria-busy="true">
+        <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-2">
+          <span className="h-7 w-24 animate-pulse rounded-full bg-slate-100" />
+          <span className="h-7 w-24 animate-pulse rounded-full bg-slate-100" />
+        </div>
+        <div className="flex min-h-0 flex-1">
+          <aside className="flex w-full shrink-0 flex-col gap-4 border-r border-slate-200 px-5 py-5 md:w-[320px]">
+            <span className="h-9 w-full animate-pulse rounded-xl bg-slate-100" />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-slate-100" />
+                <div className="flex-1 space-y-2">
+                  <span className="block h-3 w-2/3 animate-pulse rounded bg-slate-100" />
+                  <span className="block h-2.5 w-1/2 animate-pulse rounded bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </aside>
+          <div className="hidden flex-1 bg-slate-50/60 md:block" />
         </div>
       </div>
     );

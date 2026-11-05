@@ -150,8 +150,8 @@ export default function TikTokPanel() {
 
   if (loading && !status) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner size="md" label="Cargando TikTok..." />
+      <div className="flex flex-1 items-center justify-center anim-fade-in" style={{ animationDelay: "300ms" }}>
+        <Spinner size="sm" muted />
       </div>
     );
   }

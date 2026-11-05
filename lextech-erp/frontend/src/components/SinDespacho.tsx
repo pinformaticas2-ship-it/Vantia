@@ -10,7 +10,11 @@ import { useOrganizacion } from "../lib/useOrganizacion";
 // esto en lugar de la aplicación.
 export function ConDespacho({ children }: { children: ReactNode }) {
   const { isLoaded, sinOrganizacion } = useOrganizacion();
-  if (isLoaded && sinOrganizacion) return <SinDespacho />;
+  // Hasta saber si tiene despacho no se pinta nada (solo el fondo): antes se
+  // veía el dashboard un instante y luego saltaba a esta pantalla. La
+  // respuesta queda compartida, así que el layout ya no vuelve a esperarla.
+  if (!isLoaded) return <div className="min-h-screen bg-slate-50 dark:bg-slate-950" aria-busy="true" />;
+  if (sinOrganizacion) return <SinDespacho />;
   return <>{children}</>;
 }
 
@@ -47,7 +51,7 @@ function SinDespacho() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <div className="anim-fade-up w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
           <Building2 className="h-7 w-7 text-slate-500" />
         </div>
@@ -57,7 +61,7 @@ function SinDespacho() {
         </p>
 
         {modo === "elegir" ? (
-          <div className="mt-6 space-y-3">
+          <div key="elegir" className="anim-fade-in mt-6 space-y-3">
             <button type="button" onClick={() => cambiar("codigo")}
               className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3.5 text-left hover:bg-slate-50">
               <KeyRound className="h-5 w-5 shrink-0 text-slate-500" />
@@ -76,7 +80,7 @@ function SinDespacho() {
             </button>
           </div>
         ) : (
-          <div className="mt-6 space-y-3">
+          <div key={modo} className="anim-fade-in mt-6 space-y-3">
             <label className="block text-sm font-medium text-slate-700" htmlFor="sin-despacho-valor">
               {modo === "codigo" ? "Código del despacho" : "Nombre del despacho"}
             </label>

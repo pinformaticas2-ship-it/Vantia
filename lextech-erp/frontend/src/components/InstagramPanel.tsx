@@ -118,7 +118,7 @@ export default function InstagramPanel() {
     catch (e: any) { setAviso({ tono: "error", texto: e.message }); setConectando(false); }
   };
 
-  if (cargando && !status) return <div className="flex flex-1 items-center justify-center"><Spinner size="md" label="Cargando Instagram..." /></div>;
+  if (cargando && !status) return <div className="flex flex-1 items-center justify-center anim-fade-in" style={{ animationDelay: "300ms" }}><Spinner size="sm" muted /></div>;
 
   if (!status?.connected) {
     return (

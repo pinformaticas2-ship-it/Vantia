@@ -45,40 +45,85 @@ export interface OrganizacionMembership extends OrganizacionInfo {
   rol: OrgRol;
 }
 
+// Respuesta de /api/organizacion compartida por todos los que usan el hook
+// (la pantalla de "sin despacho", el layout, el sidebar, las páginas...). Así
+// la primera carga hace UNA petición y quien se monta después ya tiene el dato
+// al instante, sin parpadeos de "cargando". Va atada al usuario de Clerk para
+// que un cambio de sesión en la misma pestaña nunca vea la del anterior.
+type DatosOrg = {
+  organizacion: OrganizacionInfo | null;
+  rol: OrgRol | null;
+  permisos: Record<Modulo, NivelAcceso> | null;
+  organizaciones: OrganizacionMembership[];
+  sinOrganizacion: boolean;
+};
+let compartido: { userId: string; datos: DatosOrg; at: number } | null = null;
+// Pasado este rato, quien monte el hook pinta lo guardado al instante y lo
+// refresca por detrás (p. ej. si un admin te ha cambiado los permisos).
+const FRESCO_MS = 30_000;
+let enCurso: { userId: string; promesa: Promise<DatosOrg | null> } | null = null;
+
+async function pedirOrganizacion(userId: string, getToken: () => Promise<string | null>, forzar: boolean) {
+  if (!forzar && compartido?.userId === userId && Date.now() - compartido.at < FRESCO_MS) return compartido.datos;
+  if (!forzar && enCurso?.userId === userId) return enCurso.promesa;
+  const promesa = (async (): Promise<DatosOrg | null> => {
+    try {
+      const data = await apiFetch('/api/organizacion', { getToken });
+      if (!data?.success) return null;
+      return {
+        organizacion: data.data.organizacion || null,
+        rol: data.data.rol || null,
+        permisos: data.data.permisos || null,
+        organizaciones: data.data.organizaciones || [],
+        sinOrganizacion: Boolean(data.data.sinOrganizacion),
+      };
+    } catch {
+      return null; // los consumidores tratan null como "sin organización"
+    }
+  })();
+  enCurso = { userId, promesa };
+  const datos = await promesa;
+  if (enCurso?.promesa === promesa) enCurso = null;
+  // Un fallo de red no se guarda: el siguiente que monte lo vuelve a intentar.
+  if (datos) {
+    compartido = { userId, datos, at: Date.now() };
+    orgResuelta = datos.organizacion?.id || null;
+  }
+  return datos;
+}
+
 // Organización activa del usuario + todas a las que pertenece (para el
 // selector "Seleccionar empresa" del sidebar). Mismo patrón que useIsAdmin.ts,
 // pero yendo contra nuestra propia BD (organizacion_miembros) en vez de
 // publicMetadata.role de Clerk -- ver backend/src/controllers/organizacionesController.ts.
 export function useOrganizacion() {
-  const { getToken } = useAuth();
-  const [organizacion, setOrganizacion] = useState<OrganizacionInfo | null>(null);
-  const [rol, setRol] = useState<OrgRol | null>(null);
-  const [permisos, setPermisos] = useState<Record<Modulo, NivelAcceso> | null>(null);
-  const [organizaciones, setOrganizaciones] = useState<OrganizacionMembership[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { getToken, userId } = useAuth();
+  const inicial = userId && compartido?.userId === userId ? compartido.datos : null;
+  const [organizacion, setOrganizacion] = useState<OrganizacionInfo | null>(inicial?.organizacion ?? null);
+  const [rol, setRol] = useState<OrgRol | null>(inicial?.rol ?? null);
+  const [permisos, setPermisos] = useState<Record<Modulo, NivelAcceso> | null>(inicial?.permisos ?? null);
+  const [organizaciones, setOrganizaciones] = useState<OrganizacionMembership[]>(inicial?.organizaciones ?? []);
+  const [isLoaded, setIsLoaded] = useState(Boolean(inicial));
   // El backend dice explícitamente que el usuario no pertenece a ningún despacho
   // (no es lo mismo que "aún cargando" ni que "falló la petición").
-  const [sinOrganizacion, setSinOrganizacion] = useState(false);
+  const [sinOrganizacion, setSinOrganizacion] = useState(inicial?.sinOrganizacion ?? false);
 
-  const reload = useCallback(async () => {
-    try {
-      const data = await apiFetch('/api/organizacion', { getToken });
-      if (data?.success) {
-        setSinOrganizacion(Boolean(data.data.sinOrganizacion));
-        orgResuelta = data.data.organizacion?.id || null;
-        setOrganizacion(data.data.organizacion || null);
-        setRol(data.data.rol || null);
-        setPermisos(data.data.permisos || null);
-        setOrganizaciones(data.data.organizaciones || []);
-      }
-    } catch {
-      /* deja isLoaded=true igualmente; los consumidores tratan null como "sin organización" */
-    } finally {
-      setIsLoaded(true);
+  const cargar = useCallback(async (forzar: boolean) => {
+    if (!userId) return;
+    const datos = await pedirOrganizacion(userId, getToken, forzar);
+    if (datos) {
+      setSinOrganizacion(datos.sinOrganizacion);
+      setOrganizacion(datos.organizacion);
+      setRol(datos.rol);
+      setPermisos(datos.permisos);
+      setOrganizaciones(datos.organizaciones);
     }
-  }, [getToken]);
+    setIsLoaded(true);
+  }, [getToken, userId]);
 
-  useEffect(() => { void reload(); }, [reload]);
+  const reload = useCallback(() => cargar(true), [cargar]);
+
+  useEffect(() => { void cargar(false); }, [cargar]);
 
   // Cambia la organización activa y recarga la app entera -- así todo lo que
   // ya se hubiera cargado (dashboard, listados, Vantia...) se vuelve a pedir
