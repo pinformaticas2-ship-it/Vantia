@@ -19,7 +19,7 @@ export function Spinner({ size = 'md', muted = false, label, className = '' }: S
   const color = muted ? 'rgba(148,163,184,0.75)' : 'var(--accent-from)';
 
   return (
-    <div className={`flex flex-col items-center gap-2.5 ${className}`}>
+    <div className={`spinner-entrada flex flex-col items-center gap-2.5 ${className}`} role="status" aria-live="polite">
       <div className="flex items-end" style={{ gap }}>
         {DELAYS.map((delay, i) => (
           <span

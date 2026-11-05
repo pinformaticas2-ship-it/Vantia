@@ -2280,6 +2280,15 @@ export default function DashboardLayout() {
     return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : p;
   };
 
+  // Al cambiar de módulo se empieza arriba: el contenedor con scroll es el
+  // mismo para todos, y sin esto el módulo nuevo aparecía a media altura (la
+  // del anterior). Dentro del mismo módulo (p. ej. lista → ficha) se respeta.
+  const moduloActual = getModuleBase(location.pathname);
+  useLayoutEffect(() => {
+    const el = document.getElementById('dashboard-content');
+    if (el) el.scrollTop = 0;
+  }, [moduloActual]);
+
   // ── Detectar cambio de sesión Clerk (mismo navegador, cuentas distintas) ──
   useEffect(() => {
     if (!user?.id) return;
