@@ -2,7 +2,7 @@ import pool from '../config/database';
 import { decryptPassword } from './emailCrypto';
 import { dispatchEmail } from './mailer';
 import { SmtpConfig, MailMessage } from './smtp';
-import { htmlBilingue, normalizarIdioma, traducir } from './idiomas';
+import { htmlBilingue, normalizarIdioma, traducirCorreo } from './idiomas';
 
 // Correo de confirmación al dar de alta un cliente -- se dispara desde
 // cualquier vía que cree un cliente "de verdad" (alta manual, formulario
@@ -72,7 +72,9 @@ export async function sendClientWelcomeEmail(
     // traducción no está disponible, sale solo en español como siempre.
     const idioma = normalizarIdioma(client.idioma);
     if (idioma !== 'es') {
-      const [cuerpoT, asuntoT] = await Promise.all([traducir(bodyHtml, idioma, { html: true }), traducir(subject, idioma)]);
+      const t = await traducirCorreo({ cuerpo: bodyHtml, asunto: subject, idioma, html: true });
+      const cuerpoT = t.ok ? t.cuerpo : null;
+      const asuntoT = t.ok ? t.asunto : null;
       if (cuerpoT) {
         html = htmlBilingue(bodyHtml, cuerpoT, idioma) + (signatureHtml ? `<br><br>${signatureHtml}` : '');
         if (asuntoT) asunto = `${subject} / ${asuntoT}`;

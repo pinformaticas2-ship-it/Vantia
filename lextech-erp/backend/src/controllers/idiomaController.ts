@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import pool from '../config/database';
-import { IDIOMAS, NOMBRE_ES, normalizarIdioma, traduccionDisponible, traducir } from '../utils/idiomas';
+import { IDIOMAS, MENSAJE_FALLO, NOMBRE_ES, normalizarIdioma, traduccionDisponible, traducirCorreo, type MotivoFallo } from '../utils/idiomas';
 
 // GET /api/email/idiomas-destinatarios?emails=a@x.com,b@y.com
 // Clientes del despacho activo, entre esos correos, que prefieren que se les
@@ -39,15 +39,17 @@ export const idiomasDestinatarios = async (req: any, res: Response) => {
   }
 };
 
-// POST /api/email/traducir  { texto, idioma, html? }
+// POST /api/email/traducir  { texto, idioma, html?, recibido?, asunto? }
 // recibido: true (o idioma 'es') = traducir un correo recibido, de cualquier idioma, al pedido.
+// asunto: si se manda, se traduce en la MISMA petición a la IA (data.asunto).
+const ESTADO_FALLO: Record<MotivoFallo, number> = { sin_clave: 503, cupo: 429, saturada: 503, otro: 502 };
 export const traducirTexto = async (req: any, res: Response) => {
   const texto = String(req.body?.texto || '');
+  const asunto = typeof req.body?.asunto === 'string' ? req.body.asunto : undefined;
   const idioma = normalizarIdioma(req.body?.idioma);
   if (!texto.trim()) return res.status(400).json({ success: false, error: 'No hay nada que traducir.' });
   if (texto.length > 30000) return res.status(400).json({ success: false, error: 'El texto es demasiado largo para traducirlo de una vez.' });
-  if (!traduccionDisponible()) return res.status(503).json({ success: false, error: 'La traducción automática no está configurada (falta la clave de IA).' });
-  const traduccion = await traducir(texto, idioma, { html: Boolean(req.body?.html), recibido: Boolean(req.body?.recibido) });
-  if (!traduccion) return res.status(502).json({ success: false, error: 'La IA no ha podido traducir el texto. Inténtalo de nuevo.' });
-  res.json({ success: true, data: { traduccion, idioma, idiomaNombre: IDIOMAS[idioma] } });
+  const r = await traducirCorreo({ cuerpo: texto, asunto, idioma, html: Boolean(req.body?.html), recibido: Boolean(req.body?.recibido) });
+  if ('motivo' in r) return res.status(ESTADO_FALLO[r.motivo]).json({ success: false, motivo: r.motivo, error: MENSAJE_FALLO[r.motivo] });
+  res.json({ success: true, data: { traduccion: r.cuerpo, asunto: r.asunto, idioma, idiomaNombre: IDIOMAS[idioma] } });
 };

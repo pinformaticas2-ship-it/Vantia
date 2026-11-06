@@ -69,9 +69,11 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
     if (!cuerpo.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim()) { setError("Escribe primero el mensaje."); return; }
     setEstado("traduciendo"); setError("");
     try {
-      const pedir = (texto: string, esHtml: boolean) =>
-        apiFetch("/api/email/traducir", { getToken: getToken as any, method: "POST", body: JSON.stringify({ texto, idioma, html: esHtml }) });
-      const [rc, ra] = await Promise.all([pedir(cuerpo, true), subject.trim() ? pedir(subject, false) : Promise.resolve(null)]);
+      // Cuerpo y asunto en UNA sola petición a la IA (el cupo de Gemini va por peticiones).
+      const rc = await apiFetch("/api/email/traducir", {
+        getToken: getToken as any, method: "POST",
+        body: JSON.stringify({ texto: cuerpo, asunto: subject.trim() || undefined, idioma, html: true }),
+      });
       if (!rc?.success) throw new Error(rc?.error || "No se pudo traducir.");
       const traducido = `<div lang="${idioma}"${idioma === "ar" ? ' dir="rtl"' : ""}>${rc.data.traduccion}</div>`;
       setDeshacer({ html, asunto: subject, idioma });
@@ -82,7 +84,7 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
           + `<div>${cuerpo}</div>`
           + colaBr + firma
         : traducido + colaBr + firma;
-      const asuntoT = ra?.success ? String(ra.data?.traduccion || "").trim() : "";
+      const asuntoT = String(rc.data?.asunto || "").trim();
       if (asuntoT) setSubject(mantenerOriginal ? `${asuntoT} / ${subject.trim()}` : asuntoT);
       setEstado("hecho");
     } catch (e: any) {

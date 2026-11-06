@@ -2351,16 +2351,17 @@ function EmailReader({
     if (!cuerpo.trim()) { setErrorTraduccion('Este correo no tiene texto que traducir.'); return; }
     setTraduciendo(true); setErrorTraduccion('');
     try {
-      const pedir = (t: string, html: boolean) => apiFetch('/api/email/traducir', {
-        getToken: getTokenTraduccion as any, method: 'POST', body: JSON.stringify({ texto: t, idioma, html, recibido: true }),
+      // Cuerpo y asunto en UNA sola petición a la IA (el cupo de Gemini va por peticiones).
+      const rc = await apiFetch('/api/email/traducir', {
+        getToken: getTokenTraduccion as any, method: 'POST',
+        body: JSON.stringify({ texto: cuerpo, asunto: email.subject?.trim() || undefined, idioma, html: usarHtml, recibido: true }),
       });
-      const [rc, ra] = await Promise.all([pedir(cuerpo, usarHtml), email.subject?.trim() ? pedir(email.subject, false) : Promise.resolve(null)]);
       if (!rc?.success) throw new Error(rc?.error || 'No se pudo traducir.');
       setTraducciones((prev) => ({
         ...prev,
         [clave]: {
           ...(usarHtml ? { html: rc.data.traduccion } : { text: rc.data.traduccion }),
-          asunto: ra?.success ? ra.data.traduccion : undefined,
+          asunto: rc.data.asunto || undefined,
         },
       }));
       setVerTraduccion(true);
