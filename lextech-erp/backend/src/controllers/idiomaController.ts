@@ -40,11 +40,11 @@ export const idiomasDestinatarios = async (req: any, res: Response) => {
 };
 
 // POST /api/email/traducir  { texto, idioma, html? }
+// idioma 'es' = traducir al español un correo recibido (de cualquier idioma).
 export const traducirTexto = async (req: any, res: Response) => {
   const texto = String(req.body?.texto || '');
   const idioma = normalizarIdioma(req.body?.idioma);
   if (!texto.trim()) return res.status(400).json({ success: false, error: 'No hay nada que traducir.' });
-  if (idioma === 'es') return res.status(400).json({ success: false, error: 'El idioma de destino no puede ser español.' });
   if (texto.length > 30000) return res.status(400).json({ success: false, error: 'El texto es demasiado largo para traducirlo de una vez.' });
   if (!traduccionDisponible()) return res.status(503).json({ success: false, error: 'La traducción automática no está configurada (falta la clave de IA).' });
   const traduccion = await traducir(texto, idioma, { html: Boolean(req.body?.html) });

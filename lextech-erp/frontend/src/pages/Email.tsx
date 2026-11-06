@@ -4,6 +4,7 @@
  * El usuario autenticado (Clerk) se usa como identidad principal
  */
 import { CorreoBilingue } from "../components/CorreoBilingue";
+import { apiFetch } from "../lib/api";
 import { Spinner } from "../components/Spinner";
 import { useSidebar } from "../layouts/DashboardLayout";
 import React, {
@@ -20,7 +21,7 @@ import {
 import {
   Inbox, Star, Send, FileText, Trash2, RefreshCw, Plus,
   Search, ChevronDown, X, Mail, MailOpen,
-  Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
+  Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2, Globe2,
   MoreVertical, AlertCircle, Eye, EyeOff,
   AlertTriangle, Stethoscope, ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
@@ -2317,10 +2318,53 @@ function EmailReader({
     [dedupedExpedienteOptions, email.expedienteId],
   );
 
+  // ── Traducir al español un correo recibido en otro idioma ──
+  const { getToken: getTokenTraduccion } = useAuth();
+  const [traduccion, setTraduccion] = useState<{ id: string; html?: string; text?: string; asunto?: string } | null>(null);
+  const [verTraduccion, setVerTraduccion] = useState(false);
+  const [traduciendo, setTraduciendo] = useState(false);
+  const [errorTraduccion, setErrorTraduccion] = useState('');
+  useEffect(() => { setVerTraduccion(false); setErrorTraduccion(''); }, [email.id]);
+  const traduccionActual = traduccion?.id === email.id ? traduccion : null;
+
+  const traducirCorreo = async () => {
+    if (traduccionActual) { setVerTraduccion(true); return; }
+    // HTML si cabe (se conserva el formato); si no, el texto plano.
+    const limpio = decodeQP(email.bodyHtml || '')
+      .replace(/<head[\s\S]*?<\/head>/gi, '')
+      .replace(/<(style|script)[\s\S]*?<\/\1>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .trim();
+    const texto = decodeQP(email.bodyText || '') || limpio.replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ');
+    const usarHtml = Boolean(limpio) && limpio.length <= 30000;
+    const cuerpo = usarHtml ? limpio : texto.slice(0, 30000);
+    if (!cuerpo.trim()) { setErrorTraduccion('Este correo no tiene texto que traducir.'); return; }
+    setTraduciendo(true); setErrorTraduccion('');
+    try {
+      const pedir = (t: string, html: boolean) => apiFetch('/api/email/traducir', {
+        getToken: getTokenTraduccion as any, method: 'POST', body: JSON.stringify({ texto: t, idioma: 'es', html }),
+      });
+      const [rc, ra] = await Promise.all([pedir(cuerpo, usarHtml), email.subject?.trim() ? pedir(email.subject, false) : Promise.resolve(null)]);
+      if (!rc?.success) throw new Error(rc?.error || 'No se pudo traducir.');
+      setTraduccion({
+        id: email.id,
+        ...(usarHtml ? { html: rc.data.traduccion } : { text: rc.data.traduccion }),
+        asunto: ra?.success ? ra.data.traduccion : undefined,
+      });
+      setVerTraduccion(true);
+    } catch (e: any) {
+      setErrorTraduccion(e?.message || 'No se pudo traducir.');
+    } finally {
+      setTraduciendo(false);
+    }
+  };
+
   const srcDoc = useMemo(
-    () => buildEmailDoc(decodeQP(email.bodyHtml || ''), decodeQP(email.bodyText || '')),
+    () => (verTraduccion && traduccionActual
+      ? buildEmailDoc(traduccionActual.html || null, traduccionActual.text || null)
+      : buildEmailDoc(decodeQP(email.bodyHtml || ''), decodeQP(email.bodyText || ''))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [email.id, email.bodyHtml, email.bodyText],
+    [email.id, email.bodyHtml, email.bodyText, verTraduccion, traduccionActual],
   );
 
   // Tope de altura del iframe: algunos correos (firmas con tablas/imágenes
@@ -2733,6 +2777,25 @@ function EmailReader({
                   </div>
                 )}
 
+                {!bodyLoading && (
+                  <div className="flex flex-wrap items-center gap-2 px-6 pt-4 text-xs">
+                    {verTraduccion && traduccionActual ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">
+                          <Globe2 size={13} /> Traducido al español
+                        </span>
+                        {traduccionActual.asunto && <span className="min-w-0 truncate text-slate-500">Asunto: <strong className="text-slate-700">{traduccionActual.asunto}</strong></span>}
+                        <button type="button" onClick={() => setVerTraduccion(false)} className="ml-auto rounded-lg px-2.5 py-1 font-semibold text-slate-500 hover:bg-slate-100">Ver original</button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => void traducirCorreo()} disabled={traduciendo}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                        {traduciendo ? <><Loader2 size={13} className="animate-spin" /> Traduciendo…</> : <><Globe2 size={13} /> {traduccionActual ? 'Ver traducción' : 'Traducir al español'}</>}
+                      </button>
+                    )}
+                    {errorTraduccion && <span className="text-red-600">{errorTraduccion}</span>}
+                  </div>
+                )}
                 <div className="px-6 py-6">
                   {bodyLoading ? (
                     <div className="space-y-3 py-2 animate-pulse">

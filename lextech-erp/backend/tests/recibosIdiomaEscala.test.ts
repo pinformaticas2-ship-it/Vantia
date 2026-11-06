@@ -138,6 +138,9 @@ test('idioma del cliente: se guarda, se normaliza y solo se consulta dentro del 
   delete process.env.GOOGLE_API_KEY;
   const t = await call(idioma.traducirTexto, orgA, { body: { texto: 'Hola', idioma: 'en' } });
   assert.equal(t.status, 503);
+  // Traducir al español un correo recibido ya no se rechaza por idioma (solo falta la IA).
+  const alEs = await call(idioma.traducirTexto, orgA, { body: { texto: 'Dear Sir', idioma: 'es' } });
+  assert.equal(alEs.status, 503);
 });
 
 test('escala de honorarios: solo propietario/admin la cambian, se valida y es de cada despacho', { skip }, async () => {
