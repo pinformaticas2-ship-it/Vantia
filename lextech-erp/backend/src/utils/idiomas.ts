@@ -33,7 +33,13 @@ export const normalizarIdioma = (v: unknown): string => {
 
 export const traduccionDisponible = () => Boolean((process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim());
 
-const MODELOS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+// gemini-2.0-flash ya no existe (404, retirado por Google en 2026). Gemini da
+// a menudo 503 «high demand» o 429 durante unos segundos: se reintenta con
+// espera creciente y alternando de modelo antes de rendirse.
+const MODELOS = ['gemini-2.5-flash', 'gemini-3.8-flash'];
+const ESPERAS_MS = [0, 800, 2000, 4000];
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const esTransitorio = (e: any) => /\b(429|500|503)\b|high demand|overloaded|unavailable|fetch failed|ECONNRESET|ETIMEDOUT/i.test(String(e?.message || e));
 
 /**
  * Traduce un texto (o HTML de correo):
@@ -59,21 +65,30 @@ export async function traducir(texto: string, idioma: string, opts: { html?: boo
 - Devuelve SOLO la traducción, sin comentarios ni comillas.
 
 ${texto.slice(0, 30000)}`
-    : `Traduce al ${NOMBRE_ES[destino]} el siguiente ${opts.html ? 'fragmento HTML de un correo' : 'texto de un correo'} de un despacho de abogados a su cliente.
+    : `Traduce al ${NOMBRE_ES[destino]} el siguiente ${opts.html ? 'fragmento HTML de un correo' : 'texto de un correo'} que escribe un despacho de abogados. Detecta tú el idioma original (normalmente español).
 - Registro profesional y cordial, como lo escribiría un abogado nativo.
 - Conserva nombres propios, importes, fechas, números de expediente, direcciones de correo y enlaces tal cual.
 - ${formato}
 - Devuelve SOLO la traducción, sin comentarios ni comillas.
 
 ${texto.slice(0, 30000)}`;
-  for (const nombre of MODELOS) {
+  let ultimoError: any = null;
+  for (let intento = 0; intento < ESPERAS_MS.length; intento++) {
+    if (ESPERAS_MS[intento]) await esperar(ESPERAS_MS[intento]);
+    const nombre = MODELOS[intento % MODELOS.length];
     try {
       const model = genAI.getGenerativeModel({ model: nombre });
       const r = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2 } } as any);
       const out = r.response.text().trim().replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/, '').trim();
       if (out) return out;
-    } catch { /* siguiente modelo */ }
+    } catch (e: any) {
+      ultimoError = e;
+      // Un modelo inexistente (404) se salta al siguiente; otros errores (clave
+      // inválida, petición rechazada) no se arreglan esperando.
+      if (!esTransitorio(e) && !/\b404\b/.test(String(e?.message))) break;
+    }
   }
+  if (ultimoError) console.warn('traducir: la IA no respondió:', String(ultimoError?.message || ultimoError).slice(0, 200));
   return null;
 }
 
