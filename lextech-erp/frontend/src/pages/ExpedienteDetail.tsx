@@ -56,6 +56,7 @@ import {
   MessageSquare,
   Video,
   Mic,
+  Calculator,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { ProfesionalInput, useProfesionalesOptions } from "../components/ProfesionalInput";
@@ -5883,6 +5884,13 @@ export default function ExpedienteDetail() {
               <ExternalLink size={14} className="text-slate-400" /> Ir a carpeta
             </a>
           )}
+          <button
+            onClick={() => navigate(`/dashboard/calculadora?expediente=${exp.id}`)}
+            title="Tasación de costas y jura de cuentas con los datos de este expediente"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+          >
+            <Calculator size={14} className="text-slate-400" /> Costas
+          </button>
           <button
             onClick={openPlaudModal}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"

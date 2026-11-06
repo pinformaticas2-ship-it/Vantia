@@ -13,8 +13,30 @@ if (ini < 0 || finCabecera < ini || iniScripts < finCabecera || fin < iniScripts
 
 const cabecera = h.slice(ini, finCabecera);          // <title>, fuentes y estilos
 // (el contenido de la página va en cuerpoLetrado, más abajo)
-let scripts = h.slice(iniScripts, fin);                // CDN + script de la calculadora
+let scripts = h.slice(iniScripts, fin);
+function sustituirUna(txt, desde, hacia) { const n = txt.split(desde).length - 1; if (n !== 1) throw new Error(`«${desde.slice(0, 40)}» aparece ${n} veces`); return txt.replace(desde, hacia); }                // CDN + script de la calculadora
 // En Vantia la IA es Gemini (vía nuestro backend), no Claude: textos visibles.
+// Con datos del expediente (window.__vantiaExpCampos), leer la resolución no
+// vacía lo que la resolución no menciona (NIG, partes contrarias, procurador) ni
+// cambia la cuantía del expediente por el importe de la condena.
+const VX = '(window.__vantiaExpCampos||{})';
+scripts = sustituirUna(scripts, 'if(want("nig")) setField("nig", g.nig||"");',
+  'if(want("nig") && (g.nig || !' + VX + '.nig)) setField("nig", g.nig||"");');
+scripts = sustituirUna(scripts, 'else if(!g.cuantia_indeterminada && coN!=null && coN>0){',
+  'else if(!g.cuantia_indeterminada && coN!=null && coN>0 && !' + VX + '.cuant){');
+scripts = sustituirUna(scripts, '    setField("indet", !!g.cuantia_indeterminada);',
+  '    if(g.cuantia_indeterminada || !' + VX + '.indet) setField("indet", !!g.cuantia_indeterminada);');
+scripts = sustituirUna(scripts, 'if(want("procurador_condenada")) setField(',
+  'if(want("procurador_condenada") && (has(g.procurador_condenada) || !' + VX + '.contraProc)) setField(');
+scripts = sustituirUna(scripts, 'if(want("letrado_condenada")) setField(',
+  'if(want("letrado_condenada") && (has(g.letrado_condenada) || !' + VX + '.contraLetr)) setField(');
+scripts = sustituirUna(scripts, 'else extNotes.pr="No se ha identificado al procurador/a',
+  'else if(!' + VX + '.procNom) extNotes.pr="No se ha identificado al procurador/a');
+
+// El script de la calculadora va dentro de un (function(){ … })(): el puente de
+// Vantia solo puede usar lo que se expone aquí, junto a su propio window.__calc.
+scripts = sustituirUna(scripts, 'restore(); render();\nwindow.__calc = {',
+  'restore(); render();\nwindow.__vantiaInterno = {setField, setMode, render, resStatus, colFromText, colegioProcDe, ponerResolucion: f=>{ resFileObj=f; }};\nwindow.__calc = {');
 scripts = scripts.replace(/Claude \(IA\)/g, 'IA').replace(/a Claude/g, 'a la IA').replace(/usar Claude/g, 'usar la IA').replace(/Claude no respondió/g, 'La IA no respondió')
   .replace(/Claude está/g, 'La IA está').replace(/"Claude /g, '"La IA ');
 if (/Claude/.test(scripts)) throw new Error('Quedan menciones a Claude: ' + (scripts.match(/.{30}Claude.{30}/g) || []).join(' | '));
@@ -61,6 +83,8 @@ const puente = `<script>
       var a = document.createElement('a'); a.href = url; a.download = (o && o.filename) || 'documento';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      // Si la calculadora está vinculada a un expediente, Vantia ofrece guardarlo allí.
+      try { if (window.parent && window.parent !== window && window.parent.__vantiaDocGenerado) window.parent.__vantiaDocGenerado(blob, (o && o.filename) || 'documento'); } catch (e) {}
       return { ok: true };
     },
   };
@@ -111,8 +135,60 @@ function vantiaPintarLetrado() {
   if (l.corta) { el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(l.corta)); }
 }
 /* La página de Vantia lo llama cuando el usuario cambia sus datos. */
-window.__vantiaLetradoCambio = function () { vantiaPintarLetrado(); try { if (typeof render === 'function') render(); } catch (e) {} };
+window.__vantiaLetradoCambio = function () { vantiaPintarLetrado(); try { var I = window.__vantiaInterno; if (I) I.render(); } catch (e) {} };
 document.addEventListener('DOMContentLoaded', vantiaPintarLetrado);
+
+/* Vantia: abrir la calculadora desde un expediente o la ficha de un cliente.
+   La página que la contiene pasa los datos que ya tiene el ERP; aquí se
+   empieza una tasación en blanco y se rellenan esos campos (los que no
+   vienen quedan vacíos, no con los valores de ejemplo). */
+var VANTIA_VACIOS = ['juz', 'autos', 'nig', 'nref', 'resol', 'cliente', 'contra', 'contraProc', 'contraLetr', 'procNom', 'procCol', 'procIban'];
+function vantiaAplicarExpediente(d) {
+  var I = window.__vantiaInterno; if (!I) return;
+  var b = document.getElementById('nuevaTas');
+  if (b) { b.click(); b.click(); } // «+ Nueva tasación» confirmada: formulario en blanco
+  var f = Object.assign({}, d.campos || {});
+  VANTIA_VACIOS.forEach(function (k) { if (!(k in f)) f[k] = ''; });
+  if (!('cuant' in f)) f.cuant = '';
+  if (!f.col) f.col = I.colFromText(String(f.juz || '') + ' ' + String(d.localidad || '')) || '';
+  if (f.procNom && !f.procCol) f.procCol = I.colegioProcDe(f.juz) || '';
+  Object.keys(f).forEach(function (k) {
+    var el = document.getElementById(k); if (!el) return;
+    if (k === 'col' && (!f.col || !Array.prototype.some.call(el.options, function (o) { return o.value === f.col; }))) return;
+    if (k === 'proc' && !f.proc) return;
+    I.setField(k, f[k]);
+  });
+  if (d.modo === 'jura' || d.modo === 'tas') I.setMode(d.modo, true);
+  I.render();
+  if (d.aviso) I.resStatus(d.aviso);
+  vantiaRecordarExp(f);
+}
+function vantiaRecordarExp(f) {
+  var v = {}; ['nig', 'cuant', 'indet', 'contraProc', 'contraLetr', 'procNom'].forEach(function (k) { if (f[k]) v[k] = f[k]; });
+  window.__vantiaExpCampos = Object.keys(v).length ? v : null;
+  try { if (window.__vantiaExpCampos) localStorage.setItem('vantia.costas.exp', JSON.stringify(v)); else localStorage.removeItem('vantia.costas.exp'); } catch (e) {}
+}
+try { window.__vantiaExpCampos = JSON.parse(localStorage.getItem('vantia.costas.exp') || 'null'); } catch (e) {}
+window.__vantiaCargarExpediente = function (d) {
+  if (!d) return;
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', function () { vantiaAplicarExpediente(d); }); return; }
+  vantiaAplicarExpediente(d);
+};
+/* Usar un documento del expediente (sentencia, auto, decreto…) como resolución. */
+window.__vantiaUsarResolucion = function (archivo, leer) {
+  var I = window.__vantiaInterno; if (!I) return;
+  I.ponerResolucion(archivo); document.getElementById('resName').textContent = archivo.name;
+  document.getElementById('resText').value = '';
+  var box = document.getElementById('resBox'); if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (leer) document.getElementById('resGo').click();
+};
+document.addEventListener('DOMContentLoaded', function () {
+  // «+ Nueva tasación» confirmada a mano: ya no hay datos de expediente que proteger.
+  var nt = document.getElementById('nuevaTas');
+  if (nt) nt.addEventListener('click', function () { if (nt.textContent.indexOf('¿') < 0) vantiaRecordarExp({}); });
+  var p = null; try { p = window.parent && window.parent !== window ? window.parent.__vantiaExpedientePendiente : null; } catch (e) {}
+  if (p) { try { window.parent.__vantiaExpedientePendiente = null; } catch (e) {} setTimeout(function () { vantiaAplicarExpediente(p); }, 0); }
+});
 </script>
 `;
 

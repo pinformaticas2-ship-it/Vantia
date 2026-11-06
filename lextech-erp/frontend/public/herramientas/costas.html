@@ -522,6 +522,8 @@ footer{margin-top:30px;color:var(--muted);font-size:.8rem;max-width:90ch}
       var a = document.createElement('a'); a.href = url; a.download = (o && o.filename) || 'documento';
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      // Si la calculadora está vinculada a un expediente, Vantia ofrece guardarlo allí.
+      try { if (window.parent && window.parent !== window && window.parent.__vantiaDocGenerado) window.parent.__vantiaDocGenerado(blob, (o && o.filename) || 'documento'); } catch (e) {}
       return { ok: true };
     },
   };
@@ -572,8 +574,60 @@ function vantiaPintarLetrado() {
   if (l.corta) { el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(l.corta)); }
 }
 /* La página de Vantia lo llama cuando el usuario cambia sus datos. */
-window.__vantiaLetradoCambio = function () { vantiaPintarLetrado(); try { if (typeof render === 'function') render(); } catch (e) {} };
+window.__vantiaLetradoCambio = function () { vantiaPintarLetrado(); try { var I = window.__vantiaInterno; if (I) I.render(); } catch (e) {} };
 document.addEventListener('DOMContentLoaded', vantiaPintarLetrado);
+
+/* Vantia: abrir la calculadora desde un expediente o la ficha de un cliente.
+   La página que la contiene pasa los datos que ya tiene el ERP; aquí se
+   empieza una tasación en blanco y se rellenan esos campos (los que no
+   vienen quedan vacíos, no con los valores de ejemplo). */
+var VANTIA_VACIOS = ['juz', 'autos', 'nig', 'nref', 'resol', 'cliente', 'contra', 'contraProc', 'contraLetr', 'procNom', 'procCol', 'procIban'];
+function vantiaAplicarExpediente(d) {
+  var I = window.__vantiaInterno; if (!I) return;
+  var b = document.getElementById('nuevaTas');
+  if (b) { b.click(); b.click(); } // «+ Nueva tasación» confirmada: formulario en blanco
+  var f = Object.assign({}, d.campos || {});
+  VANTIA_VACIOS.forEach(function (k) { if (!(k in f)) f[k] = ''; });
+  if (!('cuant' in f)) f.cuant = '';
+  if (!f.col) f.col = I.colFromText(String(f.juz || '') + ' ' + String(d.localidad || '')) || '';
+  if (f.procNom && !f.procCol) f.procCol = I.colegioProcDe(f.juz) || '';
+  Object.keys(f).forEach(function (k) {
+    var el = document.getElementById(k); if (!el) return;
+    if (k === 'col' && (!f.col || !Array.prototype.some.call(el.options, function (o) { return o.value === f.col; }))) return;
+    if (k === 'proc' && !f.proc) return;
+    I.setField(k, f[k]);
+  });
+  if (d.modo === 'jura' || d.modo === 'tas') I.setMode(d.modo, true);
+  I.render();
+  if (d.aviso) I.resStatus(d.aviso);
+  vantiaRecordarExp(f);
+}
+function vantiaRecordarExp(f) {
+  var v = {}; ['nig', 'cuant', 'indet', 'contraProc', 'contraLetr', 'procNom'].forEach(function (k) { if (f[k]) v[k] = f[k]; });
+  window.__vantiaExpCampos = Object.keys(v).length ? v : null;
+  try { if (window.__vantiaExpCampos) localStorage.setItem('vantia.costas.exp', JSON.stringify(v)); else localStorage.removeItem('vantia.costas.exp'); } catch (e) {}
+}
+try { window.__vantiaExpCampos = JSON.parse(localStorage.getItem('vantia.costas.exp') || 'null'); } catch (e) {}
+window.__vantiaCargarExpediente = function (d) {
+  if (!d) return;
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', function () { vantiaAplicarExpediente(d); }); return; }
+  vantiaAplicarExpediente(d);
+};
+/* Usar un documento del expediente (sentencia, auto, decreto…) como resolución. */
+window.__vantiaUsarResolucion = function (archivo, leer) {
+  var I = window.__vantiaInterno; if (!I) return;
+  I.ponerResolucion(archivo); document.getElementById('resName').textContent = archivo.name;
+  document.getElementById('resText').value = '';
+  var box = document.getElementById('resBox'); if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (leer) document.getElementById('resGo').click();
+};
+document.addEventListener('DOMContentLoaded', function () {
+  // «+ Nueva tasación» confirmada a mano: ya no hay datos de expediente que proteger.
+  var nt = document.getElementById('nuevaTas');
+  if (nt) nt.addEventListener('click', function () { if (nt.textContent.indexOf('¿') < 0) vantiaRecordarExp({}); });
+  var p = null; try { p = window.parent && window.parent !== window ? window.parent.__vantiaExpedientePendiente : null; } catch (e) {}
+  if (p) { try { window.parent.__vantiaExpedientePendiente = null; } catch (e) {} setTimeout(function () { vantiaAplicarExpediente(p); }, 0); }
+});
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1901,7 +1955,7 @@ function applyExtraction(g, only){
   const has = v => v!==undefined && v!==null && v!=="";
   if(want("organo") && has(g.organo)) setField("juz", g.organo);
   if(want("numero_autos") && has(g.numero_autos)) setField("autos", g.numero_autos);
-  if(want("nig")) setField("nig", g.nig||"");
+  if(want("nig") && (g.nig || !(window.__vantiaExpCampos||{}).nig)) setField("nig", g.nig||"");
   if(["tipo_resolucion","numero_resolucion","fecha_resolucion"].some(want) && (has(g.tipo_resolucion)||has(g.fecha_resolucion)||has(g.numero_resolucion)))
     setField("resol", [g.tipo_resolucion||"Resolución", has(g.numero_resolucion)?"nº "+g.numero_resolucion:"", has(g.fecha_resolucion)?"de "+fdate(g.fecha_resolucion):""].filter(Boolean).join(" "));
   if(want("fecha_demanda") && has(g.fecha_demanda)) setField("fdem", g.fecha_demanda);
@@ -1912,22 +1966,22 @@ function applyExtraction(g, only){
   if(["cuantia","condena_importe","cuantia_indeterminada"].some(want)){
     const cuN=parseEs(g.cuantia), coN=parseEs(g.condena_importe); extNotes.cu="";
     if(cuN!=null && cuN>0) setField("cuant", cuN);
-    else if(!g.cuantia_indeterminada && coN!=null && coN>0){ setField("cuant", coN); extNotes.cu="La resolución no fija la cuantía: se ha tomado el importe de la condena; revísalo."; }
+    else if(!g.cuantia_indeterminada && coN!=null && coN>0 && !(window.__vantiaExpCampos||{}).cuant){ setField("cuant", coN); extNotes.cu="La resolución no fija la cuantía: se ha tomado el importe de la condena; revísalo."; }
     setField("condena", coN!=null && coN>0 ? coN : "");
-    setField("indet", !!g.cuantia_indeterminada);
+    if(g.cuantia_indeterminada || !(window.__vantiaExpCampos||{}).indet) setField("indet", !!g.cuantia_indeterminada);
   }
   if(want("parte_beneficiaria") && has(g.parte_beneficiaria)) setField("cliente", g.parte_beneficiaria);
   if(want("parte_condenada") && has(g.parte_condenada)) setField("contra", g.parte_condenada);
   if(["procurador_beneficiaria","colegiado_procurador_beneficiaria","colegio_procurador_beneficiaria"].some(want)){
     const prNom=quitaTrat(g.procurador_beneficiaria); extNotes.pr="";
-    if(prNom){ setField("procNom", prNom); $("procOn").checked=true; } else extNotes.pr="No se ha identificado al procurador/a de la parte favorecida: complétalo en «Procurador/a».";
+    if(prNom){ setField("procNom", prNom); $("procOn").checked=true; } else if(!(window.__vantiaExpCampos||{}).procNom) extNotes.pr="No se ha identificado al procurador/a de la parte favorecida: complétalo en «Procurador/a».";
     const num = has(g.colegiado_procurador_beneficiaria)? "Colegiado/a nº "+String(g.colegiado_procurador_beneficiaria).replace(/^n[ºo°.]*\s*/i,"") : "Colegiado/a nº [nº]";
     let col = g.colegio_procurador_beneficiaria;
     if(!has(col) && prNom){ col = colegioProcDe(g.organo||$("juz").value); if(col) extNotes.pr="Colegio del procurador/a deducido de la sede del órgano: verifícalo."; }
     if(prNom || has(g.colegio_procurador_beneficiaria) || has(g.colegiado_procurador_beneficiaria)) setField("procCol", has(col)? num+" · "+col : num);
   }
-  if(want("procurador_condenada")) setField("contraProc", quitaTrat(g.procurador_condenada));
-  if(want("letrado_condenada")) setField("contraLetr", quitaTrat(g.letrado_condenada));
+  if(want("procurador_condenada") && (has(g.procurador_condenada) || !(window.__vantiaExpCampos||{}).contraProc)) setField("contraProc", quitaTrat(g.procurador_condenada));
+  if(want("letrado_condenada") && (has(g.letrado_condenada) || !(window.__vantiaExpCampos||{}).contraLetr)) setField("contraLetr", quitaTrat(g.letrado_condenada));
   if(want("allanamiento")){ const r=document.querySelector('input[name="term"][value="'+(g.allanamiento?"allan":"completo")+'"]'); if(r && (g.allanamiento || only)) r.checked=true; }
   if(want("temeridad")) $("cap").checked = !g.temeridad;
   extNotes.letr = (has(g.letrado_beneficiaria) && !/ferr[aá]ndez\s+pina/i.test(g.letrado_beneficiaria))? "La resolución identifica como letrado de la parte favorecida a "+g.letrado_beneficiaria+"." : "";
@@ -1963,6 +2017,7 @@ $("resDiscard").addEventListener("click",()=>{
 $("resApply").addEventListener("click",()=>{ verifyExtraction(); });
 
 restore(); render();
+window.__vantiaInterno = {setField, setMode, render, resStatus, colFromText, colegioProcDe, ponerResolucion: f=>{ resFileObj=f; }};
 window.__calc = {calc, finalize, escala, COLEGIOS, buildDocx, jointText, calcProc, arancel, parseEs, buildTasDocx, juzgadoTexto, minutaTexto, tplCtx};
 })();
 </script>

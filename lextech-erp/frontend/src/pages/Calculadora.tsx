@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { usePreferencias } from "../lib/preferencias";
-import { AlertTriangle, Calculator, Copy, Gavel, Plus, Printer, Scale, Settings2, Trash2 } from "lucide-react";
+import { AlertTriangle, Calculator, Copy, FileText, FolderSearch, Gavel, Link2, Plus, Printer, RotateCcw, Scale, Settings2, Trash2, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  datosCalculadora, nombreCliente, refExpediente,
+  type ClienteCostas, type DatosCalculadora, type ExpedienteCostas, type ProcuradorCostas,
+} from "../lib/costasExpediente";
 import { apiFetch } from "../lib/api";
 import { aviso } from "../lib/avisos";
 import { Modal } from "../components/Modal";
@@ -451,7 +456,140 @@ function EditorEscala({ inicial, onClose, onGuardada }: { inicial: Escala; onClo
 declare global { interface Window {
   __vantiaIA?: (prompt: string, imagenes: { mime: string; base64: string }[]) => Promise<any>;
   __vantiaLetrado?: { nombre: string; colegiado: string; colegio: string };
+  __vantiaExpedientePendiente?: DatosCalculadora | null;
+  __vantiaDocGenerado?: (blob: Blob, nombre: string) => void;
 } }
+
+// ── Vínculo con un expediente o un cliente ──────────────────────────────
+// Se abre con ?expediente=<id> (desde el expediente) o ?cliente=<id> (desde la
+// ficha del cliente). Los datos que ya tiene el ERP se pasan a la calculadora;
+// el Word generado se puede guardar en el expediente con un clic.
+interface Vinculo {
+  expediente: ExpedienteCostas | null;
+  cliente: ClienteCostas | null;
+  delCliente: ExpedienteCostas[];   // expedientes del cliente (si se abrió desde su ficha)
+}
+interface DocExp { id: string; original_name: string; document_name?: string | null; mimetype?: string | null; created_at?: string }
+const LEIBLE = /pdf|image\/(jpeg|png|webp)/i;
+const sinAcentos = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+async function cargarVinculo(getToken: Parameters<typeof apiFetch>[1]["getToken"], expId: string, cliId: string) {
+  const g = (url: string) => apiFetch(url, { getToken }).catch(() => null);
+  let expediente: ExpedienteCostas | null = null;
+  let delCliente: ExpedienteCostas[] = [];
+  if (expId) {
+    const r = await g(`/api/expedientes/${encodeURIComponent(expId)}`);
+    expediente = r?.data || null;
+    if (!expediente) throw new Error("No se encontró el expediente o no tienes acceso.");
+  }
+  const idCliente = cliId || expediente?.cliente_id || "";
+  const [rc, rl] = await Promise.all([
+    idCliente ? g(`/api/entities/${encodeURIComponent(idCliente)}`) : null,
+    cliId ? g(`/api/expedientes?limit=100&clienteId=${encodeURIComponent(cliId)}`) : null,
+  ]);
+  const cliente: ClienteCostas | null = rc?.data || null;
+  if (cliId && !cliente) throw new Error("No se encontró el cliente o no tienes acceso.");
+  delCliente = rl?.data || [];
+  // Nº de colegiado y Colegio de nuestro procurador, si está en el Directorio.
+  let procurador: ProcuradorCostas | null = null;
+  const nomProc = (expediente?.procurador || "").trim();
+  if (nomProc) {
+    const primera = nomProc.split(/\s+/)[0];
+    const rp = await g(`/api/directorio?tipo=PROCURADOR&q=${encodeURIComponent(primera)}`);
+    const objetivo = sinAcentos(nomProc);
+    procurador = (rp?.data || []).find((p: any) => sinAcentos(`${p.first_name || ""} ${p.last_name || ""}`) === objetivo) || null;
+  }
+  return { vinculo: { expediente, cliente, delCliente } as Vinculo, procurador };
+}
+
+function BarraVinculo({ vinculo, cargando, docs, onElegirExpediente, onLeerDoc, onRecargar, onQuitar }: {
+  vinculo: Vinculo | null;
+  cargando: boolean;
+  docs: DocExp[] | null;
+  onElegirExpediente: (id: string) => void;
+  onLeerDoc: (d: DocExp) => void;
+  onRecargar: () => void;
+  onQuitar: () => void;
+}) {
+  const [verDocs, setVerDocs] = useState(false);
+  if (cargando && !vinculo) return <div className="h-10 flex-shrink-0 animate-pulse border-b border-slate-200 bg-slate-50" />;
+  if (!vinculo) return null;
+  const { expediente: e, cliente: c, delCliente } = vinculo;
+  const leibles = (docs || []).filter((d) => LEIBLE.test(d.mimetype || "") || /\.(pdf|jpe?g|png|webp)$/i.test(d.original_name));
+  return (
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-amber-200 bg-amber-50/70 px-4 py-1.5 text-xs text-slate-700">
+      <Link2 size={13} className="text-amber-700" />
+      {e ? (
+        <Link to={`/dashboard/expedientes/${e.id}`} className="font-semibold text-slate-900 hover:underline">
+          Expediente {refExpediente(e)}{e.descripcion ? ` · ${e.descripcion.slice(0, 60)}` : ""}
+        </Link>
+      ) : <span className="font-semibold text-slate-900">Sin expediente</span>}
+      {c && <Link to={`/dashboard/clientes/${c.id}`} className="text-slate-500 hover:underline">{nombreCliente(c)}</Link>}
+      {delCliente.length > 0 && (
+        <select value={e?.id || ""} onChange={(ev) => onElegirExpediente(ev.target.value)}
+          className="max-w-[16rem] rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs">
+          <option value="">{e ? "Solo datos del cliente" : `Elegir expediente (${delCliente.length})`}</option>
+          {delCliente.map((x) => <option key={x.id} value={x.id}>{refExpediente(x)}{x.descripcion ? ` · ${x.descripcion.slice(0, 40)}` : ""}</option>)}
+        </select>
+      )}
+      <div className="ml-auto flex items-center gap-1">
+        {e && (
+          <div className="relative">
+            <button type="button" onClick={() => setVerDocs((v) => !v)} disabled={docs === null}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50">
+              <FileText size={13} /> Leer resolución del expediente
+            </button>
+            {verDocs && (
+              <div className="absolute right-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+                {leibles.length === 0 ? (
+                  <p className="px-3 py-2 text-slate-500">El expediente no tiene PDF ni imágenes. Súbelo en la calculadora o en Documentos del expediente.</p>
+                ) : leibles.map((d) => (
+                  <button key={d.id} type="button" onClick={() => { setVerDocs(false); onLeerDoc(d); }}
+                    className="block w-full truncate rounded-lg px-3 py-2 text-left hover:bg-slate-50">
+                    {d.document_name || d.original_name}
+                    {d.created_at && <span className="ml-1 text-slate-400">· {new Date(d.created_at).toLocaleDateString("es-ES")}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        <button type="button" onClick={onRecargar} title="Volver a cargar los datos del expediente (borra lo que hayas cambiado)"
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100"><RotateCcw size={13} /></button>
+        <button type="button" onClick={onQuitar} title="Desvincular" className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100"><X size={13} /></button>
+      </div>
+    </div>
+  );
+}
+
+function BuscarExpediente({ onElegir, onClose }: { onElegir: (id: string) => void; onClose: () => void }) {
+  const { getToken } = useAuth();
+  const [q, setQ] = useState("");
+  const [lista, setLista] = useState<ExpedienteCostas[] | null>(null);
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const r = await apiFetch(`/api/expedientes?limit=30${q.trim() ? `&q=${encodeURIComponent(q.trim())}` : ""}`, { getToken }).catch(() => null);
+      setLista(r?.data || []);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, getToken]);
+  return (
+    <Modal open onClose={onClose} title="Cargar datos de un expediente" subtitle="Juzgado, autos, partes, procurador y cuantía pasan a la calculadora" maxWidth="max-w-lg">
+      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por número, cliente, contrario, autos…" className={campo} />
+      <div className="mt-3 max-h-80 space-y-1 overflow-y-auto">
+        {lista === null ? <p className="px-1 py-2 text-sm text-slate-400">Buscando…</p>
+          : lista.length === 0 ? <p className="px-1 py-2 text-sm text-slate-500">Sin resultados.</p>
+          : lista.map((x) => (
+            <button key={x.id} type="button" onClick={() => onElegir(x.id)} className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50">
+              <span className="font-mono text-xs text-slate-500">{refExpediente(x)}</span>{" "}
+              <span className="text-sm font-semibold text-slate-800">{x.descripcion || x.cliente_nombre || "—"}</span>
+              <span className="block truncate text-xs text-slate-500">{[x.cliente_nombre, x.contrario && `c/ ${x.contrario}`, x.juzgado].filter(Boolean).join(" · ")}</span>
+            </button>
+          ))}
+      </div>
+    </Modal>
+  );
+}
 
 export default function Calculadora() {
   const { getToken } = useAuth();
@@ -494,6 +632,103 @@ export default function Calculadora() {
     try { localStorage.setItem("vantia.calculadora.vista", v); } catch { /* sin almacenamiento */ }
   };
 
+  // ── Vínculo con expediente / cliente ──
+  const [params, setParams] = useSearchParams();
+  const expId = params.get("expediente") || "";
+  const cliId = params.get("cliente") || "";
+  const [vinculo, setVinculo] = useState<Vinculo | null>(null);
+  const [cargandoVinculo, setCargandoVinculo] = useState(false);
+  const [docs, setDocs] = useState<DocExp[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [recarga, setRecarga] = useState(0);
+
+  const enviar = (d: DatosCalculadora) => {
+    const w = iframeRef.current?.contentWindow as any;
+    if (w?.__vantiaCargarExpediente && w.document?.readyState !== "loading") {
+      window.__vantiaExpedientePendiente = null;
+      try { w.__vantiaCargarExpediente(d); } catch { aviso.error("La calculadora no pudo recibir los datos del expediente."); }
+    } else window.__vantiaExpedientePendiente = d; // la calculadora lo recoge al cargar
+  };
+
+  useEffect(() => {
+    if (!expId && !cliId) { setVinculo(null); setDocs(null); return; }
+    if (vista !== "completa") cambiar("completa");
+    let vivo = true;
+    setCargandoVinculo(true);
+    (async () => {
+      try {
+        const { vinculo: v, procurador } = await cargarVinculo(getToken, expId, cliId);
+        if (!vivo) return;
+        setVinculo(v);
+        // Si el cliente solo tiene un expediente, se usa ese directamente.
+        if (!expId && cliId && v.delCliente.length === 1) { setParams({ cliente: cliId, expediente: v.delCliente[0].id }, { replace: true }); return; }
+        // Los datos se cargan una vez por vínculo: al volver a la calculadora
+        // se conserva lo que hayas cambiado (salvo que pulses «Volver a cargar»).
+        const clave = `${expId}|${cliId}`;
+        let ya = "";
+        try { ya = sessionStorage.getItem("vantia.costas.vinculo") || ""; } catch { /* nada */ }
+        if (ya !== clave || recarga > 0) {
+          enviar(datosCalculadora({ expediente: v.expediente, cliente: v.cliente, procurador }));
+          try { sessionStorage.setItem("vantia.costas.vinculo", clave); } catch { /* nada */ }
+        }
+        if (v.expediente) {
+          const r = await apiFetch(`/api/files/${encodeURIComponent(v.expediente.id)}`, { getToken }).catch(() => null);
+          if (vivo) setDocs(r?.data || []);
+        } else setDocs(null);
+      } catch (e: any) {
+        if (vivo) { aviso.error(e?.message || "No se pudieron cargar los datos."); setVinculo(null); }
+      } finally {
+        if (vivo) setCargandoVinculo(false);
+      }
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expId, cliId, recarga, getToken]);
+
+  const leerDoc = async (d: DocExp) => {
+    const id = vinculo?.expediente?.id; if (!id) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${id}/${d.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const archivo = new File([blob], d.original_name, { type: d.mimetype || blob.type });
+      (iframeRef.current?.contentWindow as any)?.__vantiaUsarResolucion?.(archivo, true);
+    } catch { aviso.error("No se pudo abrir el documento del expediente."); }
+  };
+
+  // Word descargado desde la calculadora → ofrecer guardarlo en el expediente.
+  const expVinculado = vinculo?.expediente || null;
+  useEffect(() => {
+    if (!expVinculado) { delete window.__vantiaDocGenerado; return; }
+    window.__vantiaDocGenerado = (blob, nombre) => {
+      aviso.info("Documento descargado", {
+        duracion: 12000,
+        accion: {
+          label: `Guardar en el exp. ${refExpediente(expVinculado)}`,
+          onClick: async () => {
+            try {
+              const token = await getToken({ skipCache: true });
+              const fd = new FormData();
+              fd.append("files", new File([blob], nombre, { type: blob.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+              const res = await fetch(`/api/files/${expVinculado.id}`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+              if (!res.ok) throw new Error();
+              const r = await res.json().catch(() => null);
+              const fileId = r?.data?.[0]?.id;
+              if (fileId) await fetch(`/api/files/${expVinculado.id}/${fileId}`, {
+                method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ document_name: nombre.replace(/\.[^/.]+$/, ""), attachment_type: "Sin clasificar" }),
+              }).catch(() => {});
+              aviso.ok(`Guardado en Documentos del expediente ${refExpediente(expVinculado)}`);
+            } catch { aviso.error("No se pudo guardar en el expediente."); }
+          },
+        },
+      });
+    };
+    return () => { delete window.__vantiaDocGenerado; };
+  }, [expVinculado, getToken]);
+  useEffect(() => () => { delete window.__vantiaExpedientePendiente; }, []);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
@@ -505,6 +740,12 @@ export default function Calculadora() {
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${vista === v ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50"}`}>{t}</button>
           ))}
         </div>
+        {vista === "completa" && !vinculo && !cargandoVinculo && (
+          <button type="button" onClick={() => setBuscando(true)}
+            className="ml-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 sm:inline-flex">
+            <FolderSearch size={13} /> Cargar expediente
+          </button>
+        )}
         {vista === "completa" && (
           <button type="button" onClick={() => setEditandoLetrado(true)} title="Datos que salen en las notas y escritos"
             className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
@@ -516,6 +757,14 @@ export default function Calculadora() {
           </button>
         )}
       </div>
+      {vista === "completa" && (
+        <BarraVinculo vinculo={vinculo} cargando={cargandoVinculo} docs={docs}
+          onElegirExpediente={(id) => setParams(id ? { ...(cliId ? { cliente: cliId } : {}), expediente: id } : { cliente: cliId })}
+          onLeerDoc={leerDoc}
+          onRecargar={() => setRecarga((n) => n + 1)}
+          onQuitar={() => { setParams({}); try { sessionStorage.removeItem("vantia.costas.vinculo"); } catch { /* nada */ } }} />
+      )}
+      {buscando && <BuscarExpediente onClose={() => setBuscando(false)} onElegir={(id) => { setBuscando(false); setParams({ expediente: id }); }} />}
       {editandoLetrado && (
         <DatosLetrado inicial={letrado} onClose={() => setEditandoLetrado(false)}
           onGuardar={async (d) => { await guardar({ letradoNombre: d.nombre, colegiado: d.colegiado, colegio: d.colegio }); setEditandoLetrado(false); aviso.ok("Datos de letrado guardados"); }} />
@@ -524,7 +773,16 @@ export default function Calculadora() {
         <div className="relative min-h-0 flex-1 bg-white">
           {!cargada && <div className="absolute inset-0 animate-pulse bg-slate-50" />}
           <iframe ref={iframeRef} title="Calculadora de tasación de costas y jura de cuentas" src="/herramientas/costas.html"
-            onLoad={() => { setCargada(true); try { (iframeRef.current?.contentWindow as any)?.__vantiaLetradoCambio?.(); } catch { /* nada */ } }}
+            onLoad={() => {
+              setCargada(true);
+              try {
+                const w = iframeRef.current?.contentWindow as any;
+                w?.__vantiaLetradoCambio?.();
+                // Por si los datos llegaron justo mientras cargaba.
+                const p = window.__vantiaExpedientePendiente;
+                if (p && w?.__vantiaCargarExpediente) { window.__vantiaExpedientePendiente = null; w.__vantiaCargarExpediente(p); }
+              } catch { /* nada */ }
+            }}
             className={`h-full w-full border-0 transition-opacity duration-300 ${cargada ? "opacity-100" : "opacity-0"}`} />
         </div>
       ) : (

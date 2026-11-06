@@ -14,7 +14,7 @@ import { Landmark,
   ScrollText, Receipt, Scale, UserCheck,
   MessageSquare, FileSignature, ShieldAlert, FilePlus,
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
-  Banknote, TrendingUp, TrendingDown, BadgeEuro, Link2,
+  Banknote, TrendingUp, TrendingDown, BadgeEuro, Link2, Calculator,
 } from "lucide-react";
 import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -4149,6 +4149,13 @@ export default function ClientDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={() => navigate(`/dashboard/calculadora?cliente=${client.id}`)}
+            title="Tasación de costas y jura de cuentas con los datos de este cliente y sus expedientes"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+          >
+            <Calculator size={14} className="text-slate-400" /> Costas
+          </button>
           <BackButton onClick={() => navigate("/dashboard/clientes")} />
           {editing ? (
             <>
