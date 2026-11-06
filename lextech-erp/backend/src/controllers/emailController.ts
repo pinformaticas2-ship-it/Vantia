@@ -1727,10 +1727,17 @@ export async function sendMail(req: Request, res: Response) {
     }
     if (!accountId) return err(res, 'No hay ninguna cuenta de correo activa en esta organización para enviar', 400);
 
-    const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
-      [accountId, uid, organizacionId],
-    );
+    // La cuenta y (si es una respuesta) el Message-ID del original se piden a
+    // la vez: cada consulta a la BD cuesta ~130 ms desde producción.
+    const [{ rows }, { rows: orig }] = await Promise.all([
+      pool.query(
+        `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+        [accountId, uid, organizacionId],
+      ),
+      reply_to_id
+        ? pool.query(`SELECT message_id FROM emails WHERE id = $1 AND user_id = $2`, [reply_to_id, uid]).catch(() => ({ rows: [] as any[] }))
+        : Promise.resolve({ rows: [] as any[] }),
+    ]);
     if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
     const acc = rows[0];
     const password = decryptPassword(acc.password_enc);
@@ -1762,14 +1769,8 @@ export async function sendMail(req: Request, res: Response) {
     // Respuesta: se enlaza con el correo original (In-Reply-To/References)
     // para que el destinatario la vea dentro de la misma conversación.
     let inReplyTo: string | undefined;
-    if (reply_to_id) {
-      const { rows: orig } = await pool.query(
-        `SELECT message_id FROM emails WHERE id = $1 AND user_id = $2`,
-        [reply_to_id, uid],
-      ).catch(() => ({ rows: [] as any[] }));
-      const mid = String(orig[0]?.message_id || '').replace(/[<>]/g, '').trim();
-      if (mid) inReplyTo = `<${mid}>`;
-    }
+    const midOriginal = String(orig[0]?.message_id || '').replace(/[<>]/g, '').trim();
+    if (midOriginal) inReplyTo = `<${midOriginal}>`;
     // Message-ID propio: el mismo en lo enviado y en la copia de Enviados.
     const dominio = String(acc.email || '').split('@')[1] || 'vantia.app';
     const messageId = `<${crypto.randomUUID()}@${dominio}>`;
@@ -1784,32 +1785,40 @@ export async function sendMail(req: Request, res: Response) {
 
     await dispatchEmail(smtpCfg, mailMsg);
 
-    await guardarCopiaEnviada(acc, uid, {
-      to: toList, cc: ccList, bcc: bccList, subject, html, text,
-      messageId, inReplyTo, attachments: adjuntos, expedienteId: expediente_id || null,
-    });
+    // Enviado: se contesta YA. Lo demás (copia en Enviados por IMAP, que
+    // conecta con el buzón y sincroniza la carpeta, varios segundos; borrar
+    // el borrador; contactos; trazabilidad) sigue por detrás. Antes todo eso
+    // iba antes de responder y la ventana de redactar se quedaba esperando.
+    // La copia avisa sola a la pantalla (emitEmailEvent 'messageSent').
+    ok(res, { sent: true });
 
-    // Delete draft if any
-    if (draft_id) {
-      await pool.query(`DELETE FROM emails WHERE id=$1 AND user_id=$2 AND is_draft=true`, [draft_id, uid]);
-    }
-
-    await upsertEmailContacts(uid, [
-      ...extractContacts(to),
-      ...extractContacts(cc),
-      ...extractContacts(bcc),
-    ], 'smtp');
-
-    await logActivityForReq(
-      req,
-      `Correo enviado: ${subject}`,
-      'EMAIL',
-      accountId,
-      (Array.isArray(toList) ? toList : [toList]).join(', '),
-      'CREATE',
-    );
-
-    return ok(res, { sent: true });
+    const cuentaId = accountId;
+    void (async () => {
+      const tarea = async (nombre: string, fn: () => Promise<unknown>) => {
+        try { await fn(); } catch (e: any) { console.warn(`[correo] tras enviar (${nombre}):`, e?.message || e); }
+      };
+      await Promise.all([
+        tarea('copia en Enviados', () => guardarCopiaEnviada(acc, uid, {
+          to: toList, cc: ccList, bcc: bccList, subject, html, text,
+          messageId, inReplyTo, attachments: adjuntos, expedienteId: expediente_id || null,
+        })),
+        draft_id ? tarea('borrador', () => pool.query(`DELETE FROM emails WHERE id=$1 AND user_id=$2 AND is_draft=true`, [draft_id, uid])) : null,
+        tarea('contactos', () => upsertEmailContacts(uid, [
+          ...extractContacts(to),
+          ...extractContacts(cc),
+          ...extractContacts(bcc),
+        ], 'smtp')),
+        tarea('trazabilidad', () => logActivityForReq(
+          req,
+          `Correo enviado: ${subject}`,
+          'EMAIL',
+          cuentaId,
+          toList.join(', '),
+          'CREATE',
+        )),
+      ]);
+    })();
+    return;
   } catch (e: any) { return err(res, `Error al enviar: ${e.message}`); }
 }
 
@@ -1856,6 +1865,9 @@ export async function getRecipientSuggestions(req: Request, res: Response) {
   const q = String(req.query.q || '').trim();
   const limit = Math.min(Math.max(Number(req.query.limit || 8), 1), 20);
   const like = `%${q}%`;
+  // Los clientes sugeridos son solo los del despacho activo (antes salían los
+  // de todos los despachos de la base de datos).
+  const organizacionId = (req as any).organizacionId || null;
 
   try {
     const { rows } = await pool.query(
@@ -1881,14 +1893,15 @@ export async function getRecipientSuggestions(req: Request, res: Response) {
           0 AS usage_count,
           NULL::timestamptz AS last_used_at
         FROM entities e
-        WHERE e.email IS NOT NULL
+        WHERE e.organizacion_id = $5
+          AND e.email IS NOT NULL
           AND e.email <> ''
           AND ($2 = '' OR e.email ILIKE $3 OR COALESCE(e.first_name, '') ILIKE $3 OR COALESCE(e.last_name, '') ILIKE $3 OR COALESCE(e.commercial_name, '') ILIKE $3)
       ) candidates
       ORDER BY usage_count DESC, last_used_at DESC NULLS LAST, name ASC
       LIMIT $4
       `,
-      [uid, q, like, limit],
+      [uid, q, like, limit, organizacionId],
     );
 
     return ok(res, rows);

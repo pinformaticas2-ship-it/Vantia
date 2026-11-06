@@ -909,8 +909,8 @@ function ComposeWindow({
           attachments,
         });
         await gmail.sendMessage(raw, data.replyThreadId);
-        const token = await getToken();
-        await fetch(`${API}/email/gmail/log-sent`, {
+        // Registro del envío (contactos, trazabilidad): no hace falta esperarlo.
+        void getToken().then((token) => fetch(`${API}/email/gmail/log-sent`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -921,7 +921,7 @@ function ComposeWindow({
             snippet: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220),
             has_attachments: attachments.length > 0,
           }),
-        }).catch(() => {});
+        })).catch(() => {});
       } else {
         const token = await getToken();
         const res = await fetch(`${API}/email/send`, {

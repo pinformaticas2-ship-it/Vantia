@@ -160,3 +160,14 @@ test('escala de honorarios: solo propietario/admin la cambian, se valida y es de
   const leidaB = await call(org.getEscalaHonorarios, orgB);
   assert.equal(leidaB.body.data.escala, null);
 });
+
+test('correo: las sugerencias de destinatarios solo traen clientes del despacho activo', { skip }, async () => {
+  const email = await import('../src/controllers/emailController');
+  await pool.query(
+    `INSERT INTO entities (type, first_name, email, organizacion_id) VALUES ('CLIENTE','Cliente Secreto A','secreto.a@example.test',$1)`, [orgA],
+  );
+  const desdeA = await call(email.getRecipientSuggestions, orgA, { query: { q: 'secreto' } });
+  assert.ok(JSON.stringify(desdeA.body).includes('secreto.a@example.test'));
+  const desdeB = await call(email.getRecipientSuggestions, orgB, { query: { q: 'secreto' } });
+  assert.equal(JSON.stringify(desdeB.body).includes('secreto.a@example.test'), false);
+});
