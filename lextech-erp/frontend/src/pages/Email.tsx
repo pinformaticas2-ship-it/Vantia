@@ -4592,6 +4592,10 @@ export default function Email() {
   }, [activePinnedKey]);
 
   // ── Reload when folder / provider changes ─────────────────────────────────
+  // Depende del ID de la cuenta, no del objeto: las cuentas se releen cada
+  // minuto (aviso de "problema al actualizar") y cada lectura trae un objeto
+  // nuevo de la MISMA cuenta. Con el objeto como dependencia, esto se tomaba
+  // por un cambio de cuenta y cerraba el correo que se estaba leyendo.
   useEffect(() => {
     if (!gmail && !currentImapAccount) return;
     const clave = searchQ.trim() ? null : claveListaCorreo(currentImapAccount?.id, currentGmailProfileRef.current?.id, selectedFolder);
@@ -4604,7 +4608,7 @@ export default function Email() {
     } else {
       loadEmails(true);
     }
-  }, [gmail, currentImapAccount, selectedFolder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gmail, currentImapAccount?.id, selectedFolder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!gmail && !currentImapAccount) return;
