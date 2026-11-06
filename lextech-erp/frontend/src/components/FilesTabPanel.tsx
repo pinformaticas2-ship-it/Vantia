@@ -6,8 +6,9 @@ import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
   ChevronDown, ChevronRight, X, Search, Copy, Clipboard, Cloud, Check,
-  Combine, PenLine,
+  Combine, PenLine, Languages,
 } from "lucide-react";
+import { TraducirDocumento, traducible } from "./TraducirDocumento";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard, getErpClipboard, clearErpClipboard } from "../lib/usePasteFiles";
@@ -86,6 +87,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   const [files, setFiles]           = useState<any[]>([]);
   // Herramienta PDF (fusionar / editar páginas): ids con los que se abre.
   const [pdfTool, setPdfTool]       = useState<string[] | null>(null);
+  const [traducir, setTraducir]     = useState<{ id: string; nombre: string } | null>(null);
   const [editorFile, setEditorFile] = useState<{ id: string; original_name: string } | null>(null);
   const onlyofficeEnabled = useOnlyOfficeEnabled();
   const [loadingFiles, setLoadingFiles] = useState(true);
@@ -1136,6 +1138,13 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                 <Combine size={14} />
                               </button>
                             )}
+                            {!locked && traducible(f.original_name, f.mimetype) && (
+                              <button onClick={(e) => { e.stopPropagation(); setTraducir({ id: f.id, nombre: f.document_name || f.original_name }); }}
+                                title="Traducir a otro idioma (se guarda junto al original)"
+                                className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors">
+                                <Languages size={14} />
+                              </button>
+                            )}
                             {/* Copiar al portapapeles del ERP — siempre visible */}
                             <button
                               title="Copiar archivo (Ctrl+V para pegar en cualquier zona de adjuntos)"
@@ -1831,6 +1840,12 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           </div>
         </div>,
         document.body
+      )}
+      {traducir && (
+        <TraducirDocumento nombre={traducir.nombre} url={`/api/files/${entityId}/${traducir.id}/traducir`}
+          idiomaSugerido={entity?.idioma}
+          onClose={() => setTraducir(null)}
+          onHecho={(r) => { void loadFiles(true); aviso.ok(`Traducción guardada: ${r.tipo === "archivo" ? r.nombre : r.titulo}`); }} />
       )}
       {pdfTool && (
         <PdfToolModal entityId={entityId} files={files} initialFileIds={pdfTool}

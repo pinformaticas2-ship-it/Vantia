@@ -124,6 +124,9 @@ export async function pedirGemini(o: {
   imagenes?: { mime: string; base64: string }[];
   json?: boolean;
   validar?: (texto: string) => boolean;
+  /** Para trabajos en segundo plano (documentos largos): nadie espera delante. */
+  topeTotalMs?: number;
+  topeLlamadaMs?: number;
 }): Promise<ResultadoGemini> {
   if (!traduccionDisponible()) return { ok: false, motivo: 'sin_clave' };
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
@@ -133,7 +136,8 @@ export async function pedirGemini(o: {
   const ahora = Date.now();
   const modelos = MODELOS.filter((m) => (agotadoHasta.get(m) || 0) < ahora);
   if (!modelos.length) return { ok: false, motivo: 'cupo' };
-  const limite = ahora + TOPE_TOTAL_MS;
+  const limite = ahora + (o.topeTotalMs || TOPE_TOTAL_MS);
+  const topeLlamada = o.topeLlamadaMs || TOPE_LLAMADA_MS;
   for (let intento = 0; intento < ESPERAS_MS.length && modelos.length; intento++) {
     if (ESPERAS_MS[intento]) await esperar(ESPERAS_MS[intento]);
     const queda = limite - Date.now();
@@ -141,7 +145,7 @@ export async function pedirGemini(o: {
     const nombre = modelos[intento % modelos.length];
     try {
       // Sin límite, una llamada a Google se puede quedar colgada minutos.
-      const model = genAI.getGenerativeModel({ model: nombre }, { timeout: Math.min(TOPE_LLAMADA_MS, queda) });
+      const model = genAI.getGenerativeModel({ model: nombre }, { timeout: Math.min(topeLlamada, queda) });
       const r = await model.generateContent({
         contents: [{ role: 'user', parts }],
         generationConfig: { temperature: 0.2, ...(o.json ? { responseMimeType: 'application/json' } : {}) },

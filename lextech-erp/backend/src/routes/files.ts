@@ -8,6 +8,8 @@ import { requireAuth } from '../middleware/auth';
 import { requireFilesPermission } from '../middleware/requireFilesPermission';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 import { getFileAsPdf, runPdfTool } from '../controllers/pdfToolController';
+import { traducirArchivo } from '../controllers/traduccionesController';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 import { camposPlantilla, generarPlantilla } from '../controllers/plantillasController';
 import { onlyofficeStatus, getEditorConfig, editorCallback } from '../controllers/onlyofficeController';
 const router = Router();
@@ -66,6 +68,9 @@ const filesGate = [requireAuth, requireFilesPermission];
 router.post('/:clientId/create-blank',              ...filesGate, createBlankDocument);
 // Herramienta PDF: fusionar y retocar páginas (controllers/pdfToolController.ts)
 router.post('/:clientId/pdf-tool',                  ...filesGate, runPdfTool);
+// Traducir un documento (Word, PDF, escaneado): trabajo en segundo plano, el
+// resultado se adjunta junto al original. Estado en GET /api/traducciones/:id.
+router.post('/:clientId/:fileId/traducir',        ...filesGate, costlyActionLimiter, express.json({ limit: '10kb' }), traducirArchivo);
 router.get('/:clientId/:fileId/as-pdf',             ...filesGate, getFileAsPdf);
 router.get('/:clientId/:fileId/onlyoffice',         ...filesGate, getEditorConfig);
 router.get('/:clientId',                            ...filesGate, listFiles);

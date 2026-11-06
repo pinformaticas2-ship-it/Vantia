@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 import { costlyActionLimiter } from '../middleware/rateLimits';
+import { traducirDocumentoEditor } from '../controllers/traduccionesController';
 import {
   listarDocumentos, verDocumento, crearDocumento, actualizarDocumento, borrarDocumento,
   exportarDocx, guardarEnExpediente, generarConIa,
@@ -20,5 +21,6 @@ router.put('/:id', actualizarDocumento);
 router.delete('/:id', borrarDocumento);
 router.get('/:id/docx', exportarDocx);
 router.post('/:id/guardar-en-expediente', guardarEnExpediente);
+router.post('/:id/traducir', costlyActionLimiter, traducirDocumentoEditor);
 
 export default router;

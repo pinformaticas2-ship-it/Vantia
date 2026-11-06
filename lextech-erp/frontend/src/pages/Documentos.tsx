@@ -4,9 +4,11 @@ import { useAuth } from "@clerk/clerk-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, Briefcase, Check, CheckCircle2, Download, FileText, FolderInput, Loader2, Plus, Printer,
-  Search, Sparkles, Trash2, Wand2, X,
+  Languages, Search, Sparkles, Trash2, Wand2, X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { TraducirDocumento } from "../components/TraducirDocumento";
+import { aviso as avisoGlobal } from "../lib/avisos";
 import { SIN_TITULO, useDocumento } from "../lib/useDocumento";
 import { useIsMobile } from "../lib/useIsMobile";
 import { Spinner } from "../components/Spinner";
@@ -70,6 +72,7 @@ export default function Documentos() {
   const skillInicial = estadoNav.skillId || "";
   const [selectorExp, setSelectorExp] = useState<null | "vincular" | "guardar">(null);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
+  const [traduciendo, setTraduciendo] = useState(false);
 
   // Carga y guardado automático del documento abierto (lib/useDocumento).
   const {
@@ -293,6 +296,18 @@ export default function Documentos() {
                   <button type="button" onClick={descargarWord} disabled={exportando} title="Descargar en Word (.docx)" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
                     {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Word
                   </button>
+                  <button type="button" onClick={async () => { await guardarYa(); setTraduciendo(true); }} title="Traducir a otro idioma (crea un documento nuevo)" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <Languages size={14} /> <span className="hidden lg:inline">Traducir</span>
+                  </button>
+                  {traduciendo && doc && (
+                    <TraducirDocumento nombre={doc.titulo || SIN_TITULO} url={`/api/documentos/${doc.id}/traducir`}
+                      onClose={() => setTraduciendo(false)}
+                      onHecho={(r) => {
+                        if (r.tipo !== "documento") return;
+                        void apiFetch("/api/documentos", { getToken }).then((x: any) => { if (x?.success && Array.isArray(x.data)) setLista(x.data); }).catch(() => {});
+                        avisoGlobal.ok(`Traducción lista: ${r.titulo}`, { duracion: 12000, accion: { label: "Abrir", onClick: () => navigate(r.url) } });
+                      }} />
+                  )}
                   <button type="button" onClick={imprimir} title="Imprimir o guardar como PDF" className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50">
                     <Printer size={14} /> PDF
                   </button>
