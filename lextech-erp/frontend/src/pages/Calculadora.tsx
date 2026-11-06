@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { usePreferencias } from "../lib/preferencias";
 import { AlertTriangle, Calculator, Copy, Gavel, Plus, Printer, Scale, Settings2, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { aviso } from "../lib/avisos";
@@ -68,7 +69,7 @@ const copiar = async (texto: string) => {
   catch { aviso.error("No se ha podido copiar."); }
 };
 
-export default function Calculadora() {
+function CalculadoraRapida() {
   const { getToken } = useAuth();
   const [pestana, setPestana] = useState<Pestana>("honorarios");
   const [escala, setEscala] = useState<Escala>(ESCALA_EJEMPLO);
@@ -438,6 +439,122 @@ function EditorEscala({ inicial, onClose, onGuardada }: { inicial: Escala; onClo
             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus size={13} /> Añadir tramo</button>
         </div>
         {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+// ── Página: la calculadora completa de tasación de costas y jura de cuentas
+// (copiada tal cual en public/herramientas/costas.html) y, aparte, la rápida.
+// La completa vive en un iframe del mismo origen; su IA (leer la resolución,
+// asistente de cambios) pasa por /api/ia/json con la sesión de esta página.
+declare global { interface Window {
+  __vantiaIA?: (prompt: string, imagenes: { mime: string; base64: string }[]) => Promise<any>;
+  __vantiaLetrado?: { nombre: string; colegiado: string; colegio: string };
+} }
+
+export default function Calculadora() {
+  const { getToken } = useAuth();
+  const { user } = useUser();
+  const { prefs, guardar } = usePreferencias();
+  const [editandoLetrado, setEditandoLetrado] = useState(false);
+  // Quien firma las notas: sus datos de letrado (Mi perfil); si aún no los ha
+  // puesto, su nombre de usuario. Nunca los de otra persona.
+  const letrado = useMemo(() => ({
+    nombre: prefs.letradoNombre || user?.fullName || "",
+    colegiado: prefs.colegiado || "",
+    colegio: prefs.colegio || "",
+  }), [prefs.letradoNombre, prefs.colegiado, prefs.colegio, user?.fullName]);
+  useEffect(() => {
+    window.__vantiaLetrado = letrado;
+    try { (iframeRef.current?.contentWindow as any)?.__vantiaLetradoCambio?.(); } catch { /* aún cargando */ }
+  }, [letrado]);
+  useEffect(() => () => { delete window.__vantiaLetrado; }, []);
+  const [vista, setVista] = useState<"completa" | "rapida">(() => {
+    try { return (localStorage.getItem("vantia.calculadora.vista") as any) === "rapida" ? "rapida" : "completa"; } catch { return "completa"; }
+  });
+  const [cargada, setCargada] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    window.__vantiaIA = async (prompt, imagenes) => {
+      const r = await apiFetch("/api/ia/json", { getToken, method: "POST", body: JSON.stringify({ prompt, imagenes }) });
+      if (!r?.success) {
+        const e: any = new Error(r?.error || "La IA no respondió.");
+        e.code = r?.motivo === "sin_clave" ? "capability_disabled" : "error";
+        throw e;
+      }
+      return r.data;
+    };
+    return () => { delete window.__vantiaIA; };
+  }, [getToken]);
+
+  const cambiar = (v: "completa" | "rapida") => {
+    setVista(v);
+    try { localStorage.setItem("vantia.calculadora.vista", v); } catch { /* sin almacenamiento */ }
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
+        <Calculator size={16} className="text-red-700" />
+        <span className="mr-2 text-sm font-semibold text-slate-800">Calculadora</span>
+        <div className="flex rounded-xl border border-slate-200 p-0.5">
+          {([["completa", "Tasación de costas y jura de cuentas"], ["rapida", "Calculadora rápida"]] as const).map(([v, t]) => (
+            <button key={v} type="button" onClick={() => cambiar(v)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${vista === v ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-50"}`}>{t}</button>
+          ))}
+        </div>
+        {vista === "completa" && (
+          <button type="button" onClick={() => setEditandoLetrado(true)} title="Datos que salen en las notas y escritos"
+            className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
+            <Gavel size={13} className="shrink-0" />
+            <span className="truncate">
+              {letrado.nombre || "Sin nombre"}{letrado.colegiado ? ` · nº ${letrado.colegiado}` : ""}
+              {!letrado.colegiado && <span className="ml-1 font-semibold text-amber-700">· añade tu nº de colegiado</span>}
+            </span>
+          </button>
+        )}
+      </div>
+      {editandoLetrado && (
+        <DatosLetrado inicial={letrado} onClose={() => setEditandoLetrado(false)}
+          onGuardar={async (d) => { await guardar({ letradoNombre: d.nombre, colegiado: d.colegiado, colegio: d.colegio }); setEditandoLetrado(false); aviso.ok("Datos de letrado guardados"); }} />
+      )}
+      {vista === "completa" ? (
+        <div className="relative min-h-0 flex-1 bg-white">
+          {!cargada && <div className="absolute inset-0 animate-pulse bg-slate-50" />}
+          <iframe ref={iframeRef} title="Calculadora de tasación de costas y jura de cuentas" src="/herramientas/costas.html"
+            onLoad={() => { setCargada(true); try { (iframeRef.current?.contentWindow as any)?.__vantiaLetradoCambio?.(); } catch { /* nada */ } }}
+            className={`h-full w-full border-0 transition-opacity duration-300 ${cargada ? "opacity-100" : "opacity-0"}`} />
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8"><CalculadoraRapida /></div>
+      )}
+    </div>
+  );
+}
+
+function DatosLetrado({ inicial, onClose, onGuardar }: {
+  inicial: { nombre: string; colegiado: string; colegio: string };
+  onClose: () => void;
+  onGuardar: (d: { nombre: string; colegiado: string; colegio: string }) => Promise<void>;
+}) {
+  const [d, setD] = useState(inicial);
+  const [guardando, setGuardando] = useState(false);
+  return (
+    <Modal open onClose={onClose} title="Datos de letrado" subtitle="Salen en tus notas de honorarios y escritos" maxWidth="max-w-lg"
+      footer={<>
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button type="button" disabled={guardando || !d.nombre.trim()} onClick={async () => { setGuardando(true); try { await onGuardar(d); } finally { setGuardando(false); } }}
+          className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">{guardando ? "Guardando…" : "Guardar"}</button>
+      </>}>
+      <div className="space-y-4">
+        <Campo label="Nombre completo"><input value={d.nombre} onChange={(e) => setD({ ...d, nombre: e.target.value })} className={campo} /></Campo>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr]">
+          <Campo label="Nº de colegiado"><input value={d.colegiado} onChange={(e) => setD({ ...d, colegiado: e.target.value })} placeholder="1.234" className={campo} /></Campo>
+          <Campo label="Colegio"><input value={d.colegio} onChange={(e) => setD({ ...d, colegio: e.target.value })} placeholder="Ilustre Colegio de Abogados de …" className={campo} /></Campo>
+        </div>
+        <p className="text-xs text-slate-500">Son tuyos: cada usuario tiene los suyos y no los ve nadie más del despacho salvo en los documentos que generes.</p>
       </div>
     </Modal>
   );

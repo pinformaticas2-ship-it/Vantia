@@ -17,6 +17,10 @@ export interface Preferencias {
   cargo: string;
   telefono: string;
   texto: TamanoTexto;
+  /** Datos de letrado para notas de honorarios y escritos (Calculadora). */
+  letradoNombre: string;
+  colegiado: string;
+  colegio: string;
 }
 
 export type TamanoTexto = 'normal' | 'grande' | 'muy_grande';
@@ -29,6 +33,7 @@ export const TAMANOS_TEXTO: { valor: TamanoTexto; label: string; px: number }[] 
 
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
   modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal',
+  letradoNombre: '', colegiado: '', colegio: '',
 };
 
 export const PAGINAS_INICIO: { path: string; label: string }[] = [
@@ -55,6 +60,9 @@ function normalizar(raw: any): Preferencias {
     cargo: typeof p.cargo === 'string' ? p.cargo : '',
     telefono: typeof p.telefono === 'string' ? p.telefono : '',
     texto: p.texto === 'grande' || p.texto === 'muy_grande' ? p.texto : 'normal',
+    letradoNombre: typeof p.letradoNombre === 'string' ? p.letradoNombre : '',
+    colegiado: typeof p.colegiado === 'string' ? p.colegiado : '',
+    colegio: typeof p.colegio === 'string' ? p.colegio : '',
   };
 }
 

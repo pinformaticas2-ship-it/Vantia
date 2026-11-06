@@ -70,7 +70,6 @@ export async function traducirCorreo(o: { cuerpo: string; asunto?: string; idiom
   const destino = normalizarIdioma(o.idioma);
   if (!o.cuerpo.trim()) return { ok: false, motivo: 'otro' };
   if (!traduccionDisponible()) return { ok: false, motivo: 'sin_clave' };
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
   const conAsunto = Boolean(o.asunto?.trim());
   const formato = o.html
     ? 'Conserva exactamente las etiquetas HTML y los atributos; traduce solo el texto visible.'
@@ -100,6 +99,35 @@ ${o.cuerpo.slice(0, 30000)}`
 
 ${o.cuerpo.slice(0, 30000)}`;
 
+  const r = await pedirGemini({
+    texto: prompt,
+    json: conAsunto,
+    validar: conAsunto ? (out) => { const j = JSON.parse(out); return typeof j?.cuerpo === 'string' && j.cuerpo.trim() !== ''; } : undefined,
+  });
+  if ('motivo' in r) return r;
+  if (!conAsunto) return { ok: true, cuerpo: r.texto };
+  const j = JSON.parse(r.texto);
+  return { ok: true, cuerpo: j.cuerpo.trim(), asunto: typeof j.asunto === 'string' ? j.asunto.trim() : undefined };
+}
+
+export type ResultadoGemini = { ok: true; texto: string } | { ok: false; motivo: MotivoFallo };
+
+/**
+ * Una petición a Gemini con lo necesario para que funcione en la práctica:
+ * reintentos con espera si está saturado, cambio de modelo cuando uno agota
+ * su cupo diario gratuito o ya no existe, y límites de tiempo (20 s por
+ * llamada, 45 s en total). imagenes: base64 sin cabecera "data:".
+ * validar: si devuelve false (o lanza), la respuesta no vale y se reintenta.
+ */
+export async function pedirGemini(o: {
+  texto: string;
+  imagenes?: { mime: string; base64: string }[];
+  json?: boolean;
+  validar?: (texto: string) => boolean;
+}): Promise<ResultadoGemini> {
+  if (!traduccionDisponible()) return { ok: false, motivo: 'sin_clave' };
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
+  const parts: any[] = [{ text: o.texto }, ...(o.imagenes || []).map((i) => ({ inlineData: { mimeType: i.mime, data: i.base64 } }))];
   let motivo: MotivoFallo = 'otro';
   let ultimoError: any = null;
   const ahora = Date.now();
@@ -115,21 +143,19 @@ ${o.cuerpo.slice(0, 30000)}`;
       // Sin límite, una llamada a Google se puede quedar colgada minutos.
       const model = genAI.getGenerativeModel({ model: nombre }, { timeout: Math.min(TOPE_LLAMADA_MS, queda) });
       const r = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, ...(conAsunto ? { responseMimeType: 'application/json' } : {}) },
+        contents: [{ role: 'user', parts }],
+        generationConfig: { temperature: 0.2, ...(o.json ? { responseMimeType: 'application/json' } : {}) },
       } as any);
       const out = r.response.text().trim().replace(/^```(?:html|json)?\s*/i, '').replace(/```\s*$/, '').trim();
       if (!out) continue;
-      if (!conAsunto) return { ok: true, cuerpo: out };
-      const j = JSON.parse(out);
-      if (typeof j?.cuerpo === 'string' && j.cuerpo.trim()) {
-        return { ok: true, cuerpo: j.cuerpo.trim(), asunto: typeof j.asunto === 'string' ? j.asunto.trim() : undefined };
-      }
+      let vale = true;
+      try { vale = o.validar ? o.validar(out) : true; } catch { vale = false; }
+      if (vale) return { ok: true, texto: out };
     } catch (e: any) {
       ultimoError = e;
       const msg = String(e?.message || e);
       if (esCupoDiario(e)) {
-        // Sin cupo hoy en este modelo: se aparta 1 h (o lo que diga Google) y se prueba el siguiente.
+        // Sin cupo hoy en este modelo: se aparta (lo que diga Google, máx. 6 h) y se prueba el siguiente.
         const seg = Number(msg.match(/retry in (\d+)/i)?.[1] || 3600);
         agotadoHasta.set(nombre, Date.now() + Math.min(seg, 6 * 3600) * 1000);
         modelos.splice(modelos.indexOf(nombre), 1);
@@ -142,7 +168,7 @@ ${o.cuerpo.slice(0, 30000)}`;
       if (!esTransitorio(e)) break;
     }
   }
-  if (ultimoError) console.warn('traducir: la IA no respondió:', String(ultimoError?.message || ultimoError).slice(0, 200));
+  if (ultimoError) console.warn('IA (Gemini) no respondió:', String(ultimoError?.message || ultimoError).slice(0, 200));
   return { ok: false, motivo };
 }
 

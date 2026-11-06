@@ -171,3 +171,14 @@ test('correo: las sugerencias de destinatarios solo traen clientes del despacho 
   const desdeB = await call(email.getRecipientSuggestions, orgB, { query: { q: 'secreto' } });
   assert.equal(JSON.stringify(desdeB.body).includes('secreto.a@example.test'), false);
 });
+
+test('IA para la Calculadora de costas: valida lo que recibe y sin clave lo dice', { skip }, async () => {
+  const ia = await import('../src/controllers/iaController');
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  assert.equal((await call(ia.iaJson, orgA, { body: { prompt: '' } })).status, 400);
+  assert.equal((await call(ia.iaJson, orgA, { body: { prompt: 'x'.repeat(90_001) } })).status, 400);
+  const sinClave = await call(ia.iaJson, orgA, { body: { prompt: 'Devuelve {"a":1}', imagenes: [{ mime: 'text/html', base64: 'PGgxPg==' }] } });
+  assert.equal(sinClave.status, 503);
+  assert.equal(sinClave.body.motivo, 'sin_clave');
+});

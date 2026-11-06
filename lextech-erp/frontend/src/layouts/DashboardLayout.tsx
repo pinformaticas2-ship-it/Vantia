@@ -2728,6 +2728,7 @@ export default function DashboardLayout() {
   const isFullPage = useMemo(() => (
     [
       '/dashboard/correo',
+      '/dashboard/calculadora',
       '/dashboard/clientes',
       '/dashboard/expedientes',
       '/dashboard/procuradores',

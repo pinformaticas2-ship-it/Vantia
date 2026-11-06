@@ -1,0 +1,1970 @@
+<!doctype html>
+<!-- Calculadora de tasación de costas y jura de cuentas.
+     Copiada del artifact https://claude.ai/artifact/MsQ2R8nHLWMaWTUVrMn6UM (06/11/2026)
+     sin cambios en su lógica; ver lextech-erp/frontend/src/pages/Calculadora.tsx. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Calculadora de Costas Procesales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: mesa de trabajo de dos columnas — expediente (datos) a la izquierda, nota de honorarios como documento a la derecha; debajo, escala, comparativa por plazas y referencias. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --ink:#1b2230; --muted:#5d6574; --line:#d9dcd4;
+  --accent:#1f5a48; --accent-soft:#e3eee9; --seal:#8a2b2b; --warn:#9a6200; --warn-soft:#fbf1dd;
+  --ok:#2d6a3e; --row:#f7f8f5;
+  --f-display:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171d; --surface:#1b2028; --ink:#e6e8eb; --muted:#9aa2ae; --line:#2e3540;
+  --accent:#6fbf9f; --accent-soft:#1d3029; --seal:#e08c8c; --warn:#e2b04f; --warn-soft:#2e2717;
+  --ok:#7cc792; --row:#20262f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171d; --surface:#1b2028; --ink:#e6e8eb; --muted:#9aa2ae; --line:#2e3540;
+  --accent:#6fbf9f; --accent-soft:#1d3029; --seal:#e08c8c; --warn:#e2b04f; --warn-soft:#2e2717;
+  --ok:#7cc792; --row:#20262f; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.row2{align-items:start}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 64px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+h1{font-family:var(--f-display);font-weight:650;font-size:clamp(1.6rem,3.2vw,2.3rem);line-height:1.1;margin:0;text-wrap:balance}
+.kicker{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.top p.lead{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.modes{display:flex;border:1px solid var(--ink);border-radius:var(--r);overflow:hidden}
+.modes button{font:inherit;font-weight:500;background:transparent;color:var(--ink);border:0;padding:8px 14px;cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.panel h2{font-family:var(--f-display);font-weight:650;font-size:1.15rem;margin:0 0 12px}
+fieldset{border:0;padding:0;margin:0 0 16px;display:grid;gap:10px}
+legend{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:600}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.row2{grid-template-columns:1fr}}
+label.f{display:grid;gap:4px;font-size:.85rem;font-weight:500;min-width:0}
+input[type=number],input[type=text],select,textarea{font:inherit;font-size:.95rem;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:8px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:.78rem;color:var(--muted);font-weight:400}
+.checks{display:flex;flex-wrap:wrap;gap:8px 16px}
+.checks label{display:flex;gap:6px;align-items:center;font-size:.88rem;cursor:pointer}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg label{cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.85rem;background:var(--bg)}
+.seg input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* Nota de honorarios como documento */
+.doc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:26px 26px 20px;position:relative}
+.doc .hd{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
+.doc h2{font-family:var(--f-display);font-size:1.3rem;margin:0}
+.doc .who{font-size:.8rem;color:var(--muted);line-height:1.4}
+.stamp{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--seal);border:1.5px solid var(--seal);border-radius:4px;padding:4px 8px;align-self:flex-start;white-space:nowrap}
+table{border-collapse:collapse;width:100%}
+.lines td{padding:7px 0;border-bottom:1px dashed var(--line);vertical-align:top}
+.lines td.amt{text-align:right;white-space:nowrap;padding-left:12px}
+.lines .det{display:block;font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
+.lines .ref{font-size:.72rem;color:var(--accent);margin-left:4px}
+.tot td{padding:6px 0}
+.tot td.amt{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.tot tr.sub td{border-top:1px solid var(--ink);padding-top:10px}
+.tot tr.grand td{font-weight:600;font-size:1.15rem;border-top:2px solid var(--ink);padding-top:10px}
+.tot tr.muted td{color:var(--muted);font-size:.85rem}
+.tot tr.strike td.amt{text-decoration:line-through;color:var(--muted)}
+.flags{display:grid;gap:8px;margin-top:14px}
+.flag{border-left:3px solid var(--warn);background:var(--warn-soft);padding:8px 10px;font-size:.84rem;border-radius:0 4px 4px 0}
+.flag.info{border-color:var(--accent);background:var(--accent-soft)}
+.flag.cap{border-color:var(--seal)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.btn{font:inherit;font-weight:500;font-size:.88rem;border-radius:5px;padding:8px 14px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.toast{font-size:.82rem;color:var(--ok);align-self:center}
+
+section.blk{margin-top:26px}
+section.blk>h2{font-family:var(--f-display);font-weight:650;font-size:1.25rem;margin:0 0 4px}
+section.blk>p.sub{margin:0 0 12px;color:var(--muted);font-size:.9rem;max-width:75ch}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.dt th,.dt td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:.88rem;white-space:nowrap}
+.dt th{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--row)}
+.dt td.r,.dt th.r{text-align:right}
+.dt tr.hit td{background:var(--accent-soft)}
+.dt tr.sel td{font-weight:600}
+.dt tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.warn{border-color:var(--warn);color:var(--warn)}
+.pill.cap{border-color:var(--seal);color:var(--seal)}
+.two{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px}
+@media (max-width:900px){.two{grid-template-columns:minmax(0,1fr)}}
+textarea{font-family:var(--f-mono);font-size:.82rem;min-height:180px;resize:vertical}
+.refs{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.refs li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:6px 0;font-size:.86rem}
+.refs li span:last-child{white-space:nowrap}
+.drop{display:grid;gap:4px;border:1.5px dashed var(--line);border-radius:var(--r);padding:14px;background:var(--bg);cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop-t{font-weight:600;font-size:.92rem}
+.drop input{font-size:.82rem;margin-top:4px;max-width:100%}
+.fname{font-family:var(--f-mono);font-size:.78rem;color:var(--accent);overflow-wrap:anywhere}
+details summary{cursor:pointer;font-size:.85rem;color:var(--muted)}
+details textarea{min-height:120px;margin-top:6px;font-family:var(--f-body)}
+#resOut{display:grid;gap:10px;border:1px solid var(--accent);border-radius:var(--r);padding:12px;background:var(--accent-soft)}
+.rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 10px}
+@media (max-width:480px){.rgrid{grid-template-columns:minmax(0,1fr)}}
+.rgrid label{display:grid;gap:3px;font-size:.78rem;font-weight:500;min-width:0}
+.rgrid label.wide{grid-column:1/-1}
+.rgrid input,.rgrid select{font-size:.88rem;padding:6px 8px;background:var(--surface)}
+.rgrid .chk{display:flex;align-items:center;gap:6px;font-size:.85rem}
+.fund{border-left:3px solid var(--accent);padding:2px 0 2px 12px;margin:12px 0 6px}
+.fund-l{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.fund p{margin:4px 0 0;font-family:var(--f-display);font-size:.98rem;line-height:1.5}
+.trace{font-size:.74rem;color:var(--muted);margin-top:10px;font-family:var(--f-mono)}
+.colr{display:grid;gap:22px;min-width:0}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.pgrid label{display:grid;grid-template-columns:56px minmax(0,1fr);gap:8px;align-items:center;font-size:.8rem;line-height:1.25}
+.pgrid input[type=number]{padding:5px 6px;text-align:center}
+.pgrid input[type=checkbox]{justify-self:center}
+.pgrid-wrap{display:grid;gap:10px}
+.joint{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:900px){.joint{grid-template-columns:minmax(0,1fr)}}
+.jside{display:grid;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.dt tr.jt td{font-weight:600;border-top:2px solid var(--ink);font-size:.95rem}
+.dt tr.jh td{background:var(--row);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+input.filled{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+@media (prefers-reduced-motion:no-preference){input.filled{transition:box-shadow .3s,border-color .3s}}
+.verout{display:grid;gap:6px;font-size:.84rem}
+.vb{display:inline-block;margin-left:6px;font-size:.7rem;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--line);vertical-align:1px}
+.vb.ok{color:var(--ok);border-color:var(--ok)} .vb.err{color:var(--seal);border-color:var(--seal)} .vb.nc{color:var(--muted)}
+.sug{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.78rem;color:var(--seal)}
+.mini{font:inherit;font-size:.75rem;padding:2px 8px;border-radius:4px;border:1px solid var(--accent);background:var(--surface);color:var(--accent);cursor:pointer}
+.lines td.amt input{width:120px;text-align:right;font-family:var(--f-mono);font-size:.88rem;padding:4px 6px;background:var(--bg);border:1px solid var(--accent);border-radius:4px;color:var(--ink)}
+.lines input.lbl{width:100%;font:inherit;font-size:.9rem;padding:4px 6px;background:var(--bg);border:1px solid var(--accent);border-radius:4px;color:var(--ink)}
+.lines tr.man td:first-child{border-left:3px solid var(--warn);padding-left:8px}
+.lines .orig{display:block;font-size:.72rem;color:var(--warn);font-family:var(--f-mono)}
+.chat{display:grid;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.chatlog{display:grid;gap:8px;max-height:340px;overflow-y:auto;padding-right:4px}
+.msg{max-width:85%;padding:8px 12px;border-radius:10px;font-size:.9rem;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.user{justify-self:end;background:var(--ink);color:var(--bg)}
+.msg.bot{justify-self:start;background:var(--accent-soft);color:var(--ink)}
+.msg.sys{justify-self:center;max-width:100%;font-size:.8rem;color:var(--muted);background:transparent}
+.msg ul{margin:6px 0 0;padding-left:18px} .msg .undo{margin-top:6px}
+.chatin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.chatin textarea{min-height:52px;font-family:var(--f-body);font-size:.92rem;resize:vertical}
+.chatbtns{display:grid;gap:6px}
+.topact{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn.new{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.new.armed{background:var(--seal);border-color:var(--seal)}
+footer{margin-top:30px;color:var(--muted);font-size:.8rem;max-width:90ch}
+@media (prefers-reduced-motion:no-preference){.doc{transition:box-shadow .2s}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="kicker">Tasación de costas · Jura de cuentas · Art. 241–246 y 35 LEC</p>
+      <h1>Calculadora de Costas Procesales</h1>
+      <p class="lead">Honorarios de letrado por cuantía, materia y complejidad según los criterios orientativos de cada Colegio, con límite del art. 394.3 LEC, IVA y nota de honorarios lista para presentar.</p>
+    </div>
+    <div class="topact">
+    <button type="button" class="btn new" id="nuevaTas">+ Nueva tasación</button>
+    <div class="modes" role="group" aria-label="Finalidad de la minuta">
+      <button type="button" id="mTas" aria-pressed="true">Tasación de costas</button>
+      <button type="button" id="mJura" aria-pressed="false">Jura de cuentas</button>
+    </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- DATOS -->
+    <form class="panel" id="form" autocomplete="off">
+      <h2>Datos del asunto</h2>
+      <fieldset class="res" id="resBox">
+        <legend>Resolución que condena en costas</legend>
+        <label class="drop" id="drop" for="resFile">
+          <span class="drop-t">Sube la sentencia, auto o decreto</span>
+          <span class="hint">PDF (también escaneado) o fotografía. Se extraen órgano, procedimiento, nº de autos, NIG, fechas, cuantía y partes.</span>
+          <input type="file" id="resFile" accept="application/pdf,image/jpeg,image/png,image/webp">
+          <span class="fname" id="resName"></span>
+        </label>
+        <details><summary>O pega el texto de la resolución</summary>
+          <textarea id="resText" aria-label="Texto de la resolución" placeholder="Pega aquí el encabezamiento y el fallo…"></textarea>
+        </details>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="btn" id="resGo">Extraer datos</button>
+          <button type="button" class="btn ghost" id="resStop" hidden>Detener</button>
+          <span class="toast" id="resStatus" role="status"></span>
+        </div>
+        <div id="resOut" hidden>
+          <p class="hint" style="margin:0">Estos datos ya están volcados en todo el formulario. Si corriges uno aquí o en el formulario, se actualiza en ambos sitios y en los documentos.</p>
+          <div class="rgrid" id="resFields"></div>
+          <div id="verOut" class="verout" hidden></div>
+          <div class="actions" style="margin-top:4px">
+            <button type="button" class="btn" id="resApply">Verificar extracción</button>
+            <button type="button" class="btn ghost" id="resDiscard">Deshacer extracción</button>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Plaza y procedimiento</legend>
+        <label class="f">Colegio / plaza judicial
+          <select id="col"></select>
+          <span class="hint" id="colInfo"></span>
+        </label>
+        <div class="row2">
+          <label class="f">Procedimiento
+            <select id="proc">
+              <option value="ord">Juicio ordinario</option>
+              <option value="verb">Juicio verbal</option>
+              <option value="mon_sin">Monitorio sin oposición</option>
+              <option value="mon_op">Monitorio con oposición → juicio verbal</option>
+              <option value="ej_jud">Ejecución de título judicial</option>
+              <option value="ej_ext">Ejecución de título no judicial</option>
+              <option value="ej_hip">Ejecución hipotecaria</option>
+              <option value="apel">Recurso de apelación</option>
+              <option value="libre">Otra actuación (% de escala)</option>
+            </select>
+          </label>
+          <label class="f">Materia
+            <select id="mat">
+              <option value="cantidad">Reclamación de cantidad / general</option>
+              <option value="consumo">Condiciones generales / cláusulas abusivas</option>
+              <option value="arrend">Arrendamientos (base: renta anual)</option>
+              <option value="lph">Propiedad horizontal</option>
+              <option value="honor">Honor, intimidad, DD.FF.</option>
+            </select>
+          </label>
+        </div>
+        <div class="row2" id="apelBox" hidden>
+          <label class="f">Proceso de origen del recurso
+            <select id="apelOrig"><option value="ord">Juicio ordinario</option><option value="verb">Juicio verbal</option></select>
+          </label>
+          <div class="checks" style="align-self:end">
+            <label><input type="checkbox" id="ap2prueba"> Prueba en 2ª instancia</label>
+            <label><input type="checkbox" id="ap2vista"> Vista</label>
+          </div>
+        </div>
+        <label class="f" id="libreBox" hidden>Porcentaje de la escala aplicable
+          <input type="number" id="librePct" min="0" max="200" step="1" value="15">
+          <span class="hint">Para incidentes, medidas cautelares, recursos de reposición u otras actuaciones: indica el % del artículo aplicable.</span>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Cuantía</legend>
+        <div class="row2">
+          <label class="f"><span id="cuantLbl">Cuantía del procedimiento (€)</span>
+            <input type="number" id="cuant" min="0" step="0.01" value="6000">
+          </label>
+          <label class="f">Condena en sentencia (€)
+            <input type="number" id="condena" min="0" step="0.01" placeholder="Igual a la cuantía">
+            <span class="hint">Si se condena a menos de lo pedido, la base pasa a ser la condena.</span>
+          </label>
+        </div>
+        <div class="row2">
+          <label class="f">Fecha de presentación de la demanda
+            <input type="date" id="fdem" value="2025-09-15">
+            <span class="hint">Desde el 3-4-2025 las cuantías inestimables se valoran en 24.000 € (art. 394.3 LEC).</span>
+          </label>
+          <div class="checks" style="align-self:center">
+            <label><input type="checkbox" id="indet"> Cuantía indeterminada / inestimable</label>
+          </div>
+        </div>
+        <span class="hint" id="cuantHint"></span>
+      </fieldset>
+
+      <fieldset id="tramBox">
+        <legend>Desarrollo del proceso</legend>
+        <div class="seg" id="termSeg">
+          <label><input type="radio" name="term" value="completo" checked><span>Completo hasta sentencia</span></label>
+          <label><input type="radio" name="term" value="sinjuicio"><span>Sin juicio / visto en AP</span></label>
+          <label><input type="radio" name="term" value="alegaciones"><span>Solo alegaciones</span></label>
+          <label><input type="radio" name="term" value="allan"><span>Allanamiento antes de contestar</span></label>
+        </div>
+        <label class="f" style="max-width:240px">Sesiones adicionales de vista / AP
+          <input type="number" id="sesiones" min="0" step="1" value="0">
+        </label>
+      </fieldset>
+
+      <fieldset id="ejBox" hidden>
+        <legend>Ejecución</legend>
+        <div class="checks">
+          <label><input type="checkbox" id="ejOp"> Con oposición</label>
+          <label><input type="checkbox" id="ejApremio"> Vía de apremio (embargo)</label>
+          <label><input type="checkbox" id="ejSubasta"> Realización / subasta</label>
+          <label id="pagoLbl"><input type="checkbox" id="pago"> Pago o consignación sin más trámite</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Complejidad y trabajo real</legend>
+        <div class="seg">
+          <label><input type="radio" name="cx" value="sencilla"><span>Sencilla / litigio en masa</span></label>
+          <label><input type="radio" name="cx" value="normal" checked><span>Normal</span></label>
+          <label><input type="radio" name="cx" value="compleja"><span>Compleja</span></label>
+          <label><input type="radio" name="cx" value="muy"><span>Muy compleja</span></label>
+        </div>
+        <span class="hint" id="cxHint"></span>
+        <div class="row2">
+          <label class="f">Letrados acreedores de las costas
+            <input type="number" id="nLetr" min="1" step="1" value="1">
+            <span class="hint">Minuta ideal dividida entre todos (pretensión solidaria).</span>
+          </label>
+          <label class="f">IVA (%)
+            <input type="number" id="iva" min="0" max="30" step="0.5" value="21">
+          </label>
+        </div>
+        <div class="checks">
+          <label id="capLbl"><input type="checkbox" id="cap" checked> Aplicar límite art. 394.3 LEC (sin temeridad)</label>
+          <label id="dedLbl"><input type="checkbox" id="ded"> El beneficiario deduce el IVA (empresa / profesional)</label>
+          <label id="irpfLbl" hidden><input type="checkbox" id="irpf"> Retención IRPF 15 % (cliente empresario)</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Identificación del procedimiento (para la nota)</legend>
+        <div class="row2">
+          <label class="f">Órgano judicial<input type="text" id="juz" value="Juzgado de Primera Instancia nº 3 de Orihuela"></label>
+          <label class="f">Nº de autos<input type="text" id="autos" value="Procedimiento Ordinario 000/2026"></label>
+        </div>
+        <div class="row2">
+          <label class="f">NIG<input type="text" id="nig" value="" placeholder="03099 42 1 2026 0000000" inputmode="numeric"></label>
+          <label class="f">N/Ref. (nº de expediente del despacho)<input type="text" id="nref" value="" placeholder="123/2026"></label>
+          <label class="f">Resolución que impone las costas<input type="text" id="resol" value="" placeholder="Sentencia de 12/03/2026"></label>
+        </div>
+        <label class="f">Posición del cliente
+          <select id="pos">
+            <option value="activa">Actora / ejecutante / recurrente</option>
+            <option value="pasiva">Demandada / ejecutada / recurrida</option>
+          </select>
+        </label>
+        <div class="row2">
+          <label class="f">Cliente (beneficiario)<input type="text" id="cliente" value="[Cliente de ejemplo]"></label>
+          <label class="f">Parte condenada / deudora<input type="text" id="contra" value="[Entidad demandada]"></label>
+        </div>
+        <div class="row2">
+          <label class="f">Procurador/a de la parte condenada<input type="text" id="contraProc" value="" placeholder="Se extrae de la resolución"></label>
+          <label class="f">Letrado/a de la parte condenada<input type="text" id="contraLetr" value="" placeholder="Se extrae de la resolución"></label>
+        </div>
+      </fieldset>
+
+      <fieldset id="procBox">
+        <legend>Procurador · arancel RD 434/2024</legend>
+        <div class="checks"><label><input type="checkbox" id="procOn" checked> Incluir derechos de procurador</label></div>
+        <div id="procFields" class="pgrid-wrap">
+          <div class="row2">
+            <label class="f">Procurador/a<input type="text" id="procNom" value="[Procurador/a]" list="procList"><datalist id="procList"></datalist></label>
+            <label class="f">Nº de colegiado/a y Colegio<input type="text" id="procCol" value="[nº] · Ilustre Colegio de Procuradores de Orihuela"></label>
+          </div>
+          <div class="row2">
+            <label class="f">Poderdantes bajo una misma dirección
+              <input type="number" id="procN" min="1" step="1" value="1">
+              <span class="hint">Art. 6.1: una sola cuenta más un 10 % por cada representado.</span>
+            </label>
+            <label class="f">Suplidos (€)
+              <input type="number" id="procSup" min="0" step="0.01" value="0">
+              <span class="hint">Depósitos, tasas, certificaciones. Sin IVA.</span>
+            </label>
+          </div>
+          <label class="f">Cuenta del procurador para el pago de las costas (IBAN)<input type="text" id="procIban" value="" placeholder="ES00 0000 0000 0000 0000 0000"></label>
+          <span class="hint" style="font-weight:600;color:var(--ink)">Actuaciones adicionales (nº de veces)</span>
+          <div class="pgrid" id="procExtras"></div>
+        </div>
+      </fieldset>
+    </form>
+
+    <div class="colr">
+    <!-- NOTA -->
+    <article class="doc" aria-live="polite">
+      <div class="hd">
+        <div>
+          <h2 id="docTitle">Nota de honorarios</h2>
+          <div class="who" id="vantiaWho"></div>
+        </div>
+        <span class="stamp" id="docStamp">Tasación de costas</span>
+      </div>
+      <div class="who" id="docAutos"></div>
+      <div class="fund"><span class="fund-l">Conceptos valorados</span><p id="fund"></p></div>
+      <table class="lines" id="lines"></table>
+      <table class="tot" id="tot"></table>
+      <div class="flags" id="flags"></div>
+      <div class="actions">
+        <button type="button" class="btn" id="copyNota">Copiar minuta de abogado</button>
+        <button type="button" class="btn ghost" id="copyEsc">Copiar desglose de escala</button>
+        <button type="button" class="btn ghost" id="editAb" aria-pressed="false">Editar importes</button>
+        <button type="button" class="btn ghost" id="resetAb" hidden>Restablecer cálculo</button>
+        <span class="toast" id="toast" role="status"></span>
+      </div>
+      <div class="trace" id="trace" hidden></div>
+    </article>
+
+    <article class="doc" id="procDoc" aria-live="polite">
+      <div class="hd">
+        <div>
+          <h2 id="pDocTitle">Cuenta de derechos del procurador</h2>
+          <div class="who" id="pWho"></div>
+        </div>
+        <span class="stamp">Arancel · RD 434/2024</span>
+      </div>
+      <table class="lines" id="pLines"></table>
+      <table class="tot" id="pTot"></table>
+      <div class="flags" id="pFlags"></div>
+      <div class="actions">
+        <button type="button" class="btn" id="copyProc">Copiar minuta de procurador</button>
+        <button type="button" class="btn ghost" id="editPr" aria-pressed="false">Editar importes</button>
+        <button type="button" class="btn ghost" id="resetPr" hidden>Restablecer cálculo</button>
+        <span class="toast" id="pToast" role="status"></span>
+      </div>
+    </article>
+    </div>
+  </div>
+
+  <section class="blk" id="chatBlk">
+    <h2>Asistente de modificaciones</h2>
+    <p class="sub">Pide cambios con tus palabras. Por ejemplo: «la cuantía es 8.500 €», «el procurador es Dña. Ana Ruiz Gil», «hubo dos sesiones de juicio», «fija los honorarios del abogado en 2.300 €», «quita la solicitud de tasación del procurador».</p>
+    <div class="chat">
+      <div class="chatlog" id="chatLog" aria-live="polite"><div class="msg sys">Los cambios que haga el asistente se reflejan en el formulario, en las notas y en los documentos, y puedes deshacerlos uno a uno.</div></div>
+      <form id="chatForm" class="chatin" autocomplete="off">
+        <textarea id="chatIn" rows="2" aria-label="Modificación que quieres hacer" placeholder="Escribe la modificación…"></textarea>
+        <div class="chatbtns"><button type="submit" class="btn" id="chatSend">Enviar</button><button type="button" class="btn ghost" id="chatStop" hidden>Detener</button></div>
+      </form>
+      <span class="toast" id="chatStatus" role="status"></span>
+    </div>
+  </section>
+
+  <section class="blk" id="jointBlk">
+    <h2>Honorarios de abogado y procurador</h2>
+    <p class="sub">Resumen conjunto para entregar al cliente o para acompañar la solicitud de tasación.</p>
+    <div class="joint">
+      <div class="scroll"><table class="dt" id="joint"></table></div>
+      <div class="jside">
+        <label class="f">Destino del documento
+          <select id="docDest">
+            <option value="cliente">Informe al cliente</option>
+            <option value="juzgado">Presentación en el Juzgado (tasación / cuenta)</option>
+          </select>
+        </label>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="btn" id="dlDocx">Descargar documento Word</button>
+          <button type="button" class="btn ghost" id="copyJoint">Copiar texto</button>
+        </div>
+        <span class="toast" id="jToast" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk">
+    <h2>El mismo asunto en cada plaza</h2>
+    <p class="sub">Comparativa con los mismos datos. Útil para anticipar la impugnación por excesivos y para informar al cliente del riesgo de costas (art. 48.4 EGA).</p>
+    <div class="scroll"><table class="dt" id="cmp"></table></div>
+  </section>
+
+  <section class="blk two">
+    <div>
+      <h2 id="escTitle" style="font-family:var(--f-display);font-size:1.25rem;margin:0 0 4px">Escala aplicada</h2>
+      <p class="sub" id="escSub" style="margin:0 0 12px;color:var(--muted);font-size:.9rem"></p>
+      <div class="scroll"><table class="dt" id="escTbl"></table></div>
+    </div>
+    <div>
+      <h2 style="font-family:var(--f-display);font-size:1.25rem;margin:0 0 4px">Editar escala del Colegio</h2>
+      <p class="sub" style="margin:0 0 12px;color:var(--muted);font-size:.9rem">Una línea por tramo: <span class="num">límite superior;porcentaje</span>. Usa <span class="num">max</span> para el último tramo. Se guarda en este navegador.</p>
+      <textarea id="escEdit" aria-label="Tramos de la escala"></textarea>
+      <div class="actions">
+        <button type="button" class="btn" id="escSave">Guardar escala</button>
+        <button type="button" class="btn ghost" id="escReset">Restaurar original</button>
+        <span class="toast" id="escToast" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk two">
+    <div>
+      <h2 style="font-family:var(--f-display);font-size:1.25rem;margin:0 0 4px">Dictámenes de referencia del archivo</h2>
+      <p class="sub" style="margin:0 0 12px;color:var(--muted);font-size:.9rem">Minutas informadas por los Colegios en la carpeta «Recopilación dictámenes». Sirven de contraste en litigios de consumo.</p>
+      <ul class="refs" id="refs"></ul>
+    </div>
+    <div>
+      <h2 style="font-family:var(--f-display);font-size:1.25rem;margin:0 0 4px">Fuentes cargadas</h2>
+      <p class="sub" style="margin:0 0 12px;color:var(--muted);font-size:.9rem">Criterios extraídos de la carpeta «00.- Criterios».</p>
+      <ul class="refs" id="srcs"></ul>
+    </div>
+  </section>
+
+  <footer>Los criterios colegiales son orientativos y no vinculan al Letrado de la Administración de Justicia (D.A. 4ª Ley 2/1974; art. 246 LEC). El resultado es una propuesta razonada de minuta, que debe revisar el letrado antes de presentarla. Las cantidades fijas de Madrid, Oviedo y Cartagena se actualizan por IPC conforme a sus propios criterios; aquí figuran sin actualizar.</footer>
+</div>
+
+
+<script>
+/* Vantia: lo que en claude.ai daba el entorno del artifact.
+   - downloads.save: descarga normal del navegador.
+   - sample.json: IA (Gemini) a través del backend de Vantia, con la sesión de
+     la página que contiene esta calculadora (window.parent.__vantiaIA). */
+(function () {
+  function aBase64(blob) {
+    return new Promise(function (ok, ko) { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(',')[1] || ''); }; r.onerror = ko; r.readAsDataURL(blob); });
+  }
+  function error(code, msg) { var e = new Error(msg || code); e.code = code; return e; }
+  function api() { try { return window.parent && window.parent !== window ? window.parent.__vantiaIA : null; } catch (e) { return null; } }
+  var downloads = {
+    save: async function (o) {
+      var blob = o && o.data instanceof Blob ? o.data : new Blob([o && o.data]);
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = (o && o.filename) || 'documento';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      return { ok: true };
+    },
+  };
+  var sample = {
+    limits: async function () { return { images: { maxCount: 8 } }; },
+    json: async function (prompt, opts) {
+      opts = opts || {};
+      var fn = api();
+      if (!fn) throw error('capability_disabled');
+      if (opts.signal && opts.signal.aborted) throw error('cancelled');
+      var imagenes = [];
+      for (var i = 0; i < (opts.images || []).length && imagenes.length < 8; i++) {
+        var im = opts.images[i];
+        if (im instanceof Blob) imagenes.push({ mime: im.type || 'image/jpeg', base64: await aBase64(im) });
+      }
+      var p = fn(prompt, imagenes);
+      if (!opts.signal) return p;
+      return Promise.race([p, new Promise(function (_, ko) { opts.signal.addEventListener('abort', function () { ko(error('cancelled')); }, { once: true }); })]);
+    },
+  };
+  window.claude = {
+    use: async function (nombre) {
+      if (nombre === 'downloads') return downloads;
+      if (nombre === 'sample') { if (!api()) throw error('capability_disabled'); return sample; }
+      throw error('not_declared');
+    },
+  };
+})();
+
+/* Vantia: datos del letrado que firma (Ajustes → Mi perfil → Datos de letrado),
+   que da la página que contiene la calculadora (window.parent.__vantiaLetrado). */
+function LET() {
+  var d = {};
+  try { d = (window.parent && window.parent.__vantiaLetrado) || {}; } catch (e) { d = {}; }
+  var nombre = String(d.nombre || '').trim() || '[Nombre del letrado]';
+  var col = String(d.colegiado || '').trim();
+  var cg = String(d.colegio || '').trim();
+  return {
+    nombre: nombre,
+    linea: nombre.toUpperCase() + (col ? ', colegiado nº ' + col : '') + (cg ? (col ? ' del ' : ', ') + cg : ''),
+    corta: (col ? 'Colegiado nº ' + col : '') + (col && cg ? ' · ' : '') + cg,
+  };
+}
+function vantiaPintarLetrado() {
+  var el = document.getElementById('vantiaWho'); if (!el) return;
+  var l = LET(); el.textContent = '';
+  el.appendChild(document.createTextNode(l.nombre.toUpperCase()));
+  if (l.corta) { el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(l.corta)); }
+}
+/* La página de Vantia lo llama cuando el usuario cambia sus datos. */
+window.__vantiaLetradoCambio = function () { vantiaPintarLetrado(); try { if (typeof render === 'function') render(); } catch (e) {} };
+document.addEventListener('DOMContentLoaded', vantiaPintarLetrado);
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script>
+(function(){
+"use strict";
+const INF = Infinity;
+/* ---------- ESCALAS (porcentaje marginal por tramo) ---------- */
+const ESCALAS_ORIG = {
+  ALI: [[300,42],[600,36],[1200,30],[3000,22],[4000,20],[6000,18],[12000,17],[18000,16],[24000,12],[30000,11],[40000,10],[50000,9],[60000,8],[120000,7],[300000,6.5],[600000,5],[1200000,2.5],[1800000,2],[2500000,1.75],[3500000,1.5],[INF,1]],
+  MAD: [[4000,25],[18000,18],[30000,16],[45000,14],[60000,12],[90000,10],[120000,9],[180000,8],[240000,7],[300000,6],[450000,5.5],[600000,5],[750000,4.5],[900000,4],[1050000,3.5],[1200000,3],[1500000,2.5],[1800000,2],[2100000,1.5],[2400000,1],[2700000,0.5],[INF,0]],
+  OVI: [[600,35],[3000,20],[6000,15],[12000,12],[30000,10],[60000,8.5],[300000,6],[600000,5],[1200000,3.5],[3000000,2],[INF,1]],
+  CAR: []
+};
+const ESC_NOMBRE = {ALI:"Escala ICALI 2013 (= Escala Segunda C. Valenciana 2008)",MAD:"Escala ICAM",OVI:"Escala Segunda ICAO/Gijón (asuntos judiciales)",CAR:"Escala ICA Cartagena"};
+let ESCALAS = JSON.parse(JSON.stringify(ESCALAS_ORIG, (k,v)=> v===INF?"max":v), (k,v)=> v==="max"?INF:v);
+function loadCustom(){ try{ const s=localStorage.getItem("costas.escalas"); if(s){ const o=JSON.parse(s,(k,v)=>v==="max"?INF:v); Object.assign(ESCALAS,o);} }catch(e){} }
+function saveCustom(id){ try{ const s=localStorage.getItem("costas.escalas"); const o=s?JSON.parse(s):{}; o[id]=ESCALAS[id].map(([h,p])=>[h===INF?"max":h,p]); localStorage.setItem("costas.escalas",JSON.stringify(o)); return true;}catch(e){return false;} }
+function dropCustom(id){ try{ const s=localStorage.getItem("costas.escalas"); if(!s) return; const o=JSON.parse(s); delete o[id]; localStorage.setItem("costas.escalas",JSON.stringify(o)); }catch(e){} }
+loadCustom();
+
+function escala(base, id){
+  const tr = ESCALAS[id]||[]; let prev=0, tot=0; const rows=[];
+  for(const [hasta,p] of tr){
+    if(base<=prev) break;
+    const tramo = Math.min(base,hasta)-prev, imp = tramo*p/100;
+    tot += imp; rows.push({desde:prev,hasta,p,tramo,imp,acum:tot}); prev=hasta;
+  }
+  return {tot, rows, ok: tr.length>0};
+}
+
+/* ---------- FORMATO ---------- */
+const nf = new Intl.NumberFormat("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
+const ni = {format: v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g,".")};
+const eur = v => { const n=Math.round(v*100)/100; const s=Math.abs(n).toFixed(2).split("."); s[0]=s[0].replace(/\B(?=(\d{3})+(?!\d))/g,"."); return (n<0?"−":"")+s[0]+","+s[1]+" €"; };
+const r2 = v => Math.round(v*100)/100;
+const pc = v => (Math.round(v*100)/100).toString().replace(".",",")+" %";
+
+/* ---------- COMPLEJIDAD ---------- */
+const CX = {sencilla:{f:0.75,t:"Sencilla / masa: −25 %"},normal:{f:1,t:"Normal: sin ajuste"},compleja:{f:1.25,t:"Compleja: +25 %"},muy:{f:1.5,t:"Muy compleja: +50 %"}};
+
+/* ---------- COLEGIOS ---------- */
+// Cada colegio: escala, reglas de declarativos y función de procedimientos especiales.
+const ALI_LIKE = (nombre, fuente, art) => ({
+  nombre, fuente, escala:"ALI", indet:{tipo:"fijo", ord:2000, verb:500},
+  ord:{min:2000, ref:art.ord}, verb:{min:500, ref:art.verb},
+  fases:{ord:[60,10,30], verb:[60,40]}, allan:70, sesion:150, cxNote:"Moderación prudencial: los criterios no tabulan la complejidad.",
+  materias:{ honor:{indetFijo:2000,min:2000,ref:"Art. 16.2"} },
+  mon_sin:(c,H)=>[H.p("Petición inicial hasta auto despachando ejecución",50,150,"Art. 47")],
+  mon_op:(c,H)=>[H.p("Monitorio con oposición",10,150,"Art. 48.1")],
+  ej_jud:(c,H)=>{ const a=[H.p("Diligencias hasta inicio del apremio",20,150,"Art. 27.1")];
+    if(c.ejOp) a.push(H.p("Incidente de oposición",20,300,"Art. 27.2"));
+    if(c.ejApremio) a.push(H.p("Apremio hasta petición de realización",10,0,"Art. 27.3.A"));
+    if(c.ejSubasta) a.push(H.p("Resto del apremio (subasta incluida)",10,150,"Art. 27.3.B"));
+    return a; },
+  ej_ext:(c,H)=>{ const a=[H.p("Ejecución hasta inicio del apremio",65,150,"Art. 28.1")];
+    if(c.ejOp) a.push(H.p("Incidente de oposición (ejecutante)",35,300,"Art. 28.2"));
+    if(c.ejApremio) a.push(H.p("Apremio hasta petición de realización",10,0,"Art. 28.3.A"));
+    if(c.ejSubasta) a.push(H.p("Resto del apremio (subasta incluida)",10,0,"Art. 28.3.B"));
+    return a; },
+  ej_hip:(c,H)=>{ const a=[H.p("Ejecución hipotecaria (por analogía, título no judicial)",65,150,"Art. 28–29")];
+    if(c.ejOp) a.push(H.p("Incidente de oposición (ejecutante)",35,300,"Art. 28.2"));
+    if(c.ejSubasta) a.push(H.p("Realización / subasta",20,0,"Art. 28.3"));
+    return a; },
+  apel:(c,H)=>{ const pri=H.primera(c.apelOrig); const out=[H.f("Tramitación del recurso: 50 % de la 1ª instancia",pri*0.5,"Art. 50.1", "50 % × "+eur(pri))];
+    if(c.vista2) out.push(H.f("Vista en la Audiencia: +10 % de la 1ª instancia",Math.max(pri*0.1,150),"Art. 50.2"));
+    if(c.prueba2) out.push(H.f("Prueba en 2ª instancia: +10 %",Math.max(pri*0.1,150),"Art. 50.3"));
+    const min = c.apelOrig==="ord"?1000:500; H.minTotal(min,"Mínimo apelación "+(c.apelOrig==="ord"?"juicio ordinario":"juicio verbal")+": "+eur(min)+" (art. 50.4)");
+    return out; }
+});
+
+const COLEGIOS = {
+  ORI: ALI_LIKE("ICA Orihuela","Criterios de honorarios 1-1-2013",{ord:"Art. 15",verb:"Art. 13"}),
+  ALI: ALI_LIKE("ICA Alicante","Criterios para dictámenes de honorarios 2013",{ord:"Art. 15",verb:"Art. 13"}),
+  VAL: {
+    nombre:"Consejo Valenciano (Valencia, Alzira, Alcoy, Castellón…)", fuente:"Baremo de orientación 2008 · Escala Segunda", escala:"ALI",
+    indet:{tipo:"fijo", ord:1500, verb:325},
+    ord:{min:1500, ref:"Art. 49"}, verb:{min:325, ref:"Art. 47"},
+    fases:{ord:[60,10,30], verb:[60,40]}, allan:75, sesion:105, cxNote:"Moderación prudencial: el baremo no tabula la complejidad.",
+    materias:{},
+    mon_sin:(c,H)=>[H.p("Petición inicial hasta auto despachando ejecución",70,150,"Art. 83")],
+    mon_op:(c,H)=>[H.note("Oposición: juicio declarativo incrementado en un 10 % (incluye el monitorio, mismo letrado). Art. 84.1"), H.mult(1.10)],
+    ej_jud:(c,H)=>{ const a=[c.ejOp? H.p("Ejecución con oposición hasta apremio",30,105,"Art. 63.2") : H.p("Ejecución sin oposición hasta apremio",20,80,"Art. 63.1")];
+      if(c.ejApremio) a.push(H.p("Apremio hasta petición de realización",10,80,"Art. 63.3.B"));
+      if(c.ejSubasta) a.push(H.p("Resto del apremio (subasta incluida)",10,80,"Art. 63.3.B"));
+      return a; },
+    ej_ext:(c,H)=>{ const a=[H.p("Ejecución sin oposición hasta apremio",75,0,"Art. 64.1")];
+      if(c.ejOp) H.warn("Oposición en título no judicial: porcentaje no extraído del baremo 2008. Revisa el art. 64.");
+      if(c.ejApremio) a.push(H.p("Apremio hasta petición de realización",10,80,"Art. 63.3 por remisión"));
+      if(c.ejSubasta) a.push(H.p("Resto del apremio (subasta incluida)",10,80,"Art. 63.3 por remisión"));
+      return a; },
+    ej_hip:(c,H)=>{ H.warn("Ejecución hipotecaria: se aplica por analogía el art. 64 (75 %). Contrasta con el art. 65 del baremo."); return [H.p("Ejecución hipotecaria sin oposición",75,0,"Art. 64–65")]; },
+    apel:(c,H)=>{ const pri=H.primera(c.apelOrig); const out=[H.f("Tramitación del recurso: 50 % de la 1ª instancia",pri*0.5,"Art. 86.1","50 % × "+eur(pri))];
+      if(c.vista2) out.push(H.f("Vista: +10 % de la 1ª instancia",pri*0.1,"Art. 86.2"));
+      if(c.prueba2) out.push(H.f("Prueba: +10 % de la 1ª instancia",pri*0.1,"Art. 86.3"));
+      const min = c.apelOrig==="ord"?750:200; H.minTotal(min,"Criterio orientador apelación: "+eur(min)+" (art. 86.4)"); return out; }
+  },
+  MAD: {
+    nombre:"ICA Madrid", fuente:"Criterios orientativos ICAM (valores de referencia 2013 + IPC)", escala:"MAD",
+    indet:{tipo:"base"},
+    ord:{min:2100, ref:"Criterio 4"}, verb:{min:1200, ref:"Criterio 5"},
+    fases:{ord:[50,20,30], verb:[50,50]}, allan:null, sesion:0, cxNote:"El ICAM permite incrementar o reducir según el trabajo efectivo (D.G. 4ª).",
+    materias:{ honor:{indetBase:true,ref:"Criterio 4.1"} },
+    mon_sin:(c,H)=> c.pago? [H.p("Petición inicial con pago del deudor",c.base<=30000?50:25,0,"Criterio 23.A")] : [H.f("Petición inicial sin oposición ni pago (valor de referencia)",400,"Criterio 23.A")],
+    mon_op:(c,H)=>[H.f("Petición inicial del monitorio (valor de referencia)",400,"Criterio 23.C")],
+    ej_jud:(c,H)=>{
+      if(c.pago && !c.ejOp) return [H.f("Ejecución sin oposición con consignación (valor de referencia)",600,"Criterio 15.a.1")];
+      if(c.ejOp) return c.ejSubasta? [H.p("Ejecución íntegra con oposición",100,0,"Criterio 15.a.4")] : [H.p("Ejecución con oposición (estimada o con consignación)",50,1200,"Criterio 15.a.3")];
+      if(c.ejSubasta) return [H.p("Ejecución íntegra sin oposición",75,0,"Criterio 15.a.4")];
+      if(c.ejApremio) return [H.p("Sin oposición con apremio, sin avalúo ni subasta (hasta 75 %)",75,600,"Criterio 15.a.2")];
+      return [H.f("Demanda de ejecución sin oposición (valor de referencia)",600,"Criterio 15.a.1")]; },
+    ej_ext:(c,H)=>{
+      if(c.pago && !c.ejOp) return [H.p("Sin oposición, consignando lo reclamado (hasta 50 %)",50,600,"Criterio 15.c")];
+      const a=[H.p("Demanda hasta concluir la fase de oposición (hasta 50 %)",50,1200,"Criterio 15.c")];
+      if(c.ejApremio||c.ejSubasta) H.warn("Vía de apremio en título no judicial: el ICAM remite al apartado a.2; valóralo con el % de la ejecución de título judicial.");
+      return a; },
+    ej_hip:(c,H)=>[H.p(c.ejOp?"Ejecución hipotecaria íntegra con oposición":"Ejecución hipotecaria íntegra sin oposición",c.ejOp?100:75,0,"Criterio 15.d")],
+    apel:(c,H)=>{ const out=[H.p("Recurso de apelación: 50 % de la escala sobre la cuantía del recurso",50,1200,"Criterio 7")];
+      if(c.prueba2) out.push(H.pctOf("Prueba en 2ª instancia: hasta +25 %",25,"Criterio 7"));
+      if(c.vista2) out.push(H.pctOf("Vista: hasta +25 %",25,"Criterio 7"));
+      return out; }
+  },
+  OVI: {
+    nombre:"ICA Oviedo y Gijón", fuente:"Criterios 2007-2008 + Pautas interpretativas 2014", escala:"OVI",
+    indet:{tipo:"fijo", ord:1200, verb:550},
+    ord:{min:1200, ref:"Criterio 33"}, verb:{min:550, ref:"Criterio 42"},
+    fases:{ord:[60,15,25], verb:[60,40]}, allan:60, sesion:0, cxNote:"Moderación prudencial: los criterios no tabulan la complejidad.",
+    materias:{ consumo:{indetFijo:1320,ref:"Criterio 38"}, lph:{indetFijo:800,ref:"Criterio 40"}, honor:{indetFijo:2500,min:2500,ref:"Criterio 35"} },
+    mon_sin:(c,H)=>[H.p(c.pago?"Petición inicial con pago del deudor":"Petición inicial sin pago",c.pago?30:15,170,"Criterio 41")],
+    mon_op:(c,H)=>[H.p("Petición inicial del monitorio",15,170,"Criterio 41")],
+    ej_jud:(c,H)=>[c.ejOp? H.p("Ejecución de título judicial con oposición",100,300,"Criterio 75.1.b") : H.p("Ejecución de título judicial sin oposición",90,180,"Criterio 75.1.a")],
+    ej_ext:(c,H)=>[c.ejOp? H.p("Ejecución de título no judicial con oposición",100,360,"Criterio 75.2.b") : H.p("Ejecución de título no judicial sin oposición",90,250,"Criterio 75.2.a")],
+    ej_hip:(c,H)=>[c.ejOp? H.p("Ejecución hipotecaria con oposición",100,360,"Criterio 75.2.b") : H.p("Ejecución hipotecaria sin oposición",90,250,"Criterio 75.2.a")],
+    apel:(c,H)=>{ const pri=H.primera(c.apelOrig); let v=H.escVal(70); const capd = v>pri*0.7; v=Math.min(v,pri*0.7);
+      const out=[H.f("Recurso de apelación: 70 % de la Escala Segunda"+(capd?" (limitado al 70 % de la 1ª instancia)":""),Math.max(v,270),"Criterio 67")];
+      if(c.vista2||c.prueba2) out.push(H.pctOf("Prueba y vista: +15 %",15,"Criterio 67"));
+      return out; }
+  },
+  CAR: {
+    nombre:"ICA Cartagena", fuente:"Normas orientadoras de honorarios (2003 + IPC Región de Murcia)", escala:"CAR",
+    indet:{tipo:"base"},
+    ord:{min:900, ref:"Norma 54"}, verb:{min:600, ref:"Norma 55"},
+    fases:{ord:[60,15,25], verb:[60,40]}, allan:null, sesion:"30%", cxNote:"Norma 4ª: trabajo, complejidad, tiempo y resultado. En CGC con efectos colectivos, hasta el triple.",
+    materias:{ consumo:{min:3000,ref:"Norma 54.04"}, honor:{indetBase:true,min:3000,ref:"Norma 54.01"}, lph:{min:900,ref:"Norma 54.07"}, arrend:{min:500,ref:"Norma 55.1º"} },
+    mon_sin:(c,H)=>[H.f("Petición inicial y tramitación sin oposición (recomendado)",150,"Norma 73.A")],
+    mon_op:(c,H)=>[H.note("Con oposición: se aplica la norma del juicio declarativo correspondiente (Norma 73.B).")],
+    ej_jud:(c,H)=>{ const a=[c.ejOp? H.p("Ejecución forzosa con oposición",100,600,"Norma 65.B") : H.p("Ejecución forzosa sin oposición",50,0,"Norma 65.A")];
+      if(c.ejApremio||c.ejSubasta) a.push(H.p("Vía de apremio",25,150,"Norma 65.C")); return a; },
+    ej_ext:(c,H)=>{ const a=[c.ejOp? H.p("Ejecución forzosa con oposición",100,600,"Norma 65.B") : H.p("Ejecución forzosa sin oposición",50,0,"Norma 65.A")];
+      if(c.ejApremio||c.ejSubasta) a.push(H.p("Vía de apremio",25,150,"Norma 65.C")); return a; },
+    ej_hip:(c,H)=>{ const a=[c.ejOp? H.p("Ejecución con oposición",100,600,"Norma 65.B") : H.p("Ejecución sin oposición",50,0,"Norma 65.A")];
+      if(c.ejApremio||c.ejSubasta) a.push(H.p("Vía de apremio",25,150,"Norma 65.C")); return a; },
+    apel:(c,H)=>{ const pri=H.primera(c.apelOrig); const out=[H.f("Recurso de apelación: 50 % de la 1ª instancia",Math.max(pri*0.5,600),"Norma 58","50 % × "+eur(pri))];
+      if(c.vista2||c.prueba2) out.push(H.pctOf("Prueba o vista: +50 %",50,"Norma 58")); return out; }
+  },
+  MUR: {
+    nombre:"ICA Murcia (criterios 2024)", fuente:"Criterios orientativos aprobados el 15-1-2024 · sistema de 18 grados", escala:"GRADOS",
+    grados:true, cxNote:"Complejidad: cambia de grado (criterio 7º). Cuantías que no superan la inestimable legal suben un grado (criterio 11º.10).",
+    fases:{ord:[50,25,25], verb:[50,50]}
+  }
+};
+const ORDER = ["ORI","ALI","VAL","MUR","CAR","MAD","OVI"];
+
+/* ---------- MURCIA 2024: grados ---------- */
+const MUR_G = {
+  ord:{n:4,cx:2,t:"Ordinario (grado 4º; con complejidad 2º)"},
+  ord_consumo:{n:7,cx:4,t:"Ordinario CGC / cláusulas abusivas sin complejidad (grado 7º; con complejidad 4º)"},
+  verb:{n:5,cx:4,t:"Verbal (grado 5º; con complejidad 4º)"},
+  mon_sin:{n:12,cx:12,t:"Petición inicial de monitorio (grado 12º)"},
+  ej_sin:{n:12,cx:12,t:"Demanda de ejecución sin oposición ni apremio (grado 12º)"},
+  ej_apremio:{n:7,cx:7,t:"Ejecución sin oposición con vía de apremio (grado 7º)"},
+  ej_op:{n:6,cx:6,t:"Ejecución con oposición (grado 6º)"}
+};
+function murcia(c, warn){
+  const parts=[]; const base0 = c.indet? c.indetVal : c.base;
+  const tope = 600000; const baseU = Math.min(base0, tope);
+  if(base0>tope) warn("Criterio 11º.9: no se computa la cuantía que excede de 600.000 € (acceso a casación anterior al RDL 5/2023).");
+  function gradoDe(key){
+    const g=MUR_G[key]; let n = (c.cx==="compleja"||c.cx==="muy")? g.cx : g.n;
+    let det=[g.t];
+    if(c.cx==="muy"){ n=Math.max(1,n-1); det.push("excepcional complejidad: −1 grado"); }
+    if(c.cx==="sencilla"){ n=Math.min(18,n+1); det.push("especial sencillez: +1 grado"); }
+    if(base0<=c.indetVal && key!=="mon_sin" && key!=="ej_sin"){ n=Math.max(1,n-1); det.push("cuantía ≤ "+ni.format(c.indetVal)+" € (inestimable legal): grado superior"); }
+    if(base0>300000){ n=Math.min(18,n+1); det.push("cuantía > 300.000 €: reducción de grado"); }
+    return {n, det:det.join(" · ")};
+  }
+  function val(n){ return baseU/3*(19-n)/18; }
+  const lineFor = (label,key,ref)=>{ const g=gradoDe(key); const v=val(g.n);
+    return {l:label, v, ref, d:"Grado "+g.n+"º: "+ni.format(baseU)+" € ÷ 3 × "+(19-g.n)+"/18 · "+g.det}; };
+  const p=c.proc;
+  if(p==="ord"||p==="verb"||p==="mon_op"){
+    const key = p==="ord"? (c.mat==="consumo"?"ord_consumo":"ord") : "verb";
+    const L=lineFor(p==="ord"?"Juicio ordinario":"Juicio verbal",key,"Criterios 5º–6º");
+    const f = MUR_FASES(c,p==="ord"?"ord":"verb"); L.v*=f.k; if(f.t) L.d+=" · "+f.t;
+    parts.push(L);
+    if(p==="mon_op"){ const M=lineFor("Petición inicial de monitorio","mon_sin","Criterio 6º grado 12º"); parts.unshift(M); }
+  } else if(p==="mon_sin"){ parts.push(lineFor("Petición inicial de monitorio sin oposición","mon_sin","Criterio 6º")); }
+  else if(p.startsWith("ej_")){
+    const key = c.ejOp? "ej_op" : (c.ejApremio||c.ejSubasta? "ej_apremio":"ej_sin");
+    parts.push(lineFor("Ejecución","ej_"+(key==="ej_op"?"op":key==="ej_apremio"?"apremio":"sin"),"Criterio 6º · base 11º.5"));
+  } else if(p==="apel"){
+    const key = c.apelOrig==="ord"?(c.mat==="consumo"?"ord_consumo":"ord"):"verb";
+    const L=lineFor("Recurso de apelación (equiparable a la fase de alegaciones de 1ª instancia)",key,"Criterio 8º"); L.v*=0.5; L.d+=" · × 50 %";
+    parts.push(L);
+    if(c.vista2){ parts.push({l:"Vista en 2ª instancia: leve incremento (+10 %)",v:L.v*0.10,ref:"Criterio 8º",d:"Incremento orientativo; el criterio no fija porcentaje"}); }
+  } else if(p==="libre"){
+    parts.push({l:"Actuación al "+c.librePct+" % del grado 1º",v:val(1)*c.librePct/100,ref:"Analogía",d:"Grado 1º = 1/3 de la cuantía (art. 394.3 LEC)"});
+  }
+  return parts;
+}
+function MUR_FASES(c,tipo){
+  if(c.term==="completo") return {k:1,t:""};
+  if(c.term==="allan") return {k:0.5,t:"allanamiento antes de contestar: fase de alegaciones (criterio 15º.4)"};
+  if(c.term==="alegaciones") return {k:0.5,t:"solo fase de alegaciones (50 %)"};
+  if(c.term==="sinjuicio") return tipo==="ord"? {k:0.75,t:"sin juicio: alegaciones + audiencia previa"} : {k:0.5,t:"verbal sin vista: alegaciones"};
+  return {k:1,t:""};
+}
+
+/* ---------- MOTOR ---------- */
+function calc(colId, c){
+  const C = COLEGIOS[colId]; const flags=[]; const warn = t=>flags.push({t,k:"warn"}); const info=t=>flags.push({t,k:"info"});
+  let parts=[]; let minTotal=null; let mult=1; let noteParts=[];
+  const baseEsc = c.base;
+
+  if(C.grados){
+    parts = murcia(c,warn);
+    info("Murcia 2024 sustituye la escala por 18 grados: el grado 1º equivale al tercio del art. 394.3 LEC y cada grado inferior reduce 1/18. Es una interpretación lineal del criterio 5º; contrástala con los informes del ICAMUR.");
+  } else {
+    const esc = escala(baseEsc, C.escala);
+    if(!esc.ok){ warn("Este Colegio no tiene escala cargada: el PDF disponible no incluye la tabla de tramos. Introdúcela en «Editar escala del Colegio». Mientras tanto se aplican solo los mínimos."); }
+    const H = {
+      p:(l,pct,min,ref)=>{ const raw=esc.tot*pct/100; const v=Math.max(raw,min||0); return {l,v,ref,d:pct+" % de "+eur(esc.tot)+(v>raw?" → mínimo "+eur(min):"")}; },
+      f:(l,v,ref,d)=>({l,v,ref,d:d||"Importe fijo de referencia"}),
+      pctOf:(l,pct,ref)=>({l,v:0,ref,pctOf:pct,d:pct+" % sobre lo anterior"}),
+      escVal:pct=>esc.tot*pct/100,
+      primera:(orig)=>declarativo(C,colId,Object.assign({},c,{proc:orig,term:"completo",sesiones:0}),{silent:true}).total,
+      minTotal:(m,t)=>{minTotal={m,t};},
+      mult:(k)=>{mult=k; return null;},
+      note:(t)=>{info(t); return null;},
+      warn:(t)=>warn(t)
+    };
+    if(c.proc==="ord"||c.proc==="verb"){
+      const d = declarativo(C,colId,c,{warn,info}); parts=d.parts;
+    } else if(c.proc==="mon_op"){
+      parts = C.mon_op(c,H).filter(Boolean);
+      const d = declarativo(C,colId,Object.assign({},c,{proc:"verb"}),{warn,info});
+      parts = parts.concat(d.parts.map(x=>Object.assign({},x,{l:"Juicio verbal subsiguiente · "+x.l})));
+    } else if(c.proc==="libre"){
+      parts=[H.p("Actuación al "+c.librePct+" % de la escala",c.librePct,0,"Analogía")];
+    } else {
+      parts = (C[c.proc](c,H)||[]).filter(Boolean);
+    }
+    // porcentajes sobre lo anterior
+    let acc=0; parts.forEach(p=>{ if(p.pctOf){ p.v=acc*p.pctOf/100; } acc+=p.v; });
+    if(mult!==1){ parts.forEach(p=>{p.v*=mult;}); info("Incremento del 10 % aplicado por oposición al monitorio."); }
+    // complejidad (no en Murcia)
+    const k = CX[c.cx].f;
+    if(k!==1){ const sum=parts.reduce((s,p)=>s+p.v,0); parts.push({l:"Ajuste por complejidad y trabajo efectivo ("+CX[c.cx].t+")",v:sum*(k-1),ref:"Ponderación",d:C.cxNote}); }
+  }
+  let total = parts.reduce((s,p)=>s+p.v,0);
+  if(minTotal && total<minTotal.m){ parts.push({l:"Ajuste al mínimo orientador",v:minTotal.m-total,ref:"",d:minTotal.t}); total=minTotal.m; }
+  return {parts, total, flags};
+}
+
+function declarativo(C, colId, c, o){
+  const tipo = c.proc==="ord"?"ord":"verb"; const cfg=C[tipo]; const mat=(C.materias||{})[c.mat]||{};
+  const parts=[]; const w=o.warn||(()=>{}), inf=o.info||(()=>{});
+  let v, det;
+  const esc = escala(c.base, C.escala);
+  if(c.indet && C.indet.tipo==="fijo" && !mat.indetBase){
+    v = mat.indetFijo || C.indet[tipo]; det="Cuantía indeterminada: criterio fijo "+eur(v)+(mat.ref?" ("+mat.ref+")":"");
+  } else {
+    v = esc.tot; det="100 % de la escala sobre "+eur(c.base);
+  }
+  const min = Math.max(cfg.min, mat.min||0);
+  if(v<min){ det+=" → mínimo "+eur(min)+(mat.min&&mat.min>cfg.min?" ("+mat.ref+")":""); v=min; }
+  // fases
+  const F = C.fases[tipo]; let k=1, ft="";
+  if(c.term==="allan"){
+    if(C.allan){ k=C.allan/100; ft="allanamiento antes de contestar: "+C.allan+" % del procedimiento completo"; }
+    else { k=F[0]/100; ft="allanamiento: se atempera a la fase de alegaciones ("+F[0]+" %)"; }
+  } else if(c.term==="alegaciones"){ k=F[0]/100; ft="solo fase de alegaciones ("+F[0]+" %)"; }
+  else if(c.term==="sinjuicio"){ if(tipo==="ord"){ k=(F[0]+F[1])/100; ft="sin juicio: alegaciones + audiencia previa ("+(F[0]+F[1])+" %)"; } else { k=F[0]/100; ft="verbal sin vista: alegaciones ("+F[0]+" %)"; } }
+  const label = (tipo==="ord"?"Juicio ordinario":"Juicio verbal")+" · primera instancia";
+  parts.push({l:label, v:v*k, ref:cfg.ref, d:det+(ft?" · "+ft:"")});
+  if(c.sesiones>0 && C.sesion){
+    if(C.sesion==="30%"){ parts.push({l:"Varias sesiones por duración y complejidad (+30 %)",v:v*k*0.30,ref:"Norma 56",d:"Incremento único, con independencia del nº de sesiones"}); }
+    else parts.push({l:c.sesiones+" sesión(es) adicional(es) × "+eur(C.sesion),v:c.sesiones*C.sesion,ref:cfg.ref,d:"Por cada sesión más de vista, audiencia previa o juicio"});
+  }
+  if(c.mat==="arrend" && !o.silent) inf("Arrendamientos: introduce como cuantía la anualidad de renta, ajustada a mercado.");
+  if(c.mat==="consumo" && colId==="CAR" && !o.silent) inf("Cartagena, Norma 54.04.b: en CGC con efectos para una pluralidad de consumidores, los honorarios pueden elevarse hasta el triple.");
+  return {parts, total:parts.reduce((s,p)=>s+p.v,0)};
+}
+
+/* ---------- ESTADO / UI ---------- */
+const $ = id=>document.getElementById(id);
+let mode="tas";
+function ctx(){
+  const g = n=>{ const el=document.querySelector('input[name="'+n+'"]:checked'); return el?el.value:null; };
+  const cuant = parseFloat($("cuant").value)||0; const cond = parseFloat($("condena").value);
+  const indet = $("indet").checked;
+  const fdem = $("fdem").value || "";
+  const indetVal = indetLegal(fdem);
+  const base = indet? indetVal : (isFinite(cond) && cond>0 && cond<cuant ? cond : cuant);
+  return { col:$("col").value, proc:$("proc").value, mat:$("mat").value, cuant, cond, indet, base, fdem, indetVal, pos:$("pos").value,
+    term:g("term"), sesiones:parseInt($("sesiones").value)||0, cx:g("cx"),
+    ejOp:$("ejOp").checked, ejApremio:$("ejApremio").checked, ejSubasta:$("ejSubasta").checked, pago:$("pago").checked,
+    apelOrig:$("apelOrig").value, vista2:$("ap2vista").checked, prueba2:$("ap2prueba").checked,
+    librePct:parseFloat($("librePct").value)||0, nLetr:Math.max(1,parseInt($("nLetr").value)||1),
+    iva:parseFloat($("iva").value)||0, cap:$("cap").checked && mode==="tas", ded:$("ded").checked && mode==="tas", irpf:$("irpf").checked && mode==="jura" };
+}
+
+function finalize(c, res){
+  // límite 394.3 LEC sobre el conjunto de honorarios de letrados (minuta ideal), antes de dividir
+  let hon = res.total; let capInfo=null;
+  if(c.cap){
+    const cuantProc = c.indet? c.indetVal : c.cuant;
+    const lim = cuantProc/3;
+    if(hon>lim){ capInfo={lim, antes:hon}; hon=lim; }
+    else capInfo={lim, antes:null};
+  }
+  const porLetrado = hon / c.nLetr;
+  const ivaImp = porLetrado * c.iva/100;
+  const ivaRepercutible = !c.ded;
+  const totalNota = porLetrado + ivaImp;
+  const totalTasacion = porLetrado + (ivaRepercutible? ivaImp:0);
+  const irpfImp = c.irpf? porLetrado*0.15 : 0;
+  return {hon, capInfo, porLetrado, ivaImp, ivaRepercutible, totalNota, totalTasacion, irpfImp};
+}
+
+const PROC_TXT = {ord:"juicio ordinario",verb:"juicio verbal",mon_sin:"proceso monitorio sin oposición",mon_op:"proceso monitorio con oposición y juicio verbal subsiguiente",ej_jud:"ejecución de título judicial",ej_ext:"ejecución de título no judicial",ej_hip:"ejecución hipotecaria",apel:"recurso de apelación",libre:"actuación profesional"};
+
+function render(){
+  procRepoFill();
+  const c = ctx(); const C = COLEGIOS[c.col];
+  // visibilidad
+  const decl = ["ord","verb","mon_op"].includes(c.proc);
+  $("tramBox").hidden = !decl; $("ejBox").hidden = !c.proc.startsWith("ej_") && c.proc!=="mon_sin";
+  $("ejOp").parentElement.hidden = c.proc==="mon_sin"; $("ejApremio").parentElement.hidden = c.proc==="mon_sin"; $("ejSubasta").parentElement.hidden = c.proc==="mon_sin";
+  $("apelBox").hidden = c.proc!=="apel"; $("libreBox").hidden = c.proc!=="libre";
+  $("cuantLbl").textContent = c.proc.startsWith("ej_")? "Cantidad despachada: principal + intereses + costas (€)" : c.proc==="apel"? "Cuantía del recurso (€)" : c.proc.startsWith("mon")? "Cantidad requerida de pago (€)" : "Cuantía del procedimiento (€)";
+  $("cuantHint").textContent = c.indet? "Inestimable valorada en "+eur(c.indetVal)+" (art. 394.3 LEC"+(c.indetVal===24000?", demanda desde el 3-4-2025":", demanda anterior al 3-4-2025")+"). Algunos Colegios aplican además un criterio fijo." : (c.base!==c.cuant? "Base de cálculo: condena de "+eur(c.base)+"." : "");
+  $("colInfo").textContent = C.fuente;
+  $("cxHint").textContent = C.cxNote||"";
+  $("capLbl").hidden = mode!=="tas"; $("dedLbl").hidden = mode!=="tas"; $("irpfLbl").hidden = mode!=="jura";
+
+  const res = calc(c.col, c);
+  if(applyOvParts(res.parts,"ab")){ res.total=res.parts.reduce((s,p)=>s+p.v,0); res.flags.push({k:"warn",t:"Importes modificados manualmente: los conceptos marcados sustituyen al cálculo según criterios. Revisa que la minuta siga siendo defendible ante una impugnación por excesiva."}); }
+  const fin = finalize(c,res);
+  // documento
+  $("docTitle").textContent = mode==="tas"? "Nota de honorarios · tasación de costas" : "Nota de honorarios · jura de cuentas";
+  $("docStamp").textContent = mode==="tas"? "Tasación de costas · art. 242 LEC" : "Jura de cuentas · art. 35 LEC";
+  $("fund").textContent = fundamento(c);
+  const tr = $("trace"); tr.hidden = !lastExtraction; if(lastExtraction) tr.textContent = "Datos del procedimiento extraídos de «"+lastExtraction.file+"» el "+lastExtraction.when+" mediante "+lastExtraction.via+(lastExtraction.verif? "; verificados el "+lastExtraction.verif.when+" mediante "+lastExtraction.verif.via+" ("+lastExtraction.verif.txt+")" : "; pendientes de verificación")+". Revisados por el letrado antes de su presentación.";
+  $("docAutos").innerHTML = esc($("juz").value)+" · "+esc($("autos").value)+($("nig").value.trim()?" · NIG "+esc($("nig").value.trim()):"")+($("resol").value.trim()?"<br>"+esc($("resol").value.trim()):"")+"<br>"+ partesLineas().map(([x,y])=>"<b>"+esc(x)+":</b> "+esc(y)).join("<br>") + "<br>Criterios: "+esc(C.nombre)+" — "+esc(C.fuente);
+  const L = $("lines"); L.innerHTML="";
+  L.innerHTML = linesHTML(res.parts,"ab",editMode.ab);
+  const T=$("tot"); let h="";
+  h+='<tr class="sub"><td>Honorarios según criterios</td><td class="amt">'+eur(res.total)+'</td></tr>';
+  if(fin.capInfo && fin.capInfo.antes!=null) h+='<tr><td>Límite art. 394.3 LEC: 1/3 de '+eur(c.indet?c.indetVal:c.cuant)+'</td><td class="amt">'+eur(fin.capInfo.lim)+'</td></tr>';
+  if(c.nLetr>1) h+='<tr><td>Minuta ideal ÷ '+c.nLetr+' letrados acreedores</td><td class="amt">'+eur(fin.porLetrado)+'</td></tr>';
+  h+='<tr class="sub"><td><b>Base imponible</b></td><td class="amt"><b>'+eur(fin.porLetrado)+'</b></td></tr>';
+  h+='<tr'+(fin.ivaRepercutible?'':' class="strike"')+'><td>IVA '+pc(c.iva)+(fin.ivaRepercutible?'':' · no repercutible al condenado')+'</td><td class="amt">'+eur(fin.ivaImp)+'</td></tr>';
+  if(mode==="tas"){
+    h+='<tr class="grand"><td>Total a incluir en la tasación</td><td class="amt">'+eur(fin.totalTasacion)+'</td></tr>';
+    if(!fin.ivaRepercutible) h+='<tr class="muted"><td>Total de la minuta con IVA (a cargo del cliente)</td><td class="amt">'+eur(fin.totalNota)+'</td></tr>';
+  } else {
+    h+='<tr class="grand"><td>Total nota de honorarios</td><td class="amt">'+eur(fin.totalNota)+'</td></tr>';
+    if(c.irpf) h+='<tr class="muted"><td>Retención IRPF 15 % (la practica el cliente)</td><td class="amt">−'+eur(fin.irpfImp)+'</td></tr><tr class="muted"><td>Líquido a percibir</td><td class="amt">'+eur(fin.totalNota-fin.irpfImp)+'</td></tr>';
+  }
+  T.innerHTML=h;
+  // avisos
+  const fl=$("flags"); fl.innerHTML="";
+  const all = res.flags.slice();
+  if(fin.capInfo && fin.capInfo.antes!=null) all.unshift({k:"cap",t:"La minuta ("+eur(fin.capInfo.antes)+") supera el tercio de la cuantía del proceso. Salvo declaración de temeridad, el condenado solo responde hasta "+eur(fin.capInfo.lim)+" por el conjunto de letrados y profesionales no sujetos a arancel (art. 394.3 LEC). Comprueba si los derechos de otros profesionales consumen parte del límite."});
+  if(c.indet) all.push({k:"info",t: c.indetVal===24000? "Cuantía inestimable valorada en 24.000 € (art. 394.3 LEC en la redacción de la LO 1/2025, para demandas presentadas desde el 3-4-2025). El tope del tercio queda en "+eur(8000)+"." : "Demanda anterior al 3-4-2025: la cuantía inestimable se valora en 18.000 € y el tope del tercio en "+eur(6000)+"."});
+  if(!c.fdem && c.indet) all.push({k:"warn",t:"Falta la fecha de presentación de la demanda: se aplica el valor de 24.000 €. Indícala para confirmar el régimen."});
+  if(mode==="tas" && !fin.ivaRepercutible) all.push({k:"info",t:"Si el beneficiario de las costas puede deducirse el IVA soportado, el IVA no forma parte de las costas y no se incluye en la tasación."});
+  if(mode==="jura") all.push({k:"info",t:"En la jura de cuentas los criterios colegiales solo rigen en defecto de hoja de encargo (art. 35 LEC y art. 27 EGA). Si existe presupuesto pactado, minuta conforme a él."});
+  all.forEach(f=>{ const d=document.createElement("div"); d.className="flag"+(f.k==="info"?" info":f.k==="cap"?" cap":""); d.textContent=f.t; fl.appendChild(d); });
+  renderEscala(c); renderCmp(c);
+  lastNota = notaTexto(c,res,fin,C);
+  const pr = renderProc(c); renderJoint(c,res,fin,pr);
+  lastState = {c,res,fin,pr,C};
+  try{ localStorage.setItem("costas.form", JSON.stringify(snapshot())); }catch(e){}
+}
+
+function notaTexto(c,res,fin,C){
+  const L=[]; const ln=(a,b)=>L.push(a.padEnd(58," ")+(b||"").padStart(16," "));
+  L.push("NOTA DE HONORARIOS PROFESIONALES"+(mode==="tas"?" PARA TASACIÓN DE COSTAS":" (JURA DE CUENTAS, ART. 35 LEC)"));
+  L.push("");
+  L.push("Letrado: "+LET().linea+".");
+  L.push("Órgano: "+$("juz").value+" · "+$("autos").value+($("nig").value.trim()?" · NIG "+$("nig").value.trim():""));
+  if($("resol").value.trim()) L.push("Resolución que impone las costas: "+$("resol").value.trim());
+  partesLineas().forEach(([x,y])=>L.push(x+": "+y+"."));
+  L.push("Concepto: honorarios por la dirección letrada en "+PROC_TXT[c.proc]+(c.indet?", de cuantía indeterminada":", cuantía base "+eur(c.base))+".");
+  L.push("Criterios orientativos aplicados: "+C.nombre+" ("+C.fuente+").");
+  L.push("");
+  L.push(fundamento(c));
+  L.push("");
+  res.parts.forEach(p=>{ ln("· "+p.l, eur(p.v)); if(p.d) L.push("    "+p.d+(p.ref?" ["+p.ref+"]":"")); });
+  L.push("");
+  if(fin.capInfo && fin.capInfo.antes!=null) ln("Limitado al tercio de la cuantía (art. 394.3 LEC)", eur(fin.capInfo.lim));
+  if(c.nLetr>1) ln("Minuta ideal dividida entre "+c.nLetr+" letrados", eur(fin.porLetrado));
+  ln("BASE IMPONIBLE", eur(fin.porLetrado));
+  ln("IVA "+pc(c.iva)+(fin.ivaRepercutible?"":" (no repercutible: beneficiario deduce IVA)"), eur(fin.ivaImp));
+  ln(mode==="tas"?"TOTAL A INCLUIR EN LA TASACIÓN":"TOTAL NOTA DE HONORARIOS", eur(mode==="tas"?fin.totalTasacion:fin.totalNota));
+  if(mode==="jura" && c.irpf) ln("Retención IRPF 15 % (a practicar por el cliente)", "−"+eur(fin.irpfImp));
+  L.push("");
+  L.push("En Orihuela, a "+new Date().toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"})+".");
+  return L.join("\n");
+}
+let lastNota="";
+let lastExtraction=null;
+
+/* ---------- Cuantía inestimable (art. 394.3 LEC) ---------- */
+function indetLegal(fdem){ return (!fdem || fdem >= "2025-04-03") ? 24000 : 18000; }
+
+/* ---------- Conceptos valorados (en todos los casos) ---------- */
+function fundParts(c){
+  const act = c.pos==="activa";
+  const ESC = {
+    ord: act? "la demanda de juicio ordinario" : "la contestación a la demanda",
+    verb: act? "la demanda de juicio verbal" : "la contestación a la demanda",
+    mon_sin: act? "la petición inicial del proceso monitorio" : "el escrito de oposición al proceso monitorio",
+    mon_op: act? "la petición inicial del proceso monitorio y la demanda del juicio verbal subsiguiente" : "el escrito de oposición al proceso monitorio y la defensa en el juicio verbal",
+    ej_jud: act? "la demanda ejecutiva" : "el escrito de oposición a la ejecución",
+    ej_ext: act? "la demanda ejecutiva" : "el escrito de oposición a la ejecución",
+    ej_hip: act? "la demanda de ejecución hipotecaria" : "el escrito de oposición a la ejecución hipotecaria",
+    apel: act? "el escrito de interposición del recurso de apelación" : "el escrito de oposición al recurso de apelación",
+    libre: "el escrito correspondiente"
+  };
+  const INST = {
+    ord:"la primera instancia, con intervención en la audiencia previa y en el acto del juicio", verb:"la primera instancia, con asistencia a la vista",
+    mon_sin:"el proceso monitorio", mon_op:"el proceso monitorio y en la primera instancia del juicio verbal",
+    ej_jud:"el proceso de ejecución", ej_ext:"el proceso de ejecución", ej_hip:"el proceso de ejecución hipotecaria",
+    apel:"la segunda instancia"+(c.vista2?", con asistencia a la vista":""), libre:"la instancia correspondiente"
+  };
+  let inst = INST[c.proc];
+  if((c.proc==="ord"||c.proc==="verb") && c.term!=="completo") inst = "la primera instancia hasta la fase procesal efectivamente alcanzada";
+  const CXT = {sencilla:"sin que la reiteración de la materia excluya el estudio individualizado del asunto", normal:"con la complejidad propia de esta clase de procedimientos", compleja:"de complejidad superior a la habitual", muy:"de complejidad excepcional"};
+  return {esc:ESC[c.proc], inst, cx:CXT[c.cx]};
+}
+function fundamento(c){ const f=fundParts(c);
+  return "Para la determinación de los honorarios se han tenido en cuenta el estudio del asunto y de la documentación, la preparación y la redacción de "+f.esc+"; la defensa del cliente en "+f.inst+"; la naturaleza y la complejidad del asunto, "+f.cx+"; y la singularidad del asunto, con la aplicación de la legislación y la jurisprudencia al caso concreto."; }
+
+function renderEscala(c){
+  const C=COLEGIOS[c.col]; const tb=$("escTbl");
+  $("escEdit").disabled = !!C.grados; $("escSave").disabled=!!C.grados; $("escReset").disabled=!!C.grados;
+  if(C.grados){
+    $("escTitle").textContent="Grados de trabajo · ICA Murcia 2024";
+    $("escSub").textContent="Valor de cada grado sobre la base "+eur(Math.min(c.indet?c.indetVal:c.base,600000))+": grado 1º = 1/3 (art. 394.3 LEC), reducción lineal de 1/18 por grado.";
+    const base=Math.min(c.indet?c.indetVal:c.base,600000); let h='<tr><th>Grado</th><th class="r">Fracción del tercio</th><th class="r">Importe</th></tr>';
+    for(let g=1; g<=18; g++){ h+='<tr><td>'+g+'º</td><td class="r num">'+(19-g)+'/18</td><td class="r num">'+eur(base/3*(19-g)/18)+'</td></tr>'; }
+    tb.innerHTML=h; $("escEdit").value="El sistema de grados de Murcia 2024 no usa tramos."; return;
+  }
+  const id=C.escala; const e=escala(c.base,id);
+  $("escTitle").textContent = ESC_NOMBRE[id];
+  $("escSub").textContent = e.ok? "Cálculo por tramos sobre "+eur(c.base)+": "+eur(e.tot)+" al 100 %." : "Sin tramos cargados para este Colegio.";
+  const tr=ESCALAS[id]; let h='<tr><th>Desde</th><th>Hasta</th><th class="r">%</th><th class="r">Tramo aplicado</th><th class="r">Importe</th><th class="r">Acumulado</th></tr>';
+  let prev=0;
+  tr.forEach(([hasta,p],i)=>{ const row=e.rows[i]; const hit=row && c.base>prev && c.base<=hasta;
+    h+='<tr class="'+(hit?"hit":"")+'"><td class="num">'+ni.format(prev)+'</td><td class="num">'+(hasta===INF?"en adelante":ni.format(hasta))+'</td><td class="r num">'+pc(p)+'</td><td class="r num">'+(row?eur(row.tramo):"—")+'</td><td class="r num">'+(row?eur(row.imp):"—")+'</td><td class="r num">'+(row?eur(row.acum):"—")+'</td></tr>'; prev=hasta; });
+  tb.innerHTML=h;
+  if(document.activeElement!==$("escEdit")) $("escEdit").value = tr.map(([a,p])=>(a===INF?"max":a)+";"+String(p).replace(".",",")).join("\n");
+}
+
+function renderCmp(c){
+  let h='<tr><th>Colegio</th><th class="r">Honorarios</th><th class="r">Tras 394.3</th><th class="r">Base imponible</th><th class="r">IVA</th><th class="r">'+(mode==="tas"?"Total tasación":"Total nota")+'</th><th>Estado</th></tr>';
+  ORDER.forEach(id=>{
+    const cc=Object.assign({},c,{col:id}); const r=calc(id,cc); const f=finalize(cc,r); const C=COLEGIOS[id];
+    const noEsc = !C.grados && !(ESCALAS[C.escala]||[]).length;
+    const st = noEsc? '<span class="pill warn">sin escala</span>' : (f.capInfo&&f.capInfo.antes!=null? '<span class="pill cap">limitada 394.3</span>' : '<span class="pill">dentro de límite</span>');
+    h+='<tr class="'+(id===c.col?"sel":"")+'"><td>'+esc(C.nombre)+'</td><td class="r num">'+eur(r.total)+'</td><td class="r num">'+eur(f.hon)+'</td><td class="r num">'+eur(f.porLetrado)+'</td><td class="r num">'+eur(f.ivaRepercutible?f.ivaImp:0)+'</td><td class="r num"><b>'+eur(mode==="tas"?f.totalTasacion:f.totalNota)+'</b></td><td>'+st+'</td></tr>';
+  });
+  $("cmp").innerHTML=h;
+}
+
+function esc(s){ return String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
+
+/* ---------- Referencias ---------- */
+const REFS = [
+  ["ICAE (Elche) 12-9-22 · Wizink, minuta no excesiva","2.420 €"],
+  ["ICAMUR 27-6-22 · allanamiento Wizink","informe"],
+  ["ICAMUR · minuta informada","2.700 € + IVA"],
+  ["ICAMUR 18-1-23 · excesiva, reducida a","2.400 €"],
+  ["ICAMUR 23-3-23 · honorarios informados","2.780 € + IVA"],
+  ["ICA Cartagena 12-12-22 · minuta impugnada","2.812,50 €"],
+  ["ICA Alzira 27-5-22 · no excesiva","2.000 €"],
+  ["ICAV · no excesiva","18.000 €"]
+];
+$("refs").innerHTML = REFS.map(([a,b])=>'<li><span>'+esc(a)+'</span><span class="num">'+esc(b)+'</span></li>').join("");
+const SRCS = [
+  ["ICA Orihuela · Criterios 1-1-2013","Escala pág. 56"],["ICA Alicante · Criterios 2013","Escala pág. 73"],
+  ["Consejo Valenciano · Baremo 2008","Escala Segunda"],["ICA Murcia · Criterios 2024","18 grados"],
+  ["ICA Cartagena · Normas orientadoras","sin tabla de escala"],["ICA Madrid · Criterios orientativos","Escala ICAM"],
+  ["ICA Oviedo y Gijón · Criterios + Pautas 2014","Escala Segunda"],
+  ["RD 434/2024 · Arancel de los profesionales de la Procura","BOE 1-5-2024"]
+];
+$("srcs").innerHTML = SRCS.map(([a,b])=>'<li><span>'+esc(a)+'</span><span class="hint">'+esc(b)+'</span></li>').join("");
+
+/* ---------- Eventos ---------- */
+const sel=$("col"); ORDER.forEach(id=>{ const o=document.createElement("option"); o.value=id; o.textContent=COLEGIOS[id].nombre; sel.appendChild(o); });
+function snapshot(){ const o={mode}; document.querySelectorAll("#form input,#form select").forEach(el=>{ if(!el.id && el.type!=="radio") return; if(el.type==="file" || el.closest("#resBox")) return; if(el.type==="checkbox") o[el.id]=el.checked; else if(el.type==="radio"){ if(el.checked) o["r_"+el.name]=el.value; } else o[el.id]=el.value; }); return o; }
+function restore(){ try{ const s=localStorage.getItem("costas.form"); if(!s) return; const o=JSON.parse(s);
+  Object.keys(o).forEach(k=>{ if(k==="mode"){ setMode(o[k],true); return; } if(k.startsWith("r_")){ const el=document.querySelector('input[name="'+k.slice(2)+'"][value="'+o[k]+'"]'); if(el) el.checked=true; return; } const el=$(k); if(!el) return; if(el.type==="checkbox") el.checked=o[k]; else el.value=o[k]; }); }catch(e){} }
+function setMode(m,silent){ mode=m; $("mTas").setAttribute("aria-pressed",m==="tas"); $("mJura").setAttribute("aria-pressed",m==="jura"); if(!silent) render(); }
+$("mTas").addEventListener("click",()=>setMode("tas")); $("mJura").addEventListener("click",()=>setMode("jura"));
+$("form").addEventListener("input",render); $("form").addEventListener("change",render);
+$("form").addEventListener("submit",e=>e.preventDefault());
+
+async function copy(text, toastEl){
+  try{ await navigator.clipboard.writeText(text); toastEl.textContent="Copiado al portapapeles"; }
+  catch(e){ const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand("copy"); toastEl.textContent="Copiado al portapapeles";}catch(_){toastEl.textContent="Selecciona y copia el texto manualmente";} ta.remove(); }
+  setTimeout(()=>{toastEl.textContent="";},2500);
+}
+$("copyNota").addEventListener("click",()=>{ if(lastState) copy(minutaTexto(tplCtx(),"abogado"),$("toast")); });
+$("copyEsc").addEventListener("click",()=>{ const c=ctx(); const C=COLEGIOS[c.col]; if(C.grados){ copy("Murcia 2024: sistema de grados; ver nota.",$("toast")); return;} const e=escala(c.base,C.escala);
+  const t=[ESC_NOMBRE[C.escala]+" · base "+eur(c.base)].concat(e.rows.map(r=>"De "+ni.format(r.desde)+" a "+(r.hasta===INF?"en adelante":ni.format(Math.min(r.hasta,c.base)))+" al "+pc(r.p)+": "+eur(r.imp)),["Total escala 100 %: "+eur(e.tot)]).join("\n"); copy(t,$("toast")); });
+$("escSave").addEventListener("click",()=>{ const id=COLEGIOS[$("col").value].escala; const lines=$("escEdit").value.split(/\n+/).map(s=>s.trim()).filter(Boolean); const tr=[]; let bad=null; let prev=0;
+  lines.forEach((ln,i)=>{ const [a,b]=ln.split(";"); const h = /^max$/i.test((a||"").trim())? INF : parseFloat((a||"").replace(/\./g,"").replace(",",".")); const p=parseFloat((b||"").replace(",",".")); if(!(h>prev) || !(p>=0)) bad=bad||("Línea "+(i+1)+": revisa el límite (debe ser creciente) o el porcentaje."); else { tr.push([h,p]); prev=h; } });
+  if(bad||!tr.length){ $("escToast").style.color="var(--seal)"; $("escToast").textContent=bad||"Introduce al menos un tramo."; return; }
+  if(tr[tr.length-1][0]!==INF) tr.push([INF,tr[tr.length-1][1]]);
+  ESCALAS[id]=tr; const ok=saveCustom(id); $("escToast").style.color=""; $("escToast").textContent= ok? "Escala guardada" : "Escala aplicada (no se pudo guardar en este navegador)"; render(); });
+$("escReset").addEventListener("click",()=>{ const id=COLEGIOS[$("col").value].escala; ESCALAS[id]=ESCALAS_ORIG[id].map(x=>x.slice()); dropCustom(id); $("escEdit").value=""; $("escToast").textContent="Escala original restaurada"; render(); });
+
+/* ---------- PROCURADOR · ARANCEL RD 434/2024 ---------- */
+let lastState = null;
+// Art. 2: importe máximo para cuantías hasta cada tramo (escala escalonada)
+const PROC_ESC=[[60,13.01],[120,23.48],[180,28.63],[240,35.15],[300,40.43],[360,46.94],[420,57.28],[480,63.36],[540,66.93],[600,71.39],[1200,89.25],[1800,107.10],[2400,120.49],[3000,133.87],[3600,151.71],[4200,169.56],[4800,187.42],[5400,205.27],[6000,223.11],[12000,356.99],[24000,535.50],[36000,714.00],[48000,892.50],[60000,1026.36],[90000,1115.63],[120000,1204.88],[180000,1294.12],[240000,1383.37],[300000,1472.62],[360000,1561.87],[420000,1651.12],[480000,1829.61],[540000,1927.80],[600000,2079.53]];
+function arancel(cu){
+  if(!(cu>0)) return {v:0,d:"sin cuantía"};
+  for(const [h,v] of PROC_ESC) if(cu<=h) return {v, d:"Escala art. 2: cuantía hasta "+ni.format(h)+" € → "+eur(v)};
+  const fr=Math.ceil((cu-600000)/6000); return {v:2079.53+fr*15.17, d:"Art. 2: 2.079,53 € + "+fr+" fracciones de 6.000 € × 15,17 €"};
+}
+const PEXTRA = [
+  ["tas","Solicitud de tasación de costas","Art. 8.1",30.09,"chk"],
+  ["exc","Impugnación de la tasación (excesivas o indebidas)","Art. 8.2–3",50.15],
+  ["liq","Liquidación de intereses","Art. 9",30.09],
+  ["exh","Exhortos, oficios y mandamientos","Art. 7.1",17.55],
+  ["inc","Incidencias (alzamiento, remoción, desistimiento…)","Art. 10.1",30.09],
+  ["emb","Embargos, anotaciones, retenciones, ampliaciones","Art. 10.2",50.15],
+  ["inv","Investigación patrimonial","Art. 10.3",40.50],
+  ["cons","Consignaciones y mandamientos de pago","Art. 11",15.00],
+  ["test","Testimonios, certificaciones y desgloses","Art. 13",4.01],
+  ["caut","Solicitud de medida cautelar","Art. 45.1",50.15],
+  ["repo","Recursos de reposición o revisión","Art. 49.1",30.09]
+];
+$("procExtras").innerHTML = PEXTRA.map(([k,l,ref,imp,t])=> t==="chk"
+  ? '<label><input type="checkbox" id="px_'+k+'" checked><span>'+esc(l)+' <span class="hint">'+ref+' · '+nf.format(imp)+' €</span></span></label>'
+  : '<label><input type="number" id="px_'+k+'" min="0" step="1" value="0" aria-label="'+esc(l)+'"><span>'+esc(l)+' <span class="hint">'+ref+' · '+nf.format(imp)+' €</span></span></label>').join("");
+
+function pctx(){ const x={}; PEXTRA.forEach(([k,,,,t])=>{ const el=$("px_"+k); x[k]= t==="chk"? ((el.checked && mode==="tas")?1:0) : Math.max(0,parseInt(el.value)||0); });
+  return {on:$("procOn").checked, nom:$("procNom").value, col:$("procCol").value, n:Math.max(1,parseInt($("procN").value)||1), sup:Math.max(0,parseFloat($("procSup").value)||0), x}; }
+
+function calcProc(c){
+  const P=pctx(); const parts=[], flags=[]; const warn=t=>flags.push({k:"warn",t}), info=t=>flags.push({k:"info",t});
+  const act = c.pos==="activa";
+  const A0 = c.indet? {v:351, d:"Cuantía indeterminada: art. 3 → 351,00 €"} : arancel(c.cuant);
+  const A = A0.v;
+  const termK = ()=>{
+    if(c.term==="alegaciones") return [0.70,"solo primer período (70 %, art. 18.e)"];
+    if(c.term==="allan") return act? [0.70,"terminación antes de contestar: primer período (70 %, art. 18.e)"] : [0.25,"comparecencia para allanarse (25 %, art. 18.f)"];
+    return [1,"dos períodos: 70 % hasta la contestación + 30 % hasta sentencia (art. 18.e)"]; };
+  const decl = (tipo,label)=>{ const b = tipo==="ord"? A*1.10 : A; const [k,t]=termK();
+    parts.push({l:label, v:b*k, ref: tipo==="ord"?"Arts. 2–3 y 18.d–e":"Arts. 2–3 y 18.e", d:A0.d+(tipo==="ord"?" · +10 % juicio ordinario":"")+" · "+t}); };
+  switch(c.proc){
+    case "ord": decl("ord","Juicio ordinario · primera instancia"); break;
+    case "verb": decl("verb","Juicio verbal · primera instancia"); break;
+    case "mon_sin":
+      if(c.pago) parts.push({l:"Monitorio con cobro en esta fase",v:A*0.25,ref:"Art. 24.2",d:"25 % de "+eur(A)});
+      else parts.push({l:"Proceso monitorio (conjunto de la intervención)",v:47.25,ref:"Art. 24.1",d:"Cantidad máxima"});
+      break;
+    case "mon_op": parts.push({l:"Proceso monitorio",v:47.25,ref:"Art. 24.1",d:"Cantidad máxima"}); decl("verb","Juicio verbal subsiguiente"); break;
+    case "ej_jud": case "ej_ext": {
+      const k = act?1:0.5;
+      parts.push({l:"Demanda ejecutiva y despacho hasta el apremio",v:A*k,ref:act?"Art. 40.1":"Art. 40.1 y 40.3",d:A0.d+(act?"":" · parte ejecutada: 50 %")});
+      if(c.ejApremio||c.ejSubasta) parts.push({l:"Vía de apremio hasta su finalización",v:A*0.5*k,ref:act?"Art. 40.2":"Art. 40.2 y 40.3",d:"50 % de "+eur(A)+(act?"":" · parte ejecutada: 50 %")});
+      if(c.ejOp) parts.push({l:"Incremento por oposición",v:A*0.25,ref:"Art. 39.2",d:"25 % de "+eur(A)});
+      break; }
+    case "ej_hip": {
+      let b;
+      if(c.pago && act){ b=A*0.70; parts.push({l:"Ejecución hipotecaria con pago en plazo",v:b,ref:"Art. 26.1.e",d:"70 % de "+eur(A)}); }
+      else { b=A*0.75; parts.push({l:"Ejecución hipotecaria",v:act?b:b*0.5,ref:act?"Art. 26.1.a":"Art. 26.1.a y d",d:"75 % de "+eur(A)+" sobre la responsabilidad reclamada"+(act?"":" · parte ejecutada: 50 %")}); }
+      if(c.ejOp) parts.push({l:"Incremento por oposición",v:b*0.10,ref:"Art. 26.1.c",d:"10 % adicional"});
+      info("Ejecución hipotecaria: la base es la responsabilidad reclamada de cada finca por separado (art. 26.1.a).");
+      break; }
+    case "apel": {
+      const b1 = c.apelOrig==="ord"? A*1.10 : A; const v=b1*1.20;
+      parts.push({l:"Recurso de apelación: derechos de 1ª instancia + 20 %",v,ref:"Art. 50",d:"Base "+eur(b1)+(c.apelOrig==="ord"?" (ordinario, +10 %)":"")+" × 1,20 · 60 % interposición u oposición ("+eur(v*0.6)+") y 40 % ante la Audiencia ("+eur(v*0.4)+")"});
+      break; }
+    default: parts.push({l:"Procedimiento sin concepto especial de percepción",v:351,ref:"Art. 3",d:"Cantidad máxima"});
+  }
+  const sub = parts.reduce((s,p)=>s+p.v,0);
+  if(P.n>1) parts.push({l:"Multirrepresentación: "+P.n+" poderdantes × 10 %",v:sub*0.10*P.n,ref:"Art. 6.1",d:"Una sola cuenta más un 10 % por cada representado"});
+  PEXTRA.forEach(([k,l,ref,imp,t])=>{ const n=P.x[k]||0; if(n>0) parts.push({l: t==="chk"? l : n+" × "+l.charAt(0).toLowerCase()+l.slice(1), v:n*imp, ref, d:eur(imp)+(t==="chk"?"":" por actuación")}); });
+  if(applyOvParts(parts,"pr")) warn("Importes modificados manualmente: los conceptos marcados sustituyen a los del arancel. Recuerda que el arancel fija máximos (art. 1.2 RD 434/2024).");
+  let total = parts.reduce((s,p)=>s+p.v,0);
+  if(total>75000){ parts.push({l:"Ajuste al tope global por asunto",v:75000-total,ref:"RD art. 1.4",d:"Máximo 75.000 € por el conjunto de actuaciones"}); total=75000; }
+  if(c.fdem && c.fdem<"2024-05-02") warn("Procedimiento iniciado antes del 2-5-2024: el RD 434/2024 solo se aplica a las actuaciones posteriores (disposición transitoria única). Las anteriores se rigen por el RD 1373/2003, que no está cargado en la calculadora.");
+  info("Los importes del arancel son máximos (art. 1.2 RD 434/2024). Los derechos del procurador no computan en el límite del tercio del art. 394.3 LEC, que se refiere a profesionales no sujetos a arancel.");
+  total = r2(total);
+  const ivaImp = r2(total*c.iva/100); const ivaRep = !c.ded;
+  return {parts,total,ivaImp,ivaRep,sup:P.sup,totalNota:total+ivaImp+P.sup,totalTas:total+(ivaRep?ivaImp:0)+P.sup,flags,on:P.on,nom:P.nom,col:P.col};
+}
+
+function renderProc(c){
+  const r = calcProc(c);
+  $("procFields").hidden = !r.on; $("procDoc").hidden = !r.on;
+  if(!r.on) return r;
+  $("pDocTitle").textContent = mode==="tas"? "Cuenta de derechos del procurador · tasación de costas" : "Cuenta de derechos del procurador · art. 34 LEC";
+  $("pWho").innerHTML = esc(r.nom)+"<br>"+esc(r.col);
+  $("pLines").innerHTML = linesHTML(r.parts,"pr",editMode.pr);
+  let h='<tr class="sub"><td><b>Derechos (base imponible)</b></td><td class="amt"><b>'+eur(r.total)+'</b></td></tr>';
+  h+='<tr'+(r.ivaRep?'':' class="strike"')+'><td>IVA '+pc(c.iva)+(r.ivaRep?'':' · no repercutible al condenado')+'</td><td class="amt">'+eur(r.ivaImp)+'</td></tr>';
+  if(r.sup>0) h+='<tr><td>Suplidos</td><td class="amt">'+eur(r.sup)+'</td></tr>';
+  h+='<tr class="grand"><td>'+(mode==="tas"?"Total a incluir en la tasación":"Total cuenta del procurador")+'</td><td class="amt">'+eur(mode==="tas"?r.totalTas:r.totalNota)+'</td></tr>';
+  $("pTot").innerHTML=h;
+  $("pFlags").innerHTML = r.flags.map(f=>'<div class="flag'+(f.k==="info"?" info":"")+'">'+esc(f.t)+'</div>').join("");
+  return r;
+}
+
+function jointRows(fin,pr){
+  const tas = mode==="tas";
+  const ab = {base:fin.porLetrado, iva: fin.ivaRepercutible||!tas? fin.ivaImp:0, sup:0, tot: tas? fin.totalTasacion : fin.totalNota};
+  const rows=[["Honorarios de letrado",ab]];
+  if(pr.on) rows.push(["Derechos de procurador",{base:pr.total, iva: pr.ivaRep||!tas? pr.ivaImp:0, sup:pr.sup, tot: tas? pr.totalTas : pr.totalNota}]);
+  const T = rows.reduce((a,[,r])=>({base:a.base+r.base,iva:a.iva+r.iva,sup:a.sup+r.sup,tot:a.tot+r.tot}),{base:0,iva:0,sup:0,tot:0});
+  return {rows,T};
+}
+function renderJoint(c,res,fin,pr){
+  const {rows,T}=jointRows(fin,pr);
+  let h='<tr><th>Concepto</th><th class="r">Base imponible</th><th class="r">IVA</th><th class="r">Suplidos</th><th class="r">Total</th></tr>';
+  rows.forEach(([l,r])=>{ h+='<tr><td>'+l+'</td><td class="r num">'+eur(r.base)+'</td><td class="r num">'+eur(r.iva)+'</td><td class="r num">'+eur(r.sup)+'</td><td class="r num">'+eur(r.tot)+'</td></tr>'; });
+  h+='<tr class="jt"><td>'+(mode==="tas"?"Total costas a reclamar":"Total honorarios y derechos")+'</td><td class="r num">'+eur(T.base)+'</td><td class="r num">'+eur(T.iva)+'</td><td class="r num">'+eur(T.sup)+'</td><td class="r num">'+eur(T.tot)+'</td></tr>';
+  $("joint").innerHTML=h;
+}
+
+function jointTitle(dest){
+  if(dest==="cliente") return mode==="tas"? "INFORMACIÓN AL CLIENTE SOBRE LAS COSTAS A RECLAMAR: HONORARIOS DE ABOGADO Y DERECHOS DE PROCURADOR" : "INFORMACIÓN AL CLIENTE: HONORARIOS DE ABOGADO Y DERECHOS DE PROCURADOR";
+  return mode==="tas"? "NOTA DE HONORARIOS DE LETRADO Y CUENTA DE DERECHOS DE PROCURADOR PARA LA TASACIÓN DE COSTAS" : "MINUTA DE HONORARIOS DE LETRADO Y CUENTA DE DERECHOS DE PROCURADOR";
+}
+function jointData(dest){
+  const {c,res,fin,pr,C}=lastState; const {rows,T}=jointRows(fin,pr);
+  const v=id=>$(id).value.trim();
+  const fecha = new Date().toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"});
+  const intro = dest==="cliente"
+    ? (mode==="tas"
+        ? "En relación con el procedimiento indicado, le informamos de los honorarios de abogado y de los derechos de procurador que se incluirán en la solicitud de tasación de costas a cargo de "+(v("contra")||"la parte condenada")+". Los honorarios del abogado se han calculado conforme a los criterios orientativos del "+C.nombre+" y con el límite del artículo 394.3 de la Ley de Enjuiciamiento Civil; los derechos del procurador, conforme al arancel aprobado por el Real Decreto 434/2024, de 30 de abril, cuyos importes son máximos."
+        : "En relación con el procedimiento indicado, le informamos de los honorarios de abogado y de los derechos de procurador correspondientes a la intervención profesional realizada. Los honorarios del abogado se han calculado conforme a los criterios orientativos del "+C.nombre+", y los derechos del procurador conforme al arancel aprobado por el Real Decreto 434/2024, de 30 de abril, cuyos importes son máximos.")
+    : (mode==="tas"
+        ? "Se presentan, para su inclusión en la tasación de costas, la minuta de honorarios del letrado y la cuenta de derechos y suplidos del procurador de la parte "+(v("cliente")||"beneficiaria")+", con detalle de los conceptos y de los preceptos aplicados."
+        : "Se presentan la minuta de honorarios del letrado y la cuenta de derechos y suplidos del procurador, con detalle de los conceptos y de los preceptos aplicados.");
+  const notas=[];
+  if(fin.capInfo && fin.capInfo.antes!=null) notas.push("Los honorarios del letrado se han limitado a la tercera parte de la cuantía del proceso ("+eur(fin.capInfo.lim)+"), conforme al artículo 394.3 LEC.");
+  if(mode==="tas" && c.ded) notas.push("El beneficiario de las costas puede deducir el IVA soportado; por ello el IVA no se incluye en la tasación y es a cargo del cliente.");
+  if(pr.on) notas.push("Los derechos del procurador son importes máximos del arancel (art. 1.2 RD 434/2024) y no computan en el límite del art. 394.3 LEC.");
+  if(dest==="cliente") notas.push("La condena en costas no sustituye la obligación del cliente de abonar los honorarios pactados con sus profesionales; la parte condenada solo responde de la cantidad que se apruebe en la tasación.");
+  return {c,res,fin,pr,C,rows,T,fecha,intro,notas,v};
+}
+function partesLineas(){
+  const v=id=>$(id).value.trim(); const real=x=>x && !/^\[/.test(x);
+  const L=[];
+  let fav = (v("cliente")||"[Cliente]");
+  if($("procOn").checked && real(v("procNom"))) fav += ", representada por el/la procurador/a "+v("procNom");
+  fav += ", y defendida por el letrado "+LET().nombre;
+  L.push([mode==="tas"?"Parte favorecida por las costas":"Cliente", fav]);
+  if(mode==="tas"){
+    let con = v("contra")||"[Parte condenada]";
+    const rp=[]; if(real(v("contraProc"))) rp.push("representada por el/la procurador/a "+v("contraProc")); if(real(v("contraLetr"))) rp.push("defendida por el/la letrado/a "+v("contraLetr"));
+    if(rp.length) con += ", "+rp.join(" y ");
+    L.push(["Parte condenada en costas", con]);
+  }
+  return L;
+}
+function jointText(dest){
+  const d=jointData(dest); const L=[]; const ln=(a,b)=>L.push(a.padEnd(60," ")+(b||"").padStart(16," "));
+  L.push(jointTitle(dest)); L.push("");
+  L.push("Órgano: "+d.v("juz")+" · "+d.v("autos")+(d.v("nig")?" · NIG "+d.v("nig"):""));
+  if(d.v("resol")) L.push("Resolución: "+d.v("resol"));
+  partesLineas().forEach(([a,b])=>L.push(a+": "+b+"."));
+  L.push(""); L.push(d.intro); L.push("");
+  L.push("1. HONORARIOS DE LETRADO — "+LET().linea);
+  L.push(fundamento(d.c));
+  d.res.parts.forEach(p=>ln("· "+p.l,eur(p.v)));
+  if(d.fin.capInfo && d.fin.capInfo.antes!=null) ln("Limitado al tercio (art. 394.3 LEC)",eur(d.fin.capInfo.lim));
+  ln("Base imponible",eur(d.fin.porLetrado)); ln("IVA "+pc(d.c.iva),eur(d.rows[0][1].iva)); ln("Total letrado",eur(d.rows[0][1].tot));
+  if(d.pr.on){ L.push(""); L.push("2. DERECHOS DE PROCURADOR — "+d.pr.nom+" · "+d.pr.col+" (arancel RD 434/2024)");
+    d.pr.parts.forEach(p=>ln("· "+p.l+" ["+p.ref+"]",eur(p.v)));
+    ln("Derechos (base imponible)",eur(d.pr.total)); ln("IVA "+pc(d.c.iva),eur(d.rows[1][1].iva)); if(d.pr.sup>0) ln("Suplidos",eur(d.pr.sup)); ln("Total procurador",eur(d.rows[1][1].tot)); }
+  L.push(""); ln(mode==="tas"?"TOTAL COSTAS A RECLAMAR":"TOTAL HONORARIOS Y DERECHOS",eur(d.T.tot));
+  if(d.notas.length){ L.push(""); d.notas.forEach(n=>L.push("· "+n)); }
+  L.push(""); L.push("En Orihuela, a "+d.fecha+".");
+  return L.join("\n");
+}
+
+async function buildDocx(dest){
+  const D = window.docx; const d=jointData(dest);
+  const F="Times New Roman";
+  const P=(text,o={})=>new D.Paragraph({alignment:o.align||D.AlignmentType.JUSTIFIED, spacing:{after:o.after==null?120:o.after, line:o.line||276}, children:[new D.TextRun({text,bold:!!o.bold,italics:!!o.it,size:o.size||22,font:F})]});
+  const cell=(text,o={})=>new D.TableCell({width:{size:Math.round((o.w||25)*87.88),type:D.WidthType.DXA}, shading:o.fill?{fill:o.fill,type:D.ShadingType.CLEAR,color:"auto"}:undefined, margins:{top:60,bottom:60,left:100,right:100},
+    children:[new D.Paragraph({alignment:o.right?D.AlignmentType.RIGHT:D.AlignmentType.LEFT, children:[new D.TextRun({text:String(text),bold:!!o.bold,size:o.size||20,font:F})]})]});
+  const tbl=(rows,cw)=>new D.Table({width:{size:8788,type:D.WidthType.DXA}, columnWidths:cw, layout:D.TableLayoutType.FIXED, rows});
+  const partsTable=(parts,withRef)=>tbl([ new D.TableRow({tableHeader:true, children:[cell("Concepto",{w:withRef?58:75,bold:true,fill:"E3EEE9"}), ...(withRef?[cell("Precepto",{w:17,bold:true,fill:"E3EEE9"})]:[]), cell("Importe",{w:25,bold:true,fill:"E3EEE9",right:true})]}),
+    ...parts.map(p=>new D.TableRow({children:[cell(p.l+(p.d?" — "+p.d:""),{w:withRef?58:75,size:19}), ...(withRef?[cell(p.ref||"",{w:17,size:19})]:[]), cell(eur(p.v),{w:25,right:true})]})) ], withRef?[5097,1494,2197]:[6591,2197]);
+  const sumTable=lines=>tbl(lines.map(([a,b,bold])=>new D.TableRow({children:[cell(a,{w:75,bold}),cell(b,{w:25,right:true,bold})]})),[6591,2197]);
+  const ch=[];
+  ch.push(P(jointTitle(dest),{bold:true,align:D.AlignmentType.CENTER,size:24,after:240}));
+  ch.push(P("Órgano judicial: "+d.v("juz"),{after:40,align:D.AlignmentType.LEFT}));
+  ch.push(P("Procedimiento: "+d.v("autos")+(d.v("nig")?" · NIG "+d.v("nig"):""),{after:40,align:D.AlignmentType.LEFT}));
+  if(d.v("resol")) ch.push(P("Resolución que impone las costas: "+d.v("resol"),{after:40,align:D.AlignmentType.LEFT}));
+  ch.push(P("",{after:60}));
+  partesLineas().forEach(([a,b],i,arr)=>ch.push(new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED, spacing:{after:i===arr.length-1?200:60}, children:[new D.TextRun({text:a+": ",bold:true,size:22,font:F}), new D.TextRun({text:b+".",size:22,font:F})]})));
+  ch.push(P(d.intro,{after:200}));
+  ch.push(P("1. Honorarios de letrado",{bold:true,size:23,after:80}));
+  ch.push(P("Letrado: "+LET().linea+". Criterios aplicados: "+d.C.nombre+" ("+d.C.fuente+").",{after:100}));
+  ch.push(P(fundamento(d.c),{it:true,after:120}));
+  ch.push(partsTable(d.res.parts,false));
+  const ab=[];
+  if(d.fin.capInfo && d.fin.capInfo.antes!=null) ab.push(["Limitado a la tercera parte de la cuantía (art. 394.3 LEC)",eur(d.fin.capInfo.lim)]);
+  if(d.c.nLetr>1) ab.push(["Minuta ideal dividida entre "+d.c.nLetr+" letrados",eur(d.fin.porLetrado)]);
+  ab.push(["Base imponible",eur(d.fin.porLetrado)],["IVA "+pc(d.c.iva)+(mode==="tas"&&d.c.ded?" (no repercutible)":""),eur(d.rows[0][1].iva)],["Total honorarios de letrado",eur(d.rows[0][1].tot),true]);
+  ch.push(P("",{after:60})); ch.push(sumTable(ab)); ch.push(P("",{after:200}));
+  if(d.pr.on){
+    ch.push(P("2. Derechos de procurador",{bold:true,size:23,after:80}));
+    ch.push(P("Procurador/a: "+d.pr.nom+" · "+d.pr.col+". Arancel aprobado por el Real Decreto 434/2024, de 30 de abril.",{after:120}));
+    ch.push(partsTable(d.pr.parts,true));
+    const pl=[["Derechos (base imponible)",eur(d.pr.total)],["IVA "+pc(d.c.iva)+(mode==="tas"&&d.c.ded?" (no repercutible)":""),eur(d.rows[1][1].iva)]];
+    if(d.pr.sup>0) pl.push(["Suplidos",eur(d.pr.sup)]);
+    pl.push(["Total derechos de procurador",eur(d.rows[1][1].tot),true]);
+    ch.push(P("",{after:60})); ch.push(sumTable(pl)); ch.push(P("",{after:200}));
+  }
+  ch.push(P((d.pr.on?"3":"2")+". Resumen",{bold:true,size:23,after:80}));
+  ch.push(tbl([ new D.TableRow({tableHeader:true,children:["Concepto","Base imponible","IVA","Suplidos","Total"].map((t,i)=>cell(t,{w:i?17:32,bold:true,fill:"E3EEE9",right:i>0}))}),
+    ...d.rows.map(([l,r])=>new D.TableRow({children:[cell(l,{w:32}),cell(eur(r.base),{w:17,right:true}),cell(eur(r.iva),{w:17,right:true}),cell(eur(r.sup),{w:17,right:true}),cell(eur(r.tot),{w:17,right:true})]})),
+    new D.TableRow({children:[cell(mode==="tas"?"Total costas a reclamar":"Total",{w:32,bold:true}),cell(eur(d.T.base),{w:17,right:true,bold:true}),cell(eur(d.T.iva),{w:17,right:true,bold:true}),cell(eur(d.T.sup),{w:17,right:true,bold:true}),cell(eur(d.T.tot),{w:17,right:true,bold:true})]}) ],[2812,1494,1494,1494,1494]));
+  if(d.notas.length){ ch.push(P("",{after:120})); d.notas.forEach(n=>ch.push(P("· "+n,{size:19,after:60}))); }
+  ch.push(P("En Orihuela, a "+d.fecha+".",{after:480,align:D.AlignmentType.LEFT}));
+  ch.push(P("Fdo.: "+LET().nombre,{after:0,align:D.AlignmentType.LEFT}));
+  ch.push(P("Abogado"+(LET().corta?" · "+LET().corta:""),{after:360,size:19,align:D.AlignmentType.LEFT}));
+  if(d.pr.on){ ch.push(P("Fdo.: "+d.pr.nom,{after:0,align:D.AlignmentType.LEFT})); ch.push(P("Procurador/a · "+d.pr.col,{size:19,align:D.AlignmentType.LEFT})); }
+  const doc = new D.Document({creator:LET().nombre, title:jointTitle(dest),
+    sections:[{properties:{page:{margin:{top:1417,bottom:1417,left:1701,right:1417}}}, children:ch}]});
+  return D.Packer.toBlob(doc);
+}
+
+let dlApi = null;
+if(window.claude && typeof window.claude.use==="function") window.claude.use("downloads").then(x=>{dlApi=x;}).catch(()=>{});
+const jToast=(t,err)=>{ $("jToast").style.color= err?"var(--seal)":""; $("jToast").textContent=t; };
+$("dlDocx").addEventListener("click", async ()=>{
+  if(!lastState) return;
+  if(!window.docx){ jToast("No se pudo cargar el generador de Word. Usa «Copiar texto».",true); return; }
+  if(!dlApi){ jToast("La descarga no está disponible en esta vista. Usa «Copiar texto».",true); return; }
+  try{
+    $("dlDocx").disabled=true; jToast("Generando documento…");
+    const blob = $("docDest").value==="juzgado"? await buildTasDocx() : await buildDocx("cliente");
+    const ref = ($("autos").value||"procedimiento").replace(/[\\/:*?"<>|]+/g,"-").slice(0,80);
+    await dlApi.save({filename:"Honorarios abogado y procurador - "+ref+".docx", data:blob});
+    jToast("Documento descargado.");
+  }catch(e){
+    const code=e&&e.code;
+    if(code==="declined") jToast("Descarga cancelada.");
+    else if(code==="rate_limited") jToast("Hay otra descarga pendiente. Inténtalo en un momento.",true);
+    else jToast("No se pudo generar o descargar el documento. Usa «Copiar texto».",true);
+  }finally{ $("dlDocx").disabled=false; }
+});
+$("copyJoint").addEventListener("click",()=>{ if(!lastState) return; const t=tplCtx(); copy($("docDest").value==="juzgado"? juzgadoTexto(t) : jointText("cliente"),$("jToast")); });
+$("copyProc").addEventListener("click",()=>{ if(lastState) copy(minutaTexto(tplCtx(),"procurador"),$("pToast")); });
+$("docDest").addEventListener("change",()=>{ try{ localStorage.setItem("costas.dest",$("docDest").value); }catch(e){} });
+try{ const dd=localStorage.getItem("costas.dest"); if(dd) $("docDest").value=dd; }catch(e){}
+
+/* ---------- PLANTILLA DEL DESPACHO: escrito (pág. 1) + minuta de abogado (pág. 2) + minuta de procurador (pág. 3) ---------- */
+const COL_LOC = {ORI:"Orihuela",ALI:"Alicante",VAL:"Valencia",MUR:"Murcia",CAR:"Cartagena",MAD:"Madrid",OVI:"Oviedo"};
+const eurT = v => eur(v).replace(/ €$/,".-€");
+const pcI = v => String(v).replace(".",",")+"%";
+const ENTIDAD = /\b(S\.?\s?A\.?\s?U?\.?|S\.?\s?L\.?\s?U?\.?|BANK|BANCO|BANCA|ENTIDAD|SOCIEDAD|COMUNIDAD|FINANCIERA|FINANCE|CAIXA|CAJA|CR[EÉ]DITO|LIMITED|LTD|COOP|ASOCIACI[OÓ]N|FUNDACI[OÓ]N|AYUNTAMIENTO|CONSEJER[IÍ]A|SEGUROS|ASEGURADORA|SERVICIOS|GROUP|GRUPO)\b/i;
+const tratado = n => ENTIDAD.test(n||"")? "la entidad "+n : "D./Dª. "+n;
+const artOrg = j => /^(juzgado|tribunal)/i.test(j||"")? "el" : "la";
+function splitAutos(a){ a=(a||"").trim(); const m=a.match(/^(.*?)[\s,·–-]*(?:n[ºo°.]*\s*)?(\d{1,6}\s*\/\s*\d{2,4})\s*$/i);
+  return m? {tipo:(m[1].trim()||"Procedimiento"), num:m[2].replace(/\s/g,"")} : {tipo:a||"[Tipo de procedimiento]", num:"[nº]"}; }
+function poblacion(j){ const m=String(j||"").match(/\bde\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ\- ]{2,30})\s*$/i); if(!m) return "Orihuela";
+  return m[1].trim().toLowerCase().replace(/(^|\s|-)([a-záéíóúñ])/g,(x,a,b)=>a+b.toUpperCase()); }
+function tplCtx(){
+  const {c,res,fin,pr,C}=lastState; const v=id=>($(id).value||"").trim(); const real=x=>x && !/^\[/.test(x);
+  const au=splitAutos(v("autos")); const ej=c.proc.startsWith("ej_"), ap=c.proc==="apel";
+  const A = ej? ["ejecutante","ejecutada"] : ap? ["apelante","apelada"] : ["demandante","demandada"];
+  const ro = c.pos==="activa"? {cli:A[0],con:A[1]} : {cli:A[1],con:A[0]};
+  const juz=v("juz")||"[Órgano judicial]";
+  return {c,res,fin,pr,C, juz, nig:v("nig")||"[NIG]", tipo:au.tipo, num:au.num,
+    cli:v("cliente")||"[Cliente]", con:v("contra")||"[Parte contraria]",
+    proc: real(v("procNom"))? v("procNom") : "[Procurador/a]", procCon: v("contraProc")||"[Procurador/a de la parte contraria]",
+    nref: v("nref")||"[N/Ref.]", iban: v("procIban")||"[cuenta del procurador]",
+    colLoc: COL_LOC[c.col]||C.nombre, pobl: poblacion(juz), ro,
+    fecha: new Date().toLocaleDateString("es-ES",{day:"numeric",month:"long",year:"numeric"}),
+    pagador: mode==="tas"? (v("contra")||"[Parte contraria]") : (v("cliente")||"[Cliente]") };
+}
+function abogadoTabla(t){
+  const f=fundParts(t.c); const rows=[];
+  t.res.parts.forEach((p,i)=>{
+    const txt = i===0
+      ? "Por el estudio del asunto y de la documentación, por la preparación y redacción de "+f.esc+", y por la defensa en "+f.inst+", atendiendo a la naturaleza y complejidad del asunto, "+f.cx+", y a su singularidad, con la aplicación de la legislación y la jurisprudencia al caso concreto ("+p.l+(p.d?": "+p.d:"")+")"
+      : p.l+(p.d?" ("+p.d+")":"");
+    rows.push([txt+(p.manual && p.extraIdx==null? " — importe fijado por el letrado" : ""),p.v]); });
+  if(t.fin.capInfo && t.fin.capInfo.antes!=null) rows.push(["Limitación a la tercera parte de la cuantía del proceso (art. 394.3 LEC)", t.fin.hon - t.res.total]);
+  if(t.c.nLetr>1) rows.push(["Minuta ideal dividida entre "+t.c.nLetr+" letrados acreedores de las costas", t.fin.porLetrado - t.fin.hon]);
+  const base=t.fin.porLetrado, noIva = mode==="tas" && t.c.ded, iva = noIva? 0 : t.fin.ivaImp, ret = t.c.irpf? t.fin.irpfImp : 0;
+  return {rows, tot:[["SUBTOTAL",base],["BASE IMPONIBLE",base],["I.V.A. "+pcI(t.c.iva)+(noIva?" (no repercutible)":""),iva],["RETENCIÓN 15%",ret],["TOTAL",base+iva-ret]]};
+}
+function procuradorTabla(t){
+  const pr=t.pr; const rows=pr.parts.map(p=>[p.l+" ("+p.ref+")"+(p.d?" — "+p.d:"")+(p.manual && p.extraIdx==null? " — importe fijado manualmente" : ""), p.v]);
+  const noIva = mode==="tas" && t.c.ded, iva = noIva? 0 : pr.ivaImp, ret = t.c.irpf? r2(pr.total*0.15) : 0;
+  return {rows, tot:[["SUBTOTAL",pr.total],["BASE IMPONIBLE",pr.total],["I.V.A. "+pcI(t.c.iva)+(noIva?" (no repercutible)":""),iva],["SUPLIDOS",pr.sup],["RETENCIÓN 15%",ret],["TOTAL",pr.total+iva+pr.sup-ret]]};
+}
+const NORMA_AB = "los ordinales d) y e) del art. 6.2 de la Ley Orgánica 5/2024, de 11 de noviembre";
+const NORMA_PR = "el arancel de derechos de los profesionales de la Procura aprobado por el Real Decreto 434/2024, de 30 de abril";
+// Párrafo introductorio de cada minuta como lista de [texto, negrita+subrayado]
+function introMinuta(t,quien){
+  const rol = (quien==="abogado"? "siendo mi defendida " : "siendo mi representada ")+tratado(t.cli)+" ("+t.ro.cli+"), y la parte contraria "+tratado(t.con)+" ("+t.ro.con+").";
+  const autos = " en los Autos de "+t.tipo+" que con el número "+t.num+" se tramitan en "+artOrg(t.juz)+" "+t.juz+", ";
+  if(quien==="abogado") return mode==="tas"
+    ? [["\tPara la tasación de costas, de conformidad a lo establecido en ",false],[NORMA_AB,true],[", devengadas"+autos+rol,false]]
+    : [["\tPara la jura de cuentas (art. 35 LEC), por los honorarios devengados"+autos+rol,false]];
+  return mode==="tas"
+    ? [["\tPara la tasación de costas, de conformidad a lo establecido en ",false],[NORMA_PR,true],[", devengados"+autos+rol,false]]
+    : [["\tPara la reclamación de la cuenta del procurador (art. 34 LEC), de conformidad a lo establecido en ",false],[NORMA_PR,true],[", devengados"+autos+rol,false]];
+}
+function escritoBloques(t){
+  const conPr = t.pr.on;
+  return {
+    cab:[[t.juz],["N.I.G.: "+t.nig],[t.tipo+" – "+t.num],null,["Parte que presenta el escrito:",t.cli],["Procurador:",t.proc.toUpperCase()],null,["Parte Contraria:",t.con],["Procurador contraria:",t.procCon],null,["N/Ref.: "+t.nref]],
+    titulo: ((/^(juzgado|tribunal)/i.test(t.juz)? "AL " : "A LA ")+t.juz).toUpperCase(),
+    p1:[[t.proc.toUpperCase(),1],[", Procurador ante los Tribunales actuando en nombre y representación de ",0],[t.cli,1],[", conforme consta acreditado en los ",0],["Autos de "+t.tipo+" que con el número "+t.num+" ",1],["se tramitan en el Juzgado a que me dirijo, ante el mismo comparezco y, como más procedente sea en Derecho,",0]],
+    p2:[["DIGO: ",1],["Que, por medio del presente escrito, habida cuenta los ordinales d) y e) del art. 6.2 de la Ley Orgánica 5/2024, de 11 de noviembre, los cuales ",0],["vienen a señalar que las costas se fijarán en función a los criterios del Colegio de Abogados, en este caso el de "+t.colLoc+", y que este tiene señalado que las costas para estos procedimientos se establecen en el importe de "+eurT(t.fin.porLetrado)+",",1],[" se interesa que se tasen las costas conforme a "+(conPr?"las minutas de abogado y de procurador acompañadas":"la minuta de abogado acompañada")+" a este escrito.",0]],
+    p3:[["A estos efectos, VENGO A SOLICITAR AL JUZGADO QUE UNA VEZ APROBADAS LAS COSTAS PROCESALES requiera a la parte condenada a que el pago se efectúe en la cuenta de consignaciones de este Juzgado o en la de este procurador ("+t.iban+"). Para el supuesto de que sean consignadas en la cuenta del Juzgado, se interesa que el importe en concepto de costas se transfiera a la cuenta señalada del procurador que suscribe o se le haga entrega del correspondiente mandamiento de pago, todo ello de conformidad a la Nota Informativa del Ministerio de Justicia de junio 2019, y a los Autos del Tribunal Supremo de fechas 19 de octubre de 2022 y 10 de julio de 2025.",0]],
+    p4:[["En su virtud,",0]],
+    p5:[["SUPLICO AL JUZGADO",1],[": Que teniendo por presentado este escrito, se sirva admitirlo, por realizadas las manifestaciones contenidas en el cuerpo del mismo, y tras los trámites legales oportunas, se tasen las costas de este procedimiento, y una vez aprobadas ",0],["SE REQUIERA A LA PARTE CONTRARIA A QUE CONSIGNE LAS MISMAS en la cuenta de este Órgano Judicial.",2]]
+  };
+}
+/* --- Textos para copiar (misma estructura que la plantilla) --- */
+function tablaTexto(tab){ const L=[]; const ln=(a,b)=>L.push(a.padEnd(62," ")+b.padStart(16," "));
+  ln("CONCEPTO","CANTIDAD"); L.push("-".repeat(78)); tab.rows.forEach(([a,b])=>{ L.push(a); ln("",eurT(b)); }); L.push("-".repeat(78));
+  tab.tot.forEach(([a,b])=>ln(a.padStart(62," ").trimStart().padStart(62," "),eurT(b))); return L.join("\n"); }
+function minutaTexto(t,quien){
+  const tab = quien==="abogado"? abogadoTabla(t) : procuradorTabla(t);
+  const L=[t.pagador.padStart(78," "),"",(quien==="abogado"?"MINUTA DE HONORARIOS DE ABOGADO":"MINUTA DE DERECHOS Y SUPLIDOS DE PROCURADOR"),"",
+    introMinuta(t,quien).map(x=>x[0]).join("").replace(/^\t/,"    "),"",tablaTexto(tab),"","En "+t.pobl+", a "+t.fecha];
+  return L.join("\n");
+}
+function escritoTexto(t){ const e=escritoBloques(t); const L=[];
+  e.cab.forEach(x=>L.push(x? (x.length===2? x[0].padEnd(32," ")+x[1] : x[0]) : ""));
+  L.push("", e.titulo.toUpperCase(), "");
+  [e.p1,e.p2,e.p3].forEach(p=>{ L.push("    "+p.map(x=>x[0]).join("")); L.push(""); });
+  L.push("    En su virtud,",""); L.push("    "+e.p5.map(x=>x[0]).join("")); L.push("","Es Justicia que pido,","En "+t.pobl+", a "+t.fecha);
+  return L.join("\n"); }
+function juzgadoTexto(t){
+  const parts=[]; if(mode==="tas") parts.push(escritoTexto(t)); parts.push(minutaTexto(t,"abogado")); if(t.pr.on) parts.push(minutaTexto(t,"procurador"));
+  return parts.join("\n\n"+"═".repeat(78)+"\n\n"); }
+
+/* --- Word con el formato de la plantilla (Arial, A4, márgenes 2,5/3 cm, sin numeración de páginas) --- */
+async function buildTasDocx(){
+  const D=window.docx; const t=tplCtx(); const A="Arial";
+  const run=(text,o={})=>new D.TextRun({text, font:A, size:o.size||22, bold:!!o.b, smallCaps:!!o.sc, underline:o.u?{}:undefined});
+  const runs=(arr,size)=>arr.map(([x,f])=>run(x,{b:f===1||f===true||f===2, u:f===2||f===true, size}));
+  const ch=[];
+  const body=(arr,o={})=>new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED, spacing:{before:120,after:120,line:276}, indent:{firstLine:708}, children:runs(arr), pageBreakBefore:!!o.pb});
+  const center=(text,o={})=>new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{before:o.before||0,after:0,line:240}, children:[run(text)]});
+  const blank=(o={})=>new D.Paragraph({spacing:{line:o.line||276,after:0}, children:[]});
+  if(mode==="tas"){
+    const e=escritoBloques(t);
+    e.cab.forEach((x,i)=>{
+      if(!x){ ch.push(new D.Paragraph({spacing:{before:120,after:120,line:276}, indent:{left:-851}, children:[]})); return; }
+      const pair=x.length===2;
+      ch.push(new D.Paragraph({spacing:{before:120,after:120,line:276}, indent:{left:-851}, contextualSpacing:pair,
+        tabStops:[{type:D.TabStopType.LEFT, position:2155}],
+        children: pair? [run(x[0],{b:true,size:16}), run("\t",{b:true,size:16}), run(x[1],{size:16})] : [run(x[0],{b:true,size:16})]}));
+    });
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{before:120,after:120,line:276}, children:[run(e.titulo,{b:true,sc:true,size:32})]}));
+    ch.push(body(e.p1)); ch.push(body(e.p2)); ch.push(body(e.p3));
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED, spacing:{before:120,after:120,line:276}, indent:{firstLine:709}, children:[]}));
+    ch.push(body(e.p4)); ch.push(body(e.p5));
+    ch.push(center("Es Justicia que pido,",{before:240}));
+    ch.push(center("En "+t.pobl+", a "+t.fecha));
+  }
+  const TT=D.BorderStyle.THICK_THIN_SMALL_GAP, TH=D.BorderStyle.THIN_THICK_SMALL_GAP, S=D.BorderStyle.SINGLE;
+  const bd=(st,sz)=>({style:st,size:sz,color:"auto"});
+  const cell=(text,o,borders,w)=>new D.TableCell({width:{size:w,type:D.WidthType.DXA}, verticalAlign:D.VerticalAlign.CENTER, borders,
+    children:[new D.Paragraph({alignment:o.align, spacing:{line:252}, children:[run(text,{b:o.b,size:o.size})]})]});
+  function tabla(tab){
+    const rows=[];
+    rows.push(new D.TableRow({height:{value:709,rule:D.HeightRule.ATLEAST}, children:[
+      cell("CONCEPTO",{align:D.AlignmentType.CENTER,b:true,size:22},{top:bd(TT,24),left:bd(TT,24),bottom:bd(TT,24),right:bd(S,4)},8143),
+      cell("CANTIDAD",{align:D.AlignmentType.CENTER,b:true,size:22},{top:bd(TT,24),left:bd(S,4),bottom:bd(TT,24),right:bd(TH,24)},2267)]}));
+    tab.rows.forEach(([a,b])=>rows.push(new D.TableRow({height:{value:426,rule:D.HeightRule.ATLEAST}, children:[
+      cell(a,{align:D.AlignmentType.CENTER,size:15},{top:bd(S,4),left:bd(TT,24),bottom:bd(S,4),right:bd(S,4)},8143),
+      cell(eurT(b),{align:D.AlignmentType.CENTER,size:15},{top:bd(S,4),left:bd(S,4),bottom:bd(S,4),right:bd(TH,24)},2267)]})));
+    tab.tot.forEach(([a,b],i,arr)=>{ const last=i===arr.length-1; const bot= last? bd(TH,24) : bd(S,4);
+      rows.push(new D.TableRow({height:{value:last?268:300,rule:D.HeightRule.ATLEAST}, children:[
+        cell(a,{align:D.AlignmentType.RIGHT,b:true,size:15},{top:bd(S,4),left:bd(TT,24),bottom:bot,right:bd(S,4)},8143),
+        cell(eurT(b),{align:D.AlignmentType.CENTER,b:last,size:15},{top:bd(S,4),left:bd(S,4),bottom:bot,right:bd(TH,24)},2267)]})); });
+    return new D.Table({width:{size:10410,type:D.WidthType.DXA}, columnWidths:[8143,2267], alignment:D.AlignmentType.CENTER, layout:D.TableLayoutType.FIXED,
+      margins:{left:70,right:70}, rows});
+  }
+  function pagina(quien, pb){
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.RIGHT, spacing:{line:252,after:160}, indent:{firstLine:709}, pageBreakBefore:pb, children:[run(t.pagador,{b:true})]}));
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, spacing:{before:80,after:80,line:360}, children:[]}));
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.CENTER, keepNext:true, spacing:{before:80,after:80,line:360}, children:[run(quien==="abogado"?"MINUTA DE HONORARIOS DE ABOGADO":"MINUTA DE DERECHOS Y SUPLIDOS DE PROCURADOR",{b:true})]}));
+    ch.push(new D.Paragraph({alignment:D.AlignmentType.JUSTIFIED, spacing:{after:0,line:276}, children:runs(introMinuta(t,quien))}));
+    ch.push(blank({line:240}));
+    ch.push(tabla(quien==="abogado"? abogadoTabla(t) : procuradorTabla(t)));
+    ch.push(blank({line:240}));
+    ch.push(center("En "+t.pobl+", a "+t.fecha,{before:120}));
+  }
+  pagina("abogado", mode==="tas");
+  if(t.pr.on) pagina("procurador", true);
+  const doc=new D.Document({creator:LET().nombre, title:"Tasación de costas · "+t.tipo+" "+t.num,
+    styles:{default:{document:{run:{font:A,size:22}}}},
+    sections:[{properties:{page:{size:{width:11906,height:16838}, margin:{top:1417,right:1701,bottom:1417,left:1701,header:708,footer:708}}}, children:ch}]});
+  return D.Packer.toBlob(doc);
+}
+
+/* ---------- EDICIÓN MANUAL DE IMPORTES ---------- */
+const OV = {ab:{parts:{},extra:[]}, pr:{parts:{},extra:[]}};
+const editMode = {ab:false, pr:false};
+let lastSource = null;
+function applyOvParts(parts,kind){
+  const o=OV[kind]; let man=false;
+  parts.forEach(p=>{ if(o.parts[p.l]!=null){ p.orig=p.v; p.v=o.parts[p.l]; p.manual=true; man=true; } });
+  o.extra.forEach((e,i)=>{ parts.push({l:e.l||"Concepto adicional", v:e.v||0, ref:"Manual", d:"Concepto añadido manualmente", manual:true, extraIdx:i}); man=true; });
+  return man;
+}
+function linesHTML(parts,kind,edit){
+  let h = parts.map(p=>{
+    const lab = (edit && p.extraIdx!=null)
+      ? '<input class="lbl" data-kind="'+kind+'" data-x="'+p.extraIdx+'" data-f="l" value="'+esc(p.l)+'" aria-label="Concepto">'
+      : esc(p.l)+(p.ref?'<span class="ref">'+esc(p.ref)+'</span>':'');
+    const det = '<span class="det">'+esc(p.d||"")+'</span>'+(p.manual && p.orig!=null? '<span class="orig">Cálculo original: '+eur(p.orig)+'</span>' : '');
+    const amt = edit
+      ? '<input type="number" step="0.01" data-kind="'+kind+'" '+(p.extraIdx!=null? 'data-x="'+p.extraIdx+'" data-f="v"' : 'data-l="'+esc(p.l)+'"')+' value="'+r2(p.v)+'" aria-label="Importe de '+esc(p.l)+'">'
+        + (p.extraIdx!=null? ' <button type="button" class="mini" data-kind="'+kind+'" data-del="'+p.extraIdx+'">Quitar</button>' : '')
+      : eur(p.v);
+    return '<tr class="'+(p.manual?'man':'')+'"><td>'+lab+det+'</td><td class="amt num">'+amt+'</td></tr>'; }).join("");
+  if(edit) h += '<tr><td colspan="2"><button type="button" class="mini" data-kind="'+kind+'" data-add="1">+ Añadir concepto</button></td></tr>';
+  return h;
+}
+function ovChanged(kind){ $(kind==="ab"?"resetAb":"resetPr").hidden = !(Object.keys(OV[kind].parts).length || OV[kind].extra.length); render(); }
+["lines","pLines"].forEach(id=>{
+  const el=$(id);
+  el.addEventListener("change",e=>{ const t=e.target, k=t.dataset.kind; if(!k) return;
+    if(t.dataset.l!=null){ const v=parseEs(t.value); if(v==null) delete OV[k].parts[t.dataset.l]; else OV[k].parts[t.dataset.l]=v; }
+    else if(t.dataset.x!=null){ const it=OV[k].extra[+t.dataset.x]; if(!it) return; if(t.dataset.f==="l") it.l=t.value; else it.v=parseEs(t.value)||0; }
+    ovChanged(k); });
+  el.addEventListener("click",e=>{ const t=e.target, k=t.dataset.kind; if(!k) return;
+    if(t.dataset.add){ OV[k].extra.push({l:"Concepto adicional",v:0}); ovChanged(k); }
+    if(t.dataset.del!=null){ OV[k].extra.splice(+t.dataset.del,1); ovChanged(k); } });
+});
+function toggleEdit(kind){ editMode[kind]=!editMode[kind]; const b=$(kind==="ab"?"editAb":"editPr"); b.setAttribute("aria-pressed",editMode[kind]); b.textContent=editMode[kind]?"Terminar edición":"Editar importes"; render(); }
+$("editAb").addEventListener("click",()=>toggleEdit("ab")); $("editPr").addEventListener("click",()=>toggleEdit("pr"));
+$("resetAb").addEventListener("click",()=>{ OV.ab={parts:{},extra:[]}; ovChanged("ab"); });
+$("resetPr").addEventListener("click",()=>{ OV.pr={parts:{},extra:[]}; ovChanged("pr"); });
+
+/* ---------- VERIFICACIÓN DE LA EXTRACCIÓN ---------- */
+const normTxt = x => String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9ñ]+/g," ").trim();
+function localVerify(g,text){
+  const T=normTxt(text), D=String(text||"").replace(/\D/g,""); const out=[];
+  Object.entries(g).forEach(([k,v])=>{
+    if(v===""||v===false||v==null||["col","materia","procedimiento_tipo","posicion_beneficiaria","pronunciamiento_costas"].includes(k)) return;
+    let ok;
+    if(["cuantia","condena_importe"].includes(k)){ const n=parseEs(v); ok = n!=null && (D.includes(String(Math.round(n))) || D.includes(n.toFixed(2).replace(".",""))); }
+    else if(/fecha/.test(k)){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v); ok = !!m && (T.includes(String(+m[3])+" de ") && T.includes(m[1])); }
+    else if(k==="nig"){ ok = D.includes(String(v).replace(/\D/g,"")); }
+    else if(typeof v==="boolean"){ return; }
+    else { const w=normTxt(v).split(" ").filter(x=>x.length>2); ok = w.length>0 && w.filter(x=>T.includes(x)).length/w.length>=0.8; }
+    out.push({campo:k, estado: ok?"ok":"no_consta"}); });
+  return out;
+}
+function showVerif(list,via){
+  $("resFields").querySelectorAll(".vb,.sug").forEach(x=>x.remove());
+  let err=0, ok=0, nc=0;
+  list.forEach(r=>{ const inp=$("resFields").querySelector('[data-k="'+r.campo+'"]'); if(!inp) return; const lab=inp.closest("label"); if(!lab) return;
+    const b=document.createElement("span");
+    if(r.estado==="ok"){ b.className="vb ok"; b.textContent="✓ verificado"; ok++; }
+    else if(r.estado==="error"){ b.className="vb err"; b.textContent="✗ discrepancia"; err++;
+      const sg=document.createElement("span"); sg.className="sug";
+      sg.innerHTML='Según la resolución: <b>'+esc(r.valor_correcto==null?"(no consta)":String(r.valor_correcto))+'</b>'+(r.cita?' · «'+esc(String(r.cita).slice(0,140))+'»':'')+(r.valor_correcto!=null?' <button type="button" class="mini" data-fix="'+esc(r.campo)+'">Corregir</button>':'');
+      sg.dataset.val = r.valor_correcto==null? "" : String(r.valor_correcto); lab.appendChild(sg); }
+    else { b.className="vb nc"; b.textContent="no consta en el texto"; nc++; }
+    (lab.firstChild && lab.firstChild.nodeType===3 ? lab.insertBefore(b, lab.firstChild.nextSibling) : lab.prepend(b)); });
+  const vo=$("verOut"); vo.hidden=false;
+  vo.innerHTML = '<div class="flag '+(err?'':'info')+'">Verificación mediante '+esc(via)+': '+ok+' datos coinciden, '+err+' discrepancias y '+nc+' sin confirmar en el texto.'+(err?' <button type="button" class="mini" id="fixAll">Corregir todas</button>':'')+'</div>';
+  if(lastExtraction){ lastExtraction.verif = {when:new Date().toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"}), via, txt: err? err+" discrepancias señaladas" : "sin discrepancias"}; render(); }
+}
+function fixField(k,val){ const inp=$("resFields").querySelector('[data-k="'+k+'"]'); if(!inp) return;
+  if(inp.type==="checkbox") inp.checked = /^(true|s[ií]|1)$/i.test(val); else if(inp.type==="number") inp.value = parseEs(val)==null? "" : parseEs(val); else inp.value = val;
+  applyExtraction(readReview(), new Set([k, GROUP[k]||k])); render();
+  const lab=inp.closest("label"); if(lab){ lab.querySelectorAll(".sug").forEach(x=>x.remove()); const b=lab.querySelector(".vb"); if(b){ b.className="vb ok"; b.textContent="✓ corregido"; } } }
+$("verOut").addEventListener("click",e=>{ if(e.target.id==="fixAll") $("resFields").querySelectorAll(".sug").forEach(sg=>{ const bt=sg.querySelector("[data-fix]"); if(bt) fixField(bt.dataset.fix, sg.dataset.val); }); });
+$("resFields").addEventListener("click",e=>{ const k=e.target.dataset && e.target.dataset.fix; if(k){ fixField(k, e.target.closest(".sug").dataset.val); resStatus("Campo corregido con el dato de la resolución."); } });
+async function verifyExtraction(){
+  if(!lastSource){ resError("No hay ninguna resolución cargada que verificar."); return; }
+  const g=readReview(); $("resApply").disabled=true;
+  try{
+    if(sampleFn){
+      resStatus("La IA está comprobando cada dato con la resolución…");
+      const t=lastSource.text||""; const body = t.length>60000? t.slice(0,42000)+"\n[…]\n"+t.slice(-18000) : t;
+      const prompt = "Eres un revisor de un despacho de abogados español. Comprueba, uno por uno, si los datos extraídos de una resolución judicial coinciden con ella.\n"
+        + "Datos extraídos (JSON):\n"+JSON.stringify(g)+"\n\n"
+        + 'Responde SOLO con JSON: {"verificacion":[{"campo":"clave tal como aparece arriba","estado":"ok|error|no_consta","valor_correcto":"valor según la resolución, en el mismo formato que el extraído (fechas AAAA-MM-DD, importes como número sin formato), o null","cita":"fragmento literal breve de la resolución que lo justifica, o null"}]}\n'
+        + "Incluye todas las claves con valor. Marca «error» solo si la resolución dice otra cosa; «no_consta» si la resolución no lo menciona. Para procedimiento_tipo, materia, col y posicion_beneficiaria valora si la clasificación es correcta.\n\nRESOLUCIÓN:\n"+(body||"(resolución escaneada: ver imágenes adjuntas)");
+      const ai = await sampleFn.json(prompt, {images: (lastSource.images&&lastSource.images.length&&sampleImages)? lastSource.images.slice(0,sampleImages.maxCount) : undefined, cache:false});
+      const list = (ai && (ai.verificacion||ai.verificación||ai.resultados)) || (Array.isArray(ai)? ai : []);
+      showVerif(list.filter(x=>x && x.campo), "IA");
+      resStatus("Verificación terminada. Revisa los datos marcados.");
+    } else {
+      if(!lastSource.text){ resError("Sin acceso a la IA solo se puede verificar una resolución con texto."); return; }
+      showVerif(localVerify(g,lastSource.text), "comparación automática con el texto");
+      resStatus("Verificación local terminada: comprueba los datos que no se han podido confirmar.");
+    }
+  }catch(e){ const code=e&&e.code; resError(code==="rate_limited"? "Demasiadas consultas seguidas. Espera un momento." : "No se pudo completar la verificación. Inténtalo de nuevo."); }
+  finally{ $("resApply").disabled=false; }
+}
+
+/* ---------- ASISTENTE DE MODIFICACIONES (chat) ---------- */
+const CHAT_FIELDS = {
+  col:"Colegio/plaza: ORI, ALI, VAL, MUR, CAR, MAD, OVI", proc:"procedimiento: ord, verb, mon_sin, mon_op, ej_jud, ej_ext, ej_hip, apel, libre", mat:"materia: cantidad, consumo, arrend, lph, honor",
+  cuant:"cuantía del procedimiento (número)", condena:"importe de la condena (número o vacío)", indet:"cuantía indeterminada (true/false)", fdem:"fecha de presentación de la demanda AAAA-MM-DD",
+  term:"desarrollo: completo, sinjuicio, alegaciones, allan", sesiones:"sesiones adicionales (número)", cx:"complejidad: sencilla, normal, compleja, muy",
+  ejOp:"ejecución con oposición (true/false)", ejApremio:"vía de apremio (true/false)", ejSubasta:"realización/subasta (true/false)", pago:"pago o consignación (true/false)",
+  apelOrig:"proceso de origen de la apelación: ord, verb", ap2vista:"vista en apelación (true/false)", ap2prueba:"prueba en apelación (true/false)", librePct:"% de escala para otra actuación",
+  nLetr:"letrados acreedores (número)", iva:"tipo de IVA (número)", cap:"aplicar límite art. 394.3 (true/false)", ded:"beneficiario deduce IVA (true/false)", irpf:"retención IRPF en jura (true/false)",
+  juz:"órgano judicial", autos:"procedimiento y nº de autos", nig:"NIG", resol:"resolución que impone las costas", nref:"N/Ref. del despacho", pos:"posición del cliente: activa, pasiva",
+  cliente:"parte favorecida / cliente", contra:"parte condenada", contraProc:"procurador/a de la parte condenada", contraLetr:"letrado/a de la parte condenada",
+  procOn:"incluir procurador (true/false)", procNom:"nombre del procurador/a", procCol:"nº de colegiado y Colegio del procurador/a", procN:"poderdantes (número)", procSup:"suplidos del procurador (número)", procIban:"IBAN del procurador",
+  docDest:"destino del documento: cliente, juzgado"
+};
+PEXTRA.forEach(([k,l,ref,imp,t])=>{ CHAT_FIELDS["px_"+k] = "procurador · "+l+" ("+ref+")"+(t==="chk"?" (true/false)":" (nº de veces)"); });
+let chatTurns = [], chatCtl = null;
+function chatMsg(cls,html){ const d=document.createElement("div"); d.className="msg "+cls; d.innerHTML=html; $("chatLog").appendChild(d); $("chatLog").scrollTop=$("chatLog").scrollHeight; return d; }
+function fieldValue(id){ if(id==="term"||id==="cx"){ const r=document.querySelector('input[name="'+id+'"]:checked'); return r?r.value:null; } const el=$(id); if(!el) return null; return el.type==="checkbox"? el.checked : el.value; }
+function setAny(id,val){
+  if(id==="term"||id==="cx"){ const r=document.querySelector('input[name="'+id+'"][value="'+val+'"]'); if(!r) return false; r.checked=true; return true; }
+  const el=$(id); if(!el) return false;
+  if(el.type==="checkbox"){ el.checked = val===true || /^(true|s[ií]|1)$/i.test(String(val)); }
+  else if(el.type==="number"){ const n=parseEs(val); if(n==null && val!=="" && val!=null) return false; el.value = n==null? "" : n; }
+  else if(el.tagName==="SELECT"){ if(![...el.options].some(o=>o.value===String(val))) return false; el.value=String(val); }
+  else el.value = val==null? "" : String(val);
+  el.classList.add("filled"); setTimeout(()=>el.classList.remove("filled"),2500); return true;
+}
+function chatState(){
+  const f={}; Object.keys(CHAT_FIELDS).forEach(k=>{ f[k]=fieldValue(k); });
+  const st=lastState||{}; const ab=(st.res&&st.res.parts||[]).map(p=>({concepto:p.l, importe:r2(p.v), manual:!!p.manual}));
+  const pr=(st.pr&&st.pr.on? st.pr.parts:[]).map(p=>({concepto:p.l, importe:r2(p.v), manual:!!p.manual}));
+  return {modo:mode, campos:f, abogado:{conceptos:ab, base_imponible: st.fin? r2(st.fin.porLetrado):null}, procurador:{conceptos:pr, derechos: st.pr? st.pr.total:null}};
+}
+async function chatSendMsg(text){
+  chatMsg("user", esc(text));
+  if(!sampleFn){ chatMsg("bot","El asistente necesita acceso a la IA, disponible en la versión publicada de la herramienta. Mientras tanto puedes cambiar los datos en el formulario o con «Editar importes»."); return; }
+  const before = snapshot(), ovBefore = JSON.parse(JSON.stringify(OV)), modeBefore = mode;
+  const hist = chatTurns.slice(-6).map(t=>(t.r==="u"?"Usuario: ":"Asistente: ")+t.t).join("\n");
+  const prompt = "Eres el asistente de una calculadora de costas procesales de un despacho de abogados español. El letrado te pide modificar datos, cuantías o circunstancias. Traduce su petición a cambios concretos.\n"
+    + "Campos modificables (id: significado y valores admitidos):\n"+Object.entries(CHAT_FIELDS).map(([k,v])=>"- "+k+": "+v).join("\n")+"\n\n"
+    + "Estado actual (JSON):\n"+JSON.stringify(chatState())+"\n\n"
+    + (hist? "Conversación previa:\n"+hist+"\n\n" : "")
+    + "Petición del letrado: «"+text+"»\n\n"
+    + 'Responde SOLO con JSON: {"respuesta":"frase breve en español que explique lo que cambias o pregunte lo que falte","cambios":[{"campo":"id","valor":valor}],"importes":[{"profesional":"abogado|procurador","accion":"fijar|añadir|quitar","concepto":"etiqueta exacta de un concepto existente o texto del nuevo concepto","importe":número}],"restablecer":[],"modo":null}\n'
+    + "Reglas: usa solo los ids indicados; números sin formato; fechas AAAA-MM-DD. Para cambiar el importe de un concepto ya calculado usa importes/fijar con su etiqueta exacta; para un concepto nuevo, importes/añadir. «restablecer» admite \"abogado\" o \"procurador\" para volver al cálculo automático. «modo» puede ser \"tas\" (tasación) o \"jura\" (jura de cuentas). Si la petición es ambigua, no cambies nada y pregunta en «respuesta». No inventes datos que el letrado no haya dado.";
+  chatCtl = new AbortController(); $("chatStop").hidden=false; $("chatSend").disabled=true; $("chatStatus").textContent="Pensando…";
+  try{
+    const ai = await sampleFn.json(prompt, {signal:chatCtl.signal, cache:false});
+    const done=[], fail=[];
+    if(ai && ai.modo && (ai.modo==="tas"||ai.modo==="jura") && ai.modo!==mode){ setMode(ai.modo,true); done.push("modo → "+(ai.modo==="tas"?"tasación de costas":"jura de cuentas")); }
+    (ai && Array.isArray(ai.cambios)? ai.cambios : []).forEach(ch=>{ const k=ch && ch.campo; if(!k || !(k in CHAT_FIELDS)){ if(k) fail.push(k); return; }
+      const prev=fieldValue(k); if(setAny(k, ch.valor)){ done.push((CHAT_FIELDS[k].split(":")[0])+": "+(prev===""||prev==null?"—":prev)+" → "+fieldValue(k)); if(typeof syncReviewFrom==="function") syncReviewFrom(k); } else fail.push(k); });
+    (ai && Array.isArray(ai.restablecer)? ai.restablecer : []).forEach(x=>{ const k = /proc/i.test(x)?"pr":"ab"; OV[k]={parts:{},extra:[]}; done.push("cálculo automático restablecido ("+(k==="ab"?"abogado":"procurador")+")"); });
+    const lastParts = {ab:(lastState&&lastState.res? lastState.res.parts:[]), pr:(lastState&&lastState.pr? lastState.pr.parts:[])};
+    (ai && Array.isArray(ai.importes)? ai.importes : []).forEach(im=>{ if(!im) return; const k = /proc/i.test(im.profesional||"")? "pr" : "ab"; const n=parseEs(im.importe); const con=String(im.concepto||"").trim();
+      const match = lastParts[k].find(p=>p.extraIdx==null && (p.l===con || normTxt(p.l)===normTxt(con) || (con && normTxt(p.l).includes(normTxt(con)))));
+      const xi = OV[k].extra.findIndex(e=>normTxt(e.l)===normTxt(con));
+      if(im.accion==="quitar"){ if(xi>=0){ OV[k].extra.splice(xi,1); done.push("quitado: "+con); } else if(match){ OV[k].parts[match.l]=0; done.push(match.l+" → 0,00 €"); } else fail.push(con); return; }
+      if(n==null){ fail.push(con||"importe"); return; }
+      if(im.accion!=="añadir" && match){ OV[k].parts[match.l]=n; done.push((k==="ab"?"Abogado":"Procurador")+" · "+match.l+": "+eur(match.v)+" → "+eur(n)); }
+      else if(xi>=0){ OV[k].extra[xi].v=n; done.push((k==="ab"?"Abogado":"Procurador")+" · "+con+" → "+eur(n)); }
+      else { OV[k].extra.push({l:con||"Concepto adicional", v:n}); done.push((k==="ab"?"Abogado":"Procurador")+" · nuevo concepto «"+(con||"Concepto adicional")+"»: "+eur(n)); } });
+    ["ab","pr"].forEach(k=>{ $(k==="ab"?"resetAb":"resetPr").hidden = !(Object.keys(OV[k].parts).length || OV[k].extra.length); });
+    render();
+    const resp = (ai && ai.respuesta) || (done.length? "Hecho." : "No he identificado ningún cambio que aplicar.");
+    chatTurns.push({r:"u",t:text},{r:"a",t:resp});
+    const d = chatMsg("bot", esc(resp) + (done.length? "<ul>"+done.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>" : "") + (fail.length? '<div style="margin-top:6px;color:var(--seal)">No se pudo aplicar: '+esc(fail.join(", "))+'.</div>' : "")
+      + (done.length? '<div class="undo"><button type="button" class="mini">Deshacer estos cambios</button></div>' : ""));
+    const ub=d.querySelector(".undo button"); if(ub) ub.addEventListener("click",()=>{ applySnapChat(before); Object.assign(OV, JSON.parse(JSON.stringify(ovBefore))); setMode(modeBefore,true); ["ab","pr"].forEach(k=>{ $(k==="ab"?"resetAb":"resetPr").hidden = !(Object.keys(OV[k].parts).length || OV[k].extra.length); }); render(); ub.disabled=true; ub.textContent="Cambios deshechos"; });
+    $("chatStatus").textContent="";
+  }catch(e){
+    const code=e&&e.code;
+    if(code==="cancelled") $("chatStatus").textContent="Detenido.";
+    else if(code==="not_granted"||code==="sampling_disabled"){ $("chatStatus").textContent=""; chatMsg("bot","No tengo permiso para usar la IA en esta vista. Puedes hacer los cambios en el formulario o con «Editar importes»."); }
+    else if(code==="rate_limited") $("chatStatus").textContent="Demasiadas consultas seguidas. Espera un momento.";
+    else { $("chatStatus").textContent=""; chatMsg("bot","No he podido procesar la petición. Reformúlala o inténtalo de nuevo."); }
+  }finally{ $("chatStop").hidden=true; $("chatSend").disabled=false; }
+}
+function applySnapChat(o){ Object.keys(o||{}).forEach(k=>{ if(k==="mode") return; if(k.startsWith("r_")){ const el=document.querySelector('input[name="'+k.slice(2)+'"][value="'+o[k]+'"]'); if(el) el.checked=true; return; } const el=$(k); if(!el||el.type==="file") return; if(el.type==="checkbox") el.checked=o[k]; else el.value=o[k]; }); }
+$("chatForm").addEventListener("submit",e=>{ e.preventDefault(); const t=$("chatIn").value.trim(); if(!t) return; $("chatIn").value=""; chatSendMsg(t); });
+$("chatIn").addEventListener("keydown",e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); $("chatForm").requestSubmit(); } });
+$("chatStop").addEventListener("click",()=>{ if(chatCtl) chatCtl.abort(); });
+
+/* ---------- DIRECTORIO DE PROCURADORES (datos facilitados por el despacho) ---------- */
+const PROC_REPO = [
+  {nombre:"CONSTANTINO MANUEL GUTIÉRREZ SARMIENTO", iban:"ES83-0049-4518-13-2910049185"}
+];
+const normN = x => String(x||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9ñ]+/g," ").trim();
+$("procList").innerHTML = PROC_REPO.map(p=>'<option value="'+esc(p.nombre)+'">').join("");
+function procRepoFind(n){ const k=normN(n); if(!k || k.split(" ").length<2) return null;
+  return PROC_REPO.find(p=>{ const r=normN(p.nombre); return r===k || r.includes(k) || k.includes(r); }) || null; }
+function procRepoFill(){ const m=procRepoFind($("procNom").value); const ib=$("procIban");
+  if(m && normN($("procNom").value)===normN(m.nombre) && $("procNom").value!==m.nombre && document.activeElement!==$("procNom")) $("procNom").value=m.nombre;
+  if(m && !ib.value.trim()){ ib.value=m.iban; ib.classList.add("filled"); setTimeout(()=>ib.classList.remove("filled"),2500); } }
+
+/* ---------- NUEVA TASACIÓN ---------- */
+let newArm = null;
+$("nuevaTas").addEventListener("click",()=>{
+  const b=$("nuevaTas");
+  if(!newArm){ b.classList.add("armed"); b.textContent="¿Borrar todo? Pulsa de nuevo"; newArm=setTimeout(()=>{ newArm=null; b.classList.remove("armed"); b.textContent="+ Nueva tasación"; },4000); return; }
+  clearTimeout(newArm); newArm=null; b.classList.remove("armed"); b.textContent="+ Nueva tasación";
+  document.querySelectorAll("#form input, #form select, #form textarea").forEach(el=>{
+    if(el.type==="file") el.value="";
+    else if(el.type==="checkbox"||el.type==="radio") el.checked=el.defaultChecked;
+    else if(el.tagName==="SELECT"){ const d=[...el.options].findIndex(o=>o.defaultSelected); el.selectedIndex = d>=0? d : 0; }
+    else el.value=el.defaultValue; });
+  try{ localStorage.removeItem("costas.form"); }catch(e){}
+  OV.ab={parts:{},extra:[]}; OV.pr={parts:{},extra:[]}; editMode.ab=false; editMode.pr=false;
+  ["editAb","editPr"].forEach(id=>{ $(id).setAttribute("aria-pressed","false"); $(id).textContent="Editar importes"; });
+  $("resetAb").hidden=true; $("resetPr").hidden=true;
+  lastExtraction=null; lastSource=null; preExtraction=null; resFileObj=null;
+  $("resOut").hidden=true; $("resName").textContent=""; $("resStatus").textContent=""; $("resText").value="";
+  chatTurns=[]; $("chatLog").innerHTML='<div class="msg sys">Nueva tasación. Los cambios que haga el asistente se reflejan en el formulario, en las notas y en los documentos, y puedes deshacerlos uno a uno.</div>';
+  setMode("tas",true); render(); window.scrollTo({top:0,behavior:"smooth"});
+  resStatus("Formulario en blanco: sube la resolución o introduce los datos de la nueva tasación.");
+});
+
+/* ---------- EXTRACCIÓN DE LA RESOLUCIÓN ---------- */
+let sampleFn = null, sampleImages = null, resCtl = null, resFileObj = null;
+if(window.claude && typeof window.claude.use==="function"){
+  window.claude.use("sample").then(s=>{ sampleFn=s; if(s && s.limits) s.limits().then(l=>{ sampleImages = l && l.images || null; }).catch(()=>{}); }).catch(()=>{});
+}
+const resStatus = t=>{ $("resStatus").style.color=""; $("resStatus").textContent=t; };
+const resError = t=>{ $("resStatus").style.color="var(--seal)"; $("resStatus").textContent=t; };
+
+$("resFile").addEventListener("change",e=>{ resFileObj=e.target.files[0]||null; $("resName").textContent=resFileObj?resFileObj.name:""; });
+const drop=$("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); drop.classList.add("over");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault(); drop.classList.remove("over");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f){ resFileObj=f; $("resName").textContent=f.name; } });
+
+async function pdfContent(file){
+  if(!window.pdfjsLib) throw new Error("nopdf");
+  try{ pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; }catch(e){}
+  const pdf = await pdfjsLib.getDocument({data: new Uint8Array(await file.arrayBuffer())}).promise;
+  const n = Math.min(pdf.numPages, 40); let text="";
+  for(let i=1;i<=n;i++){ const pg=await pdf.getPage(i); const tc=await pg.getTextContent(); let line=""; let lastY=null;
+    tc.items.forEach(it=>{ const y=it.transform? it.transform[5]:null; if(lastY!==null && y!==null && Math.abs(y-lastY)>2){ text+=line+"\n"; line=""; } line+=it.str+(it.hasEOL?"\n":" "); lastY=y; });
+    text+=line+"\n\n"; }
+  const clean = text.replace(/[ \t]+/g," ").trim();
+  let images=[];
+  if(clean.replace(/\s/g,"").length < 400){ // escaneado: rasterizar primeras páginas
+    const max = Math.min(pdf.numPages, sampleImages? sampleImages.maxCount : 3, 4);
+    for(let i=1;i<=max;i++){ const pg=await pdf.getPage(i); const vp=pg.getViewport({scale:1.6}); const cv=document.createElement("canvas"); cv.width=vp.width; cv.height=vp.height;
+      await pg.render({canvasContext:cv.getContext("2d"), viewport:vp}).promise; images.push(await new Promise(r=>cv.toBlob(r,"image/jpeg",0.85))); }
+    if(pdf.numPages>max) images.push(...[]);
+  }
+  return {text:clean, images, pages:pdf.numPages};
+}
+
+function regexExtract(t){
+  const o={}; const s=t.replace(/ /g," ");
+  const nig = s.match(/N\.?\s?I\.?\s?G\.?\s*[:.]?\s*([0-9][0-9 .\-]{16,30}[0-9])/i); if(nig){ const d=nig[1].replace(/\D/g,""); if(d.length>=19) o.nig=d.slice(0,5)+" "+d.slice(5,7)+" "+d.slice(7,8)+" "+d.slice(8,12)+" "+d.slice(12,19); }
+  const org = s.match(/(JUZGADO DE PRIMERA INSTANCIA[^\n]{0,90}|AUDIENCIA PROVINCIAL[^\n]{0,70}|JUZGADO DE LO MERCANTIL[^\n]{0,60}|TRIBUNAL DE INSTANCIA[^\n]{0,120})/i); if(org) o.organo=org[1].replace(/\s+/g," ").trim();
+  const pr = s.match(/(PROCEDIMIENTO ORDINARIO|JUICIO ORDINARIO|JUICIO VERBAL|PROCEDIMIENTO VERBAL|MONITORIO|EJECUCI[OÓ]N HIPOTECARIA|EJECUCI[OÓ]N DE T[IÍ]TULOS? (?:NO )?JUDICIAL(?:ES)?|EJECUCI[OÓ]N|RECURSO DE APELACI[OÓ]N|ROLLO DE APELACI[OÓ]N)\s*(?:\([A-Z]{1,4}\))?\s*(?:N[ºo°.]*\s*)?:?\s*(\d{1,6}\s*\/\s*\d{2,4})/i);
+  if(pr){ o.numero_autos=(pr[1]+" "+pr[2].replace(/\s/g,"")).replace(/\s+/g," "); const k=pr[1].toUpperCase();
+    o.procedimiento_tipo = /APELACI/.test(k)?"apel": /HIPOTEC/.test(k)?"ej_hip": /NO JUDICIAL/.test(k)?"ej_ext": /EJECUCI/.test(k)?"ej_jud": /MONITORIO/.test(k)?"mon_sin": /VERBAL/.test(k)?"verb":"ord"; }
+  const cu = s.match(/cuant[ií]a[^\n\d]{0,60}?([\d.]{1,12},\d{2}|\d[\d.]{2,12})\s*(?:€|euros|EUR)/i); if(cu) o.cuantia=parseFloat(cu[1].replace(/\./g,"").replace(",","."));
+  if(/cuant[ií]a\s+(?:indeterminada|inestimable)/i.test(s)) o.cuantia_indeterminada=true;
+  const fe = s.match(/(?:SENTENCIA|AUTO|DECRETO)[^\n]{0,40}?(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})/i);
+  if(fe){ const M={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12}; o.fecha_resolucion=fe[3]+"-"+String(M[fe[2].toLowerCase()]).padStart(2,"0")+"-"+fe[1].padStart(2,"0"); }
+  const tr = s.match(/\b(SENTENCIA|AUTO|DECRETO)\b/); if(tr) o.tipo_resolucion=tr[1][0]+tr[1].slice(1).toLowerCase();
+  o.condena_costas = /(?:impon|condena)[^.]{0,120}costas|costas[^.]{0,60}(?:a la parte|al demandad|a la demandad|al actor)/i.test(s);
+  o.temeridad = /temeridad/i.test(s) && /aprecia[^.]{0,40}temeridad|con\s+temeridad/i.test(s);
+  const names = re => { const out=[]; let m; while((m=re.exec(s)) && out.length<6){ const n=m[1].replace(/\s+/g," ").replace(/[ .]+$/,"").trim(); if(n.length>4 && !out.includes(n)) out.push(n); } return out; };
+  const TRAT = "(?:D\\.ª|D\\.\\s?ª|Dña\\.?|Doña|Don|D\\.|Sr\\.|Sra\\.)?\\s*";
+  const NOM = "([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñü'\\-]+(?:\\s+(?:de\\s+(?:la\\s+|los\\s+)?|del\\s+)?[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñü'\\-]+){1,4})";
+  const procs = names(new RegExp("Procurador(?:a)?(?:\\s+de\\s+los\\s+Tribunales)?\\s+"+TRAT+NOM,"g"));
+  const letrs = names(new RegExp("(?:Letrad[oa]|Abogad[oa])\\s+"+TRAT+NOM,"g"));
+  o._procs=procs; o._letrs=letrs;
+  if(!o.fecha_resolucion){ const f2=s.match(/\ba\s+(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})/i);
+    if(f2){ const M={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,setiembre:9,octubre:10,noviembre:11,diciembre:12}; o.fecha_resolucion=f2[3]+"-"+String(M[f2[2].toLowerCase()]).padStart(2,"0")+"-"+f2[1].padStart(2,"0"); } }
+  const nr=s.match(/\b(?:SENTENCIA|AUTO|DECRETO)\s*(?:N[ºo°.]*\s*)?:?\s*(\d{1,5}\s*\/\s*\d{2,4})/i); if(nr) o.numero_resolucion=nr[1].replace(/\s/g,"");
+  const parte = re => { const m=s.match(re); return m? m[1].replace(/\s+/g," ").trim() : undefined; };
+  const TR="(?:D\\.ª|Dña\\.?|Doña|Don|D\\.)?\\s*";
+  o._act = parte(new RegExp("(?:parte\\s+)?(?:demandante|actora|ejecutante|apelante|recurrente)\\s*:?\\s+"+TR+"([^,;\\n]{3,90}?),\\s*(?:representad|asistid|defendid|con\\s+domicilio)","i"));
+  o._pas = parte(new RegExp("(?:parte\\s+)?(?:demandad[oa]|ejecutad[oa]|apelad[oa]|recurrid[oa])\\s*:?\\s+"+TR+"([^,;\\n]{3,90}?),\\s*(?:representad|asistid|defendid|con\\s+domicilio)","i"));
+  return o;
+}
+
+const PROMPT = `Eres un asistente de un despacho de abogados español. Extrae de la resolución judicial siguiente (sentencia, auto o decreto que impone las costas) los datos para preparar una nota de honorarios para tasación de costas.
+Responde SOLO con un objeto JSON con estas claves (usa null si el dato no consta; no inventes nada):
+{"tipo_resolucion":"Sentencia|Auto|Decreto","numero_resolucion":"p. ej. 123/2026","fecha_resolucion":"AAAA-MM-DD","organo":"órgano judicial completo con sección o plaza y localidad","localidad":"sede del órgano","procedimiento_tipo":"ord|verb|mon_sin|mon_op|ej_jud|ej_ext|ej_hip|apel|otro","numero_autos":"clase y número tal como figura, p. ej. Procedimiento Ordinario 517/2024","nig":"NIG completo","fecha_demanda":"AAAA-MM-DD fecha de presentación de la demanda o recurso si consta","cuantia":número en euros sin formato o null,"cuantia_indeterminada":true|false,"condena_importe":número en euros de la condena principal o null,"materia":"cantidad|consumo|arrend|lph|honor","parte_beneficiaria":"denominación completa de la parte a cuyo favor se imponen las costas","parte_condenada":"denominación completa de la parte condenada en costas","procurador_beneficiaria":"nombre completo del procurador/a que representa a la parte favorecida por las costas, sin tratamiento (D., Dña.)","colegio_procurador_beneficiaria":"Colegio de procuradores de ese procurador/a, solo si consta","colegiado_procurador_beneficiaria":"nº de colegiado del procurador/a, solo si consta","letrado_beneficiaria":"nombre completo del letrado/a que defiende a la parte favorecida, sin tratamiento","procurador_condenada":"nombre completo del procurador/a de la parte condenada en costas, sin tratamiento","letrado_condenada":"nombre completo del letrado/a de la parte condenada en costas, sin tratamiento","posicion_beneficiaria":"activa|pasiva (activa si es actora, ejecutante o recurrente)","condena_costas":true|false,"temeridad":true|false,"allanamiento":true|false,"recurso_vista":true|false,"pronunciamiento_costas":"cita literal breve del pronunciamiento sobre costas"}
+Criterios: "consumo" para condiciones generales, cláusulas abusivas, usura, tarjetas revolving o préstamos al consumo; "mon_op" si es un monitorio con oposición transformado en verbal; "apel" si la resolución es de la Audiencia Provincial resolviendo una apelación (en ese caso cuantía = interés del recurso). El NIG tiene 19 dígitos. La representación y defensa de cada parte suele figurar en el encabezamiento («representado por el Procurador… y asistido/defendido por el Letrado…»); asígnala a la parte correcta. Si hay varias partes favorecidas o condenadas, indica la principal y separa las demás con « ; ».
+
+RESOLUCIÓN:
+`;
+
+/* Importe en formato español o numérico → número */
+function parseEs(v){
+  if(v==null || v==="") return null; if(typeof v==="number") return isFinite(v)? v : null;
+  let t=String(v).replace(/[€\s]|euros?|EUR/gi,"");
+  if(t.includes(",") && t.includes(".")) t = t.lastIndexOf(",")>t.lastIndexOf(".") ? t.replace(/\./g,"").replace(",",".") : t.replace(/,/g,"");
+  else if(t.includes(",")) t = t.replace(/\./g,"").replace(",",".");
+  else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,"");
+  const n=parseFloat(t); return isFinite(n)? n : null;
+}
+/* Aplana respuestas anidadas de la IA y une listas */
+function flattenAI(o,out={}){ for(const [k,v] of Object.entries(o||{})){ if(v && typeof v==="object" && !Array.isArray(v)) flattenAI(v,out); else if(!(k in out) || out[k]==null || out[k]==="") out[k]=Array.isArray(v)? v.filter(Boolean).join(" ; ") : v; } return out; }
+/* Colegio de procuradores deducido de la sede del órgano */
+function colegioProcDe(t){ const m=String(t||"").match(/\b(?:de|DE)\s+([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ\- ]{2,30})\s*$/); if(!m) return null;
+  const loc=m[1].trim().toLowerCase().replace(/(^|\s|-)([a-záéíóúñ])/g,(x,a,b)=>a+b.toUpperCase()); return "Ilustre Colegio de Procuradores de "+loc; }
+function colFromText(t){ const s=(t||"").toLowerCase();
+  if(s.includes("orihuela")) return "ORI"; if(s.includes("alicante")) return "ALI"; if(s.includes("cartagena")) return "CAR";
+  if(s.includes("murcia")||s.includes(" mula")) return "MUR"; if(s.includes("madrid")) return "MAD"; if(s.includes("oviedo")||s.includes("gijón")||s.includes("gijon")) return "OVI";
+  if(/valencia|alzira|alcoy|alcoi|castell[oó]n|sagunt|gandia|xàtiva|xativa/.test(s)) return "VAL"; return null; }
+
+const FIELDS = [
+  ["organo","Órgano judicial","text",true],["numero_autos","Procedimiento y nº de autos","text"],["nig","NIG","text"],
+  ["tipo_resolucion","Resolución","text"],["numero_resolucion","Nº de resolución","text"],["fecha_resolucion","Fecha de la resolución","date"],
+  ["fecha_demanda","Presentación de la demanda","date"],["procedimiento_tipo","Tipo de procedimiento","proc"],
+  ["cuantia","Cuantía (€)","number"],["condena_importe","Condena principal (€)","number"],["materia","Materia","mat"],["col","Colegio / plaza","col"],
+  ["parte_beneficiaria","Beneficiario de las costas","text"],["parte_condenada","Condenado en costas","text"],
+  ["procurador_beneficiaria","Procurador/a del beneficiario","text"],["colegiado_procurador_beneficiaria","Nº colegiado del procurador/a","text"],
+  ["colegio_procurador_beneficiaria","Colegio del procurador/a","text"],["letrado_beneficiaria","Letrado/a del beneficiario","text"],
+  ["procurador_condenada","Procurador/a del condenado","text"],["letrado_condenada","Letrado/a del condenado","text"],["posicion_beneficiaria","Posición del cliente","pos"],
+  ["cuantia_indeterminada","Cuantía indeterminada","chk"],["temeridad","Aprecia temeridad","chk"],["allanamiento","Allanamiento","chk"],
+  ["pronunciamiento_costas","Pronunciamiento sobre costas","text",true]
+];
+function optionsHTML(srcSel,val){ return [...$(srcSel).options].map(o=>'<option value="'+o.value+'"'+(o.value===val?" selected":"")+'>'+esc(o.textContent)+'</option>').join(""); }
+function showFields(d){
+  const box=$("resFields"); box.innerHTML=""; $("verOut").hidden=true;
+  FIELDS.forEach(([k,lab,type,wide])=>{ const v=d[k]; let h;
+    if(type==="chk") h='<label class="chk"><input type="checkbox" data-k="'+k+'"'+(v?" checked":"")+'> '+esc(lab)+'</label>';
+    else if(type==="proc") h='<label>'+esc(lab)+'<select data-k="'+k+'">'+optionsHTML("proc",v)+'</select></label>';
+    else if(type==="mat") h='<label>'+esc(lab)+'<select data-k="'+k+'">'+optionsHTML("mat",v||"cantidad")+'</select></label>';
+    else if(type==="col") h='<label>'+esc(lab)+'<select data-k="'+k+'">'+optionsHTML("col",v||$("col").value)+'</select></label>';
+    else if(type==="pos") h='<label>'+esc(lab)+'<select data-k="'+k+'"><option value="activa"'+(v!=="pasiva"?" selected":"")+'>Actora / ejecutante / recurrente</option><option value="pasiva"'+(v==="pasiva"?" selected":"")+'>Demandada / ejecutada / recurrida</option></select></label>';
+    else h='<label'+(wide?' class="wide"':'')+'>'+esc(lab)+'<input type="'+type+'" data-k="'+k+'" value="'+esc(type==="number"? (parseEs(v)==null?"":parseEs(v)) : (v==null?"":v))+'"'+(type==="number"?' step="0.01"':'')+'></label>';
+    box.insertAdjacentHTML("beforeend",h); });
+  $("resOut").hidden=false;
+}
+
+let pendingVia="";
+$("resGo").addEventListener("click", async ()=>{
+  const pasted=$("resText").value.trim();
+  if(!resFileObj && !pasted){ resError("Sube un archivo o pega el texto de la resolución."); return; }
+  $("resGo").disabled=true; resStatus("Leyendo la resolución…");
+  let text=pasted, images=[];
+  try{
+    if(resFileObj && !pasted){
+      if(/pdf/i.test(resFileObj.type) || /\.pdf$/i.test(resFileObj.name)){ const r=await pdfContent(resFileObj); text=r.text; images=r.images; }
+      else if(/^image\//.test(resFileObj.type)){ images=[resFileObj]; }
+    }
+  }catch(e){ resError(e && e.message==="nopdf"? "No se pudo cargar el lector de PDF. Pega el texto de la resolución." : "No se pudo leer el PDF. Prueba a pegar el texto."); $("resGo").disabled=false; return; }
+
+  const base = text? regexExtract(text) : {};
+  lastSource = {text, images, file: resFileObj? resFileObj.name : "texto pegado"};
+  let data = Object.assign({}, base); pendingVia = "lectura automática del texto (patrones)";
+  if(sampleFn){
+    if(images.length && !sampleImages){ if(!text || text.replace(/\s/g,"").length<400){ resError("Documento escaneado: esta vista no permite enviar imágenes a la IA. Pega el texto de la resolución."); $("resGo").disabled=false; return; } images=[]; }
+    resCtl = new AbortController(); $("resStop").hidden=false;
+    resStatus(images.length? "La IA está leyendo las páginas escaneadas…" : "La IA está analizando la resolución…");
+    const body = text.length>60000? text.slice(0,42000)+"\n[…]\n"+text.slice(-18000) : text;
+    try{
+      const ai = await sampleFn.json(PROMPT + (body || "(resolución escaneada: ver imágenes adjuntas, una por página)"), {signal:resCtl.signal, images: images.length? images.slice(0, sampleImages? sampleImages.maxCount:images.length) : undefined});
+      if(ai && typeof ai==="object"){ const fa=flattenAI(ai); Object.keys(fa).forEach(k=>{ if(fa[k]!==null && fa[k]!=="" && fa[k]!==undefined) data[k]=fa[k]; }); pendingVia = "IA con verificación por patrones"; }
+      resStatus("Datos extraídos. Revísalos.");
+    }catch(e){
+      const code=e && e.code;
+      if(code==="cancelled") resStatus("Extracción detenida.");
+      else if(code==="not_granted"||code==="sampling_disabled"||code==="capability_disabled"||code==="not_declared"){ sampleFn=null; resStatus("Sin acceso a la IA: se muestran los datos detectados por patrones."); }
+      else if(code==="rate_limited") resError("Demasiadas consultas seguidas. Espera un momento y vuelve a intentarlo.");
+      else resStatus("La IA no respondió; se muestran los datos detectados por patrones.");
+    }finally{ $("resStop").hidden=true; }
+  } else {
+    if(!text){ resError("Sin acceso a la IA solo se pueden leer PDF con texto. Pega el texto de la resolución."); $("resGo").disabled=false; return; }
+    resStatus("Datos detectados por patrones. Revísalos y completa lo que falte.");
+  }
+  data.col = colFromText((data.localidad||"")+" "+(data.organo||"")) || $("col").value;
+  if(data.procedimiento_tipo==="otro") data.procedimiento_tipo="libre";
+  // Sin IA: el primer procurador/letrado citado suele ser el de la parte actora
+  const pas = (data.posicion_beneficiaria||"activa")==="pasiva";
+  const pick=(arr,fav)=> arr && arr.length? (fav? (pas?arr[1]:arr[0]) : (pas?arr[0]:arr[1])) : undefined;
+  if(!data.procurador_beneficiaria) data.procurador_beneficiaria = pick(base._procs,true);
+  if(!data.procurador_condenada) data.procurador_condenada = pick(base._procs,false);
+  if(!data.letrado_beneficiaria) data.letrado_beneficiaria = pick(base._letrs,true);
+  if(!data.letrado_condenada) data.letrado_condenada = pick(base._letrs,false);
+  if(!data.parte_beneficiaria) data.parte_beneficiaria = pas? base._pas : base._act;
+  if(!data.parte_condenada) data.parte_condenada = pas? base._act : base._pas;
+  delete data._procs; delete data._letrs; delete data._act; delete data._pas;
+  commitExtraction(data); $("resGo").disabled=false;
+});
+$("resStop").addEventListener("click",()=>{ if(resCtl) resCtl.abort(); });
+/* ---------- VOLCADO DE DATOS EXTRAÍDOS: una sola fuente de verdad ----------
+   La extracción escribe directamente en los campos del formulario, de los que leen
+   la nota del letrado, la cuenta del procurador, el resumen y los documentos.
+   El panel de revisión está enlazado en los dos sentidos con esos campos. */
+const fdate = d=>{ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||""); return m? m[3]+"/"+m[2]+"/"+m[1] : (d||""); };
+const quitaTrat = x => String(x||"").replace(/^(?:D\.ª|D\.\s?ª|Dña\.?|Doña|Don|D\.|Sr\.|Sra\.)\s*/i,"").trim();
+// claves del panel ↔ campo del formulario (relación 1:1)
+const BIND = {organo:"juz", numero_autos:"autos", nig:"nig", fecha_demanda:"fdem", procedimiento_tipo:"proc", cuantia:"cuant",
+  condena_importe:"condena", cuantia_indeterminada:"indet", materia:"mat", col:"col", posicion_beneficiaria:"pos",
+  parte_beneficiaria:"cliente", parte_condenada:"contra", procurador_beneficiaria:"procNom", procurador_condenada:"contraProc", letrado_condenada:"contraLetr"};
+// grupos: qué campos del formulario alimenta cada clave
+const GROUP = {tipo_resolucion:"resol", numero_resolucion:"resol", fecha_resolucion:"resol", cuantia:"cuantias", condena_importe:"cuantias", cuantia_indeterminada:"cuantias",
+  procurador_beneficiaria:"proc", colegiado_procurador_beneficiaria:"proc", colegio_procurador_beneficiaria:"proc", allanamiento:"allan", temeridad:"tem"};
+let preExtraction = null, extNotes = {};
+function readReview(){ const g={}; $("resFields").querySelectorAll("[data-k]").forEach(el=>{ g[el.dataset.k]= el.type==="checkbox"? el.checked : el.value.trim(); }); return g; }
+function setField(id,val){ const el=$(id); if(!el) return; if(el.type==="checkbox") el.checked=!!val; else el.value = val==null? "" : val; el.classList.add("filled"); setTimeout(()=>el.classList.remove("filled"),2500); }
+function applyExtraction(g, only){
+  const want = k => !only || only.has(k) || only.has(GROUP[k]||"") ;
+  const has = v => v!==undefined && v!==null && v!=="";
+  if(want("organo") && has(g.organo)) setField("juz", g.organo);
+  if(want("numero_autos") && has(g.numero_autos)) setField("autos", g.numero_autos);
+  if(want("nig")) setField("nig", g.nig||"");
+  if(["tipo_resolucion","numero_resolucion","fecha_resolucion"].some(want) && (has(g.tipo_resolucion)||has(g.fecha_resolucion)||has(g.numero_resolucion)))
+    setField("resol", [g.tipo_resolucion||"Resolución", has(g.numero_resolucion)?"nº "+g.numero_resolucion:"", has(g.fecha_resolucion)?"de "+fdate(g.fecha_resolucion):""].filter(Boolean).join(" "));
+  if(want("fecha_demanda") && has(g.fecha_demanda)) setField("fdem", g.fecha_demanda);
+  if(want("procedimiento_tipo") && has(g.procedimiento_tipo)) setField("proc", g.procedimiento_tipo);
+  if(want("materia") && has(g.materia)) setField("mat", g.materia);
+  if(want("col") && has(g.col)) setField("col", g.col);
+  if(want("posicion_beneficiaria") && has(g.posicion_beneficiaria)) setField("pos", g.posicion_beneficiaria);
+  if(["cuantia","condena_importe","cuantia_indeterminada"].some(want)){
+    const cuN=parseEs(g.cuantia), coN=parseEs(g.condena_importe); extNotes.cu="";
+    if(cuN!=null && cuN>0) setField("cuant", cuN);
+    else if(!g.cuantia_indeterminada && coN!=null && coN>0){ setField("cuant", coN); extNotes.cu="La resolución no fija la cuantía: se ha tomado el importe de la condena; revísalo."; }
+    setField("condena", coN!=null && coN>0 ? coN : "");
+    setField("indet", !!g.cuantia_indeterminada);
+  }
+  if(want("parte_beneficiaria") && has(g.parte_beneficiaria)) setField("cliente", g.parte_beneficiaria);
+  if(want("parte_condenada") && has(g.parte_condenada)) setField("contra", g.parte_condenada);
+  if(["procurador_beneficiaria","colegiado_procurador_beneficiaria","colegio_procurador_beneficiaria"].some(want)){
+    const prNom=quitaTrat(g.procurador_beneficiaria); extNotes.pr="";
+    if(prNom){ setField("procNom", prNom); $("procOn").checked=true; } else extNotes.pr="No se ha identificado al procurador/a de la parte favorecida: complétalo en «Procurador/a».";
+    const num = has(g.colegiado_procurador_beneficiaria)? "Colegiado/a nº "+String(g.colegiado_procurador_beneficiaria).replace(/^n[ºo°.]*\s*/i,"") : "Colegiado/a nº [nº]";
+    let col = g.colegio_procurador_beneficiaria;
+    if(!has(col) && prNom){ col = colegioProcDe(g.organo||$("juz").value); if(col) extNotes.pr="Colegio del procurador/a deducido de la sede del órgano: verifícalo."; }
+    if(prNom || has(g.colegio_procurador_beneficiaria) || has(g.colegiado_procurador_beneficiaria)) setField("procCol", has(col)? num+" · "+col : num);
+  }
+  if(want("procurador_condenada")) setField("contraProc", quitaTrat(g.procurador_condenada));
+  if(want("letrado_condenada")) setField("contraLetr", quitaTrat(g.letrado_condenada));
+  if(want("allanamiento")){ const r=document.querySelector('input[name="term"][value="'+(g.allanamiento?"allan":"completo")+'"]'); if(r && (g.allanamiento || only)) r.checked=true; }
+  if(want("temeridad")) $("cap").checked = !g.temeridad;
+  extNotes.letr = (has(g.letrado_beneficiaria) && !/ferr[aá]ndez\s+pina/i.test(g.letrado_beneficiaria))? "La resolución identifica como letrado de la parte favorecida a "+g.letrado_beneficiaria+"." : "";
+  extNotes.tem = g.temeridad? "Se aprecia temeridad: el límite del art. 394.3 queda desactivado." : "";
+}
+function extStatus(){ return ["Datos volcados en el formulario, la nota del letrado, la cuenta del procurador y los documentos.", extNotes.tem, extNotes.cu, extNotes.pr, extNotes.letr].filter(Boolean).join(" "); }
+function commitExtraction(data){
+  const snap = snapshot(); preExtraction = snap;
+  showFields(data);
+  try{
+    setMode("tas",true);
+    applyExtraction(readReview(), null);
+    lastExtraction = {file: resFileObj? resFileObj.name : "texto pegado", when: new Date().toLocaleString("es-ES",{dateStyle:"short",timeStyle:"short"}), via: pendingVia};
+    render(); resStatus(extStatus());
+  }catch(e){ resError("No se pudieron volcar todos los datos ("+(e && e.message || e)+"). Revisa los campos marcados."); }
+}
+// Panel → formulario (solo la clave editada y su grupo)
+$("resFields").addEventListener("input", e=>{ const k=e.target.dataset && e.target.dataset.k; if(!k) return; e.stopPropagation();
+  try{ applyExtraction(readReview(), new Set([k, GROUP[k]||k])); render(); resStatus(extStatus()); }catch(err){ resError("No se pudo actualizar el campo: "+(err && err.message || err)); } });
+$("resFields").addEventListener("change", e=>{ const k=e.target.dataset && e.target.dataset.k; if(!k) return; e.stopPropagation();
+  try{ applyExtraction(readReview(), new Set([k, GROUP[k]||k])); render(); }catch(err){} });
+// Formulario → panel (relación 1:1)
+$("form").addEventListener("input", e=>{ if($("resOut").hidden || !e.target.id || e.target.closest("#resBox")) return; syncReviewFrom(e.target.id); }, true);
+$("form").addEventListener("change", e=>{ if($("resOut").hidden || !e.target.id || e.target.closest("#resBox")) return; syncReviewFrom(e.target.id); }, true);
+function syncReviewFrom(id){
+  if(id==="cap"){ const t=$("resFields").querySelector('[data-k="temeridad"]'); if(t) t.checked=!$("cap").checked; return; }
+  Object.entries(BIND).forEach(([k,fid])=>{ if(fid!==id) return; const r=$("resFields").querySelector('[data-k="'+k+'"]'); if(!r) return; const f=$(fid);
+    if(r.type==="checkbox") r.checked = f.type==="checkbox"? f.checked : !!f.value; else r.value = f.type==="checkbox"? "" : f.value; });
+}
+$("resDiscard").addEventListener("click",()=>{
+  if(preExtraction){ Object.keys(preExtraction).forEach(k=>{ if(k==="mode"){ setMode(preExtraction[k],true); return; } if(k.startsWith("r_")){ const el=document.querySelector('input[name="'+k.slice(2)+'"][value="'+preExtraction[k]+'"]'); if(el) el.checked=true; return; } const el=$(k); if(!el) return; if(el.type==="checkbox") el.checked=preExtraction[k]; else el.value=preExtraction[k]; }); }
+  preExtraction=null; lastExtraction=null; $("resOut").hidden=true; resStatus("Extracción deshecha: se han restaurado los datos anteriores."); render(); });
+$("resApply").addEventListener("click",()=>{ verifyExtraction(); });
+
+restore(); render();
+window.__calc = {calc, finalize, escala, COLEGIOS, buildDocx, jointText, calcProc, arancel, parseEs, buildTasDocx, juzgadoTexto, minutaTexto, tplCtx};
+})();
+</script>
+</body>
+</html>
