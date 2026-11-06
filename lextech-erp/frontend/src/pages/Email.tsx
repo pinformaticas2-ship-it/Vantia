@@ -5,6 +5,7 @@
  */
 import { CorreoBilingue } from "../components/CorreoBilingue";
 import { apiFetch } from "../lib/api";
+import { IDIOMAS, nombreEspanol } from "../lib/idiomas";
 import { Spinner } from "../components/Spinner";
 import { useSidebar } from "../layouts/DashboardLayout";
 import React, {
@@ -2320,15 +2321,24 @@ function EmailReader({
 
   // ── Traducir al español un correo recibido en otro idioma ──
   const { getToken: getTokenTraduccion } = useAuth();
-  const [traduccion, setTraduccion] = useState<{ id: string; html?: string; text?: string; asunto?: string } | null>(null);
+  // Idioma al que se traduce (por defecto español); se recuerda el último elegido.
+  const [idiomaLectura, setIdiomaLectura] = useState<string>(() => {
+    try { return localStorage.getItem('vantia.correo.idiomaTraduccion') || 'es'; } catch { return 'es'; }
+  });
+  const elegirIdiomaLectura = (codigo: string) => {
+    setIdiomaLectura(codigo);
+    try { localStorage.setItem('vantia.correo.idiomaTraduccion', codigo); } catch { /* sin almacenamiento */ }
+  };
+  const [traducciones, setTraducciones] = useState<Record<string, { html?: string; text?: string; asunto?: string }>>({});
   const [verTraduccion, setVerTraduccion] = useState(false);
   const [traduciendo, setTraduciendo] = useState(false);
   const [errorTraduccion, setErrorTraduccion] = useState('');
   useEffect(() => { setVerTraduccion(false); setErrorTraduccion(''); }, [email.id]);
-  const traduccionActual = traduccion?.id === email.id ? traduccion : null;
+  const traduccionActual = traducciones[`${email.id}|${idiomaLectura}`] || null;
 
-  const traducirCorreo = async () => {
-    if (traduccionActual) { setVerTraduccion(true); return; }
+  const traducirCorreo = async (idioma: string = idiomaLectura) => {
+    const clave = `${email.id}|${idioma}`;
+    if (traducciones[clave]) { setVerTraduccion(true); return; }
     // HTML si cabe (se conserva el formato); si no, el texto plano.
     const limpio = decodeQP(email.bodyHtml || '')
       .replace(/<head[\s\S]*?<\/head>/gi, '')
@@ -2342,15 +2352,17 @@ function EmailReader({
     setTraduciendo(true); setErrorTraduccion('');
     try {
       const pedir = (t: string, html: boolean) => apiFetch('/api/email/traducir', {
-        getToken: getTokenTraduccion as any, method: 'POST', body: JSON.stringify({ texto: t, idioma: 'es', html }),
+        getToken: getTokenTraduccion as any, method: 'POST', body: JSON.stringify({ texto: t, idioma, html, recibido: true }),
       });
       const [rc, ra] = await Promise.all([pedir(cuerpo, usarHtml), email.subject?.trim() ? pedir(email.subject, false) : Promise.resolve(null)]);
       if (!rc?.success) throw new Error(rc?.error || 'No se pudo traducir.');
-      setTraduccion({
-        id: email.id,
-        ...(usarHtml ? { html: rc.data.traduccion } : { text: rc.data.traduccion }),
-        asunto: ra?.success ? ra.data.traduccion : undefined,
-      });
+      setTraducciones((prev) => ({
+        ...prev,
+        [clave]: {
+          ...(usarHtml ? { html: rc.data.traduccion } : { text: rc.data.traduccion }),
+          asunto: ra?.success ? ra.data.traduccion : undefined,
+        },
+      }));
       setVerTraduccion(true);
     } catch (e: any) {
       setErrorTraduccion(e?.message || 'No se pudo traducir.');
@@ -2782,16 +2794,29 @@ function EmailReader({
                     {verTraduccion && traduccionActual ? (
                       <>
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">
-                          <Globe2 size={13} /> Traducido al español
+                          <Globe2 size={13} /> Traducido al {nombreEspanol(idiomaLectura)}
                         </span>
+                        <select value={idiomaLectura} disabled={traduciendo} title="Traducir a otro idioma"
+                          onChange={(e) => { elegirIdiomaLectura(e.target.value); void traducirCorreo(e.target.value); }}
+                          className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 outline-none">
+                          {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{nombreEspanol(i.codigo)}</option>)}
+                        </select>
+                        {traduciendo && <Loader2 size={13} className="animate-spin text-slate-400" />}
                         {traduccionActual.asunto && <span className="min-w-0 truncate text-slate-500">Asunto: <strong className="text-slate-700">{traduccionActual.asunto}</strong></span>}
                         <button type="button" onClick={() => setVerTraduccion(false)} className="ml-auto rounded-lg px-2.5 py-1 font-semibold text-slate-500 hover:bg-slate-100">Ver original</button>
                       </>
                     ) : (
-                      <button type="button" onClick={() => void traducirCorreo()} disabled={traduciendo}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
-                        {traduciendo ? <><Loader2 size={13} className="animate-spin" /> Traduciendo…</> : <><Globe2 size={13} /> {traduccionActual ? 'Ver traducción' : 'Traducir al español'}</>}
-                      </button>
+                      <div className="inline-flex items-center overflow-hidden rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => void traducirCorreo()} disabled={traduciendo}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                          {traduciendo ? <><Loader2 size={13} className="animate-spin" /> Traduciendo…</> : <><Globe2 size={13} /> {traduccionActual ? 'Ver traducción' : 'Traducir al'}</>}
+                        </button>
+                        <select value={idiomaLectura} disabled={traduciendo} title="Idioma de la traducción"
+                          onChange={(e) => elegirIdiomaLectura(e.target.value)}
+                          className="border-l border-slate-200 bg-white py-1 pl-1.5 pr-1 text-xs font-semibold text-slate-600 outline-none">
+                          {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{nombreEspanol(i.codigo)}</option>)}
+                        </select>
+                      </div>
                     )}
                     {errorTraduccion && <span className="text-red-600">{errorTraduccion}</span>}
                   </div>

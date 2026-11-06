@@ -20,3 +20,11 @@ export const IDIOMAS: { codigo: string; nombre: string }[] = [
 
 export const nombreIdioma = (codigo?: string | null) =>
   IDIOMAS.find((i) => i.codigo === (codigo || "es"))?.nombre || "Español";
+
+// Nombre del idioma en español ("inglés", "francés"…), para frases como
+// «Traducido al inglés».
+const ES: Record<string, string> = {
+  es: "español", en: "inglés", fr: "francés", de: "alemán", it: "italiano", pt: "portugués", ca: "catalán",
+  nl: "neerlandés", ro: "rumano", pl: "polaco", uk: "ucraniano", ru: "ruso", ar: "árabe", zh: "chino",
+};
+export const nombreEspanol = (codigo?: string | null) => ES[codigo || "es"] || "español";
