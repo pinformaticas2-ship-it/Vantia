@@ -2404,16 +2404,6 @@ function EmailReader({
     setTimeout(measure, 900); // wait for remote images
   }, []);
 
-  const statusPills = [
-    !email.isRead ? { label: 'Nuevo', className: 'bg-red-50 text-[#ab0433] border-red-100' } : null,
-    email.source === 'gmail'
-      ? { label: 'Gmail', className: 'bg-blue-50 text-blue-700 border-blue-100' }
-      : { label: 'ERP', className: 'bg-slate-100 text-slate-700 border-slate-200' },
-    email.hasAttachments
-      ? { label: 'Adjuntos', className: 'bg-amber-50 text-amber-700 border-amber-100' }
-      : null,
-  ].filter(Boolean) as Array<{ label: string; className: string }>;
-
   const headerIsLight = theme === 'light';
   const headerCx = (dark: string, light: string) => (headerIsLight ? light : dark);
 
@@ -2529,53 +2519,28 @@ function EmailReader({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1160px] mx-auto px-6 py-6 lg:px-8">
-          <div className={`rounded-[28px] border overflow-hidden shadow-[0_24px_60px_rgba(15,23,42,0.12)] ${headerCx('border-white/10', 'border-slate-200')}`}>
-            {/* Cabecera del mensaje — oscura/inmersiva o clara según el tema */}
-            <div className={`px-8 pt-8 pb-7 relative overflow-hidden ${
-              headerCx(
-                'border-b border-white/10 bg-gradient-to-br from-[#0f172a] via-[#1a2035] to-[#1e1a2e]',
-                'border-b border-slate-100 bg-gradient-to-br from-white via-white to-red-50/40',
-              )
-            }`}>
-              {/* Decorative glow blob */}
-              {headerIsLight ? (
-                <>
-                  <div className="absolute -top-12 -right-12 w-52 h-52 bg-[#ab0433]/[0.06] rounded-full blur-3xl pointer-events-none" />
-                  <div className="absolute bottom-0 left-1/4 w-72 h-24 bg-blue-600/[0.04] rounded-full blur-2xl pointer-events-none" />
-                </>
-              ) : (
-                <>
-                  <div className="absolute -top-12 -right-12 w-52 h-52 bg-[#ab0433]/20 rounded-full blur-3xl pointer-events-none" />
-                  <div className="absolute bottom-0 left-1/4 w-72 h-24 bg-blue-600/10 rounded-full blur-2xl pointer-events-none" />
-                </>
-              )}
-
-              <div className="relative flex items-start justify-between gap-6">
+        <div className="max-w-[920px] mx-auto px-3 py-4 sm:px-6 sm:py-5">
+          {/* Una sola hoja de lectura, blanca en los dos temas (los correos
+              están pensados para fondo blanco): cabecera compacta y el cuerpo
+              justo debajo, sin tarjetas anidadas ni adornos. */}
+          <article className={`rounded-2xl border bg-white overflow-hidden ${headerCx('border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.35)]', 'border-slate-200 shadow-sm')}`}>
+            <div className="px-5 sm:px-7 pt-6 pb-5 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap mb-3">
-                    {statusPills.map((pill) => (
-                      <span
-                        key={pill.label}
-                        className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${pill.className}`}>
-                        {pill.label}
-                      </span>
-                    ))}
-                  </div>
-                  <h1 className={`text-[26px] leading-tight font-semibold tracking-[-0.02em] ${headerCx('text-white', 'text-slate-900')}`}>
-                    {email.subject}
+                  <h1 className="text-xl font-semibold leading-snug tracking-[-0.01em] text-slate-900 break-words">
+                    {email.subject || '(Sin asunto)'}
                   </h1>
                   {onLinkExpediente && (
-                    <div className="mt-3 inline-block">
+                    <div className="mt-2 inline-block">
                       <button
                         ref={expLinkBtnRef}
                         type="button"
                         disabled={linkingExpediente}
                         onClick={openExpLinkMenu}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
-                          headerCx('border-white/15 bg-white/5 text-slate-200 hover:bg-white/10', 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+                        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-60 ${
+                          email.expedienteId ? 'border-red-100 bg-red-50 text-[#ab0433] hover:bg-red-100' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                         }`}>
-                        <Briefcase size={14} className="shrink-0 text-slate-400" />
+                        <Briefcase size={13} className="shrink-0 opacity-70" />
                         <span className="max-w-[240px] truncate">{linkedExpedienteLabel || 'Sin vincular a expediente'}</span>
                         <ChevronDown size={12} className={`shrink-0 transition-transform ${expLinkOpen ? 'rotate-180' : ''}`} />
                       </button>
@@ -2673,37 +2638,30 @@ function EmailReader({
                     </div>
                   )}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 mb-1">Recibido</p>
-                  <p className={`text-sm ${headerCx('text-slate-300', 'text-slate-600')}`}>{fmtFull(email.date)}</p>
-                </div>
               </div>
 
-              <div className="relative mt-6 flex items-start gap-4">
-                <div className={`rounded-full ${headerCx('ring-2 ring-white/20', 'ring-2 ring-slate-100')}`}>
-                  <Avatar name={email.fromName} email={email.from} size={48} />
-                </div>
+              <div className="mt-4 flex items-start gap-3">
+                <Avatar name={email.fromName} email={email.from} size={40} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-base font-semibold ${headerCx('text-white', 'text-slate-900')}`}>
-                      {email.fromName || email.from}
-                    </span>
-                    {email.fromName && (
-                      <span className={`text-sm ${headerCx('text-slate-400', 'text-slate-500')}`}>&lt;{email.from}&gt;</span>
-                    )}
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-slate-900">
+                        {email.fromName || email.from}
+                      </span>
+                      {email.fromName && (
+                        <span className="text-xs text-slate-400 truncate">&lt;{email.from}&gt;</span>
+                      )}
+                    </div>
+                    <span className="flex-shrink-0 text-xs text-slate-400 whitespace-nowrap" title={fmtFull(email.date)}>{fmtFull(email.date)}</span>
                   </div>
                   <button
                     onClick={() => setDetailsOpen((d) => !d)}
-                    className={`mt-1 inline-flex items-center gap-1.5 text-sm transition-colors ${
-                      headerCx('text-slate-400 hover:text-slate-200', 'text-slate-500 hover:text-slate-700')
-                    }`}>
-                    <span>{email.to ? `para ${email.to.split(',')[0].trim()}` : 'ver destinatarios'}</span>
-                    <ChevronDown size={14} className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+                    className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors">
+                    <span>{email.to ? `para ${email.to.split(',')[0].trim()}${email.to.includes(',') ? ' y otros' : ''}` : 'ver destinatarios'}</span>
+                    <ChevronDown size={12} className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {detailsOpen && (
-                    <div className={`mt-3 rounded-2xl border backdrop-blur-sm px-4 py-3 text-sm space-y-1.5 ${
-                      headerCx('border-white/10 bg-white/5 text-slate-300', 'border-slate-200 bg-slate-50 text-slate-600')
-                    }`}>
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600 space-y-1">
                       <p><span className="font-medium text-slate-500 mr-2">De:</span>{email.fromName ? `${email.fromName} <${email.from}>` : email.from}</p>
                       {email.to && (
                         <p><span className="font-medium text-slate-500 mr-2">Para:</span>{email.to}</p>
@@ -2718,23 +2676,17 @@ function EmailReader({
               </div>
             </div>
 
-            <div className="px-8 py-8 erp-body-glow-wash">
-              <div className="mx-auto max-w-[760px] rounded-[30px] border border-slate-200/80 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.05)] overflow-hidden">
-                <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Mail size={16} className="text-[#ab0433]" />
-                    <span>Contenido del correo</span>
+            <div>
+              <div>
+                {email.hasAttachments && !email.attachments?.length && (
+                  <div className="flex items-center gap-1.5 px-5 sm:px-7 pt-3 text-xs text-slate-500">
+                    <Paperclip size={13} />
+                    {bodyLoading ? 'Cargando adjuntos…' : 'Este correo trae adjuntos'}
                   </div>
-                  {email.hasAttachments && !email.attachments?.length && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
-                      <Paperclip size={13} />
-                      {bodyLoading ? 'Cargando adjuntos…' : 'Adjuntos detectados'}
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {!!email.attachments?.length && (
-                  <div className="flex flex-nowrap gap-3 overflow-x-auto px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex flex-nowrap gap-3 overflow-x-auto px-5 sm:px-7 py-3 border-b border-slate-100">
                     {email.attachments.map((att, idx) => (
                       <div key={`${att.filename}-${idx}`} className="relative">
                         <EmailAttachmentCard
@@ -2790,7 +2742,7 @@ function EmailReader({
                 )}
 
                 {!bodyLoading && (
-                  <div className="flex flex-wrap items-center gap-2 px-6 pt-4 text-xs">
+                  <div className="flex flex-wrap items-center justify-end gap-2 px-5 sm:px-7 pt-3 text-xs">
                     {verTraduccion && traduccionActual ? (
                       <>
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">
@@ -2821,7 +2773,7 @@ function EmailReader({
                     {errorTraduccion && <span className="text-red-600">{errorTraduccion}</span>}
                   </div>
                 )}
-                <div className="px-6 py-6">
+                <div className="px-5 sm:px-7 pt-3 pb-6">
                   {bodyLoading ? (
                     <div className="space-y-3 py-2 animate-pulse">
                       <div className="h-3 bg-slate-100 rounded-full w-3/4" />
@@ -2852,30 +2804,24 @@ function EmailReader({
               </div>
             </div>
 
-            <div className="px-8 pb-8 flex items-center gap-2 flex-wrap">
+            <div className="px-5 sm:px-7 py-4 border-t border-slate-100 flex items-center gap-2 flex-wrap">
               <button
                 onClick={onReply}
-                className="flex items-center gap-2 px-4 py-2.5 border border-red-200 bg-red-50 hover:bg-red-100 text-sm font-medium text-[#ab0433] rounded-full transition-colors">
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-[#ab0433] hover:bg-[#8a0329] text-sm font-medium text-white rounded-lg transition-colors">
                 <Reply size={15} /> Responder
               </button>
               <button
                 onClick={onReplyAll}
-                className={`flex items-center gap-2 px-4 py-2.5 border text-sm rounded-full transition-colors ${
-                  headerCx('border-white/10 text-slate-300 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300',
-                           'border-slate-200 text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-[#ab0433]')
-                }`}>
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-sm text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
                 <ReplyAll size={15} /> Responder a todos
               </button>
               <button
                 onClick={onForward}
-                className={`flex items-center gap-2 px-4 py-2.5 border text-sm rounded-full transition-colors ${
-                  headerCx('border-white/10 text-slate-300 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300',
-                           'border-slate-200 text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-[#ab0433]')
-                }`}>
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-sm text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
                 <Forward size={15} /> Reenviar
               </button>
             </div>
-          </div>
+          </article>
         </div>
       </div>
 
@@ -3870,6 +3816,7 @@ export default function Email() {
   const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(() => cuentaInicial(cuentasPrevias));
   const [imapFolders, setImapFolders] = useState<ImapFolderInfo[]>([]);
   const [probeOpen, setProbeOpen] = useState(false);
+  const [avisosCuentaAbiertos, setAvisosCuentaAbiertos] = useState(false);
   // Si ya han llegado las cuentas (aunque fallase la carga): hasta entonces la
   // tarjeta de cuenta dice "Cargando cuenta…" en vez de enseñar un correo que
   // no es el de la cuenta activa.
@@ -5663,22 +5610,40 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             </form>
           </div>
 
-          {/* Aviso: la sincronización de esta cuenta ha tenido problemas */}
-          {currentImapAccount?.sync_warning && (
-            <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900" title={currentImapAccount.sync_warning}>
-              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
-              <span className="line-clamp-2 flex-1">Problema al actualizar el correo: {currentImapAccount.sync_warning}</span>
-              <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">Diagnosticar</button>
-            </div>
-          )}
-
-          {/* Aviso: lo que se envíe desde esta cuenta puede acabar en spam */}
-          {currentImapAccount?.envio_warning && (
-            <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900" title={currentImapAccount.envio_warning}>
-              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
-              <span className="line-clamp-3 flex-1">{currentImapAccount.envio_warning}</span>
-            </div>
-          )}
+          {/* Avisos de la cuenta (problemas al sincronizar, envíos que pueden
+              ir a spam): una sola línea discreta que se despliega al pulsarla,
+              en vez de varias cajas amarillas encima de la lista. */}
+          {(() => {
+            const avisos = [
+              currentImapAccount?.sync_warning ? { clave: 'sync', texto: `Problema al actualizar el correo: ${currentImapAccount.sync_warning}`, diagnosticar: true } : null,
+              currentImapAccount?.envio_warning ? { clave: 'envio', texto: currentImapAccount.envio_warning, diagnosticar: false } : null,
+            ].filter(Boolean) as { clave: string; texto: string; diagnosticar: boolean }[];
+            if (!avisos.length) return null;
+            return (
+              <div className="mx-3 mb-2 rounded-lg border border-amber-200/70 bg-amber-50/70 text-[11px] text-amber-900">
+                <button type="button" onClick={() => setAvisosCuentaAbiertos((v) => !v)}
+                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left">
+                  <AlertTriangle size={12} className="shrink-0 text-amber-600" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {avisos.length === 1 ? avisos[0].texto : `${avisos.length} avisos sobre esta cuenta`}
+                  </span>
+                  <ChevronDown size={12} className={`shrink-0 transition-transform ${avisosCuentaAbiertos ? 'rotate-180' : ''}`} />
+                </button>
+                {avisosCuentaAbiertos && (
+                  <div className="space-y-2 border-t border-amber-200/70 px-2.5 py-2">
+                    {avisos.map((a) => (
+                      <div key={a.clave} className="flex items-start gap-2">
+                        <span className="flex-1 leading-relaxed">{a.texto}</span>
+                        {a.diagnosticar && (
+                          <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">Diagnosticar</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* List */}
           <div className="modules-scrollbar flex-1 overflow-y-auto bg-white pb-2">
