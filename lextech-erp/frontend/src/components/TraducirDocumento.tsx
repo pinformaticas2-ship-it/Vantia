@@ -112,7 +112,7 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
           <div>
             <span className="mb-1 block text-xs font-semibold text-slate-600">Formato</span>
             <div className="grid grid-cols-2 gap-2">
-              {([["traduccion", "Solo la traducción", `Documento en ${nombreEspanol(idioma)}`], ["bilingue", "Original y traducción", "A dos columnas, párrafo a párrafo"]] as const).map(([v, t, s]) => (
+              {([["traduccion", "El mismo documento", `Idéntico, pero en ${nombreEspanol(idioma)}`], ["bilingue", "Original y traducción", "A dos columnas, párrafo a párrafo"]] as const).map(([v, t, s]) => (
                 <button key={v} type="button" onClick={() => setModo(v)}
                   className={`rounded-xl border px-3 py-2.5 text-left ${modo === v ? "border-red-700 bg-red-50/60 ring-1 ring-red-700" : "border-slate-200 hover:bg-slate-50"}`}>
                   <span className="block text-sm font-semibold text-slate-800">{t}</span>
@@ -122,7 +122,10 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
             </div>
           </div>
           <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-            Se guarda como un documento nuevo junto al original, con el aviso «traducción automática, no jurada». Conserva títulos, listas y tablas. Los PDF escaneados y las fotos también se leen.
+            {modo === "traduccion"
+              ? "Un Word sale exactamente igual (membrete, logos, fuentes, márgenes, tablas, encabezados y pies): solo cambia el texto. Un PDF o un escaneado no se puede copiar tal cual: se rehace en Word con sus títulos, listas y tablas."
+              : "Para revisar o para que el cliente compare: cada párrafo junto a su traducción."}
+            {" "}Se guarda como documento nuevo junto al original. Es una traducción automática, no jurada: revísala antes de enviarla.
           </p>
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         </div>

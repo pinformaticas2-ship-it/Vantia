@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import fs from 'fs';
+import path from 'path';
 import pool from '../config/database';
+import { leerComoDocx } from '../services/plantillasWord';
+import { traducirDocx } from '../utils/traducirDocx';
 import { ensureFileOnDisk, saveExpedienteAttachmentFromBuffer } from './filesController';
 import { htmlADocx, limpiarHtml } from './documentosController';
 import { logActivityForReq, resolveUserName } from './activityController';
@@ -88,19 +91,30 @@ export async function traducirArchivo(req: Request, res: Response) {
       const ruta = await ensureFileOnDisk(clientId, f.stored_name, f.storage_provider, f.drive_file_id, f.dropbox_file_id);
       if (!fs.existsSync(ruta)) { t.estado = 'error'; t.error = 'No se encontró el archivo.'; return; }
       const nombre = f.document_name || sinExtension(f.original_name);
+      const titulo = `${nombreSeguro(nombre)} ${sufijoIdioma(p.idioma, p.modo)}`;
+      const guardar = async (buf: Buffer, parcial: boolean) => {
+        const archivo = await saveExpedienteAttachmentFromBuffer(clientId, buf, `${titulo}.docx`, DOCX, userId);
+        await pool.query(`UPDATE client_files SET document_name = $1 WHERE id = $2`, [titulo, archivo.id]).catch(() => {});
+        void logActivityForReq(req, `Documento traducido (${IDIOMAS[p.idioma]}): ${nombre}`, 'DOCUMENTO', clientId).catch(() => {});
+        t.resultado = { tipo: 'archivo', archivoId: archivo.id, entidadId: clientId, nombre: titulo, parcial };
+        t.estado = 'hecho';
+      };
+      // Word y «solo la traducción»: el mismo .docx con el texto cambiado (formato intacto).
+      const ext = path.extname(f.original_name).toLowerCase();
+      if (p.modo === 'traduccion' && ['.docx', '.doc', '.odt', '.rtf'].includes(ext)) {
+        const original = ext === '.docx' ? await fs.promises.readFile(ruta) : await leerComoDocx(ruta);
+        const r = await traducirDocx(original, p.idioma, nombre, (h, total) => { t.hechos = h; t.total = total; });
+        if ('motivo' in r) return fallo(t, r);
+        return guardar(r.buffer, r.parcial);
+      }
       const origen = await htmlDeArchivo(ruta, f.original_name, f.mimetype || '');
       if ('aviso' in origen) { t.estado = 'error'; t.error = origen.aviso; return; }
       let r: Resultado;
       if ('escaneado' in origen) { t.total = 1; r = await traducirEscaneado(origen.escaneado, p.idioma, nombre); t.hechos = 1; }
       else r = await traducirHtml(t, origen.html, p.idioma, nombre);
       if ('motivo' in r) return fallo(t, r);
-      const titulo = `${nombreSeguro(nombre)} ${sufijoIdioma(p.idioma, p.modo)}`;
-      const buf = await htmlADocx(titulo, componerHtml(r, { idioma: p.idioma, modo: p.modo, nombre }));
-      const archivo = await saveExpedienteAttachmentFromBuffer(clientId, buf, `${titulo}.docx`, DOCX, userId);
-      await pool.query(`UPDATE client_files SET document_name = $1 WHERE id = $2`, [titulo, archivo.id]).catch(() => {});
-      void logActivityForReq(req, `Documento traducido (${IDIOMAS[p.idioma]}): ${nombre}`, 'DOCUMENTO', clientId).catch(() => {});
-      t.resultado = { tipo: 'archivo', archivoId: archivo.id, entidadId: clientId, nombre: titulo, parcial: r.parcial };
-      t.estado = 'hecho';
+      // PDF, escaneados, imágenes, texto: no hay un Word que copiar; se rehace con su estructura.
+      await guardar(await htmlADocx(titulo, componerHtml(r, { idioma: p.idioma, modo: p.modo, nombre })), r.parcial);
     });
   } catch (e: any) {
     if (!res.headersSent) res.status(500).json({ success: false, error: e?.message || 'No se pudo traducir el documento.' });

@@ -43,7 +43,7 @@ function iaFalsa() {
   idiomas.pedirGemini = async (o: any) => {
     llamadas.push(o.texto.slice(0, 60));
     const arr = JSON.parse(o.texto.slice(o.texto.lastIndexOf('\n\n[') + 2));
-    return { ok: true, texto: JSON.stringify(arr.map((h: string) => h.replace(/>([^<]+)</g, (_: string, t: string) => `>${t.toUpperCase()}<`))) };
+    return { ok: true, texto: JSON.stringify(arr.map((h: string) => (h.includes('<') ? h.replace(/>([^<]+)</g, (_: string, t: string) => `>${t.toUpperCase()}<`) : h.toUpperCase()))) };
   };
 }
 
@@ -93,7 +93,7 @@ test('traducirBloques: varias tandas en orden, y parcial si el documento es enor
   const bloques = Array.from({ length: 40 }, (_, i) => `<p>parrafo ${i} ${'x'.repeat(900)}</p>`);
   const r: any = await traducirBloques(bloques, 'en', 'Demanda');
   assert.equal(r.ok, true);
-  assert.ok(llamadas.length >= 3, 'se reparte en tandas');
+  assert.ok(llamadas.length >= 2, 'se reparte en tandas');
   assert.equal(r.traduccion.length, 40);
   assert.match(r.traduccion[0], /^<p>PARRAFO 0 /);
   assert.match(r.traduccion[39], /^<p>PARRAFO 39 /);
@@ -107,13 +107,69 @@ test('traducirBloques: varias tandas en orden, y parcial si el documento es enor
 test('componerHtml: aviso de traducción no jurada; bilingüe a dos columnas emparejadas', { skip }, async () => {
   const { componerHtml } = await import('../src/utils/traducirDocumento');
   const r = { original: ['<p>Hola</p>', '<p>Adiós</p>'], traduccion: ['<p>Hello</p>', '<p>Bye</p>'], parcial: false };
+  // Solo la traducción: el mismo documento, sin añadir nada.
   const solo = componerHtml(r, { idioma: 'en', modo: 'traduccion', nombre: 'Carta' });
-  assert.match(solo, /No es una traducción jurada/);
-  assert.match(solo, /<p>Hello<\/p>\n<p>Bye<\/p>/);
-  assert.doesNotMatch(solo, /Hola/);
+  assert.equal(solo.trim(), '<p>Hello</p>\n<p>Bye</p>');
+  assert.match(componerHtml({ ...r, parcial: true }, { idioma: 'en', modo: 'traduccion', nombre: 'Carta' }), /Traducción parcial/);
   const bi = componerHtml(r, { idioma: 'en', modo: 'bilingue', nombre: 'Carta' });
   assert.match(bi, /<tr><td[^>]*><p>Hola<\/p><\/td><td[^>]*><p>Hello<\/p><\/td><\/tr>/);
   assert.match(bi, /English/);
+  assert.match(bi, /No es una traducción jurada/);
+});
+
+/** Un Word «de verdad»: membrete en el encabezado, estilos, tabla, negrita a mitad de frase, tabulador, salto de página. */
+function wordCompleto(): Buffer {
+  const AdmZip = require('adm-zip');
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const z = new AdmZip();
+  z.addFile('[Content_Types].xml', Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>'));
+  z.addFile('_rels/.rels', Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'));
+  z.addFile('word/_rels/document.xml.rels', Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdH" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'));
+  z.addFile('word/styles.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Garamond"/><w:lang w:val="es-ES"/></w:rPr></w:rPrDefault></w:docDefaults></w:styles>`));
+  z.addFile('word/header1.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8"?><w:hdr ${W}><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>Despacho Pérez &amp; Asociados</w:t></w:r></w:p></w:hdr>`));
+  z.addFile('word/document.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8"?><w:document ${W}><w:body>
+<w:p><w:pPr><w:pStyle w:val="Titulo"/><w:jc w:val="center"/></w:pPr><w:r><w:t>Contrato de arrendamiento</w:t></w:r></w:p>
+<w:p><w:r><w:t xml:space="preserve">El arrendatario </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>pagará la renta</w:t></w:r><w:r><w:t xml:space="preserve"> cada mes.</w:t></w:r></w:p>
+<w:p><w:r><w:t>Fecha:</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>uno de enero</w:t></w:r></w:p>
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/></w:tblPr><w:tr><w:tc><w:p><w:r><w:t>Renta</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>1.200 €</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+<w:p/>
+<w:sectPr><w:headerReference w:type="default" r:id="rIdH"/><w:pgMar w:top="1701" w:right="1134" w:bottom="1417" w:left="1701"/></w:sectPr>
+</w:body></w:document>`));
+  return z.toBuffer();
+}
+
+test('Word «tal cual»: solo cambia el texto; formato, tablas, encabezado y márgenes intactos', { skip }, async () => {
+  const { traducirDocx } = await import('../src/utils/traducirDocx');
+  const original = wordCompleto();
+  const r: any = await traducirDocx(original, 'en', 'Contrato');
+  assert.equal(r.ok, true);
+  assert.equal(r.sinFormatoInterior, 0);
+  const AdmZip = require('adm-zip');
+  const leer = (b: Buffer, p: string) => new AdmZip(b).getEntry(p).getData().toString('utf8');
+  const doc = leer(r.buffer, 'word/document.xml');
+  // Texto traducido, cada trozo en su tramo de formato (la negrita sigue siendo la negrita).
+  assert.match(doc, /<w:t xml:space="preserve">CONTRATO DE ARRENDAMIENTO<\/w:t>/);
+  assert.match(doc, /<w:t xml:space="preserve">EL ARRENDATARIO <\/w:t><\/w:r><w:r><w:rPr><w:b\/><\/w:rPr><w:t xml:space="preserve">PAGARÁ LA RENTA<\/w:t>/);
+  assert.match(doc, /<w:tab\/>/);
+  assert.match(doc, /UNO DE ENERO/);
+  assert.match(doc, />RENTA<\/w:t>/);
+  assert.match(doc, />1.200 €<\/w:t>/); // sin letras: no se toca
+  assert.match(leer(r.buffer, 'word/header1.xml'), /<w:b\/><\/w:rPr><w:t xml:space="preserve">DESPACHO PÉREZ &amp; ASOCIADOS<\/w:t>/);
+  // Todo lo que no es texto, idéntico.
+  const sinTexto = (x: string) => x.replace(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g, '<w:t/>');
+  assert.equal(sinTexto(doc), sinTexto(leer(original, 'word/document.xml')));
+  assert.equal(leer(r.buffer, 'word/styles.xml'), leer(original, 'word/styles.xml').replace('es-ES', 'en-GB'));
+  assert.equal(leer(r.buffer, 'word/_rels/document.xml.rels'), leer(original, 'word/_rels/document.xml.rels'));
+});
+
+test('repartir: si la IA pierde o reordena las etiquetas, el texto no se pierde', { skip }, async () => {
+  const { repartir } = await import('../src/utils/traducirDocx');
+  assert.deepEqual(repartir(2, '<g1>The tenant </g1><g2>will pay</g2>'), ['The tenant ', 'will pay']);
+  assert.equal(repartir(2, '<g2>will pay</g2><g1>The tenant</g1>'), null);
+  assert.equal(repartir(2, 'The tenant will pay'), null);
+  assert.equal(repartir(2, '<g1>a</g1> suelto <g2>b</g2>'), null);
+  assert.deepEqual(repartir(1, 'Hello'), ['Hello']);
 });
 
 test('traducir un Word adjunto al expediente: se adjunta la traducción (.docx) junto al original', { skip }, async () => {

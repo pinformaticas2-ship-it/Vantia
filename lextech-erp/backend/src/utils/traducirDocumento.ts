@@ -10,9 +10,9 @@ import { leerComoDocx } from '../services/plantillasWord';
 // emparejar original y traducción (versión bilingüe a dos columnas).
 
 /** Lo que entra en cada petición a la IA (caracteres de HTML). */
-const TANDA = 12_000;
+const TANDA = 20_000; // el cupo cuenta peticiones, no tamaño: tandas grandes (cabe de sobra en la salida de Gemini)
 /** Tope por documento: con el plan gratuito de Gemini cada tanda es una petición. */
-export const MAX_CARACTERES = 120_000;
+export const MAX_CARACTERES = 220_000; // unas 70 páginas, ~11 peticiones
 /** Escaneados e imágenes se mandan enteros a la IA (lee y traduce a la vez). */
 const MAX_ESCANEADO = 12 * 1024 * 1024;
 
@@ -106,6 +106,22 @@ const ESPERA = { topeLlamadaMs: 150_000, topeTotalMs: 300_000 };
 
 /** Traduce bloques HTML por tandas. progreso(hechos, total) tras cada tanda. */
 export async function traducirBloques(bloques: string[], idioma: string, nombre: string, progreso?: (h: number, t: number) => void): Promise<Resultado> {
+  return traducirLista(bloques, idioma, nombre, {
+    que: 'fragmentos HTML consecutivos',
+    formato: '- Conserva exactamente las etiquetas y atributos HTML; traduce solo el texto visible.',
+  }, progreso);
+}
+
+/**
+ * Traduce una lista de fragmentos por tandas, pidiendo a la IA un array con
+ * el mismo número de elementos. Si el documento pasa de MAX_CARACTERES, solo
+ * se traduce el principio (parcial: true; original son los usados).
+ */
+export async function traducirLista(
+  bloques: string[], idioma: string, nombre: string,
+  o: { que: string; formato: string; validarItem?: (original: string, traducido: string) => boolean },
+  progreso?: (h: number, t: number) => void,
+): Promise<Resultado> {
   const destino = normalizarIdioma(idioma);
   let total = 0; const usados: string[] = [];
   for (const b of bloques) { if (total + b.length > MAX_CARACTERES && usados.length) break; usados.push(b); total += b.length; }
@@ -125,13 +141,17 @@ export async function traducirBloques(bloques: string[], idioma: string, nombre:
     const r = await pedirGemini({
       ...ESPERA,
       json: true,
-      texto: `Eres traductor jurídico. Traduce al ${NOMBRE_ES[destino]} cada elemento de este array JSON: son ${t.length} fragmentos HTML consecutivos del documento «${nombre}» (parte ${i + 1} de ${tandas.length}). Detecta tú el idioma original.
+      texto: `Eres traductor jurídico. Traduce al ${NOMBRE_ES[destino]} cada elemento de este array JSON: son ${t.length} ${o.que} del documento «${nombre}» (parte ${i + 1} de ${tandas.length}). Detecta tú el idioma original.
 - Devuelve SOLO un array JSON con exactamente ${t.length} cadenas, en el mismo orden: la traducción de cada fragmento.
-- Conserva exactamente las etiquetas y atributos HTML; traduce solo el texto visible.
+${o.formato}
 ${REGLAS(destino)}
 
 ${JSON.stringify(t)}`,
-      validar: (out) => { const a = JSON.parse(out); return Array.isArray(a) && a.length === t.length && a.every((x) => typeof x === 'string'); },
+      validar: (out) => {
+        const a = JSON.parse(out);
+        return Array.isArray(a) && a.length === t.length && a.every((x) => typeof x === 'string')
+          && (!o.validarItem || a.every((x: string, k: number) => o.validarItem!(t[k], x)));
+      },
     });
     if ('motivo' in r) return { ok: false, motivo: r.motivo };
     traduccion.push(...(JSON.parse(r.texto) as string[]));
@@ -172,7 +192,12 @@ export function componerHtml(r: { original: string[]; traduccion: string[]; parc
   const aviso = `<p><i>Traducción automática al ${NOMBRE_ES[destino]} de «${escapar(o.nombre)}» hecha con IA el ${fecha}. No es una traducción jurada: revísala antes de usarla.</i></p>`
     + (r.parcial ? `<p><i>Traducción parcial: el documento es muy largo y solo se ha traducido el principio (unos ${Math.round(MAX_CARACTERES / 1000)}.000 caracteres).</i></p>` : '');
   const dir = destino === 'ar' ? ' dir="rtl"' : '';
-  if (o.modo === 'traduccion') return `${aviso}\n<div lang="${destino}"${dir}>\n${r.traduccion.join('\n')}\n</div>`;
+  // Solo la traducción: el mismo documento, sin añadirle nada (el aviso de «no
+  // jurada» lo da la ventana de traducir). Solo se avisa si quedó a medias.
+  if (o.modo === 'traduccion') {
+    const nota = r.parcial ? `<p><i>[Traducción parcial: el documento es muy largo y solo se ha traducido el principio.]</i></p>\n` : '';
+    return `${dir ? `<div dir="rtl">\n` : ''}${r.traduccion.join('\n')}\n${nota}${dir ? '</div>' : ''}`;
+  }
   const celda = 'vertical-align:top;padding:4px 8px;border:1px solid #d0d7de'; // html-to-docx no admite width en % en las celdas
   const filas = r.original.map((b, i) => `<tr><td style="${celda}">${b}</td><td style="${celda}"${dir}>${r.traduccion[i] ?? ''}</td></tr>`).join('\n');
   return `${aviso}
