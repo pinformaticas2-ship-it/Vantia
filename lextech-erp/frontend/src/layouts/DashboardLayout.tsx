@@ -1817,11 +1817,29 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       if (isGroupActive(item)) setOpenGroups((prev) => (prev.has(item.name) ? prev : new Set(prev).add(item.name)));
     });
   }, [pathname, isGroupActive]);
-  const toggleGroup = (name: string) => setOpenGroups((prev) => {
+  // Al pasar el ratón: abrir/cerrar con un poco de «intención». Antes se abría y
+  // cerraba al instante, y al bajar por el menú los grupos se desplegaban solos
+  // y todo lo de debajo daba saltos.
+  const temporizadores = useRef(new Map<string, number>());
+  const cancelar = (name: string) => { window.clearTimeout(temporizadores.current.get(name)); temporizadores.current.delete(name); };
+  const programarGrupo = (name: string, abrir: boolean) => {
+    cancelar(name);
+    temporizadores.current.set(name, window.setTimeout(() => {
+      temporizadores.current.delete(name);
+      setOpenGroups((prev) => {
+        if (prev.has(name) === abrir) return prev;
+        const next = new Set(prev);
+        abrir ? next.add(name) : next.delete(name);
+        return next;
+      });
+    }, abrir ? 150 : 350));
+  };
+  useEffect(() => () => { temporizadores.current.forEach((id) => window.clearTimeout(id)); }, []);
+  const toggleGroup = (name: string) => { cancelar(name); setOpenGroups((prev) => {
     const next = new Set(prev);
     next.has(name) ? next.delete(name) : next.add(name);
     return next;
-  });
+  }); };
 
   return (
     <div className="erp-sidebar flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
@@ -1997,13 +2015,8 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                     return (
                       <div
                         key={item.name}
-                        onMouseEnter={() => setOpenGroups((prev) => (prev.has(item.name) ? prev : new Set(prev).add(item.name)))}
-                        onMouseLeave={() => setOpenGroups((prev) => {
-                          if (!prev.has(item.name)) return prev;
-                          const next = new Set(prev);
-                          next.delete(item.name);
-                          return next;
-                        })}
+                        onMouseEnter={() => programarGrupo(item.name, true)}
+                        onMouseLeave={() => programarGrupo(item.name, false)}
                       >
                         <button
                           type="button"
@@ -2015,18 +2028,25 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                         >
                           <GroupIcon className={`h-4 w-4 shrink-0 ${childActive ? "text-red-400" : "text-slate-500"}`} />
                           <span className="flex-1 truncate text-left">{item.name}</span>
-                          <ChevronDown size={13} className={`shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${childActive ? "text-red-400" : "text-slate-500"}`} />
+                          <ChevronDown size={13} className={`shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? "rotate-180" : ""} ${childActive ? "text-red-400" : "text-slate-500"}`} />
                         </button>
                         <div
-                          className={`grid transition-all duration-200 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                          className={`grid ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                          style={{ transition: isOpen
+                            ? "grid-template-rows 340ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease-out"
+                            : "grid-template-rows 260ms cubic-bezier(0.4,0,0.2,1), opacity 160ms ease-in 60ms" }}
                         >
                           <div className="overflow-hidden">
                             <div className="mt-1 ml-4 pl-3 border-l border-slate-800 space-y-1 pb-0.5">
-                              {item.children.map((child) => {
+                              {item.children.map((child, i) => {
                                 const isChildActive = hrefMatches(pathname, currentSearch, child.href);
                                 const ChildIcon = child.icon;
                                 return (
-                                  <Link key={child.name} to={child.href} onClick={onClose}
+                                  // Cada opción entra un instante después de la anterior (en cascada).
+                                  <div key={child.name}
+                                    className={`transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"}`}
+                                    style={{ transitionDelay: isOpen ? `${60 + i * 35}ms` : "0ms" }}>
+                                  <Link to={child.href} onClick={onClose}
                                     className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${
                                       isChildActive ? "bg-red-500/10 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                                     }`}
@@ -2034,6 +2054,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                                     <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
                                     <span className="flex-1 truncate">{child.name}</span>
                                   </Link>
+                                  </div>
                                 );
                               })}
                             </div>
