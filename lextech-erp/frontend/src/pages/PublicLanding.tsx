@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from "react";
-import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import VantiaBrand from "../components/VantiaBrand";
 
@@ -164,26 +164,7 @@ export default function PublicLanding() {
           </div>
 
           <SignedOut>
-            <SignIn
-              routing="hash"
-              appearance={{
-                variables: {
-                  colorPrimary: "#1e2f45",
-                  colorBackground: "#ffffff",
-                  borderRadius: "16px",
-                  fontFamily: "inherit",
-                },
-                elements: {
-                  rootBox: "w-full",
-                  card: "shadow-[0_18px_45px_rgba(30,47,69,0.12)] border border-[#e5e7eb] rounded-2xl",
-                  headerTitle: "text-[#1e2f45] font-black",
-                  headerSubtitle: "text-[#6b7280]",
-                  formButtonPrimary: "bg-[#1e2f45] hover:bg-[#243951] text-white font-bold rounded-xl",
-                  footerActionLink: "text-[#b3924a] hover:text-[#8a6e35]",
-                  identityPreviewText: "text-[#1e2f45]",
-                },
-              }}
-            />
+            <AccesoORegistro />
           </SignedOut>
 
           <SignedIn>
@@ -200,6 +181,71 @@ export default function PublicLanding() {
           </SignedIn>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Apariencia común del formulario de Clerk (entrar y crear cuenta).
+const APARIENCIA_ACCESO = {
+  variables: {
+    colorPrimary: "#1e2f45",
+    colorBackground: "#ffffff",
+    borderRadius: "16px",
+    fontFamily: "inherit",
+  },
+  elements: {
+    rootBox: "w-full",
+    card: "shadow-[0_18px_45px_rgba(30,47,69,0.12)] border border-[#e5e7eb] rounded-2xl",
+    headerTitle: "text-[#1e2f45] font-black",
+    headerSubtitle: "text-[#6b7280]",
+    formButtonPrimary: "bg-[#1e2f45] hover:bg-[#243951] text-white font-bold rounded-xl",
+    footerActionLink: "text-[#b3924a] hover:text-[#8a6e35]",
+    identityPreviewText: "text-[#1e2f45]",
+  },
+};
+
+// «Iniciar sesión» / «Crear cuenta». Se entra también con /#registro (enlace
+// para mandar a alguien directamente al registro) y los enlaces del pie de
+// cada formulario de Clerk («¿No tienes cuenta? Regístrate») cambian de uno a
+// otro sin salir de la página. Tras registrarse, la app le ofrece crear su
+// despacho o unirse al de su equipo con un código (components/SinDespacho).
+function AccesoORegistro() {
+  const leerHash = (): "entrar" | "registro" | null =>
+    window.location.hash === "#registro" ? "registro" : window.location.hash === "#entrar" ? "entrar" : null;
+  const [modo, setModo] = useState<"entrar" | "registro">(() => leerHash() || "entrar");
+  useEffect(() => {
+    const aplicar = () => {
+      const m = leerHash();
+      if (!m) return; // los pasos internos de Clerk (#/factor-one, #/verify…) no cambian el modo
+      setModo(m);
+      // Se limpia para que el enrutado por hash de Clerk empiece en su primer paso.
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    };
+    aplicar();
+    window.addEventListener("hashchange", aplicar);
+    return () => window.removeEventListener("hashchange", aplicar);
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div role="tablist" aria-label="Acceso" className="grid grid-cols-2 rounded-2xl border border-[#1e2f45]/10 bg-white/70 p-1 shadow-sm">
+        {([["entrar", "Iniciar sesión"], ["registro", "Crear cuenta"]] as const).map(([m, texto]) => (
+          <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => setModo(m)}
+            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${modo === m ? "bg-[#1e2f45] text-white shadow" : "text-[#1e2f45]/70 hover:bg-[#1e2f45]/5"}`}>
+            {texto}
+          </button>
+        ))}
+      </div>
+      {modo === "entrar" ? (
+        <SignIn routing="hash" signUpUrl="/#registro" appearance={APARIENCIA_ACCESO} />
+      ) : (
+        <>
+          <SignUp routing="hash" signInUrl="/#entrar" appearance={APARIENCIA_ACCESO} />
+          <p className="px-2 text-center text-xs leading-relaxed text-[#1e2f45]/60">
+            Después de crear tu cuenta podrás dar de alta tu despacho o unirte al de tu equipo con el código que te den.
+          </p>
+        </>
+      )}
     </div>
   );
 }
