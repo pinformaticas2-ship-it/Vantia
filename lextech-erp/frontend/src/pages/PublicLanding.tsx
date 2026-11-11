@@ -1,7 +1,10 @@
 ﻿import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { KeyRound } from "lucide-react";
 import VantiaBrand from "../components/VantiaBrand";
+import { aviso } from "../lib/avisos";
 
 const LEGAL_QUOTES = [
   {
@@ -233,6 +236,8 @@ function AccesoORegistro() {
     return () => window.removeEventListener("hashchange", aplicar);
   }, []);
 
+  const [formulario, setFormulario] = useState<HTMLDivElement | null>(null);
+
   return (
     <div className="space-y-5">
       <style>{`
@@ -251,7 +256,8 @@ function AccesoORegistro() {
         ))}
       </div>
       <AlturaSuave clave={modo}>
-        <div key={modo} style={{ animation: "accesoEntrada 320ms cubic-bezier(0.22,1,0.36,1)" }}>
+        <div key={modo} ref={setFormulario} style={{ animation: "accesoEntrada 320ms cubic-bezier(0.22,1,0.36,1)" }}>
+          <AyudasContrasena contenedor={formulario} modo={modo} />
           {modo === "entrar" ? (
             <SignIn routing="hash" signUpUrl="/#registro" appearance={APARIENCIA_ACCESO} />
           ) : (
@@ -265,6 +271,85 @@ function AccesoORegistro() {
         </div>
       </AlturaSuave>
     </div>
+  );
+}
+
+// ── Contraseñas ─────────────────────────────────────────────────────────────
+// 1) Los campos de Clerk no llevan «autocomplete»: sin él, Chrome/Google no
+//    ofrece «Sugerir contraseña segura» al registrarse ni la rellena al entrar.
+//    Se les pone el que corresponde en cuanto Clerk los pinta.
+// 2) Botón propio «Generar» junto a la etiqueta «Contraseña» del registro:
+//    crea una contraseña fuerte, la escribe en el campo, la muestra y la copia.
+
+const AUTOCOMPLETE: Record<"entrar" | "registro", Record<string, string>> = {
+  entrar: { "identifier-field": "username", "password-field": "current-password" },
+  registro: {
+    "password-field": "new-password", "emailAddress-field": "email", "username-field": "username",
+    "firstName-field": "given-name", "lastName-field": "family-name", "phoneNumber-field": "tel",
+  },
+};
+
+/** Contraseña aleatoria fuerte (crypto), sin caracteres que se confunden (0/O, 1/l/I). */
+export function generarContrasena(largo = 16): string {
+  const grupos = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnpqrstuvwxyz", "23456789", "!@#$%&*?-_=+"];
+  const todos = grupos.join("");
+  const azar = (n: number) => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+  const letras = grupos.map((g) => g[azar(g.length)]); // al menos una de cada tipo
+  while (letras.length < largo) letras.push(todos[azar(todos.length)]);
+  for (let i = letras.length - 1; i > 0; i--) { const j = azar(i + 1); [letras[i], letras[j]] = [letras[j], letras[i]]; }
+  return letras.join("");
+}
+
+function AyudasContrasena({ contenedor, modo }: { contenedor: HTMLElement | null; modo: "entrar" | "registro" }) {
+  const [hueco, setHueco] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!contenedor) return;
+    const revisar = () => {
+      for (const [id, valor] of Object.entries(AUTOCOMPLETE[modo])) {
+        const el = contenedor.querySelector<HTMLInputElement>(`input#${id}`);
+        if (el && el.getAttribute("autocomplete") !== valor) el.setAttribute("autocomplete", valor);
+      }
+      if (modo !== "registro") return;
+      // Hueco para el botón en la fila de la etiqueta «Contraseña» (Clerk puede rehacerla).
+      const fila = contenedor.querySelector<HTMLElement>(".cl-formFieldLabelRow__password");
+      let span = fila?.querySelector<HTMLElement>("[data-vantia-generar]") || null;
+      if (fila && !span) {
+        span = document.createElement("span");
+        span.setAttribute("data-vantia-generar", "");
+        span.style.marginLeft = "auto";
+        fila.appendChild(span);
+      }
+      setHueco((prev) => (prev === span ? prev : span));
+    };
+    revisar();
+    const mo = new MutationObserver(revisar);
+    mo.observe(contenedor, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  }, [contenedor, modo]);
+
+  const generar = async () => {
+    const campo = contenedor?.querySelector<HTMLInputElement>("input#password-field");
+    if (!campo) return;
+    const clave = generarContrasena();
+    // El campo es de React (Clerk): hay que pasar por el «setter» nativo y avisar con un evento.
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(campo, clave);
+    campo.dispatchEvent(new Event("input", { bubbles: true }));
+    campo.dispatchEvent(new Event("change", { bubbles: true }));
+    if (campo.type === "password") {
+      campo.closest(".cl-formFieldInputGroup, .cl-formField")?.querySelector<HTMLButtonElement>(".cl-formFieldInputShowPasswordButton")?.click();
+    }
+    let copiada = false;
+    try { await navigator.clipboard.writeText(clave); copiada = true; } catch { /* sin permiso: se ve en el campo */ }
+    aviso.ok(copiada ? "Contraseña segura generada y copiada. Guárdala en tu gestor de contraseñas." : "Contraseña segura generada: cópiala y guárdala en tu gestor de contraseñas.", { duracion: 7000 });
+  };
+
+  if (!hueco) return null;
+  return createPortal(
+    <button type="button" onClick={generar} title="Crear una contraseña segura al azar, rellenarla y copiarla"
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[13px] font-semibold text-[#b3924a] transition-colors hover:bg-[#b3924a]/10 hover:text-[#8a6e35]">
+      <KeyRound size={13} /> Generar segura
+    </button>,
+    hueco,
   );
 }
 

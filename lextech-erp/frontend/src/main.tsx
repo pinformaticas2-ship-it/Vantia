@@ -6,7 +6,7 @@ import './index.css'
 import './lib/temasExtra.css'
 import './lib/temasOscuroColores.css'
 import { ClerkProvider } from '@clerk/clerk-react'
-import { esES } from '@clerk/localizations'
+import { clerkEs } from './lib/clerkEs'
 import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
 import { AppSegura, instalarCapturaGlobal } from './lib/errores'
 
@@ -39,7 +39,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter> 
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
-        localization={esES}
+        localization={clerkEs}
         appearance={{
           variables: {
             colorPrimary: '#1e2f45',
