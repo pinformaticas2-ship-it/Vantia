@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SignedIn, SignedOut, SignIn, SignUp } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import VantiaBrand from "../components/VantiaBrand";
@@ -103,15 +103,17 @@ const LEGAL_QUOTES = [
 
 export default function PublicLanding() {
   return (
-    <div className="min-h-screen flex font-sans bg-[#f4efe6]">
-      <div className="hidden lg:flex w-1/2 relative overflow-hidden flex-col justify-between p-16 text-white bg-[#1d2735]">
+    // En escritorio la página mide exactamente la pantalla: el panel izquierdo no
+    // se estira ni se mueve cuando el formulario de la derecha crece (registro).
+    <div className="min-h-screen lg:h-screen flex font-sans bg-[#f4efe6]">
+      <div className="hidden lg:flex lg:h-screen w-1/2 relative overflow-hidden flex-col justify-between p-16 text-white bg-[#1d2735]">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(215,192,138,0.18),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(59,89,122,0.34),_transparent_40%)]" />
           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full border border-[#d7c08a]/15" />
           <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full border border-white/8" />
         </div>
 
-        <div className="relative z-10">
+        <div className="relative z-10 w-full max-w-xl">
           <div className="mb-8 inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#fff1c9]">
             Plataforma legal
           </div>
@@ -123,7 +125,7 @@ export default function PublicLanding() {
           </p>
         </div>
 
-        <div className="relative z-10 space-y-3">
+        <div className="relative z-10 w-full max-w-xl space-y-3">
           <FeatureCard
             emoji="🛡️"
             title="Seguridad Zero-Trust"
@@ -146,20 +148,22 @@ export default function PublicLanding() {
         </div>
       </div>
 
-      <div className="relative w-full lg:w-1/2 flex flex-col items-center justify-center overflow-hidden bg-[linear-gradient(180deg,#fffdf8_0%,#f5efe4_100%)] p-8">
-        <div className="pointer-events-none absolute inset-0">
+      {/* Columna anclada arriba (no centrada en vertical): al pasar de «Entrar»
+          a «Crear cuenta», que es más alto, la marca y las pestañas no se mueven. */}
+      <div className="relative w-full lg:w-1/2 lg:h-screen flex flex-col items-center overflow-x-hidden lg:overflow-y-auto bg-[linear-gradient(180deg,#fffdf8_0%,#f5efe4_100%)] px-5 pb-12 pt-14 sm:pt-[10vh]">
+        <div className="pointer-events-none absolute inset-0 hidden sm:block">
           <div className="absolute left-[8%] top-[14%] h-24 w-24 rounded-[28px] border border-[#d7c08a]/20 bg-white/30" />
           <div className="absolute right-[14%] top-[18%] h-14 w-14 rounded-full border border-[#1e2f45]/10 bg-[#d7c08a]/10" />
           <div className="absolute left-[14%] bottom-[18%] h-20 w-20 rotate-12 rounded-[24px] border border-[#1e2f45]/10 bg-white/25" />
           <div className="absolute right-[10%] bottom-[14%] h-28 w-28 rounded-full border border-[#d7c08a]/18 bg-white/20" />
         </div>
 
-        <div className="relative z-10 w-full max-w-md space-y-8">
-          {/* Logo grande en la zona superior */}
-          <div className="flex flex-col items-center lg:items-start gap-1">
-            <VantiaBrand size={72} subtitle="Suite legal profesional" className="justify-center lg:justify-start" />
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1e2f45]/40 mt-1">
-              Acceso seguro
+        <div className="relative z-10 w-full max-w-[400px] space-y-7">
+          {/* Marca, pestañas y formulario: misma columna, mismo ancho, centrados. */}
+          <div className="flex flex-col items-center gap-1.5">
+            <VantiaBrand size={64} subtitle="Suite legal profesional" className="justify-center" />
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1e2f45]/45">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" aria-hidden /> Acceso seguro
             </p>
           </div>
 
@@ -194,8 +198,11 @@ const APARIENCIA_ACCESO = {
     fontFamily: "inherit",
   },
   elements: {
+    // La tarjeta ocupa todo el ancho de la columna (Clerk la fija a 25rem):
+    // así queda alineada con las pestañas de encima.
     rootBox: "w-full",
-    card: "shadow-[0_18px_45px_rgba(30,47,69,0.12)] border border-[#e5e7eb] rounded-2xl",
+    cardBox: "w-full max-w-none rounded-2xl border border-[#1e2f45]/10 shadow-[0_1px_2px_rgba(30,47,69,0.06),0_24px_48px_-12px_rgba(30,47,69,0.18)]",
+    card: "w-full shadow-none border-0",
     headerTitle: "text-[#1e2f45] font-black",
     headerSubtitle: "text-[#6b7280]",
     formButtonPrimary: "bg-[#1e2f45] hover:bg-[#243951] text-white font-bold rounded-xl",
@@ -227,25 +234,90 @@ function AccesoORegistro() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <div role="tablist" aria-label="Acceso" className="grid grid-cols-2 rounded-2xl border border-[#1e2f45]/10 bg-white/70 p-1 shadow-sm">
+    <div className="space-y-5">
+      <style>{`
+        @keyframes accesoEntrada { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      `}</style>
+      {/* Pestañas con indicador que se desliza; mismo ancho que la tarjeta. */}
+      <div role="tablist" aria-label="Acceso" className="relative grid grid-cols-2 rounded-2xl bg-[#1e2f45]/[0.06] p-1 ring-1 ring-inset ring-[#1e2f45]/[0.06]">
+        <span aria-hidden
+          className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-[0_1px_2px_rgba(30,47,69,0.08),0_6px_16px_rgba(30,47,69,0.10)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{ transform: modo === "registro" ? "translateX(100%)" : "translateX(0)" }} />
         {([["entrar", "Iniciar sesión"], ["registro", "Crear cuenta"]] as const).map(([m, texto]) => (
           <button key={m} type="button" role="tab" aria-selected={modo === m} onClick={() => setModo(m)}
-            className={`rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${modo === m ? "bg-[#1e2f45] text-white shadow" : "text-[#1e2f45]/70 hover:bg-[#1e2f45]/5"}`}>
+            className={`relative z-10 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors duration-300 ${modo === m ? "text-[#1e2f45]" : "text-[#1e2f45]/55 hover:text-[#1e2f45]/80"}`}>
             {texto}
           </button>
         ))}
       </div>
-      {modo === "entrar" ? (
-        <SignIn routing="hash" signUpUrl="/#registro" appearance={APARIENCIA_ACCESO} />
-      ) : (
-        <>
-          <SignUp routing="hash" signInUrl="/#entrar" appearance={APARIENCIA_ACCESO} />
-          <p className="px-2 text-center text-xs leading-relaxed text-[#1e2f45]/60">
-            Después de crear tu cuenta podrás dar de alta tu despacho o unirte al de tu equipo con el código que te den.
-          </p>
-        </>
-      )}
+      <AlturaSuave clave={modo}>
+        <div key={modo} style={{ animation: "accesoEntrada 320ms cubic-bezier(0.22,1,0.36,1)" }}>
+          {modo === "entrar" ? (
+            <SignIn routing="hash" signUpUrl="/#registro" appearance={APARIENCIA_ACCESO} />
+          ) : (
+            <>
+              <SignUp routing="hash" signInUrl="/#entrar" appearance={APARIENCIA_ACCESO} />
+              <p className="mt-4 px-2 text-center text-xs leading-relaxed text-[#1e2f45]/55">
+                Después de crear tu cuenta podrás dar de alta tu despacho o unirte al de tu equipo con el código que te den.
+              </p>
+            </>
+          )}
+        </div>
+      </AlturaSuave>
+    </div>
+  );
+}
+
+/**
+ * La altura sigue al contenido con una transición, en vez de cambiar de golpe
+ * (el registro es más alto que la entrada, y Clerk pinta su tarjeta un instante
+ * después de montarse). Mientras anima recorta el desborde; en reposo no, para
+ * no cortar los desplegables de Clerk (prefijo de teléfono, etc.).
+ */
+function AlturaSuave({ clave, children }: { clave: string; children: React.ReactNode }) {
+  const interior = useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = useState<number | null>(null);
+  const [animando, setAnimando] = useState(false);
+  const primera = useRef(true);
+  // Al cambiar de formulario, Clerk monta el nuevo vacío un instante: durante
+  // ese rato solo se deja crecer (si no, la caja se encoge y vuelve a estirarse).
+  const soloCrecerHasta = useRef(0);
+  const medirRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (primera.current) return;
+    soloCrecerHasta.current = Date.now() + 700;
+    const t = window.setTimeout(() => medirRef.current(), 720);
+    return () => window.clearTimeout(t);
+  }, [clave]);
+  useLayoutEffect(() => {
+    const el = interior.current; if (!el) return;
+    const medir = () => {
+      const h = el.offsetHeight;
+      setAlto((prev) => {
+        if (prev === h) return prev;
+        if (prev !== null && h < prev && Date.now() < soloCrecerHasta.current) return prev;
+        // La primera vez que hay contenido se coloca sin animar (aparece con el fundido).
+        if (primera.current && h > 0) { primera.current = false; return h; }
+        setAnimando(true);
+        return h;
+      });
+    };
+    medirRef.current = medir;
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    // El margen/relleno negativo deja sitio a la sombra de la tarjeta al recortar.
+    <div className="-mx-6 -mb-10"
+      onTransitionEnd={(e) => { if (e.target === e.currentTarget) setAnimando(false); }}
+      style={{
+        height: alto === null ? undefined : alto,
+        overflow: animando ? "hidden" : "visible",
+        transition: "height 380ms cubic-bezier(0.22,1,0.36,1)",
+      }}>
+      <div ref={interior} className="px-6 pb-10">{children}</div>
     </div>
   );
 }
@@ -296,7 +368,7 @@ function QuoteRotator() {
           : "text-3xl sm:text-4xl";
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <style>{`
         @keyframes quoteFadeSlide {
           from { opacity: 0; transform: translateY(10px); }
