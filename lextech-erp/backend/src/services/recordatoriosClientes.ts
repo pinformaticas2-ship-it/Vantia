@@ -4,6 +4,7 @@ import { formatMadrid, madridLocalToDate, madridYmd } from './vistasAutomation';
 import { tomarTurno } from '../utils/turnos';
 import { registrarAutomatizacion } from '../utils/automatizacionesRegistro';
 import { sendPushToUsers } from '../utils/webPush';
+import { emitirEvento } from './motorAutomatizaciones';
 
 // Recordatorios a clientes (12/11/2026): unos días antes de una cita de la
 // Agenda que tiene un cliente (directamente o por su expediente), se le manda
@@ -125,6 +126,11 @@ async function procesarOrganizacion(org: { id: string; nombre: string; automatiz
         html: rellenarRecordatorio(cfg.cuerpo, v, true),
       });
       await registrarAutomatizacion(org.id, 'recordatorios', true, `Recordatorio enviado a ${ev.nombre || ev.email} <${ev.email}> · ${v.titulo}, ${v.fecha}`);
+      emitirEvento(org.id, 'recordatorio.enviado', {
+        cita: { id: ev.id, titulo: v.titulo, fecha: v.fecha, hora: v.hora, lugar: v.lugar },
+        cliente: { nombre: ev.nombre || '', email: ev.email },
+        responsable: { id: ev.user_id },
+      });
       if (cfg.avisarResponsable && ev.user_id) {
         await sendPushToUsers([ev.user_id], {
           title: 'Recordatorio enviado al cliente',

@@ -44,6 +44,7 @@ import erroresClienteRoutes from './routes/erroresCliente';
 import docsBaseRoutes from './routes/docsBase';
 import automatizacionesRoutes from './routes/automatizaciones';
 import { startRecordatoriosClientesScheduler } from './services/recordatoriosClientes';
+import { startMotorAutomatizaciones } from './services/motorAutomatizaciones';
 import plantillasRoutes from './routes/plantillas';
 import { startPurgaErroresCliente } from './controllers/erroresClienteController';
 import { startPurgaTrazabilidad } from './controllers/privacidadController';
@@ -443,6 +444,7 @@ runMigrations().then(() => {
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
     startRecordatoriosClientesScheduler();
+    startMotorAutomatizaciones();
     startCrmReglas();
     // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
     startVistasIdle();

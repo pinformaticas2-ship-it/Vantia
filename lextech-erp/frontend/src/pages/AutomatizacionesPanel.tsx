@@ -11,6 +11,7 @@ import { aviso } from '../lib/avisos';
 import { notifyVistasChanged } from '../lib/useVistasStatus';
 import VistasCorreoConfigModal, { CorreoConfig } from '../components/VistasCorreoConfigModal';
 import FlujoEditor, { Campo, CampoCorreo, CampoLista, campoCls, type PasoFlujo } from '../components/FlujoEditor';
+import MisAutomatizaciones from './AutomatizacionesPropias';
 import { locale, t, tn } from '../lib/i18n';
 
 // Ajustes → Automatizaciones (12/11/2026). Fichas como las de Integraciones,
@@ -199,6 +200,8 @@ export default function AutomatizacionesPanel() {
         <p className="text-sm text-slate-500">{t('Tareas que Vantia hace sola en esta organización. Abre el flujo de cada una para ver qué hace, paso a paso, y ajustarlo.')}</p>
       </div>
 
+      <h2 className="mb-1 text-lg font-extrabold text-slate-800">{t('De serie')}</h2>
+      <p className="mb-4 text-sm text-slate-500">{t('Vienen con Vantia. Puedes mover sus pasos, quitar los opcionales y añadirles pasos propios al final.')}</p>
       <div className="grid gap-4 lg:grid-cols-2">
         <Ficha icono={CalendarCheck} fondo="bg-red-50 text-red-600" titulo={t('Vistas recibidas por correo')}
           subtitulo={t('Correo del juzgado → expediente y agenda')}
@@ -263,6 +266,8 @@ export default function AutomatizacionesPanel() {
           puedeCambiar={gestor} cambiando={cambiando === 'recordatorios'} onCambiar={() => void cambiar('recordatorios')}
           onFlujo={() => setAbierto('recordatorios')} puedeVerFlujo />
       </div>
+
+      <MisAutomatizaciones puedeEditar={gestor} />
 
       {abierto === 'vistas' && vistas?.config && (
         <FlujoVistas datos={vistas} puedeEditar={gestor} onCerrar={() => setAbierto(null)} onGuardado={cargar} put={put}
@@ -438,7 +443,7 @@ function FlujoVistas({ datos, puedeEditar, onCerrar, onGuardado, put, onCambiarB
 
   return (
     <>
-      <FlujoEditor titulo={t('Vistas recibidas por correo')} subtitulo={t('Correo del juzgado → expediente y agenda')} icono={CalendarCheck}
+      <FlujoEditor vinculada="vistas" titulo={t('Vistas recibidas por correo')} subtitulo={t('Correo del juzgado → expediente y agenda')} icono={CalendarCheck}
         pasos={pasos} ramas={ramas} puedeEditar={puedeEditar} sucio={f.sucio} guardando={f.guardando} error={f.error} onGuardar={f.onGuardar} onCerrar={onCerrar}
         descripcion={t('Cuando llega un señalamiento al correo, Vantia lo lee, te pide confirmación y, según lo que decidas, hace el resto. Puedes quitar los pasos que no quieras.')} />
       {correoAbierto && createPortal(
@@ -473,7 +478,7 @@ function FlujoDocs({ docs, activo, puedeEditar, onCerrar, onGuardado, put }: Pro
       explicacion: t('Rellenos con los datos del despacho, del cliente y del expediente. Lo que falte queda marcado para completarlo, y se pueden volver a generar.') },
   ];
   return (
-    <FlujoEditor titulo={t('Documentos de cada expediente')} subtitulo={t('Expediente nuevo → documentos rellenos')} icono={FileText}
+    <FlujoEditor vinculada="docsBase" titulo={t('Documentos de cada expediente')} subtitulo={t('Expediente nuevo → documentos rellenos')} icono={FileText}
       pasos={pasos} puedeEditar={puedeEditar} sucio={f.sucio} guardando={f.guardando} error={f.error} onGuardar={f.onGuardar} onCerrar={onCerrar}
       descripcion={t('Elige qué documentos se preparan solos en cada expediente. Las plantillas que se usan son las de Documentos.')} />
   );
@@ -505,7 +510,7 @@ function FlujoBienvenida({ datos, cuenta, puedeEditar, onCerrar, onGuardado, put
       ) },
   ];
   return (
-    <FlujoEditor titulo={t('Bienvenida al cliente')} subtitulo={t('Alta de cliente → correo de bienvenida')} icono={UserPlus}
+    <FlujoEditor vinculada="bienvenida" titulo={t('Bienvenida al cliente')} subtitulo={t('Alta de cliente → correo de bienvenida')} icono={UserPlus}
       pasos={pasos} puedeEditar={puedeEditar} sucio={f.sucio} guardando={f.guardando} error={f.error} onGuardar={f.onGuardar} onCerrar={onCerrar}
       descripcion={t('Un correo para que el cliente sepa que tenéis sus datos. Pulsa «Enviar el correo de bienvenida» para cambiar el texto.')} />
   );
@@ -601,7 +606,7 @@ function FlujoRecordatorios({ datos, cuenta, puedeEditar, onCerrar, onGuardado, 
     },
   ];
   return (
-    <FlujoEditor titulo={t('Recordatorios a clientes')} subtitulo={t('Cita con cliente → correo recordatorio')} icono={CalendarClock}
+    <FlujoEditor vinculada="recordatorios" titulo={t('Recordatorios a clientes')} subtitulo={t('Cita con cliente → correo recordatorio')} icono={CalendarClock}
       pasos={pasos} puedeEditar={puedeEditar} sucio={f.sucio} guardando={f.guardando} error={f.error} onGuardar={f.onGuardar} onCerrar={onCerrar}
       descripcion={t('Antes de cada cita de la Agenda con un cliente, le llega un correo recordándole el día, la hora y el lugar. Menos olvidos y menos huecos perdidos.')} />
   );

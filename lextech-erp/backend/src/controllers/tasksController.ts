@@ -6,6 +6,7 @@ import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivity, logActivityForReq, resolveUserName } from './activityController';
 import { setFlagsFromString } from 'v8';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
@@ -242,6 +243,14 @@ export const createTask = async (req: any, res: Response) => {
       ]
     );
     const createdTask = result.rows[0];
+    emitirConCliente(req.organizacionId, 'tarea.creada', {
+      tarea: {
+        id: createdTask.id, titulo: createdTask.titulo, tipo: createdTask.tipo || '', prioridad: createdTask.prioridad || '',
+        plazo: createdTask.plazo ? new Date(createdTask.plazo).toLocaleDateString('es-ES', { timeZone: 'UTC' }) : '',
+      },
+      responsable: { id: createdTask.user_id || userId },
+      expediente: createdTask.expediente_id ? { id: createdTask.expediente_id } : undefined,
+    }, { clienteId: createdTask.client_id }, userId);
     const agendaPayload = buildTaskAgendaPayload(createdTask);
 
     // La sincronización con la Agenda es un extra sobre la tarea ya guardada:

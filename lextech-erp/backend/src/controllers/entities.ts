@@ -7,6 +7,7 @@ import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../conf
 import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
 import { normalizarIdioma } from '../utils/idiomas';
 import { saveMiscUpload } from '../utils/miscUploads';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
 /** Convierte strings vacíos/guiones a null (evita casts fallidos en PostgreSQL) */
 const nullIfEmpty = (v: any) => {
@@ -437,6 +438,7 @@ export const createEntity = async (req: any, res: Response) => {
       // Fire-and-forget: si falla o no hay cuenta configurada, no afecta al alta.
       if ((nullIfEmpty(type) || 'CLIENTE') === 'CLIENTE') {
         void sendClientWelcomeEmail(req.organizacionId, { email, first_name, last_name, idioma: req.body?.idioma });
+        emitirConCliente(req.organizacionId, 'cliente.creado', {}, { clienteId: result.rows[0].id }, req.auth?.userId);
       }
     }
 

@@ -22,6 +22,7 @@ import {
 } from '../services/vistasAutomation';
 import { reconcileVistasIdle } from '../services/vistasIdle';
 import { sendPushToUsers } from '../utils/webPush';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
 /** Push a los implicados en una vista (abogado responsable y dueño del buzón)
  *  cuando alguien la acepta, modifica o cancela -- menos a quien lo hizo, que
@@ -885,6 +886,20 @@ export async function aceptarVista(req: any, res: Response) {
     );
     await logActivityForReq(req, `Vista aceptada: ${tituloBase}`, expedienteId ? 'EXPEDIENTE' : 'AGENDA', expedienteId || agendaEventId || undefined, sol.subject || undefined);
     if (!critico) pushImplicados(sol, uid, `✅ Vista aceptada por ${deciderName}`, `${fechaLarga(fecha)}${datos.juzgado ? ` · ${datos.juzgado}` : ''}`);
+    if (!critico) {
+      const { rows: ex } = expedienteId
+        ? await pool.query(`SELECT anio, num_exp FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, req.organizacionId]).catch(() => ({ rows: [] as any[] }))
+        : { rows: [] as any[] };
+      emitirConCliente(req.organizacionId, 'vista.aceptada', {
+        vista: {
+          fecha: fecha ? formatMadrid(fecha, { weekday: 'long', day: 'numeric', month: 'long' }) : '',
+          hora: fecha ? formatMadrid(fecha, { hour: '2-digit', minute: '2-digit' }) : '',
+          juzgado: datos.juzgado || '', autos: datos.num_autos || '',
+        },
+        expediente: expedienteId ? { id: expedienteId, ref: ex[0] ? `${ex[0].anio}/${ex[0].num_exp}` : '' } : {},
+        responsable: { id: responsableId, nombre: responsableNombre || '' },
+      }, { expedienteId }, uid);
+    }
     return ok(res, { estado: critico ? 'error' : 'aceptada', pasos: finalPasos, expedienteId, agendaEventId });
   } catch (e: any) {
     await pool.query(

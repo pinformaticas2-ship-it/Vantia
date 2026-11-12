@@ -10,4 +10,5 @@ import './opciones';
 import './seguridad';
 import './automatizaciones';
 import './despacho';
+import './lienzo';
 import './contextos';

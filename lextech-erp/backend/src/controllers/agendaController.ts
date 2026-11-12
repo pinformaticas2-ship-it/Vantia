@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq } from './activityController';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
+import { formatMadrid } from '../services/vistasAutomation';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ` | code: ${e.code}` : ''}`;
 
@@ -263,6 +265,18 @@ export const createEvent = async (req: any, res: Response) => {
       ]
     );
     const createdEvent = result.rows[0];
+    {
+      const ini = new Date(createdEvent.start_at);
+      emitirConCliente(req.organizacionId, 'cita.creada', {
+        cita: {
+          id: createdEvent.id, titulo: createdEvent.title, tipo: createdEvent.type, lugar: createdEvent.location || '',
+          fecha: formatMadrid(ini, { weekday: 'long', day: 'numeric', month: 'long' }),
+          hora: createdEvent.all_day ? '' : formatMadrid(ini, { hour: '2-digit', minute: '2-digit' }),
+        },
+        responsable: { id: createdEvent.user_id, nombre: createdEvent.user_name || '' },
+        expediente: createdEvent.expediente_id ? { id: createdEvent.expediente_id } : undefined,
+      }, { clienteId: createdEvent.cliente_id, expedienteId: createdEvent.expediente_id }, req.auth?.userId);
+    }
 
     if (shouldSyncAgendaEventToTask(createdEvent)) {
       const clientRow = await pool.query(

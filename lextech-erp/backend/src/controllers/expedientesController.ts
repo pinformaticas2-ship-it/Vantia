@@ -2,6 +2,7 @@ import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
 import { asegurarDocsBase } from '../services/docsBaseExpediente';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
 function reqUserName(req: any): string {
   const c = req.auth?.sessionClaims;
@@ -708,6 +709,9 @@ export const createExpediente = async (req: any, res: Response) => {
     // Documentos base (LOPD, toma de requisitos, hoja de encargo) si la
     // organización los tiene activados; en segundo plano, no retrasa el alta.
     asegurarDocsBase(req.organizacionId, r.rows[0].id, req.auth?.userId || 'SYSTEM').catch((e) => console.error('[docs-base]', e?.message));
+    emitirConCliente(req.organizacionId, 'expediente.creado', {
+      expediente: { id: r.rows[0].id, ref: `${r.rows[0].anio}/${r.rows[0].num_exp}`, descripcion: r.rows[0].descripcion || '', tipo: r.rows[0].tipo || '' },
+    }, { clienteId: r.rows[0].cliente_id }, req.auth?.userId);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) {
     res.status(expedienteHttpStatus(e)).json({ error: friendlyExpedienteError(e) });

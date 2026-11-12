@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { randomBytes } from 'crypto';
 import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
 import { saveMiscUpload } from '../utils/miscUploads';
+import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
 function userId(req: Request) { return (req as any).auth?.userId || 'SYSTEM'; }
 function userName(req: Request) { return (req as any).auth?.firstName || (req as any).auth?.name || 'Usuario'; }
@@ -234,6 +235,7 @@ export async function submitPublicForm(req: Request, res: Response) {
       last_name: (last_name || '').trim() || null,
     });
 
+    emitirConCliente(link.organizacion_id, 'cliente.creado', {}, { clienteId: clientId });
     return ok(res, { message: 'Datos recibidos correctamente', client_id: clientId });
   } catch (e: any) {
     console.error('❌ submitPublicForm:', e);

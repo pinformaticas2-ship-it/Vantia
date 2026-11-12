@@ -3496,6 +3496,60 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  automatizaciones:', e?.message || e);
     }
 
+    // ── Automatizaciones propias (editor de flujos, 12/11/2026) ────
+    // Cada flujo: nodos y conexiones (JSONB) que ejecuta
+    // services/motorAutomatizaciones.ts. «vinculada» = pasos añadidos al final
+    // de una automatización de serie (vistas, docsBase, bienvenida,
+    // recordatorios); su «layout» guarda también dónde se colocaron los pasos
+    // de serie en el lienzo.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS automatizaciones_flujos (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nombre          VARCHAR(120) NOT NULL,
+          descripcion     TEXT,
+          activo          BOOLEAN      NOT NULL DEFAULT false,
+          evento          VARCHAR(40)  NOT NULL,
+          flujo           JSONB        NOT NULL DEFAULT '{}'::jsonb,
+          vinculada       VARCHAR(20),
+          proxima_at      TIMESTAMPTZ,
+          ultima_at       TIMESTAMPTZ,
+          ejecuciones     INTEGER      NOT NULL DEFAULT 0,
+          created_by      VARCHAR(150),
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_autom_flujos_evento ON automatizaciones_flujos (organizacion_id, evento) WHERE activo`);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_autom_flujos_vinculada ON automatizaciones_flujos (organizacion_id, vinculada) WHERE vinculada IS NOT NULL`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS automatizaciones_ejecuciones (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          flujo_id        UUID         NOT NULL REFERENCES automatizaciones_flujos(id) ON DELETE CASCADE,
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          estado          VARCHAR(20)  NOT NULL DEFAULT 'ok',
+          disparo         TEXT,
+          pasos           JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_autom_ejec_flujo ON automatizaciones_ejecuciones (flujo_id, created_at DESC)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS automatizaciones_esperas (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          ejecucion_id    UUID         NOT NULL REFERENCES automatizaciones_ejecuciones(id) ON DELETE CASCADE,
+          flujo_id        UUID         NOT NULL REFERENCES automatizaciones_flujos(id) ON DELETE CASCADE,
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          nodos           JSONB        NOT NULL,
+          contexto        JSONB        NOT NULL,
+          reanudar_at     TIMESTAMPTZ  NOT NULL,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_autom_esperas_at ON automatizaciones_esperas (reanudar_at)`);
+    } catch (e: any) {
+      console.warn('⚠️  automatizaciones_flujos:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,
