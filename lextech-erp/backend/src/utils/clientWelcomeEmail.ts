@@ -3,6 +3,7 @@ import { decryptPassword } from './emailCrypto';
 import { dispatchEmail } from './mailer';
 import { SmtpConfig, MailMessage } from './smtp';
 import { htmlBilingue, normalizarIdioma, traducirCorreo } from './idiomas';
+import { registrarAutomatizacion } from './automatizacionesRegistro';
 
 // Correo de confirmación al dar de alta un cliente -- se dispara desde
 // cualquier vía que cree un cliente "de verdad" (alta manual, formulario
@@ -26,12 +27,18 @@ export async function sendClientWelcomeEmail(
         [organizacionId],
       ),
       pool.query(
-        `SELECT client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature
+        `SELECT client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature, automatizaciones
          FROM organizaciones WHERE id = $1`,
         [organizacionId],
       ),
     ]);
-    if (!accRes.rows.length) return; // sin cuenta configurada -- no se manda, no rompe nada
+    // Apagada en Ajustes → Automatizaciones (12/11/2026; por defecto, encendida).
+    if (orgRes.rows[0]?.automatizaciones?.bienvenida?.activo === false) return;
+    if (!accRes.rows.length) {
+      // sin cuenta configurada -- no se manda, no rompe nada
+      await registrarAutomatizacion(organizacionId, 'bienvenida', false, `No se envió a ${client.email.trim()}: el despacho no tiene correo conectado`);
+      return;
+    }
     const acc = accRes.rows[0];
     const password = decryptPassword(acc.password_enc);
     const smtpCfg: SmtpConfig = {
@@ -89,7 +96,9 @@ export async function sendClientWelcomeEmail(
       html,
     };
     await dispatchEmail(smtpCfg, msg);
+    await registrarAutomatizacion(organizacionId, 'bienvenida', true, `Enviado a ${nombre} <${client.email.trim()}>`);
   } catch (e: any) {
     console.warn('No se pudo enviar el correo de bienvenida al cliente:', e?.message || e);
+    await registrarAutomatizacion(organizacionId, 'bienvenida', false, `No se pudo enviar a ${client.email?.trim()}: ${e?.message || e}`);
   }
 }

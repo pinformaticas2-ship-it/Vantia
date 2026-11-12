@@ -3466,6 +3466,36 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  organizaciones.escala_honorarios:', e?.message || e);
     }
 
+    // ── Automatizaciones (12/11/2026) ──────────────────────────────
+    // Ajustes de las automatizaciones que no tienen columna propia
+    // (bienvenida al cliente, recordatorios a clientes), su registro de
+    // ejecuciones y los recordatorios ya enviados (para no repetir).
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS automatizaciones JSONB NOT NULL DEFAULT '{}'::jsonb`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS automatizaciones_registro (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          clave           VARCHAR(40)  NOT NULL,
+          ok              BOOLEAN      NOT NULL DEFAULT true,
+          detalle         TEXT,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_autom_registro_org ON automatizaciones_registro (organizacion_id, clave, created_at DESC)`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS recordatorios_clientes_enviados (
+          event_id        UUID         NOT NULL,
+          start_at        TIMESTAMPTZ  NOT NULL,
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          destinatario    VARCHAR(320),
+          ok              BOOLEAN      NOT NULL DEFAULT true,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (event_id, start_at)
+        )`);
+    } catch (e: any) {
+      console.warn('⚠️  automatizaciones:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

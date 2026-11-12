@@ -381,6 +381,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
 
 function DespachoPanel() {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
   const { organizacion, rol, organizaciones, isLoaded, switchOrganizacion } = useOrganizacion();
   const [nombre, setNombre] = useState('');
   const [nifCif, setNifCif] = useState('');
@@ -389,9 +390,6 @@ function DespachoPanel() {
   const [emailContacto, setEmailContacto] = useState('');
   const [web, setWeb] = useState('');
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
-  const [welcomeEmailSubject, setWelcomeEmailSubject] = useState('');
-  const [welcomeEmailBody, setWelcomeEmailBody] = useState('');
-  const [welcomeEmailSignature, setWelcomeEmailSignature] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
@@ -417,9 +415,6 @@ function DespachoPanel() {
     setEmailContacto(organizacion.emailContacto || '');
     setWeb(organizacion.web || '');
     setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
-    setWelcomeEmailSubject(organizacion.clientWelcomeEmailSubject || '');
-    setWelcomeEmailBody(organizacion.clientWelcomeEmailBody || '');
-    setWelcomeEmailSignature(organizacion.clientWelcomeEmailSignature || '');
   }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
@@ -438,9 +433,6 @@ function DespachoPanel() {
           emailContacto: emailContacto.trim(),
           web: web.trim(),
           textoLegalFacturas: textoLegalFacturas.trim(),
-          clientWelcomeEmailSubject: welcomeEmailSubject.trim(),
-          clientWelcomeEmailBody: welcomeEmailBody.trim(),
-          clientWelcomeEmailSignature: welcomeEmailSignature.trim(),
         }),
       });
       if (data?.success === false) throw new Error(data.error);
@@ -660,39 +652,8 @@ function DespachoPanel() {
               </div>
               <div className="border-t border-slate-100 pt-4">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Correo de bienvenida al cliente")}</p>
-                <p className="text-xs text-slate-400 mb-3">{t("Se envía automáticamente al dar de alta un cliente (manual o por formulario con enlace). Deja los campos vacíos para usar el mensaje por defecto. Puedes usar")}{" "}<code className="bg-slate-100 px-1 py-0.5 rounded">{'{nombre}'}</code>{" "}{t("para insertar el nombre del cliente.")}</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Asunto")}</label>
-                    <input
-                      value={welcomeEmailSubject}
-                      onChange={(e) => setWelcomeEmailSubject(e.target.value)}
-                      placeholder={t("Hemos recibido tus datos")}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Mensaje")}</label>
-                    <textarea
-                      value={welcomeEmailBody}
-                      onChange={(e) => setWelcomeEmailBody(e.target.value)}
-                      rows={4}
-                      placeholder={t("Hola {nombre},\n\nHemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.\n\nUn saludo.")}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Firma (opcional)")}</label>
-                    <textarea
-                      value={welcomeEmailSignature}
-                      onChange={(e) => setWelcomeEmailSignature(e.target.value)}
-                      rows={3}
-                      placeholder={t("Despacho Vantia Legis\nAv. Ejemplo, 1 — 28001 Madrid\nTel. 900 000 000")}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
-                    />
-                    <p className="text-xs text-slate-400 mt-1">{t("Se añade al final del correo, debajo del mensaje.")}</p>
-                  </div>
-                </div>
+                <p className="text-xs text-slate-500">{t("Ahora se configura con las demás automatizaciones.")}{" "}
+                  <button type="button" onClick={() => navigate('/dashboard/config?section=automatizaciones')} className="font-bold text-red-600 hover:underline">{t("Ir a Automatizaciones →")}</button></p>
               </div>
             </>
           ) : (

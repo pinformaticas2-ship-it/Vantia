@@ -163,25 +163,29 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const nifCif = nullIfEmpty(req.body?.nifCif);
     const direccionFiscal = nullIfEmpty(req.body?.direccionFiscal);
     const textoLegalFacturas = nullIfEmpty(req.body?.textoLegalFacturas);
-    const clientWelcomeEmailSubject = nullIfEmpty(req.body?.clientWelcomeEmailSubject);
-    const clientWelcomeEmailBody = nullIfEmpty(req.body?.clientWelcomeEmailBody);
-    const clientWelcomeEmailSignature = nullIfEmpty(req.body?.clientWelcomeEmailSignature);
     // Contacto del despacho: si no se manda (versiones antiguas del frontend), se deja como estaba.
     const contacto = (k: string) => (k in (req.body || {}) ? nullIfEmpty(req.body[k]) : undefined);
+    // El correo de bienvenida se edita en Ajustes → Automatizaciones (12/11/2026):
+    // Mi Despacho ya no lo manda, y entonces no se toca.
+    const clientWelcomeEmailSubject = contacto('clientWelcomeEmailSubject');
+    const clientWelcomeEmailBody = contacto('clientWelcomeEmailBody');
+    const clientWelcomeEmailSignature = contacto('clientWelcomeEmailSignature');
     const telefono = contacto('telefono'), emailContacto = contacto('emailContacto'), web = contacto('web');
 
     await pool.query(
       `UPDATE organizaciones
          SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4,
-             client_welcome_email_subject = $5, client_welcome_email_body = $6,
-             client_welcome_email_signature = $7,
+             client_welcome_email_subject = CASE WHEN $15::boolean THEN $5 ELSE client_welcome_email_subject END,
+             client_welcome_email_body = CASE WHEN $16::boolean THEN $6 ELSE client_welcome_email_body END,
+             client_welcome_email_signature = CASE WHEN $17::boolean THEN $7 ELSE client_welcome_email_signature END,
              telefono = CASE WHEN $9::boolean THEN $10 ELSE telefono END,
              email_contacto = CASE WHEN $11::boolean THEN $12 ELSE email_contacto END,
              web = CASE WHEN $13::boolean THEN $14 ELSE web END,
              updated_at = NOW()
        WHERE id = $8`,
-      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature, ctx.organizacionId,
-        telefono !== undefined, telefono ?? null, emailContacto !== undefined, emailContacto ?? null, web !== undefined, web ?? null]
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject ?? null, clientWelcomeEmailBody ?? null, clientWelcomeEmailSignature ?? null, ctx.organizacionId,
+        telefono !== undefined, telefono ?? null, emailContacto !== undefined, emailContacto ?? null, web !== undefined, web ?? null,
+        clientWelcomeEmailSubject !== undefined, clientWelcomeEmailBody !== undefined, clientWelcomeEmailSignature !== undefined]
     );
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);

@@ -474,6 +474,9 @@ export async function getVista(req: any, res: Response) {
         recordatorioHora: cfg.recordatorioHora,
         guardarAdjuntos: cfg.guardarAdjuntos,
         responsableUserId: cfg.responsableUserId,
+        responderAlAceptar: cfg.responderAlAceptar,
+        responderAlRechazar: cfg.responderAlRechazar,
+        recordatorioActivo: cfg.recordatorioActivo,
       },
     });
   } catch (e: any) {

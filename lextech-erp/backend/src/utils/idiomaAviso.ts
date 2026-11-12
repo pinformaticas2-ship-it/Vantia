@@ -32,6 +32,7 @@ const EXACTOS: Record<string, string> = {
   '📚 Preparar vista': '📚 Prepare hearing',
   'Vence hoy': 'Due today',
   'Vence mañana': 'Due tomorrow',
+  'Recordatorio enviado al cliente': 'Reminder sent to the client',
 };
 
 // [patrón, sustitución] en orden. Se aplican sobre el título y el cuerpo.

@@ -67,7 +67,7 @@ interface Detalle extends Solicitud {
   coincidencias: { id: string; anio: number; num_exp: number; descripcion: string | null; juzgado: string | null; num_autos: string | null; cliente_nombre: string | null }[];
   miembros: { userId: string; nombre: string; rol: string }[];
   expediente: { id: string; anio: number; num_exp: number; descripcion: string | null } | null;
-  defaults: { duracionMin: number; recordatorioDias: number; recordatorioHora: string; guardarAdjuntos: boolean; responsableUserId: string | null };
+  defaults: { duracionMin: number; recordatorioDias: number; recordatorioHora: string; guardarAdjuntos: boolean; responsableUserId: string | null; responderAlAceptar?: boolean; responderAlRechazar?: boolean; recordatorioActivo?: boolean };
 }
 
 const PERIODOS: { key: string; label: string }[] = [
@@ -504,7 +504,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       // Si un intento anterior ya envió el correo, no se vuelve a enviar al reintentar.
       // En un cambio de fecha no se responde por defecto (09/10/2026: la confirmación
       // volvía al buzón y se generaba otra solicitud). Sigue siendo opcional.
-      setEnviarCorreo(v.tipo !== "cambio" && !(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
+      // Lo que diga el flujo de la automatización (Ajustes → Automatizaciones).
+      setEnviarCorreo(v.tipo !== "cambio" && v.defaults.responderAlAceptar !== false && !(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
+      setConRecordatorio(v.defaults.recordatorioActivo !== false);
       setConflictos(v.conflictos || []);
       setMostrarFormulario(v.tipo === "vista" || !v.relacion);
   }, []);
@@ -603,7 +605,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       } else if (accion === "cancelar") {
         body = { motivo: motivoCancelar, cerrar_expediente: cerrarExpediente };
       } else if (accion === "rechazar") {
-        body = { ...formBody(), enviar_correo: enviarCorreo, ...(modoRespuesta === "rechazar" ? { asunto, cuerpo } : {}) };
+        // Si el flujo no responde al rechazar, solo se responde con un correo preparado a mano.
+        body = { ...formBody(), enviar_correo: enviarCorreo && (d?.defaults.responderAlRechazar !== false || modoRespuesta === "rechazar"), ...(modoRespuesta === "rechazar" ? { asunto, cuerpo } : {}) };
       }
       const data = await apiFetch(`/api/vistas/${id}/${accion}`, { method: "POST", getToken, body: JSON.stringify(body) });
       if (data?.success === false) throw new Error(data.error);
@@ -950,7 +953,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{guardarAdjuntos && d.adjuntos.length ? <>{t("Guardar")}{" "}<b>{d.adjuntos.length}{" "}{t("adjunto")}{d.adjuntos.length === 1 ? "" : "s"}</b>{" "}{t("y el correo en el expediente")}</> : <>{t("Guardar el correo como nota en el expediente")}</>}</span></li>
               <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{conRecordatorio && recordatorioCalculado ? <>{t("Recordarte prepararla el")}{" "}<b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">{t("Sin recordatorio")}</span>}</span></li>
             </ol>
-            <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">{t("Si rechazas:")}{" "}{enviarCorreo ? <>{t("se responderá a")}{" "}{d.from_email}{" "}{t("que no podéis asistir")}</> : t("no se responde a nadie")}{" "}{t("y no se crea nada.")}</p>
+            <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">{t("Si rechazas:")}{" "}{enviarCorreo && d.defaults.responderAlRechazar !== false ? <>{t("se responderá a")}{" "}{d.from_email}{" "}{t("que no podéis asistir")}</> : t("no se responde a nadie")}{" "}{t("y no se crea nada.")}</p>
           </section>
 
           {actionError && <p className="peligro text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}

@@ -87,6 +87,14 @@ export function mejorPlantilla<T extends { nombre: string; carpeta: string; ext:
   return ordenadas[0]?.p || null;
 }
 
+/** Qué documentos se generan (Ajustes → Automatizaciones → flujo; por defecto, todos). */
+export async function docsBaseConfig(organizacionId: string): Promise<{ activo: boolean; docs: Record<TipoDocBase, boolean> }> {
+  const { rows } = await pool.query(`SELECT docs_base_config FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
+  const c = rows[0]?.docs_base_config || {};
+  const docs = Object.fromEntries(DOCS_BASE.map(({ tipo }) => [tipo, c.docs?.[tipo] !== false])) as Record<TipoDocBase, boolean>;
+  return { activo: Boolean(c.activo), docs };
+}
+
 export async function docsBaseActivos(organizacionId: string): Promise<boolean> {
   const { rows } = await pool.query(`SELECT docs_base_config FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
   return Boolean(rows[0]?.docs_base_config?.activo);
@@ -142,8 +150,10 @@ export async function generarDocBase(opts: {
 
 /** Crea lo que falte (sin esperar: la conversión de .doc tarda unos segundos). */
 export async function asegurarDocsBase(organizacionId: string, expedienteId: string, userId: string): Promise<void> {
-  if (!(await docsBaseActivos(organizacionId))) return;
+  const cfg = await docsBaseConfig(organizacionId);
+  if (!cfg.activo) return;
   for (const { tipo } of DOCS_BASE) {
+    if (!cfg.docs[tipo]) continue; // quitado del flujo
     // La fila hace de "candado": dos aperturas a la vez no generan dos veces.
     // Un error de hace más de 10 minutos se reintenta.
     const { rows } = await pool.query(
@@ -171,7 +181,10 @@ export async function estadoDocsBase(organizacionId: string, expedienteId: strin
     [expedienteId, organizacionId],
   );
   const { rows: exp } = await pool.query(`SELECT * FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, organizacionId]);
-  return Promise.all(DOCS_BASE.map(async ({ tipo, nombre }) => {
+  const { docs } = await docsBaseConfig(organizacionId);
+  // Los quitados del flujo no se muestran, salvo que ya se hubieran generado.
+  const visibles = DOCS_BASE.filter(({ tipo }) => docs[tipo] || rows.some((x) => x.tipo === tipo && x.file_id));
+  return Promise.all(visibles.map(async ({ tipo, nombre }) => {
     const r = rows.find((x) => x.tipo === tipo);
     const plantilla = r?.plantilla || (await elegirPlantilla(organizacionId, tipo, exp[0]).catch(() => null)) || '';
     return {

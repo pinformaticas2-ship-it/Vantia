@@ -101,6 +101,10 @@ export interface VistasConfig {
   palabrasClave: string[];
   remitentes: string[];
   guardarAdjuntos: boolean;
+  /** Pasos del flujo que se pueden quitar (Ajustes → Automatizaciones, 12/11/2026). */
+  responderAlAceptar: boolean;
+  responderAlRechazar: boolean;
+  recordatorioActivo: boolean;
   plantillaAceptar: VistasPlantilla;
   plantillaRechazar: VistasPlantilla;
   correo: VistasCorreoFormato;
@@ -170,6 +174,9 @@ export function normalizeVistasConfig(raw: any): VistasConfig {
     palabrasClave: palabras.length ? palabras : DEFAULT_PALABRAS_CLAVE,
     remitentes: cleanList(raw?.remitentes),
     guardarAdjuntos: raw?.guardarAdjuntos !== false,
+    responderAlAceptar: raw?.responderAlAceptar !== false,
+    responderAlRechazar: raw?.responderAlRechazar !== false,
+    recordatorioActivo: raw?.recordatorioActivo !== false,
     plantillaAceptar: cleanPlantilla(raw?.plantillaAceptar, DEFAULT_PLANTILLA_ACEPTAR),
     plantillaRechazar: cleanPlantilla(raw?.plantillaRechazar, DEFAULT_PLANTILLA_RECHAZAR),
     correo: cleanCorreoFormato(raw?.correo),

@@ -42,6 +42,8 @@ import skillsRoutes         from './routes/skills';
 import { startCrmReglas } from './controllers/crmController';
 import erroresClienteRoutes from './routes/erroresCliente';
 import docsBaseRoutes from './routes/docsBase';
+import automatizacionesRoutes from './routes/automatizaciones';
+import { startRecordatoriosClientesScheduler } from './services/recordatoriosClientes';
 import plantillasRoutes from './routes/plantillas';
 import { startPurgaErroresCliente } from './controllers/erroresClienteController';
 import { startPurgaTrazabilidad } from './controllers/privacidadController';
@@ -298,6 +300,7 @@ app.use('/api/documentos',        documentosRoutes);
 app.use('/api/skills',            skillsRoutes);
 app.use('/api/errores-cliente',   erroresClienteRoutes);
 app.use('/api/docs-base',         docsBaseRoutes);
+app.use('/api/automatizaciones',   automatizacionesRoutes);
 app.use('/api/plantillas',        plantillasRoutes);
 app.use('/api/soporte',           soporteRoutes);
 app.use('/api/plaud',             plaudRoutes);
@@ -439,6 +442,7 @@ runMigrations().then(() => {
     // Automatización de vistas por correo (solo actúa en las organizaciones
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
+    startRecordatoriosClientesScheduler();
     startCrmReglas();
     // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
     startVistasIdle();

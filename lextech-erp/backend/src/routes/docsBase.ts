@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 import pool from '../config/database';
-import { DOCS_BASE, TipoDocBase, asegurarDocsBase, docsBaseActivos, estadoDocsBase, generarDocBase } from '../services/docsBaseExpediente';
+import { DOCS_BASE, TipoDocBase, asegurarDocsBase, docsBaseActivos, docsBaseConfig, estadoDocsBase, generarDocBase } from '../services/docsBaseExpediente';
 import { logActivityForReq } from '../controllers/activityController';
 
 // Documentos base de cada expediente (ver services/docsBaseExpediente).
@@ -11,17 +11,23 @@ const esGestor = (req: any) => ['propietario', 'admin'].includes(req.organizacio
 
 // Ajustes → Automatizaciones: encender/apagar para la organización.
 router.get('/config', requireAuth, async (req: any, res: Response) => {
-  res.json({ success: true, data: { activo: await docsBaseActivos(req.organizacionId), canManage: esGestor(req) } });
+  const cfg = await docsBaseConfig(req.organizacionId);
+  res.json({ success: true, data: { ...cfg, canManage: esGestor(req) } });
 });
 router.put('/config', requireAuth, async (req: any, res: Response) => {
   if (!esGestor(req)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
-  const activo = Boolean(req.body?.activo);
+  const antes = await docsBaseConfig(req.organizacionId);
+  const activo = typeof req.body?.activo === 'boolean' ? req.body.activo : antes.activo;
+  // Qué documentos se generan (los que no lleguen se quedan como estaban).
+  const docs = { ...antes.docs };
+  for (const { tipo } of DOCS_BASE) if (typeof req.body?.docs?.[tipo] === 'boolean') docs[tipo] = req.body.docs[tipo];
+  if (activo && !Object.values(docs).some(Boolean)) return res.status(400).json({ success: false, error: 'Deja al menos un documento en el flujo.' });
   await pool.query(
-    `UPDATE organizaciones SET docs_base_config = COALESCE(docs_base_config, '{}'::jsonb) || jsonb_build_object('activo', $2::boolean) WHERE id = $1`,
-    [req.organizacionId, activo],
+    `UPDATE organizaciones SET docs_base_config = COALESCE(docs_base_config, '{}'::jsonb) || jsonb_build_object('activo', $2::boolean, 'docs', $3::jsonb) WHERE id = $1`,
+    [req.organizacionId, activo, JSON.stringify(docs)],
   );
-  logActivityForReq(req, `Documentos base de expedientes ${activo ? 'activados' : 'desactivados'}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
-  res.json({ success: true, data: { activo, canManage: true } });
+  if (activo !== antes.activo) logActivityForReq(req, `Documentos base de expedientes ${activo ? 'activados' : 'desactivados'}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+  res.json({ success: true, data: { activo, docs, canManage: true } });
 });
 
 async function expedienteDeLaOrg(req: any): Promise<string | null> {
