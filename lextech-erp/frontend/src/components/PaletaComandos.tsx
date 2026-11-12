@@ -9,6 +9,7 @@ import {
 import { apiFetch } from '../lib/api';
 import { usePreferencias, esOscuro } from '../lib/preferencias';
 import type { Modulo } from '../lib/useOrganizacion';
+import { t, t as tr } from '../lib/i18n';
 
 // ── Paleta de comandos: Ctrl+K / ⌘K (16/10/2026) ────────────────────────────
 // Un único sitio para ir a cualquier parte y hacer lo habitual sin ratón:
@@ -33,7 +34,7 @@ export interface ModuloPaleta { name: string; path: string; desc: string; icon: 
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const coincide = (e: Elemento, t: string) => {
-  const texto = norm(`${e.titulo} ${e.sub || ''} ${e.claves || ''}`);
+  const texto = norm(`${e.titulo} ${tr(e.titulo)} ${e.sub || ''} ${e.sub ? tr(e.sub) : ''} ${e.claves || ''}`);
   return t.split(/\s+/).filter(Boolean).every((p) => texto.includes(p));
 };
 
@@ -83,12 +84,12 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
       if (puede(mod)) lista.push({ id: `crear-${path}`, grupo: 'Acciones', titulo, icono, claves: `nuevo ${claves}`, ejecutar: ir(path) });
     }
     lista.push({
-      id: 'modo', grupo: 'Acciones', titulo: oscuro ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro',
+      id: 'modo', grupo: 'Acciones', titulo: oscuro ? t("Cambiar a modo claro") : t("Cambiar a modo oscuro"),
       icono: (oscuro ? Sun : Moon) as Icono, claves: 'tema apariencia noche dia',
       ejecutar: () => { setAbierta(false); void guardar({ modo: oscuro ? 'claro' : 'oscuro' }).catch(() => {}); },
     });
     lista.push({
-      id: 'atajos', grupo: 'Acciones', titulo: 'Ver atajos de teclado', icono: Keyboard as Icono, claves: 'ayuda teclas',
+      id: 'atajos', grupo: 'Acciones', titulo: t("Ver atajos de teclado"), icono: Keyboard as Icono, claves: 'ayuda teclas',
       ejecutar: () => { setAbierta(false); window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })); },
     });
     for (const m of modulos) {
@@ -126,7 +127,7 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
       if (!vivo) return;
       const r: Elemento[] = [];
       for (const c of (cli?.data || []) as any[]) {
-        const nombre = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.commercial_name || 'Cliente sin nombre';
+        const nombre = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.commercial_name || tr('Cliente sin nombre');
         r.push({
           id: `cli-${c.id}`, grupo: 'Clientes', titulo: nombre,
           sub: [c.nif_cif, c.email].filter(Boolean).join(' · ') || undefined,
@@ -136,7 +137,7 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
       for (const e of (exp?.data || []) as any[]) {
         const num = e.num_exp ? `${e.anio ? e.anio + '/' : ''}${e.num_exp}` : e.ref_propia || '';
         r.push({
-          id: `exp-${e.id}`, grupo: 'Expedientes', titulo: [num, e.descripcion].filter(Boolean).join(' · ') || 'Expediente',
+          id: `exp-${e.id}`, grupo: 'Expedientes', titulo: [num, e.descripcion].filter(Boolean).join(' · ') || tr("Expediente"),
           sub: e.cliente_nombre_linked || e.cliente_nombre || undefined,
           icono: Briefcase, ejecutar: ir(`/dashboard/expedientes/${e.id}`),
         });
@@ -172,7 +173,7 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
   return createPortal(
     <div className="fixed inset-0 z-[9990] flex items-start justify-center p-3 pt-[8vh] sm:pt-[12vh]" onKeyDown={onKeyDown}>
       <div className="absolute inset-0 bg-slate-900/50 aviso-fondo" onClick={() => setAbierta(false)} />
-      <div role="dialog" aria-modal="true" aria-label="Buscar o ejecutar un comando"
+      <div role="dialog" aria-modal="true" aria-label={t("Buscar o ejecutar un comando")}
         className="aviso-dialogo relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center gap-3 border-b border-slate-100 px-4">
           {buscando ? <Loader2 size={18} className="shrink-0 animate-spin text-slate-400" /> : <Search size={18} className="shrink-0 text-slate-400" />}
@@ -180,16 +181,16 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Busca clientes, expedientes, módulos o acciones…"
+            placeholder={t("Busca clientes, expedientes, módulos o acciones…")}
             className="paleta-input h-14 flex-1 min-w-0 border-0 bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400 outline-none shadow-none ring-0 focus:ring-0 focus:border-0"
-            aria-label="Buscar"
+            aria-label={t("Buscar")}
           />
           <kbd className="hidden sm:inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-sans font-semibold text-slate-500">Esc</kbd>
         </div>
         <div ref={listaRef} className="max-h-[min(60vh,440px)] overflow-y-auto p-2">
           {visibles.length === 0 && !buscando && (
             <p className="px-3 py-10 text-center text-sm text-slate-500">
-              {q.trim().length < 2 ? 'Escribe para buscar.' : <>Nada coincide con «{q.trim()}».</>}
+              {q.trim().length < 2 ? t("Escribe para buscar.") : <>{t("Nada coincide con «")}{q.trim()}».</>}
             </p>
           )}
           {visibles.map((e, i) => {
@@ -199,7 +200,7 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
             const activo = i === foco;
             return (
               <React.Fragment key={e.id}>
-                {cabecera && <p className="px-3 pb-1 pt-3 first:pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{cabecera}</p>}
+                {cabecera && <p className="px-3 pb-1 pt-3 first:pt-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{tr(cabecera)}</p>}
                 <button
                   type="button"
                   data-i={i}
@@ -211,8 +212,8 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
                     <Icono size={16} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-slate-800">{e.titulo}</span>
-                    {e.sub && <span className="block truncate text-xs text-slate-500">{e.sub}</span>}
+                    <span className="block truncate text-sm font-medium text-slate-800">{t(e.titulo)}</span>
+                    {e.sub && <span className="block truncate text-xs text-slate-500">{t(e.sub)}</span>}
                   </span>
                   {activo && (e.grupo === 'Clientes' || e.grupo === 'Expedientes' || e.grupo === 'Ir a' || e.grupo === 'Ajustes'
                     ? <ArrowRight size={15} className="shrink-0 text-slate-400" />
@@ -223,10 +224,10 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
           })}
         </div>
         <div className="hidden sm:flex items-center gap-4 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
-          <span><kbd className="font-sans font-semibold">↑↓</kbd> moverse</span>
-          <span><kbd className="font-sans font-semibold">Intro</kbd> abrir</span>
-          <span><kbd className="font-sans font-semibold">Esc</kbd> cerrar</span>
-          <span className="ml-auto"><kbd className="font-sans font-semibold">Ctrl K</kbd> desde cualquier sitio</span>
+          <span><kbd className="font-sans font-semibold">↑↓</kbd>{" "}{t("moverse")}</span>
+          <span><kbd className="font-sans font-semibold">Intro</kbd>{" "}{t("abrir")}</span>
+          <span><kbd className="font-sans font-semibold">Esc</kbd>{" "}{t("cerrar")}</span>
+          <span className="ml-auto"><kbd className="font-sans font-semibold">Ctrl K</kbd>{" "}{t("desde cualquier sitio")}</span>
         </div>
       </div>
     </div>,

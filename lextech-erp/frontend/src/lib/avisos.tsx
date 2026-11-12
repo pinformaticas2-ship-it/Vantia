@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { t, t as tr } from './i18n';
 
 // ── Avisos y confirmaciones propios (16/10/2026) ─────────────────────────────
 // Sustituyen a alert()/confirm() del navegador (ventanas grises, bloquean la
@@ -39,7 +40,7 @@ function deducirTipo(texto: string): TipoAviso {
 }
 
 function mostrar(texto: unknown, tipo?: TipoAviso, opts?: { duracion?: number; accion?: Aviso['accion'] }) {
-  const t = String(texto ?? '').trim() || 'Ha ocurrido un error inesperado';
+  const t = String(texto ?? '').trim() || tr('Ha ocurrido un error inesperado');
   const tp = tipo || deducirTipo(t);
   const id = ++seq;
   // Los errores se quedan más tiempo: hay que poder leerlos.
@@ -62,7 +63,7 @@ export const aviso = Object.assign(
 );
 
 /** Una función de la app que aún no está hecha: aviso amable en vez de nada. */
-export const proximamente = (que: string) => aviso.info(`«${que}» estará disponible próximamente.`);
+export const proximamente = (que: string) => aviso.info(t("«{que}» estará disponible próximamente.", { que: que }));
 
 export function confirmar(opts: OpcionesConfirmar | string): Promise<boolean> {
   const o = typeof opts === 'string' ? { titulo: opts } : opts;
@@ -82,7 +83,7 @@ function resolverConfirmacion(id: number, valor: boolean) {
 const ICONO = { ok: CheckCircle2, error: XCircle, info: Info };
 const COLOR = {
   ok: 'text-emerald-600',
-  error: 'text-red-600 peligro',
+  error: "text-red-600 peligro",
   info: 'text-sky-600',
 };
 
@@ -115,7 +116,7 @@ function AvisoItem({ a }: { a: Aviso }) {
           {a.accion.label}
         </button>
       )}
-      <button type="button" aria-label="Cerrar aviso" onClick={() => aviso.cerrar(a.id)} className="shrink-0 -mr-1 p-0.5 rounded text-slate-400 hover:text-slate-700">
+      <button type="button" aria-label={t("Cerrar aviso")} onClick={() => aviso.cerrar(a.id)} className="shrink-0 -mr-1 p-0.5 rounded text-slate-400 hover:text-slate-700">
         <X size={15} />
       </button>
     </div>
@@ -149,11 +150,11 @@ function DialogoConfirmar({ c }: { c: Confirmacion }) {
         <div className="mt-5 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <button ref={cancelRef} type="button" onClick={() => resolverConfirmacion(c.id, false)}
             className="h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50">
-            {c.cancelar || 'Cancelar'}
+            {c.cancelar || t("Cancelar")}
           </button>
           <button ref={okRef} type="button" onClick={() => resolverConfirmacion(c.id, true)}
             className={`h-10 px-4 rounded-lg text-sm font-semibold text-white ${c.peligro ? 'peligro bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
-            {c.confirmar || 'Aceptar'}
+            {c.confirmar || t("Aceptar")}
           </button>
         </div>
       </div>

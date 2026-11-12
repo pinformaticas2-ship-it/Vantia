@@ -48,6 +48,7 @@ const fuenteDeAviso = (id: string) =>
   : id.startsWith("plazo-exp-") ? "exp" : id.startsWith("plazo-") ? "tareas" : id.startsWith("soporte-") ? "soporte"
   : id.startsWith("vista-") ? "vistas" : "otro";
 import type { Modulo } from "../lib/useOrganizacion";
+import { t, t as tr, tn, idioma } from '../lib/i18n';
 
 // Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
 // Roles y permisos) gobierna cada entrada de navegación/búsqueda. Las que no
@@ -96,36 +97,36 @@ function moduloForPath(path: string): Modulo | null {
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
-  { name: "Dashboard",      path: "/dashboard",              icon: LayoutDashboard, desc: "Panel de control" },
-  { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: "Gestión de expedientes" },
-  { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: "Base de datos de clientes" },
-  { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
-  { name: "CRM",            path: "/dashboard/crm",          icon: HeartHandshake,       desc: "Clientes potenciales: oportunidades y seguimiento" },
-  { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: "Directorio de procuradores" },
-  { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: "Directorio de abogados" },
-  { name: "Partes contrarias", path: "/dashboard/contrarios", icon: UserX,         desc: "Partes contrarias habituales: correo y datos básicos" },
-  { name: "Trazabilidad",   path: "/dashboard/config?section=trazabilidad", icon: History, desc: "Historial de accesos y acciones (en Configuración)" },
-  { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
-  { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
-  { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
-  { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "Mensajería con clientes por los canales conectados (WhatsApp…)" },
-  { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
-  { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: "Vistas recibidas por correo pendientes de confirmar" },
-  { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: "Editor de texto con IA: escritos, cartas y contratos" },
-  { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
-  { name: "Calculadora",    path: "/dashboard/calculadora",  icon: Calculator,      desc: "Honorarios, tasación de costas y jura de cuentas" },
-  { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Vista general de tesorería" },
-  { name: "Analítica",      path: "/dashboard/facturacion?tab=analitica",     icon: BarChart3,  desc: "Analítica financiera" },
-  { name: "Facturas",       path: "/dashboard/facturacion?tab=facturas",      icon: FileText,   desc: "Facturas emitidas" },
-  { name: "Gastos",         path: "/dashboard/facturacion?tab=gastos",        icon: Wallet,     desc: "Gastos del despacho" },
-  { name: "Presupuestos",   path: "/dashboard/facturacion?tab=presupuestos",  icon: Calculator, desc: "Presupuestos" },
-  { name: "Pagos y Cobros", path: "/dashboard/facturacion?tab=receipts",      icon: CreditCard, desc: "Cobros pendientes y realizados" },
-  { name: "Contactos",      path: "/dashboard/facturacion?tab=contacts",      icon: Users,      desc: "Contactos de facturación (Quipu)" },
-  { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: "Cuentas bancarias" },
-  { name: "Conexión Quipu", path: "/dashboard/facturacion?tab=config",        icon: Settings,   desc: "Configuración de la conexión con Quipu" },
-  { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
-  { name: "Centro de soporte", path: "/dashboard/soporte",   icon: LifeBuoy,        desc: "Tickets de soporte técnico" },
-  { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
+  { name: "Dashboard",      path: "/dashboard",              icon: LayoutDashboard, desc: t("Panel de control") },
+  { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: t("Gestión de expedientes") },
+  { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: t("Base de datos de clientes") },
+  { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: t("Alta de nuevo cliente") },
+  { name: "CRM",            path: "/dashboard/crm",          icon: HeartHandshake,       desc: t("Clientes potenciales: oportunidades y seguimiento") },
+  { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: t("Directorio de procuradores") },
+  { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: t("Directorio de abogados") },
+  { name: "Partes contrarias", path: "/dashboard/contrarios", icon: UserX,         desc: t("Partes contrarias habituales: correo y datos básicos") },
+  { name: "Trazabilidad",   path: "/dashboard/config?section=trazabilidad", icon: History, desc: t("Historial de accesos y acciones (en Configuración)") },
+  { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: t("Calendario y citas") },
+  { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: t("Tareas y plazos del usuario") },
+  { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: t("Chat de equipo") },
+  { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: t("Mensajería con clientes por los canales conectados (WhatsApp…)") },
+  { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: t("Gestor de correo electrónico") },
+  { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: t("Vistas recibidas por correo pendientes de confirmar") },
+  { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: t("Editor de texto con IA: escritos, cartas y contratos") },
+  { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: t("Cendoj, BOE y Lexnet") },
+  { name: "Calculadora",    path: "/dashboard/calculadora",  icon: Calculator,      desc: t("Honorarios, tasación de costas y jura de cuentas") },
+  { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: t("Vista general de tesorería") },
+  { name: "Analítica",      path: "/dashboard/facturacion?tab=analitica",     icon: BarChart3,  desc: t("Analítica financiera") },
+  { name: "Facturas",       path: "/dashboard/facturacion?tab=facturas",      icon: FileText,   desc: t("Facturas emitidas") },
+  { name: "Gastos",         path: "/dashboard/facturacion?tab=gastos",        icon: Wallet,     desc: t("Gastos del despacho") },
+  { name: "Presupuestos",   path: "/dashboard/facturacion?tab=presupuestos",  icon: Calculator, desc: t("Presupuestos") },
+  { name: "Pagos y Cobros", path: "/dashboard/facturacion?tab=receipts",      icon: CreditCard, desc: t("Cobros pendientes y realizados") },
+  { name: "Contactos",      path: "/dashboard/facturacion?tab=contacts",      icon: Users,      desc: t("Contactos de facturación (Quipu)") },
+  { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: t("Cuentas bancarias") },
+  { name: "Conexión Quipu", path: "/dashboard/facturacion?tab=config",        icon: Settings,   desc: t("Configuración de la conexión con Quipu") },
+  { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: t("Asistente IA con herramientas e historial") },
+  { name: "Centro de soporte", path: "/dashboard/soporte",   icon: LifeBuoy,        desc: t("Tickets de soporte técnico") },
+  { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: t("Ajustes del sistema") },
 ];
 
 type NavChild = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
@@ -175,15 +176,15 @@ const NAV_ITEMS: NavItem[] = [
 
 const NAV_GROUPS = [
   {
-    label: "Principal",
+    label: t("Principal"),
     items: ["Dashboard", "Expedientes", "CRM", "Directorio", "Agenda", "Tareas"],
   },
   {
-    label: "Comunicación",
+    label: t("Comunicación"),
     items: ["Chat", "Correo", "Vistas", "Comunicación Externa"],
   },
   {
-    label: "Gestión",
+    label: t("Gestión"),
     // Trazabilidad está en Configuración (14/10/2026).
     items: ["Tesorería", "Calculadora", "Documentos", "Documental", "Chat IA"],
   },
@@ -191,6 +192,10 @@ const NAV_GROUPS = [
 
 // ── Contexto Vantia por módulo ───────────────────────────────────────────────
 function getVantiaContext(pathname: string): string {
+  const base = getVantiaContextoEs(pathname);
+  return idioma() === "en" ? `${base}\n\nThe user is using the app in English: always answer in English.` : base;
+}
+function getVantiaContextoEs(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))
     return "Eres Vantia, especializado en gestión de clientes para despachos de abogados. Ayudas con altas de clientes, consultas de datos, LOPD, NIF/CIF, tipos de documentos y todo lo relacionado con la base de clientes del despacho. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/expedientes"))
@@ -215,6 +220,9 @@ function getVantiaContext(pathname: string): string {
 }
 
 function getVantiaLabel(pathname: string): string {
+  return t(getVantiaLabelEs(pathname));
+}
+function getVantiaLabelEs(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))    return "Especialista en Clientes";
   if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
   if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
@@ -276,19 +284,17 @@ function ActionProposalCard({ proposal, onConfirm, onCancel }: {
     <div className={`rounded-xl border p-3 text-[12px] ${boxCls}`}>
       <p className="font-semibold text-slate-700">{proposal.titulo}</p>
       <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
-      {proposal.resolved === "confirmed" && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700"><Check size={12} /> Hecho</p>}
-      {proposal.resolved === "cancelled" && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
-      {proposal.resolved === "error" && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || "No se pudo completar."}</p>}
+      {proposal.resolved === "confirmed" && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700"><Check size={12} />{" "}{t("Hecho")}</p>}
+      {proposal.resolved === "cancelled" && <p className="mt-1.5 text-slate-400">{t("Cancelado.")}</p>}
+      {proposal.resolved === "error" && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || t("No se pudo completar.")}</p>}
       {!proposal.resolved && (
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={proposal.resolving} onClick={onConfirm}
             className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 disabled:opacity-50">
-            {proposal.resolving ? "Aplicando…" : "Confirmar"}
+            {proposal.resolving ? t("Aplicando…") : t("Confirmar")}
           </button>
           <button type="button" disabled={proposal.resolving} onClick={onCancel}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50">
-            Cancelar
-          </button>
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50">{t("Cancelar")}</button>
         </div>
       )}
     </div>
@@ -371,12 +377,12 @@ function renderMarkdownLite(text: string): React.ReactNode {
 function friendlyVantiaError(raw: string): string {
   const msg = (raw || "").toLowerCase();
   if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("network request failed")) {
-    return "No se ha podido conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.";
+    return t("No se ha podido conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.");
   }
   if (msg.includes("timeout") || msg.includes("timed out")) {
-    return "El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.";
+    return t("El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.");
   }
-  return raw?.trim() || "Ha ocurrido un error inesperado.";
+  return raw?.trim() || t("Ha ocurrido un error inesperado.");
 }
 
 function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
@@ -448,7 +454,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     });
     if (!res.ok || !res.body) {
       const data = await safeJson(res);
-      throw new Error(data.error || "Error en la API de Vantia");
+      throw new Error(data.error || t("Error en la API de Vantia"));
     }
 
     // Revelado suave: Gemini no manda el texto letra a letra, sino en trozos
@@ -510,7 +516,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           } else if (evt.type === "done") {
             finalReply = evt.reply;
           } else if (evt.type === "error") {
-            throw new Error(evt.message || "Error al generar la respuesta.");
+            throw new Error(evt.message || t("Error al generar la respuesta."));
           }
         }
       }
@@ -536,7 +542,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok || data?.success === false) throw new Error(data?.error || "No se pudo completar la acción.");
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo completar la acción."));
       setMessages((prev) => prev.map((m, i) => (i !== msgIdx ? m : {
         ...m, actionProposals: m.actionProposals?.map((a) => (a.token === actionToken
           ? { ...a, resolving: false, resolved: decision === "confirm" ? "confirmed" : "cancelled" } : a)),
@@ -556,7 +562,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     return () => document.removeEventListener("mousedown", h);
   }, [showMenu]);
 
-  const greeting = (): ChatMsg => ({ role: "model", text: `¡Hola! Soy Vantia — ${getVantiaLabel(pathname)}. ¿En qué puedo ayudarte?` });
+  const greeting = (): ChatMsg => ({ role: "model", text: t("¡Hola! Soy Vantia — {quien}. ¿En qué puedo ayudarte?", { quien: getVantiaLabel(pathname) }) });
 
   useEffect(() => {
     if (!open) return;
@@ -574,7 +580,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           setMessages([greeting()]);
         }
       } catch (err) {
-        setMessages([{ role: "model", text: `❌ No pude cargar el historial. ${err instanceof Error ? friendlyVantiaError(err.message) : ""}` }]);
+        setMessages([{ role: "model", text: `❌ ${t("No pude cargar el historial.")} ${err instanceof Error ? friendlyVantiaError(err.message) : ""}` }]);
       } finally {
         setLoading(false);
       }
@@ -727,7 +733,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-red-600 rounded-full" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white leading-tight">Vantia</h2>
+                <h2 className="text-sm font-bold text-white leading-tight">{t("Vantia")}</h2>
                 <div className="relative" ref={modelPickerRef}>
                   <button
                     type="button"
@@ -762,9 +768,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                       disabled={clearing}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-red-700 transition-colors disabled:opacity-50"
                     >
-                      {clearing ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} className="rotate-45" />}
-                      Nueva conversación
-                    </button>
+                      {clearing ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} className="rotate-45" />}{t("Nueva conversación")}</button>
                   </div>
                 )}
               </div>
@@ -780,9 +784,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
           >
             <div className="flex justify-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100/80 px-3 py-1 rounded-full border border-slate-200/50">
-                Hoy
-              </span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100/80 px-3 py-1 rounded-full border border-slate-200/50">{t("Hoy")}</span>
             </div>
 
             {messages.map((msg, i) => {
@@ -794,15 +796,14 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                     <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3 shadow-sm max-w-[95%]">
                       <AlertTriangle size={14} className="peligro text-red-500 mt-0.5 shrink-0" />
                       <div className="flex flex-col gap-1.5">
-                        <p className="peligro text-xs font-semibold text-red-800 leading-snug">Error al conectar con el motor de IA.</p>
+                        <p className="peligro text-xs font-semibold text-red-800 leading-snug">{t("Error al conectar con el motor de IA.")}</p>
                         <p className="peligro text-[10px] text-red-600/80 leading-snug">{msg.text.replace(/^❌\s*/, "")}</p>
                         {retryText && (
                           <button
                             onClick={retryLast}
                             className="mt-1 w-max text-[10px] font-bold uppercase tracking-wider text-red-600 hover:text-red-800 bg-white border border-red-200 hover:border-red-300 px-3 py-1.5 rounded-md shadow-sm transition-all focus:outline-none flex items-center gap-1.5"
                           >
-                            <RefreshCw size={10} /> Reintentar
-                          </button>
+                            <RefreshCw size={10} />{" "}{t("Reintentar")}</button>
                         )}
                       </div>
                     </div>
@@ -855,11 +856,11 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                           onClick={() => regenerate(i)}
                           disabled={isRegenerating || loading}
                           className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none disabled:opacity-60"
-                          title="Regenerar respuesta"
+                          title={t("Regenerar respuesta")}
                         >
                           <RotateCcw size={11} className={isRegenerating ? "animate-spin" : ""} />
                         </button>
-                        <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar">
+                        <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title={t("Copiar")}>
                           {copiedIdx === i ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
                         </button>
                       </div>
@@ -874,7 +875,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                     {msg.text}
                   </div>
                   <div className="flex items-center gap-3.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar">
+                    <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title={t("Copiar")}>
                       {copiedIdx === i ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
                     </button>
                   </div>
@@ -895,7 +896,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                   value={input}
                   onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                  placeholder="Escribe tu consulta..."
+                  placeholder={t("Escribe tu consulta...")}
                   className="w-full bg-transparent text-[13px] text-slate-800 placeholder-slate-400 px-4 py-3 focus:outline-none focus:shadow-none resize-none overflow-hidden"
                   style={{ minHeight: "44px", maxHeight: "100px" }}
                 />
@@ -903,7 +904,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               <button
                 onClick={loading ? abortStreaming : send}
                 disabled={!loading && !input.trim()}
-                title={loading ? "Detener" : "Enviar"}
+                title={loading ? t("Detener") : t("Enviar")}
                 className={`w-10 h-10 rounded-full disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md transition-all mb-0.5 active:scale-95 focus:outline-none ${
                   loading ? "bg-slate-700 hover:bg-slate-800 shadow-slate-500/20" : "bg-red-600 hover:bg-red-700 shadow-red-500/20"
                 }`}
@@ -911,9 +912,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 {loading ? <Square size={12} /> : <Send size={13} className="-translate-x-[1px] translate-y-[1px]" />}
               </button>
             </div>
-            <p className="text-center text-[9px] text-slate-400 font-medium mt-3">
-              La IA puede cometer errores. Verifica la información.
-            </p>
+            <p className="text-center text-[9px] text-slate-400 font-medium mt-3">{t("La IA puede cometer errores. Verifica la información.")}</p>
           </div>
         </div>
         </div>
@@ -942,7 +941,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       <div className="group pointer-events-none fixed bottom-2 right-0 z-50 h-24 w-28 flex items-end justify-end pb-4">
         <button
           onClick={() => setOpen((v) => !v)}
-          title="Vantia — Asistente IA"
+          title={t("Vantia — Asistente IA")}
           className={`pointer-events-auto relative h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
             open || loading
               ? "-translate-x-6 rounded-[28px]"
@@ -1000,13 +999,13 @@ function WhatsAppWidget() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        title="WhatsApp"
+        title={t("WhatsApp")}
         className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-slate-800/60 hover:bg-[#25D366]/20 border border-slate-700 hover:border-[#25D366]/50 transition-all group w-full"
       >
         <div className="h-7 w-7 bg-[#25D366]/10 group-hover:bg-[#25D366]/20 rounded-lg flex items-center justify-center">
           <MessageCircle size={15} className="text-[#25D366]" />
         </div>
-        <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#25D366]">WhatsApp</span>
+        <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#25D366]">{t("WhatsApp")}</span>
       </button>
 
       {open && (
@@ -1017,27 +1016,23 @@ function WhatsAppWidget() {
               <MessageCircle size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Despacho Vantia</p>
-              <p className="text-white/80 text-[11px] mt-0.5">Normalmente responde en minutos</p>
+              <p className="text-white font-bold text-sm leading-none">{t("Despacho Vantia")}</p>
+              <p className="text-white/80 text-[11px] mt-0.5">{t("Normalmente responde en minutos")}</p>
             </div>
           </div>
 
           {/* Body */}
           <div className="p-4 space-y-3">
             <div className="bg-[#f0f2f5] rounded-xl rounded-tl-sm px-3 py-2">
-              <p className="text-xs text-slate-700">👋 ¡Hola! ¿En qué podemos ayudarte?</p>
+              <p className="text-xs text-slate-700">{t("👋 ¡Hola! ¿En qué podemos ayudarte?")}</p>
               <p className="text-[10px] text-slate-400 mt-1 text-right">09:00 ✓✓</p>
             </div>
-            <p className="text-[11px] text-slate-500 text-center">
-              Continúa la conversación en WhatsApp
-            </p>
+            <p className="text-[11px] text-slate-500 text-center">{t("Continúa la conversación en WhatsApp")}</p>
             <button
               onClick={openChat}
               className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-bold py-2.5 rounded-xl transition-colors"
             >
-              <MessageCircle size={15} />
-              Abrir módulo
-            </button>
+              <MessageCircle size={15} />{t("Abrir módulo")}</button>
           </div>
         </div>
       )}
@@ -1078,12 +1073,11 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
   return (
     <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-        <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
+        <h3 className="font-bold text-slate-800 text-sm">{t("Notificaciones")}</h3>
         <div className="flex items-center gap-3 shrink-0">
           {notifs.length > 0 && (
             <button type="button" onClick={onDismissAll} className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600">
-              <CheckCircle2 size={13} /> Marcar todas como leídas
-            </button>
+              <CheckCircle2 size={13} />{" "}{t("Marcar todas como leídas")}</button>
           )}
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
         </div>
@@ -1097,20 +1091,17 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
         >
           <BellRing className="h-4 w-4 text-red-500 shrink-0" />
           <span className="flex-1 text-xs text-slate-700">
-            <span className="font-semibold">Activar avisos push</span> — entérate aunque tengas la pestaña cerrada
-          </span>
+            <span className="font-semibold">{t("Activar avisos push")}</span>{" "}{t("— entérate aunque tengas la pestaña cerrada")}</span>
         </button>
       )}
       {pushJustEnabled && (
-        <div className="px-4 py-2 text-[11px] text-emerald-700 bg-emerald-50 border-b border-emerald-100">
-          Avisos activados en este dispositivo ✓
-        </div>
+        <div className="px-4 py-2 text-[11px] text-emerald-700 bg-emerald-50 border-b border-emerald-100">{t("Avisos activados en este dispositivo ✓")}</div>
       )}
       <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
         {loading ? (
           <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
         ) : notifs.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">Sin mensajes pendientes</div>
+          <div className="py-8 text-center text-slate-400 text-xs">{t("Sin mensajes pendientes")}</div>
         ) : notifs.map((n) => (
           <div key={n.id} className="group relative flex items-start">
             <button
@@ -1135,7 +1126,7 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
             </button>
             <button
               type="button"
-              title="Marcar como leído"
+              title={t("Marcar como leído")}
               onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-300 opacity-0 transition-opacity hover:bg-emerald-50 hover:text-emerald-600 group-hover:opacity-100"
             >
@@ -1181,7 +1172,7 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
   const startEdit = (l: QuickLink) => { setEditingId(l.id); setLabel(l.label); setUrl(l.url); setError(""); setShowForm(true); };
 
   const handleSave = async () => {
-    if (!label.trim() || !url.trim()) { setError("Nombre y URL son obligatorios"); return; }
+    if (!label.trim() || !url.trim()) { setError(t("Nombre y URL son obligatorios")); return; }
     setSaving(true);
     setError("");
     try {
@@ -1192,11 +1183,11 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
         body: JSON.stringify({ label: label.trim(), url: url.trim() }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo guardar el enlace");
+      if (!res.ok) throw new Error(d.error || t("No se pudo guardar el enlace"));
       resetForm();
       load();
     } catch (e: any) {
-      setError(e.message || "No se pudo guardar el enlace");
+      setError(e.message || t("No se pudo guardar el enlace"));
     } finally {
       setSaving(false);
     }
@@ -1216,9 +1207,9 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
   return (
     <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="font-bold text-slate-800 text-sm">Links de interés</h3>
+        <h3 className="font-bold text-slate-800 text-sm">{t("Links de interés")}</h3>
         <div className="flex items-center gap-1">
-          <button onClick={showForm ? resetForm : openNewForm} className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors" title="Añadir enlace">
+          <button onClick={showForm ? resetForm : openNewForm} className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors" title={t("Añadir enlace")}>
             <Plus size={14} className={`transition-transform ${showForm ? "rotate-45" : ""}`} />
           </button>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1"><X size={14} /></button>
@@ -1230,21 +1221,21 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
           <input
             value={label}
             onChange={e => setLabel(e.target.value)}
-            placeholder="Nombre (ej. Portal LexNET)"
+            placeholder={t("Nombre (ej. Portal LexNET)")}
             autoFocus
             className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
           <input
             value={url}
             onChange={e => setUrl(e.target.value)}
-            placeholder="URL (ej. lexnet.justicia.es)"
+            placeholder={t("URL (ej. lexnet.justicia.es)")}
             className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
           {error && <p className="peligro text-[11px] text-red-600">{error}</p>}
           <div className="flex justify-end gap-1.5 pt-0.5">
-            <button onClick={resetForm} className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            <button onClick={resetForm} className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
             <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60">
-              {saving && <Loader2 size={10} className="animate-spin" />} {editingId ? "Guardar" : "Añadir"}
+              {saving && <Loader2 size={10} className="animate-spin" />} {editingId ? t("Guardar") : t("Añadir")}
             </button>
           </div>
         </div>
@@ -1254,19 +1245,17 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
         {loading ? (
           <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
         ) : links.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs px-6">
-            Aún no tienes enlaces guardados. Pulsa <Plus size={10} className="inline" /> para añadir uno.
-          </div>
+          <div className="py-8 text-center text-slate-400 text-xs px-6">{t("Aún no tienes enlaces guardados. Pulsa")}{" "}<Plus size={10} className="inline" />{" "}{t("para añadir uno.")}</div>
         ) : links.map(l => (
           <div key={l.id} className="group flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50">
             <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 min-w-0 flex items-center gap-2.5">
               <Link2 size={13} className="text-slate-300 shrink-0" />
               <span className="text-xs font-semibold text-slate-700 truncate group-hover:text-red-700">{l.label}</span>
             </a>
-            <button onClick={() => startEdit(l)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-600 p-1 transition-opacity shrink-0" title="Editar">
+            <button onClick={() => startEdit(l)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-600 p-1 transition-opacity shrink-0" title={t("Editar")}>
               <Pen size={11} />
             </button>
-            <button onClick={() => handleDelete(l.id)} disabled={deletingId === l.id} className="peligro opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-600 p-1 transition-opacity shrink-0" title="Eliminar">
+            <button onClick={() => handleDelete(l.id)} disabled={deletingId === l.id} className="peligro opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-600 p-1 transition-opacity shrink-0" title={t("Eliminar")}>
               {deletingId === l.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
             </button>
           </div>
@@ -1303,7 +1292,7 @@ function orgInitials(name: string) {
   if (!parts.length) return "?";
   return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[1][0]).toUpperCase();
 }
-const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admin: "Administrador", miembro: "Miembro" };
+const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admin: "Administrador", miembro: "Miembro", soporte: "Soporte técnico" };
 
 // ── Texto que se desplaza al pasar el ratón, si no cabe entero ─────────────
 // Antes se cortaba con "..." (truncate) y no había forma de leer el resto
@@ -1419,7 +1408,7 @@ function CollapsedGroupItem({ item, childActive, pathname, currentSearch, onClos
       <Link
         to={item.children![0].href}
         onClick={onClose}
-        title={item.name}
+        title={t(item.name)}
         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
           childActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                      : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
@@ -1432,7 +1421,7 @@ function CollapsedGroupItem({ item, childActive, pathname, currentSearch, onClos
           onMouseLeave={scheduleClose}
           style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left, zIndex: 999 }}
           className="animate-fade-in min-w-[190px] rounded-xl border border-slate-700 bg-slate-800 py-1.5 shadow-xl shadow-black/30">
-          <p className="px-3 pb-1 pt-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.name}</p>
+          <p className="px-3 pb-1 pt-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{t(item.name)}</p>
           {item.children!.map((child) => {
             const isChildActive = hrefMatches(pathname, currentSearch, child.href);
             const ChildIcon = child.icon;
@@ -1442,7 +1431,7 @@ function CollapsedGroupItem({ item, childActive, pathname, currentSearch, onClos
                   isChildActive ? "bg-red-500/10 text-white" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
                 }`}>
                 <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
-                <span className="truncate">{child.name}</span>
+                <span className="truncate">{t(child.name)}</span>
               </Link>
             );
           })}
@@ -1469,7 +1458,7 @@ function OrgRolChip({ rol, className = "" }: { rol?: string | null; className?: 
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       <Icon size={10} className="shrink-0" />
-      {ORG_ROL_LABEL[rol] || rol}
+      {t(ORG_ROL_LABEL[rol] || rol)}
     </span>
   );
 }
@@ -1480,9 +1469,9 @@ function textoPendientes(p?: PendientesOrg): string {
   if (!p || !p.total) return "";
   const partes: string[] = [];
   if (p.chat) partes.push(`${p.chat} mensaje${p.chat === 1 ? "" : "s"}`);
-  if (p.vistas) partes.push(`${p.vistas} vista${p.vistas === 1 ? "" : "s"} por confirmar`);
-  if (p.plazos) partes.push(`${p.plazos} plazo${p.plazos === 1 ? "" : "s"} próximo${p.plazos === 1 ? "" : "s"}`);
-  if (p.tareas) partes.push(`${p.tareas} tarea${p.tareas === 1 ? "" : "s"} próxima${p.tareas === 1 ? "" : "s"}`);
+  if (p.vistas) partes.push(tn(p.vistas, "{n} vista por confirmar", "{n} vistas por confirmar"));
+  if (p.plazos) partes.push(tn(p.plazos, "{n} plazo próximo", "{n} plazos próximos"));
+  if (p.tareas) partes.push(tn(p.tareas, "{n} tarea próxima", "{n} tareas próximas"));
   return partes.join(" · ");
 }
 
@@ -1537,15 +1526,15 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
       tabIndex={-1}
       onKeyDown={onKeyDown}
       role="menu"
-      aria-label="Cambiar de organización"
+      aria-label={t("Cambiar de organización")}
       style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
       className="erp-org-menu z-[999] rounded-2xl border shadow-2xl outline-none overflow-hidden"
     >
       <div className="px-3.5 pt-3 pb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold om-t1">Organizaciones</p>
+          <p className="text-[13px] font-semibold om-t1">{t("Organizaciones")}</p>
           <p className="text-[11px] om-t3">
-            {organizaciones.length > 1 ? "Elige en cuál quieres trabajar" : "Solo perteneces a esta"}
+            {organizaciones.length > 1 ? t("Elige en cuál quieres trabajar") : t("Solo perteneces a esta")}
           </p>
         </div>
         <span className="shrink-0 rounded-full om-chip px-2 py-0.5 text-[11px] font-semibold tabular-nums">
@@ -1561,7 +1550,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar organización…"
+              placeholder={t("Buscar organización…")}
               className="w-full h-8 om-input rounded-lg border pl-8 pr-2 text-xs outline-none"
             />
           </div>
@@ -1570,7 +1559,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
 
       <div className="max-h-[min(60vh,360px)] overflow-y-auto px-1.5 pb-1.5 space-y-0.5">
         {lista.length === 0 && (
-          <p className="px-3 py-6 text-center text-xs om-t3">Ninguna organización coincide con «{q}».</p>
+          <p className="px-3 py-6 text-center text-xs om-t3">{t("Ninguna organización coincide con «")}{q}».</p>
         )}
         {lista.map((o, i) => {
           const activa = o.id === activaId;
@@ -1611,8 +1600,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
                 <Loader2 size={16} className="shrink-0 animate-spin text-red-600" />
               ) : activa ? (
                 <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                  <Check size={11} strokeWidth={3} /> Actual
-                </span>
+                  <Check size={11} strokeWidth={3} />{" "}{t("Actual")}</span>
               ) : pendientes[o.id]?.total ? (
                 <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-[11px] font-bold text-white flex items-center justify-center tabular-nums" title={textoPendientes(pendientes[o.id])}>
                   {pendientes[o.id].total > 99 ? "99+" : pendientes[o.id].total}
@@ -1632,8 +1620,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
             onClick={() => { onClose(); navigate("/dashboard/config?section=despacho"); }}
             className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium om-accion transition-colors"
           >
-            <Settings size={14} className="om-t4" /> Ajustes del despacho
-          </button>
+            <Settings size={14} className="om-t4" />{" "}{t("Ajustes del despacho")}</button>
         )}
         {gestiona && (
           <button
@@ -1641,13 +1628,11 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
             onClick={() => { onClose(); navigate("/dashboard/config?section=usuarios"); }}
             className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium om-accion transition-colors"
           >
-            <Users size={14} className="om-t4" /> Gestionar miembros
-          </button>
+            <Users size={14} className="om-t4" />{" "}{t("Gestionar miembros")}</button>
         )}
         {organizaciones.length > 1 && (
           <p className="hidden [@media(hover:hover)]:block px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
-            <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd> para moverte · <kbd className="font-sans">Intro</kbd> para entrar
-          </p>
+            <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd>{" "}{t("para moverte ·")}{" "}<kbd className="font-sans">Intro</kbd>{" "}{t("para entrar")}</p>
         )}
       </div>
     </div>,
@@ -1659,10 +1644,10 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
 // Crear lo más habitual desde cualquier página. Ocupa el hueco que antes
 // llenaba el logo de la organización (repetido: ya sale en la barra lateral).
 const ACCIONES_NUEVO: { label: string; desc: string; to: string; modulo: Modulo; icon: typeof Plus }[] = [
-  { label: "Cliente",    desc: "Ficha de un cliente nuevo",       to: "/dashboard/clientes/new",     modulo: "clientes",    icon: Users },
-  { label: "Expediente", desc: "Abrir un expediente",             to: "/dashboard/expedientes?nuevo=1", modulo: "expedientes", icon: Briefcase },
-  { label: "Tarea",      desc: "Tarea o plazo con fecha límite",  to: "/dashboard/tareas?open=new",  modulo: "tareas",      icon: CheckCircle2 },
-  { label: "Evento",     desc: "Cita, vista o reunión en la agenda", to: "/dashboard/agenda?nuevo=1", modulo: "agenda",    icon: Calendar },
+  { label: t("Cliente"),    desc: t("Ficha de un cliente nuevo"),       to: "/dashboard/clientes/new",     modulo: "clientes",    icon: Users },
+  { label: t("Expediente"), desc: t("Abrir un expediente"),             to: "/dashboard/expedientes?nuevo=1", modulo: "expedientes", icon: Briefcase },
+  { label: t("Tarea"),      desc: t("Tarea o plazo con fecha límite"),  to: "/dashboard/tareas?open=new",  modulo: "tareas",      icon: CheckCircle2 },
+  { label: t("Evento"),     desc: t("Cita, vista o reunión en la agenda"), to: "/dashboard/agenda?nuevo=1", modulo: "agenda",    icon: Calendar },
 ];
 
 function BotonNuevo({ puede }: { puede: (m: Modulo) => boolean }) {
@@ -1686,11 +1671,11 @@ function BotonNuevo({ puede }: { puede: (m: Modulo) => boolean }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Crear nuevo"
+        title={t("Crear nuevo")}
         className={`flex items-center gap-1.5 h-10 px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white shadow-sm transition-colors ${open ? "bg-red-700" : "bg-red-600 hover:bg-red-700"}`}
       >
         <Plus size={16} strokeWidth={2.5} />
-        <span className="hidden sm:inline">Nuevo</span>
+        <span className="hidden sm:inline">{t("Nuevo")}</span>
         <ChevronDown size={14} className={`hidden sm:block opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -1709,8 +1694,8 @@ function BotonNuevo({ puede }: { puede: (m: Modulo) => boolean }) {
                   <Icon size={15} className="text-red-600" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold text-slate-800">{a.label}</span>
-                  <span className="block text-[11px] text-slate-500 truncate">{a.desc}</span>
+                  <span className="block text-[13px] font-semibold text-slate-800">{t(a.label)}</span>
+                  <span className="block text-[11px] text-slate-500 truncate">{t(a.desc)}</span>
                 </span>
               </button>
             );
@@ -1761,7 +1746,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   }, [organizaciones.length, getTokenSidebar]);
   const pendientesOtras = organizaciones.filter((o) => o.id !== organizacion?.id).reduce((a, o) => a + (pendientesOrgs[o.id]?.total || 0), 0);
   const avisoOtras = pendientesOtras > 0
-    ? `${pendientesOtras} aviso${pendientesOtras === 1 ? "" : "s"} pendiente${pendientesOtras === 1 ? "" : "s"} en tus otras organizaciones`
+    ? tn(pendientesOtras, "{n} aviso pendiente en tus otras organizaciones", "{n} avisos pendientes en tus otras organizaciones")
     : "";
   const orgMenuRef = useRef<HTMLDivElement>(null);
   // El desplegable de la vista colapsada se pinta en un portal (ver más abajo,
@@ -1851,7 +1836,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               type="button"
               onClick={onToggleCollapse}
-              title="Expandir menú"
+              title={t("Expandir menú")}
               className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
             >
               <ChevronRight size={16} />
@@ -1859,7 +1844,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               ref={orgBtnRef}
               type="button"
-              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización${avisoOtras ? ` (${avisoOtras})` : ""}` : "Vantia Legis"}
+              title={organizacion?.nombre ? `${organizacion.nombre} · ${t("cambiar de organización")}${avisoOtras ? ` (${avisoOtras})` : ""}` : t("Vantia Legis")}
               aria-haspopup="menu"
               aria-expanded={orgMenuOpen}
               onClick={toggleOrgMenu}
@@ -1879,7 +1864,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   // que contiene vantia-sidebar-slate.png, en cualquier organización).
                   <span className="h-6 w-6 rounded-md bg-slate-700/60 animate-pulse" />
                 ) : (
-                  <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+                  <img src="/vantia-mark-96.png" alt={t("Vantia Legis")} className="h-6 w-6 object-contain" />
                 )}
               </span>
               {pendientesOtras > 0 && (
@@ -1895,7 +1880,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               ref={orgBtnRef}
               type="button"
-              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización${avisoOtras ? ` (${avisoOtras})` : ""}` : "Organización"}
+              title={organizacion?.nombre ? `${organizacion.nombre} · ${t("cambiar de organización")}${avisoOtras ? ` (${avisoOtras})` : ""}` : t("Organización")}
               aria-haspopup="menu"
               aria-expanded={orgMenuOpen}
               onClick={toggleOrgMenu}
@@ -1915,13 +1900,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 ) : !orgLoaded ? (
                   <span className="h-7 w-7 rounded-md bg-slate-700/60 animate-pulse" />
                 ) : (
-                  <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+                  <img src="/vantia-mark-96.png" alt={t("Vantia Legis")} className="h-7 w-7 object-contain" />
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 {orgLoaded ? (
                   <p className="erp-company-name text-[13px] font-semibold text-slate-100 leading-[1.2] line-clamp-2 break-words">
-                    {organizacion?.nombre || "Vantia Legis"}
+                    {organizacion?.nombre || t("Vantia Legis")}
                   </p>
                 ) : (
                   <span className="block h-3 w-28 rounded bg-slate-700/60 animate-pulse" />
@@ -1944,7 +1929,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
           {onToggleCollapse && <button
             type="button"
             onClick={onToggleCollapse}
-            title="Colapsar menú"
+            title={t("Colapsar menú")}
             className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
             <ChevronLeft size={16} />
@@ -1986,7 +1971,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <div key={group.label} className="mb-3">
               {!collapsed && (
                 <p className="erp-sidebar-group-label px-2.5 pb-1 pt-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
-                  {group.label}
+                  {t(group.label)}
                 </p>
               )}
               {collapsed && <div className="erp-sidebar-divider h-px bg-slate-800 mb-2 mx-1" />}
@@ -2027,7 +2012,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                           }`}
                         >
                           <GroupIcon className={`h-4 w-4 shrink-0 ${childActive ? "text-red-400" : "text-slate-500"}`} />
-                          <span className="flex-1 truncate text-left">{item.name}</span>
+                          <span className="flex-1 truncate text-left">{t(item.name)}</span>
                           <ChevronDown size={13} className={`shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isOpen ? "rotate-180" : ""} ${childActive ? "text-red-400" : "text-slate-500"}`} />
                         </button>
                         <div
@@ -2052,7 +2037,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                                     }`}
                                   >
                                     <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
-                                    <span className="flex-1 truncate">{child.name}</span>
+                                    <span className="flex-1 truncate">{t(child.name)}</span>
                                   </Link>
                                   </div>
                                 );
@@ -2080,10 +2065,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   // Qué cuenta el número (al pasar el ratón y para lectores de pantalla).
                   // Vistas es "pendiente de decidir" (ámbar + reloj); el resto, "sin leer".
                   const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
-                  const badgeTitulo = chatBadge ? plural(badgeCount, "mensaje sin leer en el chat", "mensajes sin leer en el chat")
-                    : emailBadge ? plural(badgeCount, "correo sin leer", "correos sin leer")
-                    : waBadge ? plural(badgeCount, "mensaje de WhatsApp sin leer", "mensajes de WhatsApp sin leer")
-                    : vistasBadge ? plural(badgeCount, "vista por confirmar", "vistas por confirmar") : "";
+                  const badgeTitulo = chatBadge ? plural(badgeCount, t("mensaje sin leer en el chat"), t("mensajes sin leer en el chat"))
+                    : emailBadge ? plural(badgeCount, t("correo sin leer"), t("correos sin leer"))
+                    : waBadge ? plural(badgeCount, t("mensaje de WhatsApp sin leer"), t("mensajes de WhatsApp sin leer"))
+                    : vistasBadge ? plural(badgeCount, t("vista por confirmar"), t("vistas por confirmar")) : "";
                   const badgeAccion = vistasBadge && !chatBadge && !emailBadge && !waBadge;
                   const badgeTexto = badgeCount > 99 ? "99+" : String(badgeCount);
                   // Expedientes: mientras se procesa un ZIP de documentos (cédula ->
@@ -2093,7 +2078,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
                   if (collapsed) {
                     return (
-                      <Link key={item.name} to={href} onClick={onClose} title={showProcessingSpinner ? `${item.name} — procesando documentos…` : hasBadge ? `${item.name} — ${badgeTitulo}` : item.name}
+                      <Link key={item.name} to={href} onClick={onClose} title={showProcessingSpinner ? t("{name} — procesando documentos…", { name: item.name }) : hasBadge ? `${item.name} — ${badgeTitulo}` : item.name}
                         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
                           isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                    : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
@@ -2116,7 +2101,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
                   return (
                     <Link key={item.name} to={href} onClick={onClose}
-                      title={showProcessingSpinner ? "Procesando documentos en segundo plano…" : undefined}
+                      title={showProcessingSpinner ? t("Procesando documentos en segundo plano…") : undefined}
                       className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-4 ${
                         isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                  : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
@@ -2127,9 +2112,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                           <Loader2 size={14} className="absolute inset-0 m-auto text-red-400 animate-spin" />
                         )}
                       </span>
-                      <span className="flex-1 truncate">{item.name}</span>
+                      <span className="flex-1 truncate">{t(item.name)}</span>
                       {showProcessingSpinner && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-red-400/80 shrink-0">Procesando</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-red-400/80 shrink-0">{t("Procesando")}</span>
                       )}
                       {!showProcessingSpinner && hasBadge && (
                         <span title={badgeTitulo} aria-label={badgeTitulo}
@@ -2152,7 +2137,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       {/* Centro de soporte + Configuración */}
       <div className={`transition-all duration-300 pt-2 space-y-0.5 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
         {collapsed ? (
-          <Link to="/dashboard/soporte" onClick={onClose} title="Centro de soporte"
+          <Link to="/dashboard/soporte" onClick={onClose} title={t("Centro de soporte")}
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
               pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
@@ -2163,11 +2148,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-4 ${
               pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
-            <LifeBuoy className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" /> Centro de soporte
-          </Link>
+            <LifeBuoy className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" />{" "}{t("Centro de soporte")}</Link>
         )}
         {collapsed ? (
-          <Link to="/dashboard/config" onClick={onClose} title="Configuración"
+          <Link to="/dashboard/config" onClick={onClose} title={t("Configuración")}
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
               pathname === "/dashboard/config" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
@@ -2178,8 +2162,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-4 ${
               pathname === "/dashboard/config" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
-            <Settings className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" /> Configuración
-          </Link>
+            <Settings className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" />{" "}{t("Configuración")}</Link>
         )}
       </div>
 
@@ -2193,11 +2176,11 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
           <div className="erp-sidebar-user flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
             <UserButton afterSignOutUrl="/" appearance={aparienciaClerk} userProfileProps={{ appearance: aparienciaClerk }} />
             <div className="flex-1 min-w-0">
-              <p className="erp-sidebar-username text-[13px] font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
+              <p className="erp-sidebar-username text-[13px] font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || t("Usuario")}</p>
               <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>
             </div>
             {onSignOut && (
-              <button onClick={onSignOut} title="Cerrar sesión"
+              <button onClick={onSignOut} title={t("Cerrar sesión")}
                 className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0">
                 <LogOut size={14} />
               </button>
@@ -2456,15 +2439,15 @@ export default function DashboardLayout() {
           if (unread <= 0) continue;
           const isDM = item?.tipo === "directo";
           const channelLabel = isDM
-            ? (item?.dm_target_user_name || "Chat directo")
+            ? (item?.dm_target_user_name || t("Chat directo"))
             : `#${item?.nombre || "canal"}`;
           next.push({
             id: `chat-${item.id}`,
             kind: "chat",
             title: channelLabel,
             subtitle: isDM
-              ? (unread > 1 ? `${unread} mensajes directos sin leer` : "1 mensaje directo sin leer")
-              : (unread > 1 ? `${unread} mensajes sin leer` : "1 mensaje sin leer"),
+              ? tn(unread, "{n} mensaje directo sin leer", "{n} mensajes directos sin leer")
+              : tn(unread, "{n} mensaje sin leer", "{n} mensajes sin leer"),
             meta: item?.ultimo_mensaje || undefined,
             count: unread,
             created_at: item?.ultimo_mensaje_at || item?.created_at || new Date().toISOString(),
@@ -2483,7 +2466,7 @@ export default function DashboardLayout() {
           const createdAt = item?.sent_at || new Date().toISOString();
           if (!existing) {
             groupedEmails.set(key, {
-              from: item?.from_name || item?.from_email || "Nuevo correo",
+              from: item?.from_name || item?.from_email || t("Nuevo correo"),
               subject: item?.subject || "(Sin asunto)",
               snippet: item?.snippet || "",
               count: 1,
@@ -2507,7 +2490,7 @@ export default function DashboardLayout() {
             id: `email-${grouped.id}`,
             kind: "email",
             title: grouped.from,
-            subtitle: grouped.count > 1 ? `${grouped.count} correos sin leer` : grouped.subject,
+            subtitle: grouped.count > 1 ? t("{count} correos sin leer", { count: grouped.count }) : grouped.subject,
             meta: grouped.count > 1 ? grouped.subject : grouped.snippet,
             count: grouped.count,
             created_at: grouped.created_at,
@@ -2534,7 +2517,7 @@ export default function DashboardLayout() {
             id: `wa-${item.id}`,
             kind: "whatsapp",
             title: contactName,
-            subtitle: "Mensaje recibido por WhatsApp",
+            subtitle: t("Mensaje recibido por WhatsApp"),
             meta: item?.last_message_body || undefined,
             count: 1,
             created_at: item?.last_message_at,
@@ -2557,14 +2540,14 @@ export default function DashboardLayout() {
           const diffDays = diasHastaMadrid(t.plazo);
           if (diffDays > PLAZO_ALERT_DAYS) continue;
           const subtitle =
-            diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
-            diffDays === 0 ? "Vence hoy" :
-            diffDays === 1 ? "Vence mañana" :
-            `Vence en ${diffDays} días`;
+            diffDays < 0  ? tn(Math.abs(diffDays), "Vencida hace {n} día", "Vencida hace {n} días") :
+            diffDays === 0 ? t("Vence hoy") :
+            diffDays === 1 ? t("Vence mañana") :
+            tn(diffDays, "Vence en {n} día", "Vence en {n} días");
           next.push({
             id: `plazo-${t.id}`,
             kind: "plazo",
-            title: t.titulo || "Tarea sin título",
+            title: t.titulo || tr("Tarea sin título"),
             subtitle,
             meta: t.expediente || t.client_name_resolved || undefined,
             created_at: nowIso,
@@ -2585,14 +2568,14 @@ export default function DashboardLayout() {
           const diffDays = diasHastaMadrid(n.fecha_limite);
           if (diffDays > PLAZO_ALERT_DAYS) continue;
           const subtitle =
-            diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
-            diffDays === 0 ? "Vence hoy" :
-            diffDays === 1 ? "Vence mañana" :
-            `Vence en ${diffDays} días`;
+            diffDays < 0  ? tn(Math.abs(diffDays), "Vencida hace {n} día", "Vencida hace {n} días") :
+            diffDays === 0 ? t("Vence hoy") :
+            diffDays === 1 ? t("Vence mañana") :
+            tn(diffDays, "Vence en {n} día", "Vence en {n} días");
           next.push({
             id: `plazo-exp-${n.id}`,
             kind: "plazo",
-            title: n.titulo || "Recordatorio de expediente",
+            title: n.titulo || t("Recordatorio de expediente"),
             subtitle,
             meta: `Exp. ${n.anio}/${n.num_exp}${n.cliente_nombre ? " · " + n.cliente_nombre : ""}`,
             created_at: nowIso,
@@ -2612,7 +2595,7 @@ export default function DashboardLayout() {
           next.push({
             id: `soporte-${s.ticketId}-${s.actualizadoAt}`,
             kind: "soporte",
-            title: `Centro de soporte · Ticket ${s.referencia}`,
+            title: t("Centro de soporte · Ticket {referencia}", { referencia: s.referencia }),
             subtitle: s.asunto || undefined,
             meta: s.resumen || `Estado: ${s.estadoLabel}`,
             created_at: s.actualizadoAt || new Date().toISOString(),
@@ -2629,18 +2612,18 @@ export default function DashboardLayout() {
           if (!v?.id) continue;
           const cuando = v.fecha_vista
             ? new Date(v.fecha_vista).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-            : "Fecha por confirmar";
+            : t("Fecha por confirmar");
           const pendiente = v.estado === "pendiente";
           next.push({
             id: `vista-${v.estado}-${v.id}`,
             kind: "vista",
-            title: !pendiente ? "Preparar vista"
-              : v.tipo === "cancelacion" ? "Vista cancelada o suspendida"
-              : v.tipo === "cambio" ? "Cambio en una vista aceptada"
-              : v.tipo === "documentacion" ? "Nueva documentación de un procedimiento"
-              : "Vista por confirmar",
+            title: !pendiente ? t("Preparar vista")
+              : v.tipo === "cancelacion" ? t("Vista cancelada o suspendida")
+              : v.tipo === "cambio" ? t("Cambio en una vista aceptada")
+              : v.tipo === "documentacion" ? t("Nueva documentación de un procedimiento")
+              : t("Vista por confirmar"),
             subtitle: `${cuando}${v.juzgado ? " · " + v.juzgado : ""}`,
-            meta: pendiente && Number(v.num_conflictos) > 0 ? "⚠️ Choca con tu agenda" : (v.subject || undefined),
+            meta: pendiente && Number(v.num_conflictos) > 0 ? `⚠️ ${t("Choca con tu agenda")}` : (v.subject || undefined),
             created_at: (pendiente ? v.created_at : v.recordatorio_at) || new Date().toISOString(),
             onClick: () => navigate(`/dashboard/vistas?id=${encodeURIComponent(v.id)}`),
           });
@@ -2848,11 +2831,11 @@ export default function DashboardLayout() {
             type="button"
             data-buscador-global
             onClick={() => abrirPaleta()}
-            title="Buscar (Ctrl+K o /)"
+            title={t("Buscar (Ctrl+K o /)")}
             className="group relative flex-1 min-w-0 max-w-4xl h-10 flex items-center gap-2.5 pl-3.5 pr-2.5 rounded-lg border border-slate-200 bg-slate-50 text-left text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors"
           >
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
-            <span className="flex-1 min-w-0 truncate">{isMobile ? "Buscar..." : "Buscar clientes, expedientes, módulos o acciones..."}</span>
+            <span className="flex-1 min-w-0 truncate">{isMobile ? t("Buscar...") : t("Buscar clientes, expedientes, módulos o acciones...")}</span>
             <kbd className="hidden sm:inline-flex shrink-0 h-6 px-1.5 items-center rounded-md border border-slate-200 bg-white text-[11px] font-sans font-semibold text-slate-400">Ctrl K</kbd>
           </button>
           <PaletaComandos modulos={modulosPaleta} puede={puedeMain} />
@@ -2880,7 +2863,7 @@ export default function DashboardLayout() {
             <button
               onClick={() => setIsLinksOpen(v => !v)}
               className="relative p-2.5 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
-              title="Links de interés"
+              title={t("Links de interés")}
             >
               <Link2 className="h-5 w-5" />
             </button>
@@ -2950,7 +2933,7 @@ function EmailToast({
           <Mail className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#ab0433]">Nuevo correo</p>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#ab0433]">{t("Nuevo correo")}</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{email.subject}</p>
           <p className="text-xs text-slate-500 truncate">{email.from}</p>
           {email.snippet && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{email.snippet}</p>}
@@ -2963,15 +2946,11 @@ function EmailToast({
         <button
           onClick={onClose}
           className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100"
-        >
-          Cerrar
-        </button>
+        >{t("Cerrar")}</button>
         <button
           onClick={onOpen}
           className="px-3 py-2 rounded-xl text-xs font-semibold bg-[#ab0433] text-white hover:bg-[#8f022a]"
-        >
-          Abrir correo
-        </button>
+        >{t("Abrir correo")}</button>
       </div>
     </div>
   );
@@ -2990,15 +2969,15 @@ function WaToast({ name, message, onOpen, onClose }: { name: string; message: st
           <MessageCircle className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#1a9e4f]">WhatsApp</p>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#1a9e4f]">{t("WhatsApp")}</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
           <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{message}</p>
         </div>
         <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={14} /></button>
       </div>
       <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
-        <button onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100">Cerrar</button>
-        <button onClick={onOpen} className="px-3 py-2 rounded-xl text-xs font-semibold bg-[#25D366] text-white hover:bg-[#1ebe5d]">Ver conversación</button>
+        <button onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100">{t("Cerrar")}</button>
+        <button onClick={onOpen} className="px-3 py-2 rounded-xl text-xs font-semibold bg-[#25D366] text-white hover:bg-[#1ebe5d]">{t("Ver conversación")}</button>
       </div>
     </div>
   );

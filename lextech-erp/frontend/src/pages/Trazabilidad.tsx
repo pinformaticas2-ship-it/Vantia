@@ -13,6 +13,7 @@ import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import ComoFunciona from "../components/ComoFunciona";
+import { t } from '../lib/i18n';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -127,33 +128,33 @@ function getEventConfig(item: ActivityItem): EventConfig {
   const etype = item.entity_type?.toUpperCase() || "";
   switch (et) {
     case "LOGIN":
-      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: LogIn,    title: "Inicio de sesión exitoso" };
+      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: LogIn,    title: t("Inicio de sesión exitoso") };
     case "LOGOUT":
-      return { nodeBg: "bg-orange-100",  nodeText: "text-orange-500",  Icon: LogOut,   title: "Cierre de sesión" };
+      return { nodeBg: "bg-orange-100",  nodeText: "text-orange-500",  Icon: LogOut,   title: t("Cierre de sesión") };
     case "AUTH_ERROR":
-      return { nodeBg: "bg-red-100",     nodeText: "text-red-600",     Icon: Shield,   title: "Intento de acceso denegado", isError: true };
+      return { nodeBg: "bg-red-100",     nodeText: "text-red-600",     Icon: Shield,   title: t("Intento de acceso denegado"), isError: true };
     case "SERVER_START":
-      return { nodeBg: "bg-blue-100",    nodeText: "text-blue-600",    Icon: Server,   title: "Servidor iniciado" };
+      return { nodeBg: "bg-blue-100",    nodeText: "text-blue-600",    Icon: Server,   title: t("Servidor iniciado") };
     case "CREATE":
-      if (etype === "CLIENT")     return { nodeBg: "bg-purple-100", nodeText: "text-purple-600", Icon: UserPlus,    title: "Nuevo cliente creado" };
-      if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen,  title: "Nuevo expediente creado" };
-      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: Plus, title: item.action_type || "Creación" };
+      if (etype === "CLIENT")     return { nodeBg: "bg-purple-100", nodeText: "text-purple-600", Icon: UserPlus,    title: t("Nuevo cliente creado") };
+      if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen,  title: t("Nuevo expediente creado") };
+      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: Plus, title: item.action_type || t("Creación") };
     case "UPDATE":
-      if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen, title: "Expediente modificado" };
-      if (etype === "CLIENT")     return { nodeBg: "bg-indigo-100", nodeText: "text-indigo-600", Icon: Edit2,      title: "Cliente modificado" };
-      return { nodeBg: "bg-yellow-100", nodeText: "text-yellow-600", Icon: Edit2, title: item.action_type || "Modificación" };
+      if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen, title: t("Expediente modificado") };
+      if (etype === "CLIENT")     return { nodeBg: "bg-indigo-100", nodeText: "text-indigo-600", Icon: Edit2,      title: t("Cliente modificado") };
+      return { nodeBg: "bg-yellow-100", nodeText: "text-yellow-600", Icon: Edit2, title: item.action_type || t("Modificación") };
     case "DELETE":
-      return { nodeBg: "bg-red-100",    nodeText: "text-red-600",    Icon: Trash2,   title: item.action_type || "Eliminación", isError: true };
+      return { nodeBg: "bg-red-100",    nodeText: "text-red-600",    Icon: Trash2,   title: item.action_type || t("Eliminación"), isError: true };
     case "EXPORT":
-      return { nodeBg: "bg-violet-100", nodeText: "text-violet-600", Icon: Download, title: "Exportación de datos" };
+      return { nodeBg: "bg-violet-100", nodeText: "text-violet-600", Icon: Download, title: t("Exportación de datos") };
     case "DOWNLOAD":
-      return { nodeBg: "bg-slate-200",  nodeText: "text-slate-600",  Icon: Download, title: "Descarga de archivo" };
+      return { nodeBg: "bg-slate-200",  nodeText: "text-slate-600",  Icon: Download, title: t("Descarga de archivo") };
     case "UPLOAD":
-      return { nodeBg: "bg-teal-100",   nodeText: "text-teal-600",   Icon: Upload,   title: "Subida de archivo" };
+      return { nodeBg: "bg-teal-100",   nodeText: "text-teal-600",   Icon: Upload,   title: t("Subida de archivo") };
     case "VIEW":
-      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Eye,      title: "Consulta" };
+      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Eye,      title: t("Consulta") };
     default:
-      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Activity, title: item.action_type || "Acción" };
+      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Activity, title: item.action_type || t("Acción") };
   }
 }
 
@@ -169,20 +170,20 @@ const ENTITY_COLOR: Record<string, string> = {
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
 const EVENT_OPTS = [
-  { value: "",             label: "Todos los eventos" },
-  { value: "LOGIN",        label: "Solo logins"       },
-  { value: "LOGOUT",       label: "Solo logouts"      },
-  { value: "CREATE",       label: "Creaciones"        },
-  { value: "UPDATE",       label: "Ediciones"         },
-  { value: "DELETE",       label: "Borrados"          },
-  { value: "EXPORT",       label: "Exportaciones"     },
-  { value: "AUTH_ERROR",   label: "Errores de acceso" },
+  { value: "",             label: t("Todos los eventos") },
+  { value: "LOGIN",        label: t("Solo logins")       },
+  { value: "LOGOUT",       label: t("Solo logouts")      },
+  { value: "CREATE",       label: t("Creaciones")        },
+  { value: "UPDATE",       label: t("Ediciones")         },
+  { value: "DELETE",       label: t("Borrados")          },
+  { value: "EXPORT",       label: t("Exportaciones")     },
+  { value: "AUTH_ERROR",   label: t("Errores de acceso") },
 ];
 const ENTITY_OPTS = [
-  { value: "",           label: "Todos los módulos" },
-  { value: "CLIENT",     label: "Clientes"          },
-  { value: "EXPEDIENTE", label: "Expedientes"       },
-  { value: "FILE",       label: "Archivos"          },
+  { value: "",           label: t("Todos los módulos") },
+  { value: "CLIENT",     label: t("Clientes")          },
+  { value: "EXPEDIENTE", label: t("Expedientes")       },
+  { value: "FILE",       label: t("Archivos")          },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -239,10 +240,10 @@ export default function Trazabilidad() {
         ? await fetch("/api/activity/accesos-temporales", { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ user_id: userId, horas: 24 }) })
         : await fetch(`/api/activity/accesos-temporales/${encodeURIComponent(userId)}`, { method: "DELETE", headers: h });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d?.error || "No se pudo cambiar");
+      if (!res.ok) throw new Error(d?.error || t("No se pudo cambiar"));
       await fetchSoporte();
     } catch (e: any) {
-      setSoporteError(e?.message || "No se pudo cambiar");
+      setSoporteError(e?.message || t("No se pudo cambiar"));
     } finally {
       setSoporteBusy(null);
     }
@@ -349,9 +350,9 @@ export default function Trazabilidad() {
             <History size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{nivel?.nivel === "propia" ? "Tu actividad" : "Trazabilidad"}</h1>
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{nivel?.nivel === "propia" ? t("Tu actividad") : t("Trazabilidad")}</h1>
             <p className="hidden sm:block text-xs font-medium text-slate-500">
-              {nivel?.nivel === "propia" ? "Tus accesos y acciones en el despacho" : nivel?.nivel === "tecnica" ? "Vista técnica: sesiones y tipos de acción, sin datos de clientes" : "Auditoría completa de sesiones y acciones del sistema"}
+              {nivel?.nivel === "propia" ? t("Tus accesos y acciones en el despacho") : nivel?.nivel === "tecnica" ? t("Vista técnica: sesiones y tipos de acción, sin datos de clientes") : t("Auditoría completa de sesiones y acciones del sistema")}
               <ComoFunciona capitulo="15" className="ml-2 align-middle" />
             </p>
           </div>
@@ -361,28 +362,27 @@ export default function Trazabilidad() {
             <div className="relative">
               <button type="button" onClick={() => { setSoporteOpen((v) => !v); void fetchSoporte(); }}
                 className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-                title="Dar o quitar a soporte el acceso completo durante 24 h">
-                <ShieldCheck size={13} /> Acceso de soporte
-              </button>
+                title={t("Dar o quitar a soporte el acceso completo durante 24 h")}>
+                <ShieldCheck size={13} />{" "}{t("Acceso de soporte")}</button>
               {soporteOpen && (
                 <>
-                  <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setSoporteOpen(false)} />
+                  <button type="button" aria-label={t("Cerrar")} className="fixed inset-0 z-30 cursor-default" onClick={() => setSoporteOpen(false)} />
                   <div className="absolute right-0 top-10 z-40 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                    <p className="text-sm font-bold text-slate-800">Acceso de soporte</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Soporte ve sesiones y tipos de acción, sin datos de clientes. Si necesita el detalle para ayudar, dale acceso completo durante 24 h (queda registrado).</p>
+                    <p className="text-sm font-bold text-slate-800">{t("Acceso de soporte")}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{t("Soporte ve sesiones y tipos de acción, sin datos de clientes. Si necesita el detalle para ayudar, dale acceso completo durante 24 h (queda registrado).")}</p>
                     <div className="mt-3 space-y-2">
-                      {soporte.length === 0 && <p className="text-xs text-slate-400">No hay nadie con rol de soporte en esta organización.</p>}
+                      {soporte.length === 0 && <p className="text-xs text-slate-400">{t("No hay nadie con rol de soporte en esta organización.")}</p>}
                       {soporte.map((p) => (
                         <div key={p.user_id} className="flex items-center gap-2 rounded-lg border border-slate-100 px-2.5 py-2">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-slate-700">{p.nombre}</p>
                             <p className="text-[11px] text-slate-500">
-                              {p.hasta ? `Acceso completo hasta ${new Date(p.hasta).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : "Vista técnica"}
+                              {p.hasta ? t("Acceso completo hasta {toLocaleString}", { toLocaleString: new Date(p.hasta).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" }) }) : t("Vista técnica")}
                             </p>
                           </div>
                           <button type="button" disabled={soporteBusy === p.user_id} onClick={() => void cambiarAccesoSoporte(p.user_id, !p.hasta)}
                             className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${p.hasta ? "border border-slate-200 text-slate-600 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
-                            {soporteBusy === p.user_id ? "…" : p.hasta ? "Quitar" : "Dar 24 h"}
+                            {soporteBusy === p.user_id ? "…" : p.hasta ? t("Quitar") : t("Dar 24 h")}
                           </button>
                         </div>
                       ))}
@@ -394,13 +394,12 @@ export default function Trazabilidad() {
             </div>
           )}
           <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-600 flex items-center gap-2">
-            <Users size={13} /> {users.length} usuarios
-          </div>
+            <Users size={13} /> {users.length}{" "}{t("usuarios")}</div>
           <button
             onClick={fetchUsers}
             className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
           >
-            <RefreshCw size={13} /> <span className="hidden sm:inline">Actualizar</span>
+            <RefreshCw size={13} /> <span className="hidden sm:inline">{t("Actualizar")}</span>
           </button>
         </div>
       </div>
@@ -410,14 +409,14 @@ export default function Trazabilidad() {
         <div className="px-4 sm:px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-start gap-2 shrink-0">
           <ShieldCheck size={13} className="mt-0.5 shrink-0 text-slate-400" />
           {nivel.nivel === "tecnica"
-            ? <span>Ves los accesos y el tipo de cada acción de todo el despacho, sin nombres de clientes ni contenido. Si necesitas el detalle para ayudar, pide acceso completo al propietario o a un administrador.</span>
-            : <span>Solo ves tu propia actividad. La trazabilidad de todo el despacho la ven el propietario y los administradores.</span>}
+            ? <span>{t("Ves los accesos y el tipo de cada acción de todo el despacho, sin nombres de clientes ni contenido. Si necesitas el detalle para ayudar, pide acceso completo al propietario o a un administrador.")}</span>
+            : <span>{t("Solo ves tu propia actividad. La trazabilidad de todo el despacho la ven el propietario y los administradores.")}</span>}
         </div>
       )}
       {nivel?.nivel === "completa" && nivel.hasta && (
         <div className="px-4 sm:px-6 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-start gap-2 shrink-0">
           <ShieldCheck size={13} className="mt-0.5 shrink-0" />
-          <span>Tienes acceso completo temporal hasta el {new Date(nivel.hasta).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.</span>
+          <span>{t("Tienes acceso completo temporal hasta el")}{" "}{new Date(nivel.hasta).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.</span>
         </div>
       )}
 
@@ -434,7 +433,7 @@ export default function Trazabilidad() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar usuario o IP..."
+                placeholder={t("Buscar usuario o IP...")}
                 className="block w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-md text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors shadow-sm"
               />
               {search && (
@@ -455,7 +454,7 @@ export default function Trazabilidad() {
             {!loadUsers && filteredUsers.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 gap-2">
                 <User size={28} className="text-slate-300" />
-                <p className="text-sm text-slate-400">Sin actividad registrada</p>
+                <p className="text-sm text-slate-400">{t("Sin actividad registrada")}</p>
               </div>
             )}
             {filteredUsers.map(u => {
@@ -486,8 +485,7 @@ export default function Trazabilidad() {
                         {u.user_name}
                       </h4>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        {u.total_actions} acciones · {u.total_logins} logins
-                      </p>
+                        {u.total_actions}{" "}{t("acciones ·")}{" "}{u.total_logins}{" "}{t("logins")}</p>
                       <div className="flex items-center gap-2 mt-2">
                         {u.last_ip && (
                           <span className="text-[10px] text-slate-400 flex items-center gap-1">
@@ -495,7 +493,7 @@ export default function Trazabilidad() {
                           </span>
                         )}
                         <span className={`text-[10px] font-medium ${online ? "text-emerald-600" : "text-slate-400"}`}>
-                          {online ? "Activo ahora" : timeAgo(u.last_action_at)}
+                          {online ? t("Activo ahora") : timeAgo(u.last_action_at)}
                         </span>
                       </div>
                     </div>
@@ -521,17 +519,15 @@ export default function Trazabilidad() {
               <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <History size={28} className="text-slate-300" />
               </div>
-              <p className="text-slate-500 font-semibold">Selecciona un usuario</p>
-              <p className="text-slate-400 text-sm">para ver su historial completo de actividad</p>
+              <p className="text-slate-500 font-semibold">{t("Selecciona un usuario")}</p>
+              <p className="text-slate-400 text-sm">{t("para ver su historial completo de actividad")}</p>
             </div>
           ) : (
             <>
               {/* Cabecera del usuario seleccionado */}
               <div className="px-4 sm:px-8 py-4 sm:py-6 bg-white border-b border-slate-200 shrink-0 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.02)]">
                 <button type="button" onClick={() => setSelected(null)}
-                  className="md:hidden mb-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
-                  ← Usuarios
-                </button>
+                  className="md:hidden mb-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">{t("← Usuarios")}</button>
                 <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div className={`w-14 h-14 rounded-full ${COLORS[colorIdx(selected.user_id)].bg} ${COLORS[colorIdx(selected.user_id)].text} flex items-center justify-center font-bold text-xl shrink-0 border ${COLORS[colorIdx(selected.user_id)].border} shadow-sm`}>
                     {initials(selected.user_name)}
@@ -540,29 +536,23 @@ export default function Trazabilidad() {
                     <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2 leading-tight">
                       {selected.user_name}
                       {isOnlineNow(selected.last_action_at) && (
-                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-200">
-                          Online
-                        </span>
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-200">{t("Online")}</span>
                       )}
                     </h2>
                     <div className="flex flex-wrap items-center gap-3 mt-2">
                       <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-                        <Activity size={11} className="text-amber-400" /> {selected.total_actions} acciones totales
-                      </span>
+                        <Activity size={11} className="text-amber-400" /> {selected.total_actions}{" "}{t("acciones totales")}</span>
                       <span className="text-slate-200">|</span>
                       <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
-                        <LogIn size={11} /> {selected.total_logins} logins
-                      </span>
+                        <LogIn size={11} /> {selected.total_logins}{" "}{t("logins")}</span>
                       <span className="text-slate-200">|</span>
                       <span className="text-xs font-semibold text-orange-500 flex items-center gap-1.5">
-                        <LogOut size={11} /> {selected.total_logouts} logouts
-                      </span>
+                        <LogOut size={11} /> {selected.total_logouts}{" "}{t("logouts")}</span>
                       {selected.last_ip && (
                         <>
                           <span className="text-slate-200">|</span>
                           <span className="text-xs text-slate-500 flex items-center gap-1.5 font-mono">
-                            <Globe size={11} /> {selected.last_ip} (última)
-                          </span>
+                            <Globe size={11} /> {selected.last_ip}{" "}{t("(última)")}</span>
                         </>
                       )}
                     </div>
@@ -581,7 +571,7 @@ export default function Trazabilidad() {
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 appearance-none pr-7 cursor-pointer"
                     style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0.5rem center", backgroundSize: "1em" }}
                   >
-                    {EVENT_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {EVENT_OPTS.map(o => <option key={o.value} value={o.value}>{t(o.label)}</option>)}
                   </select>
                   <select
                     value={entityFilter}
@@ -589,7 +579,7 @@ export default function Trazabilidad() {
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 appearance-none pr-7 cursor-pointer"
                     style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0.5rem center", backgroundSize: "1em" }}
                   >
-                    {ENTITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {ENTITY_OPTS.map(o => <option key={o.value} value={o.value}>{t(o.label)}</option>)}
                   </select>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -610,7 +600,7 @@ export default function Trazabilidad() {
                     {(dateFrom || dateTo) && (
                       <button
                         onClick={() => { setDateFrom(""); setDateTo(""); }}
-                        title="Quitar filtro de fechas"
+                        title={t("Quitar filtro de fechas")}
                         className="text-slate-400 hover:text-slate-600 p-1"
                       >
                         <X size={12} />
@@ -618,7 +608,7 @@ export default function Trazabilidad() {
                     )}
                   </div>
                 </div>
-                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mostrando {filteredItems.length} de {total} registros</span>
+                <span className="text-xs font-medium text-slate-500 whitespace-nowrap">{t("Mostrando")}{" "}{filteredItems.length}{" "}{t("de")}{" "}{total}{" "}{t("registros")}</span>
               </div>
 
               {/* TIMELINE */}
@@ -632,7 +622,7 @@ export default function Trazabilidad() {
                 {!loadItems && filteredItems.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-16 gap-2">
                     <AlertCircle size={28} className="text-slate-300" />
-                    <p className="text-sm text-slate-400">Sin registros para los filtros seleccionados</p>
+                    <p className="text-sm text-slate-400">{t("Sin registros para los filtros seleccionados")}</p>
                   </div>
                 )}
 
@@ -674,7 +664,7 @@ export default function Trazabilidad() {
                             <div className={`flex-1 bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border ${cfg.isError ? "border-rose-200" : "border-slate-200"}`}>
                               <div className="flex items-start justify-between gap-4 mb-1">
                                 <h3 className={`text-sm font-bold ${cfg.isError ? "text-rose-700" : "text-slate-800"}`}>
-                                  {cfg.title}
+                                  {t(cfg.title)}
                                 </h3>
                                 <span className="text-xs font-medium text-slate-400 shrink-0">
                                   {isRecent ? timeAgo(item.created_at) : fmtTime(item.created_at)}
@@ -727,14 +717,12 @@ export default function Trazabilidad() {
                             className="bg-white border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-bold py-2 px-6 rounded-full relative z-10 shadow-sm transition-all disabled:opacity-60 flex items-center gap-2"
                           >
                             {loadingMore
-                              ? <><RefreshCw size={12} className="animate-spin" /> Cargando...</>
-                              : "Cargar registros anteriores"
+                              ? <><RefreshCw size={12} className="animate-spin" />{" "}{t("Cargando...")}</>
+                              : t("Cargar registros anteriores")
                             }
                           </button>
                         ) : items.length > 0 && (
-                          <span className="text-[11px] text-slate-400 relative z-10">
-                            — Fin del historial —
-                          </span>
+                          <span className="text-[11px] text-slate-400 relative z-10">{t("— Fin del historial —")}</span>
                         )}
                       </div>
                     </div>

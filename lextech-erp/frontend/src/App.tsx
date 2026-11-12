@@ -47,6 +47,7 @@ import DropboxOAuthCallback from './pages/DropboxOAuthCallback';
 import { Terminos, Privacidad } from './pages/Legal';
 import DemoInstagram from './pages/DemoInstagram';
 import { useOrganizacion, Modulo } from './lib/useOrganizacion';
+import { t } from './lib/i18n';
 
 // Sin sesión (se cerró desde el menú de usuario, caducó...), este navegador
 // no debe seguir recibiendo los avisos push de nadie.
@@ -81,15 +82,15 @@ export default function App() {
             <Route path="clientes/new" element={<RequireModuleAccess modulo="clientes"><ClientForm /></RequireModuleAccess>} />
             <Route path="clientes/:id/edit" element={<RequireModuleAccess modulo="clientes"><ClientForm /></RequireModuleAccess>} />
             <Route path="clientes/:id" element={<RequireModuleAccess modulo="clientes"><ClientDetail /></RequireModuleAccess>} />
-            <Route path="procuradores" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="PROCURADOR" title="Procuradores" singular="Procurador" desc="procuradores" /></RequireModuleAccess>} />
-            <Route path="procuradores/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="PROCURADOR" singular="Procurador" /></RequireModuleAccess>} />
-            <Route path="procuradores/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="PROCURADOR" singular="Procurador" /></RequireModuleAccess>} />
-            <Route path="abogados" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="ABOGADO" title="Abogados" singular="Abogado" desc="abogados" /></RequireModuleAccess>} />
-            <Route path="abogados/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular="Abogado" /></RequireModuleAccess>} />
-            <Route path="abogados/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular="Abogado" /></RequireModuleAccess>} />
-            <Route path="contrarios" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="CONTRARIO" title="Partes contrarias" singular="Parte contraria" desc="partes contrarias" /></RequireModuleAccess>} />
-            <Route path="contrarios/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular="Parte contraria" /></RequireModuleAccess>} />
-            <Route path="contrarios/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular="Parte contraria" /></RequireModuleAccess>} />
+            <Route path="procuradores" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="PROCURADOR" title={t("Procuradores")} singular={t("Procurador")} desc={t("procuradores")} /></RequireModuleAccess>} />
+            <Route path="procuradores/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="PROCURADOR" singular={t("Procurador")} /></RequireModuleAccess>} />
+            <Route path="procuradores/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="PROCURADOR" singular={t("Procurador")} /></RequireModuleAccess>} />
+            <Route path="abogados" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="ABOGADO" title={t("Abogados")} singular={t("Abogado")} desc={t("abogados")} /></RequireModuleAccess>} />
+            <Route path="abogados/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular={t("Abogado")} /></RequireModuleAccess>} />
+            <Route path="abogados/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular={t("Abogado")} /></RequireModuleAccess>} />
+            <Route path="contrarios" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="CONTRARIO" title={t("Partes contrarias")} singular={t("Parte contraria")} desc={t("partes contrarias")} /></RequireModuleAccess>} />
+            <Route path="contrarios/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular={t("Parte contraria")} /></RequireModuleAccess>} />
+            <Route path="contrarios/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular={t("Parte contraria")} /></RequireModuleAccess>} />
             <Route path="expedientes" element={<RequireModuleAccess modulo="expedientes"><ExpedienteList /></RequireModuleAccess>} />
             <Route path="expedientes/:id" element={<RequireModuleAccess modulo="expedientes"><ExpedienteDetail /></RequireModuleAccess>} />
             {/* Trazabilidad vive en Configuración (14/10/2026); los enlaces antiguos siguen valiendo. */}

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Keyboard, X } from 'lucide-react';
 import { usePreferencias } from '../lib/preferencias';
 import { abrirPaleta } from './PaletaComandos';
+import { t } from '../lib/i18n';
 
 // ── Atajos de teclado (14/10/2026) ───────────────────────────────────────────
 // "?" abre esta ayuda; "/" (o Ctrl+K) abre la paleta de comandos; "g" y luego una letra salta a un
@@ -11,16 +12,16 @@ import { abrirPaleta } from './PaletaComandos';
 // Se desactivan en Ajustes → Preferencias de trabajo.
 
 export const IR_A: { tecla: string; path: string; label: string }[] = [
-  { tecla: 'd', path: '/dashboard', label: 'Dashboard' },
-  { tecla: 'e', path: '/dashboard/expedientes', label: 'Expedientes' },
-  { tecla: 'l', path: '/dashboard/clientes', label: 'Clientes' },
-  { tecla: 'a', path: '/dashboard/agenda', label: 'Agenda' },
-  { tecla: 't', path: '/dashboard/tareas', label: 'Tareas' },
-  { tecla: 'v', path: '/dashboard/vistas', label: 'Vistas' },
-  { tecla: 'c', path: '/dashboard/chat', label: 'Chat' },
-  { tecla: 'm', path: '/dashboard/correo', label: 'Correo' },
-  { tecla: 'o', path: '/dashboard/documental', label: 'Documental' },
-  { tecla: 's', path: '/dashboard/config', label: 'Ajustes' },
+  { tecla: 'd', path: '/dashboard', label: t("Dashboard") },
+  { tecla: 'e', path: '/dashboard/expedientes', label: t("Expedientes") },
+  { tecla: 'l', path: '/dashboard/clientes', label: t("Clientes") },
+  { tecla: 'a', path: '/dashboard/agenda', label: t("Agenda") },
+  { tecla: 't', path: '/dashboard/tareas', label: t("Tareas") },
+  { tecla: 'v', path: '/dashboard/vistas', label: t("Vistas") },
+  { tecla: 'c', path: '/dashboard/chat', label: t("Chat") },
+  { tecla: 'm', path: '/dashboard/correo', label: t("Correo") },
+  { tecla: 'o', path: '/dashboard/documental', label: t("Documental") },
+  { tecla: 's', path: '/dashboard/config', label: t("Ajustes") },
 ];
 
 function escribiendo(el: EventTarget | null): boolean {
@@ -43,22 +44,22 @@ export function AyudaAtajos({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/50 p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <p className="flex items-center gap-2 text-base font-bold text-slate-800"><Keyboard size={18} className="text-slate-400" /> Atajos de teclado</p>
-          <button type="button" onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
+          <p className="flex items-center gap-2 text-base font-bold text-slate-800"><Keyboard size={18} className="text-slate-400" />{" "}{t("Atajos de teclado")}</p>
+          <button type="button" onClick={onClose} aria-label={t("Cerrar")} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
         </div>
         <div className="space-y-2 text-sm text-slate-700">
-          <div className="flex items-center justify-between"><span>Ver esta ayuda</span><Tecla>?</Tecla></div>
-          <div className="flex items-center justify-between"><span>Buscar o ejecutar una acción</span><span className="flex items-center gap-1"><Tecla>Ctrl</Tecla><Tecla>K</Tecla><span className="text-xs text-slate-400">o</span><Tecla>/</Tecla></span></div>
-          <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Ir a… (pulsa G y luego la letra)</p>
+          <div className="flex items-center justify-between"><span>{t("Ver esta ayuda")}</span><Tecla>?</Tecla></div>
+          <div className="flex items-center justify-between"><span>{t("Buscar o ejecutar una acción")}</span><span className="flex items-center gap-1"><Tecla>{t("Ctrl")}</Tecla><Tecla>K</Tecla><span className="text-xs text-slate-400">o</span><Tecla>/</Tecla></span></div>
+          <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{t("Ir a… (pulsa G y luego la letra)")}</p>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {IR_A.map((a) => (
               <div key={a.tecla} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5">
-                <span>{a.label}</span>
+                <span>{t(a.label)}</span>
                 <span className="flex items-center gap-1"><Tecla>G</Tecla><Tecla>{a.tecla.toUpperCase()}</Tecla></span>
               </div>
             ))}
           </div>
-          <p className="pt-2 text-xs text-slate-500">No funcionan mientras escribes en un campo. Se pueden desactivar en Ajustes → Preferencias de trabajo.</p>
+          <p className="pt-2 text-xs text-slate-500">{t("No funcionan mientras escribes en un campo. Se pueden desactivar en Ajustes → Preferencias de trabajo.")}</p>
         </div>
       </div>
     </div>,

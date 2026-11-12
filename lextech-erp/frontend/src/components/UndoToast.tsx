@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Undo2, X, CheckCircle2 } from "lucide-react";
+import { t } from '../lib/i18n';
 
 interface UndoToastProps {
   message: string;
@@ -102,8 +103,7 @@ export function UndoToast({
             onClick={onUndo}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-900 bg-white hover:bg-slate-100 rounded-lg transition-colors shrink-0 active:scale-95"
           >
-            <Undo2 size={12} />
-            Deshacer ({remaining}s)
+            <Undo2 size={12} />{t("Deshacer (")}{remaining}s)
           </button>
           <button
             onClick={onDismiss}

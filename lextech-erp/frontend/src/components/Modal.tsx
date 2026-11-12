@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // ── Modal/Sheet reutilizable ──────────────────────────────────────────────
 // Antes cada modal de la app tenía su propio "fixed inset-0 + createPortal"
@@ -101,7 +102,7 @@ export function Modal({
             <button
               onClick={onClose}
               className="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-              title="Cerrar"
+              title={t("Cerrar")}
             >
               <X size={18} />
             </button>

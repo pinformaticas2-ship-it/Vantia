@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n';
 type VantiaBrandProps = {
   size?: number;
   showWordmark?: boolean;
@@ -65,8 +66,7 @@ export default function VantiaBrand({
       <BrandMark size={size} />
       {showWordmark && (
         <div className="min-w-0">
-          <p className={`text-xl font-bold tracking-tight leading-none ${titleClass}`}>
-            vant<span className={accentClass}>IA</span>
+          <p className={`text-xl font-bold tracking-tight leading-none ${titleClass}`}>{t("vant")}<span className={accentClass}>{t("IA")}</span>
           </p>
           {subtitle && (
             <p className={`text-[11px] font-medium mt-1 leading-none ${subtitleClass}`}>

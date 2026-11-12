@@ -38,7 +38,7 @@ const PALETTES: {
   {
     id: 'rojo',
     name: 'Rojo y Negro',
-    description: 'Corporativo. Barra lateral negra con acento rojo intenso.',
+    description: t("Corporativo. Barra lateral negra con acento rojo intenso."),
     sidebar: '#0f172a',
     sidebarBorder: '#1e293b',
     accent: '#dc2626',
@@ -48,7 +48,7 @@ const PALETTES: {
   {
     id: 'azul',
     name: 'Azul y Ámbar',
-    description: 'Base clara con acento azul y detalles en ámbar para insignias y avisos.',
+    description: t("Base clara con acento azul y detalles en ámbar para insignias y avisos."),
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#2563eb',
@@ -59,7 +59,7 @@ const PALETTES: {
   {
     id: 'verde',
     name: 'Verde y Oro',
-    description: 'Base clara con acento verde esmeralda y detalles dorados para insignias y avisos.',
+    description: t("Base clara con acento verde esmeralda y detalles dorados para insignias y avisos."),
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#059669',
@@ -70,7 +70,7 @@ const PALETTES: {
   {
     id: 'violeta',
     name: 'Violeta y Rosa',
-    description: 'Base clara con acento violeta y detalles en rosa para insignias y avisos.',
+    description: t("Base clara con acento violeta y detalles en rosa para insignias y avisos."),
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#7c3aed',
@@ -81,7 +81,7 @@ const PALETTES: {
   {
     id: 'grafito',
     name: 'Grafito y Turquesa',
-    description: 'Barra lateral grafito oscuro con acento turquesa y detalles en ámbar.',
+    description: t("Barra lateral grafito oscuro con acento turquesa y detalles en ámbar."),
     sidebar: '#1f2937',
     sidebarBorder: '#374151',
     accent: '#0d9488',
@@ -92,7 +92,7 @@ const PALETTES: {
   {
     id: 'indigo',
     name: 'Índigo y Coral',
-    description: 'Base clara con acento índigo y detalles en coral para insignias y avisos.',
+    description: t("Base clara con acento índigo y detalles en coral para insignias y avisos."),
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#4f46e5',
@@ -107,35 +107,35 @@ type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'misdato
 
 // 14/10/2026: Ajustes en dos grupos -- lo tuyo (Mi cuenta) y lo del despacho.
 const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
-  { key: 'apariencia',    label: 'Apariencia',               icon: Palette },
-  { key: 'perfil',        label: 'Mi perfil',                icon: UserRound },
-  { key: 'preferencias',  label: 'Preferencias de trabajo',  icon: SlidersHorizontal },
-  { key: 'notificaciones', label: 'Notificaciones',          icon: Bell },
-  { key: 'seguridad',     label: 'Seguridad',                icon: ShieldCheck },
-  { key: 'misdatos',      label: 'Mis datos y privacidad',   icon: Lock },
-  { key: 'manual',        label: 'Manual de usuario',        icon: BookOpen },
-  { key: 'ayuda',         label: 'Ayuda e información',      icon: Info },
+  { key: 'apariencia',    label: t("Apariencia"),               icon: Palette },
+  { key: 'perfil',        label: t("Mi perfil"),                icon: UserRound },
+  { key: 'preferencias',  label: t("Preferencias de trabajo"),  icon: SlidersHorizontal },
+  { key: 'notificaciones', label: t("Notificaciones"),          icon: Bell },
+  { key: 'seguridad',     label: t("Seguridad"),                icon: ShieldCheck },
+  { key: 'misdatos',      label: t("Mis datos y privacidad"),   icon: Lock },
+  { key: 'manual',        label: t("Manual de usuario"),        icon: BookOpen },
+  { key: 'ayuda',         label: t("Ayuda e información"),      icon: Info },
 ];
 const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGestor?: boolean }[] = [
-  { key: 'despacho',        label: 'Mi Despacho',          icon: Building2 },
-  { key: 'integraciones',   label: 'Integraciones',        icon: Plug },
-  { key: 'automatizaciones', label: 'Automatizaciones',    icon: Zap, soloGestor: true },
-  { key: 'skills',          label: 'Skills de la IA',      icon: Sparkles },
-  { key: 'trazabilidad',    label: 'Trazabilidad',         icon: History },
-  { key: 'privacidad',      label: 'Datos y privacidad',   icon: Database, soloGestor: true },
-  { key: 'usuarios',        label: 'Gestión de Usuarios',  icon: UsersRound, soloGestor: true },
+  { key: 'despacho',        label: t("Mi Despacho"),          icon: Building2 },
+  { key: 'integraciones',   label: t("Integraciones"),        icon: Plug },
+  { key: 'automatizaciones', label: t("Automatizaciones"),    icon: Zap, soloGestor: true },
+  { key: 'skills',          label: t("Skills de la IA"),      icon: Sparkles },
+  { key: 'trazabilidad',    label: t("Trazabilidad"),         icon: History },
+  { key: 'privacidad',      label: t("Datos y privacidad"),   icon: Database, soloGestor: true },
+  { key: 'usuarios',        label: t("Gestión de Usuarios"),  icon: UsersRound, soloGestor: true },
 ];
 
 const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
-  { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
-  { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2 },
-  { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
-  { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
-  { key: 'automatizaciones', label: 'Automatizaciones',    desc: 'Flujos automáticos de la organización, como las vistas recibidas por correo.', icon: Zap },
-  { key: 'skills',         label: 'Skills de la IA',       desc: 'Instrucciones del despacho que la IA sigue al redactar documentos.',     icon: Sparkles },
+  { key: 'notificaciones', label: t("Notificaciones"),        desc: t("Configura alertas por email y avisos emergentes del sistema."),            icon: Bell },
+  { key: 'despacho',       label: t("Mi Despacho"),           desc: t("Información fiscal del despacho, logotipo y textos legales para facturas."), icon: Building2 },
+  { key: 'seguridad',      label: t("Seguridad"),             desc: t("Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas."), icon: ShieldCheck },
+  { key: 'integraciones',  label: t("Integraciones"),         desc: t("Conecta Vantia con herramientas y servicios externos."),                    icon: Plug },
+  { key: 'automatizaciones', label: t("Automatizaciones"),    desc: t("Flujos automáticos de la organización, como las vistas recibidas por correo."), icon: Zap },
+  { key: 'skills',         label: t("Skills de la IA"),       desc: t("Instrucciones del despacho que la IA sigue al redactar documentos."),     icon: Sparkles },
   // Antes en el menú lateral (14/10/2026): es auditoría, no trabajo del día a día.
-  { key: 'trazabilidad',   label: 'Trazabilidad',          desc: 'Historial de accesos y acciones de todo el despacho.',                      icon: History },
-  { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
+  { key: 'trazabilidad',   label: t("Trazabilidad"),          desc: t("Historial de accesos y acciones de todo el despacho."),                      icon: History },
+  { key: 'usuarios',       label: t("Gestión de Usuarios"),   desc: t("Administra los usuarios y permisos del despacho."),                          icon: UsersRound },
 ];
 
 function PaletteCard({ p, active, onClick }: {
@@ -235,12 +235,12 @@ function PaletteCard({ p, active, onClick }: {
             {p.secondary && <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.secondary }} />}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-800 leading-tight">{p.name}</p>
-            <p className="text-xs text-slate-400 leading-snug mt-0.5 truncate">{p.description}</p>
+            <p className="text-sm font-bold text-slate-800 leading-tight">{t(p.name)}</p>
+            <p className="text-xs text-slate-400 leading-snug mt-0.5 truncate">{t(p.description)}</p>
           </div>
         </div>
         <span className={`shrink-0 text-[11px] font-bold transition-colors ${active ? '' : 'text-slate-300 group-hover:text-slate-400'}`} style={active ? { color: oscuro ? `color-mix(in srgb, ${p.accent} 55%, white)` : p.accent } : undefined}>
-          {active ? 'En uso' : 'Aplicar'}
+          {active ? t("En uso") : t("Aplicar")}
         </span>
       </div>
 
@@ -276,7 +276,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
         if (data?.success === false) throw new Error(data.error);
         setImpact(data.data);
       } catch (e: any) {
-        setError(e.message || 'No se pudo calcular el impacto del borrado.');
+        setError(e.message || t("No se pudo calcular el impacto del borrado."));
       } finally {
         setLoadingImpact(false);
       }
@@ -297,7 +297,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
       setActiveOrganizacionId(null);
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || 'No se pudo eliminar la organización.');
+      setError(e.message || t("No se pudo eliminar la organización."));
       setDeleting(false);
     }
   };
@@ -310,8 +310,8 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
             <AlertTriangle size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-extrabold text-slate-900">Eliminar organización</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Esta acción es permanente y no se puede deshacer.</p>
+            <h2 className="text-base font-extrabold text-slate-900">{t("Eliminar organización")}</h2>
+            <p className="text-sm text-slate-500 mt-0.5">{t("Esta acción es permanente y no se puede deshacer.")}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
         </div>
@@ -320,28 +320,23 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
           {loadingImpact ? (
             <div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
           ) : impact?.esLaUnica ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              No puedes eliminar <strong>{nombre}</strong> porque es la única organización del sistema. Crea otra organización antes de poder borrar esta.
-            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("No puedes eliminar")}{" "}<strong>{nombre}</strong>{" "}{t("porque es la única organización del sistema. Crea otra organización antes de poder borrar esta.")}</div>
           ) : (
             <>
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5">
-                <p className="peligro text-xs font-bold uppercase tracking-wider text-red-700 mb-2">Se eliminará permanentemente</p>
+                <p className="peligro text-xs font-bold uppercase tracking-wider text-red-700 mb-2">{t("Se eliminará permanentemente")}</p>
                 <ul className="peligro space-y-1 text-sm text-red-800">
-                  <li>• <strong>{impact?.clientes ?? 0}</strong> cliente{impact?.clientes === 1 ? '' : 's'}</li>
-                  <li>• <strong>{impact?.expedientes ?? 0}</strong> expediente{impact?.expedientes === 1 ? '' : 's'}</li>
-                  <li>• Todo el historial de importaciones de esta organización</li>
+                  <li>• <strong>{impact?.clientes ?? 0}</strong>{" "}{t("cliente")}{impact?.clientes === 1 ? '' : 's'}</li>
+                  <li>• <strong>{impact?.expedientes ?? 0}</strong>{" "}{t("expediente")}{impact?.expedientes === 1 ? '' : 's'}</li>
+                  <li>{t("• Todo el historial de importaciones de esta organización")}</li>
                 </ul>
                 {!!impact?.otrosMiembros && (
                   <p className="mt-2.5 pt-2.5 border-t border-red-200 text-sm text-red-800">
-                    <strong>{impact.otrosMiembros}</strong> persona{impact.otrosMiembros === 1 ? '' : 's'} más perderá{impact.otrosMiembros === 1 ? '' : 'n'} el acceso a esta organización inmediatamente.
-                  </p>
+                    <strong>{impact.otrosMiembros}</strong>{" "}{t("persona")}{impact.otrosMiembros === 1 ? '' : 's'}{" "}{t("más perderá")}{impact.otrosMiembros === 1 ? '' : 'n'}{" "}{t("el acceso a esta organización inmediatamente.")}</p>
                 )}
               </div>
 
-              <p className="text-xs text-slate-500">
-                Los módulos aún compartidos entre organizaciones (chat, agenda, tareas, facturación, email, WhatsApp) no se ven afectados por este borrado.
-              </p>
+              <p className="text-xs text-slate-500">{t("Los módulos aún compartidos entre organizaciones (chat, agenda, tareas, facturación, email, WhatsApp) no se ven afectados por este borrado.")}</p>
 
               <label className="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer select-none">
                 <input
@@ -349,14 +344,10 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
                   checked={confirmChecked}
                   onChange={(e) => setConfirmChecked(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-300"
-                />
-                Entiendo que esta acción es irreversible y que se perderán todos los datos anteriores.
-              </label>
+                />{t("Entiendo que esta acción es irreversible y que se perderán todos los datos anteriores.")}</label>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Escribe <span className="text-slate-800 normal-case">{nombre}</span> para confirmar
-                </label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Escribe")}{" "}<span className="text-slate-800 normal-case">{nombre}</span>{" "}{t("para confirmar")}</label>
                 <input
                   value={typedNombre}
                   onChange={(e) => setTypedNombre(e.target.value)}
@@ -372,18 +363,14 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">
-            Cancelar
-          </button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
           {!impact?.esLaUnica && (
             <button
               onClick={handleDelete}
               disabled={!canDelete}
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              {deleting && <Loader2 size={14} className="animate-spin" />}
-              Eliminar definitivamente
-            </button>
+              {deleting && <Loader2 size={14} className="animate-spin" />}{t("Eliminar definitivamente")}</button>
           )}
         </div>
       </div>
@@ -462,7 +449,7 @@ function DespachoPanel() {
       // switchOrganizacion, para que se vea en todas partes.
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || 'No se pudo guardar.');
+      setError(e.message || t("No se pudo guardar."));
       setSaving(false);
     }
   };
@@ -481,12 +468,12 @@ function DespachoPanel() {
         body: formData,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo subir el logotipo.');
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo subir el logotipo."));
       // Mismo motivo que en save(): forzar recarga para que el logotipo
       // nuevo se vea también en el selector de organización del sidebar.
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || 'No se pudo subir el logotipo.');
+      setError(e.message || t("No se pudo subir el logotipo."));
       setUploadingLogo(false);
       if (logoInputRef.current) logoInputRef.current.value = '';
     }
@@ -501,10 +488,10 @@ function DespachoPanel() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo quitar el logotipo.');
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo quitar el logotipo."));
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || 'No se pudo quitar el logotipo.');
+      setError(e.message || t("No se pudo quitar el logotipo."));
       setRemovingLogo(false);
     }
   };
@@ -559,7 +546,7 @@ function DespachoPanel() {
 
       switchOrganizacion(newOrgId);
     } catch (e: any) {
-      setError(e.message || 'No se pudo crear la organización.');
+      setError(e.message || t("No se pudo crear la organización."));
       setCreatingLoading(false);
     }
   };
@@ -571,18 +558,18 @@ function DespachoPanel() {
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Mi Despacho</h1>
-        <p className="text-sm text-slate-500">Información de la organización activa y gestión de organizaciones.</p>
+        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">{t("Mi Despacho")}</h1>
+        <p className="text-sm text-slate-500">{t("Información de la organización activa y gestión de organizaciones.")}</p>
       </div>
 
       <section className="mb-10 max-w-3xl">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Organización activa</h3>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Organización activa")}</h3>
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex items-center gap-4">
             <div className="relative shrink-0 group">
               <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                 {organizacion?.logoUrl ? (
-                  <img src={resolveUploadUrl(organizacion.logoUrl) || ''} alt="Logotipo" className="h-full w-full object-contain" />
+                  <img src={resolveUploadUrl(organizacion.logoUrl) || ''} alt={t("Logotipo")} className="h-full w-full object-contain" />
                 ) : (
                   <Building2 size={22} className="text-slate-300" />
                 )}
@@ -593,7 +580,7 @@ function DespachoPanel() {
                   onClick={() => logoInputRef.current?.click()}
                   disabled={uploadingLogo}
                   className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
-                  title="Cambiar logotipo"
+                  title={t("Cambiar logotipo")}
                 >
                   {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                 </button>
@@ -601,8 +588,8 @@ function DespachoPanel() {
               <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-800">Logotipo</p>
-              <p className="text-xs text-slate-400 mt-0.5">{canEdit ? 'Pasa el ratón por encima para cambiarlo. Se usará en facturas y documentos.' : 'Solo el propietario o un administrador pueden cambiarlo.'}</p>
+              <p className="text-sm font-semibold text-slate-800">{t("Logotipo")}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{canEdit ? t("Pasa el ratón por encima para cambiarlo. Se usará en facturas y documentos.") : t("Solo el propietario o un administrador pueden cambiarlo.")}</p>
               {canEdit && organizacion?.logoUrl && (
                 <button
                   type="button"
@@ -610,15 +597,13 @@ function DespachoPanel() {
                   disabled={removingLogo || uploadingLogo}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 mt-1.5"
                 >
-                  {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-                  Quitar logotipo
-                </button>
+                  {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}{t("Quitar logotipo")}</button>
               )}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Nombre")}</label>
             <input
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
@@ -630,7 +615,7 @@ function DespachoPanel() {
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("NIF/CIF")}</label>
                   <input
                     value={nifCif}
                     onChange={(e) => setNifCif(e.target.value)}
@@ -639,11 +624,11 @@ function DespachoPanel() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Dirección fiscal")}</label>
                   <input
                     value={direccionFiscal}
                     onChange={(e) => setDireccionFiscal(e.target.value)}
-                    placeholder="Calle, número, CP Población (Provincia)"
+                    placeholder={t("Calle, número, CP Población (Provincia)")}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
                   />
                 </div>
@@ -656,66 +641,62 @@ function DespachoPanel() {
                   ['Web', web, setWeb, 'www.despacho.es', 'text'],
                 ] as const).map(([label, valor, set, ph, tipo]) => (
                   <div key={label}>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{label}</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t(label)}</label>
                     <input type={tipo} value={valor} onChange={(e) => set(e.target.value)} placeholder={ph}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300" />
                   </div>
                 ))}
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Texto legal para facturas")}</label>
                 <textarea
                   value={textoLegalFacturas}
                   onChange={(e) => setTextoLegalFacturas(e.target.value)}
                   rows={3}
-                  placeholder="Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)"
+                  placeholder={t("Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)")}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
                 />
               </div>
               <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo de bienvenida al cliente</p>
-                <p className="text-xs text-slate-400 mb-3">
-                  Se envía automáticamente al dar de alta un cliente (manual o por formulario con enlace). Deja los campos vacíos para usar el mensaje por defecto. Puedes usar <code className="bg-slate-100 px-1 py-0.5 rounded">{'{nombre}'}</code> para insertar el nombre del cliente.
-                </p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Correo de bienvenida al cliente")}</p>
+                <p className="text-xs text-slate-400 mb-3">{t("Se envía automáticamente al dar de alta un cliente (manual o por formulario con enlace). Deja los campos vacíos para usar el mensaje por defecto. Puedes usar")}{" "}<code className="bg-slate-100 px-1 py-0.5 rounded">{'{nombre}'}</code>{" "}{t("para insertar el nombre del cliente.")}</p>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Asunto</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Asunto")}</label>
                     <input
                       value={welcomeEmailSubject}
                       onChange={(e) => setWelcomeEmailSubject(e.target.value)}
-                      placeholder="Hemos recibido tus datos"
+                      placeholder={t("Hemos recibido tus datos")}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mensaje</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Mensaje")}</label>
                     <textarea
                       value={welcomeEmailBody}
                       onChange={(e) => setWelcomeEmailBody(e.target.value)}
                       rows={4}
-                      placeholder={`Hola {nombre},\n\nHemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.\n\nUn saludo.`}
+                      placeholder={t("Hola {nombre},\n\nHemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.\n\nUn saludo.")}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Firma (opcional)</label>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Firma (opcional)")}</label>
                     <textarea
                       value={welcomeEmailSignature}
                       onChange={(e) => setWelcomeEmailSignature(e.target.value)}
                       rows={3}
-                      placeholder={`Despacho Vantia Legis\nAv. Ejemplo, 1 — 28001 Madrid\nTel. 900 000 000`}
+                      placeholder={t("Despacho Vantia Legis\nAv. Ejemplo, 1 — 28001 Madrid\nTel. 900 000 000")}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
                     />
-                    <p className="text-xs text-slate-400 mt-1">Se añade al final del correo, debajo del mensaje.</p>
+                    <p className="text-xs text-slate-400 mt-1">{t("Se añade al final del correo, debajo del mensaje.")}</p>
                   </div>
                 </div>
               </div>
             </>
           ) : (
             <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3.5 py-3 text-xs text-slate-400">
-              <Lock size={14} className="shrink-0" />
-              Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.
-            </div>
+              <Lock size={14} className="shrink-0" />{t("Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.")}</div>
           )}
           {error && <p className="text-xs text-rose-600">{error}</p>}
           {canEdit && (
@@ -724,16 +705,14 @@ function DespachoPanel() {
               disabled={saving || !nombre.trim()}
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              Guardar cambios
-            </button>
+              {saving && <Loader2 size={14} className="animate-spin" />}{t("Guardar cambios")}</button>
           )}
         </div>
       </section>
 
       {organizaciones.length > 0 && (
         <section className="mb-10 max-w-3xl">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tus organizaciones</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Tus organizaciones")}</h3>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm overflow-hidden">
             {organizaciones.map((o) => (
               <button
@@ -753,21 +732,20 @@ function DespachoPanel() {
       )}
 
       <section className="max-w-3xl">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Crear una nueva organización</h3>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Crear una nueva organización")}</h3>
         {!creating ? (
           <button
             onClick={() => setCreating(true)}
             className="inline-flex items-center gap-2 text-sm font-semibold text-red-700 hover:text-red-800"
           >
-            <Plus size={15} /> Nueva organización
-          </button>
+            <Plus size={15} />{" "}{t("Nueva organización")}</button>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
             <div className="flex items-center gap-4">
               <div className="relative shrink-0 group">
                 <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
                   {newLogoPreview ? (
-                    <img src={newLogoPreview} alt="Logotipo" className="h-full w-full object-contain" />
+                    <img src={newLogoPreview} alt={t("Logotipo")} className="h-full w-full object-contain" />
                   ) : (
                     <Building2 size={22} className="text-slate-300" />
                   )}
@@ -776,35 +754,34 @@ function DespachoPanel() {
                   type="button"
                   onClick={() => newLogoInputRef.current?.click()}
                   className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all"
-                  title="Elegir logotipo"
+                  title={t("Elegir logotipo")}
                 >
                   <Camera size={16} />
                 </button>
                 <input ref={newLogoInputRef} type="file" accept="image/*" onChange={handleNewLogoChange} className="hidden" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800">Logotipo <span className="normal-case font-normal text-slate-300">(opcional)</span></p>
-                <p className="text-xs text-slate-400 mt-0.5">Pasa el ratón por encima para elegir una imagen. Si no pones ninguna se usará un icono por defecto.</p>
+                <p className="text-sm font-semibold text-slate-800">{t("Logotipo")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></p>
+                <p className="text-xs text-slate-400 mt-0.5">{t("Pasa el ratón por encima para elegir una imagen. Si no pones ninguna se usará un icono por defecto.")}</p>
                 {newLogoPreview && (
                   <button type="button" onClick={clearNewLogo} className="peligro inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 mt-1">
-                    <Trash2 size={11} /> Quitar
-                  </button>
+                    <Trash2 size={11} />{" "}{t("Quitar")}</button>
                 )}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Nombre")}</label>
               <input
                 value={newNombre}
                 onChange={(e) => setNewNombre(e.target.value)}
-                placeholder="Nombre del nuevo despacho"
+                placeholder={t("Nombre del nuevo despacho")}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
                 autoFocus
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("NIF/CIF")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
                 <input
                   value={newNifCif}
                   onChange={(e) => setNewNifCif(e.target.value)}
@@ -813,22 +790,22 @@ function DespachoPanel() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Dirección fiscal")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
                 <input
                   value={newDireccionFiscal}
                   onChange={(e) => setNewDireccionFiscal(e.target.value)}
-                  placeholder="Calle, número, ciudad"
+                  placeholder={t("Calle, número, ciudad")}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Texto legal para facturas")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
               <textarea
                 value={newTextoLegalFacturas}
                 onChange={(e) => setNewTextoLegalFacturas(e.target.value)}
                 rows={2}
-                placeholder="Podrás cambiarlo luego desde Mi Despacho"
+                placeholder={t("Podrás cambiarlo luego desde Mi Despacho")}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 resize-none"
               />
             </div>
@@ -838,14 +815,12 @@ function DespachoPanel() {
                 disabled={creatingLoading || !newNombre.trim()}
                 className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
               >
-                {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
+                {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : t("Crear")}
               </button>
               <button
                 onClick={() => { setCreating(false); setNewNombre(''); setNewNifCif(''); setNewDireccionFiscal(''); setNewTextoLegalFacturas(''); clearNewLogo(); }}
                 className="text-sm text-slate-400 hover:text-slate-600 px-2"
-              >
-                Cancelar
-              </button>
+              >{t("Cancelar")}</button>
             </div>
           </div>
         )}
@@ -853,18 +828,17 @@ function DespachoPanel() {
 
       {rol === 'propietario' && organizacion && (
         <section className="mt-12 max-w-3xl">
-          <h3 className="text-sm font-bold text-red-700 uppercase tracking-wider mb-4 border-b border-red-100 pb-2">Zona de peligro</h3>
+          <h3 className="text-sm font-bold text-red-700 uppercase tracking-wider mb-4 border-b border-red-100 pb-2">{t("Zona de peligro")}</h3>
           <div className="bg-red-50/50 border border-red-200 rounded-xl p-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-slate-800">Eliminar esta organización</p>
-              <p className="text-xs text-slate-500 mt-0.5">Borra permanentemente clientes, expedientes y el acceso de todos sus miembros.</p>
+              <p className="text-sm font-semibold text-slate-800">{t("Eliminar esta organización")}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{t("Borra permanentemente clientes, expedientes y el acceso de todos sus miembros.")}</p>
             </div>
             <button
               onClick={() => setShowDeleteModal(true)}
               className="inline-flex items-center gap-2 shrink-0 bg-white border border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600 text-red-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              <Trash2 size={14} /> Eliminar
-            </button>
+              <Trash2 size={14} />{" "}{t("Eliminar")}</button>
           </div>
         </section>
       )}
@@ -901,10 +875,10 @@ function CodigoInvitacion({ onUnido }: { onUnido: () => void }) {
     setGenerando(true); setError(''); setCopiado(false);
     try {
       const data = await apiFetch('/api/organizacion/codigos', { method: 'POST', getToken });
-      if (!data?.success) throw new Error(data?.error || 'No se pudo generar el código.');
+      if (!data?.success) throw new Error(data?.error || t("No se pudo generar el código."));
       setCodigo(data.data); setAhora(Date.now());
     } catch (e: any) {
-      setError(e.message || 'No se pudo generar el código.');
+      setError(e.message || t("No se pudo generar el código."));
     } finally {
       setGenerando(false);
     }
@@ -920,31 +894,29 @@ function CodigoInvitacion({ onUnido }: { onUnido: () => void }) {
 
   return (
     <section className="mb-8 max-w-2xl">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Invitar con un código</h3>
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Invitar con un código")}</h3>
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <p className="text-sm text-slate-600">
-          La persona se registra en Vantia, elige «Tengo un código» y escribe este código. Entra como miembro; luego puedes cambiarle el rol.
-        </p>
+        <p className="text-sm text-slate-600">{t("La persona se registra en Vantia, elige «Tengo un código» y escribe este código. Entra como miembro; luego puedes cambiarle el rol.")}</p>
         {vigente ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-2xl font-bold tracking-[0.2em] text-slate-900 select-all">{codigo!.codigo}</span>
             <button onClick={copiar} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-              {copiado ? <Check size={14} /> : <Link2 size={14} />}{copiado ? 'Copiado' : 'Copiar'}
+              {copiado ? <Check size={14} /> : <Link2 size={14} />}{copiado ? t("Copiado") : t("Copiar")}
             </button>
-            <span className="inline-flex items-center gap-1 text-sm text-slate-500"><Clock3 size={14} /> Caduca en {mmss} · un solo uso</span>
+            <span className="inline-flex items-center gap-1 text-sm text-slate-500"><Clock3 size={14} />{" "}{t("Caduca en")}{" "}{mmss}{" "}{t("· un solo uso")}</span>
           </div>
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button onClick={generar} disabled={generando}
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
               {generando ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-              {codigo ? 'Generar otro código' : 'Generar código'}
+              {codigo ? t("Generar otro código") : t("Generar código")}
             </button>
-            {codigo && <span className="text-sm text-slate-500">El código anterior ha caducado.</span>}
+            {codigo && <span className="text-sm text-slate-500">{t("El código anterior ha caducado.")}</span>}
           </div>
         )}
         {error && <p className="text-xs text-rose-600 mt-2">{error}</p>}
-        <p className="text-xs text-slate-400 mt-3">Caduca a los 10 minutos y solo sirve para una persona. No lo publiques: quien lo tenga entra en el despacho.</p>
+        <p className="text-xs text-slate-400 mt-3">{t("Caduca a los 10 minutos y solo sirve para una persona. No lo publiques: quien lo tenga entra en el despacho.")}</p>
       </div>
     </section>
   );
@@ -986,7 +958,7 @@ function UsuariosPanel() {
       setEmail(''); setNuevoRol('miembro');
       await load();
     } catch (e: any) {
-      setError(e.message || 'No se pudo añadir el miembro.');
+      setError(e.message || t("No se pudo añadir el miembro."));
     } finally {
       setAdding(false);
     }
@@ -1012,7 +984,7 @@ function UsuariosPanel() {
   // de miembros): tu propio rol pasa de propietario a admin, y eso afecta a
   // cosas que viven fuera de este panel (el menú lateral, qué módulos ves...).
   const doTransfer = async (confirmNombre: string): Promise<{ ok: boolean; error?: string }> => {
-    if (!transferTarget) return { ok: false, error: 'Selecciona a quién transferir.' };
+    if (!transferTarget) return { ok: false, error: t("Selecciona a quién transferir.") };
     const data = await apiFetch('/api/organizacion/transferir-propiedad', {
       method: 'POST', getToken,
       body: JSON.stringify({ toMemberId: transferTarget.id, confirmNombre }),
@@ -1024,20 +996,20 @@ function UsuariosPanel() {
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Gestión de Usuarios</h1>
-        <p className="text-sm text-slate-500">Miembros de {organizacion?.nombre || 'esta organización'} y sus roles.</p>
+        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">{t("Gestión de Usuarios")}</h1>
+        <p className="text-sm text-slate-500">{t("Miembros de")}{" "}{organizacion?.nombre || t("esta organización")}{" "}{t("y sus roles.")}</p>
       </div>
 
       {canManage && <CodigoInvitacion onUnido={load} />}
 
       {canManage && (
         <section className="mb-8 max-w-2xl">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Añadir miembro</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Añadir miembro")}</h3>
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-wrap items-center gap-3">
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@delusuario.com"
+              placeholder={t("email@delusuario.com")}
               className="flex-1 min-w-[220px] rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
             />
             <select
@@ -1045,26 +1017,24 @@ function UsuariosPanel() {
               onChange={(e) => setNuevoRol(e.target.value as OrgRol)}
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 bg-white"
             >
-              <option value="miembro">Miembro</option>
-              <option value="soporte">Soporte técnico</option>
-              <option value="admin">Admin</option>
+              <option value="miembro">{t("Miembro")}</option>
+              <option value="soporte">{t("Soporte técnico")}</option>
+              <option value="admin">{t("Admin")}</option>
             </select>
             <button
               onClick={addMiembro}
               disabled={adding || !email.trim()}
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
             >
-              {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-              Añadir
-            </button>
+              {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}{t("Añadir")}</button>
           </div>
           {error && <p className="text-xs text-rose-600 mt-2">{error}</p>}
-          <p className="text-xs text-slate-400 mt-2">La persona debe haber iniciado sesión al menos una vez en Vantia antes de poder añadirla.</p>
+          <p className="text-xs text-slate-400 mt-2">{t("La persona debe haber iniciado sesión al menos una vez en Vantia antes de poder añadirla.")}</p>
         </section>
       )}
 
       <section>
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Miembros</h3>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Miembros")}</h3>
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="animate-spin text-slate-300" size={24} /></div>
         ) : (
@@ -1081,8 +1051,7 @@ function UsuariosPanel() {
                       elige al vuelo -- ver transferTarget más abajo. */}
                   {m.rol === 'propietario' ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-full">
-                      <Crown size={12} /> Propietario
-                    </span>
+                      <Crown size={12} />{" "}{t("Propietario")}</span>
                   ) : myRol === 'propietario' ? (
                     <select
                       value={m.rol}
@@ -1090,12 +1059,12 @@ function UsuariosPanel() {
                       disabled={busyId === m.id}
                       className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white capitalize"
                     >
-                      <option value="miembro">Miembro</option>
-                      <option value="soporte">Soporte técnico</option>
-                      <option value="admin">Admin</option>
+                      <option value="miembro">{t("Miembro")}</option>
+                      <option value="soporte">{t("Soporte técnico")}</option>
+                      <option value="admin">{t("Admin")}</option>
                     </select>
                   ) : (
-                    <span className="text-xs font-semibold text-slate-500 capitalize px-2.5 py-1 bg-slate-100 rounded-full">{m.rol}</span>
+                    <span className="text-xs font-semibold text-slate-500 px-2.5 py-1 bg-slate-100 rounded-full">{t(({ admin: 'Admin', miembro: 'Miembro', soporte: 'Soporte técnico' } as Record<string, string>)[m.rol] || m.rol)}</span>
                   )}
 
                   {myRol === 'propietario' && m.rol !== 'propietario' && (
@@ -1103,7 +1072,7 @@ function UsuariosPanel() {
                       onClick={() => setTransferTarget(m)}
                       disabled={busyId === m.id}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                      title="Transferir la propiedad a esta persona"
+                      title={t("Transferir la propiedad a esta persona")}
                     >
                       <Crown size={14} />
                     </button>
@@ -1117,7 +1086,7 @@ function UsuariosPanel() {
                       onClick={() => setPermisosTarget(m)}
                       disabled={busyId === m.id}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:opacity-40"
-                      title="Permisos individuales de este miembro"
+                      title={t("Permisos individuales de este miembro")}
                     >
                       <Lock size={14} />
                     </button>
@@ -1132,7 +1101,7 @@ function UsuariosPanel() {
                       onClick={() => remove(m.id)}
                       disabled={busyId === m.id}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-                      title="Quitar de la organización"
+                      title={t("Quitar de la organización")}
                     >
                       {busyId === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                     </button>
@@ -1140,7 +1109,7 @@ function UsuariosPanel() {
                 </div>
               </div>
             ))}
-            {miembros.length === 0 && <p className="text-sm text-slate-400 px-5 py-8 text-center">Sin miembros.</p>}
+            {miembros.length === 0 && <p className="text-sm text-slate-400 px-5 py-8 text-center">{t("Sin miembros.")}</p>}
           </div>
         )}
       </section>
@@ -1191,7 +1160,7 @@ function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onD
     setBusy(true); setError('');
     const res = await transfer(typedNombre.trim());
     if (res.ok) onDone();
-    else { setError(res.error || 'No se pudo transferir la propiedad.'); setBusy(false); }
+    else { setError(res.error || t("No se pudo transferir la propiedad.")); setBusy(false); }
   };
 
   return (
@@ -1202,18 +1171,15 @@ function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onD
             <Crown size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-extrabold text-slate-900">Transferir propiedad</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Dejarás de ser propietario y pasarás a administrador.</p>
+            <h2 className="text-base font-extrabold text-slate-900">{t("Transferir propiedad")}</h2>
+            <p className="text-sm text-slate-500 mt-0.5">{t("Dejarás de ser propietario y pasarás a administrador.")}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
-            <strong>{targetNombre}</strong> pasará a ser el propietario de <strong>{organizacionNombre}</strong>, con control total:
-            podrá gestionar la facturación, eliminar la organización y cambiar el rol de cualquier miembro, incluido el tuyo.
-            Solo puede haber un propietario a la vez.
-          </div>
+            <strong>{targetNombre}</strong>{" "}{t("pasará a ser el propietario de")}{" "}<strong>{organizacionNombre}</strong>{t(", con control total: podrá gestionar la facturación, eliminar la organización y cambiar el rol de cualquier miembro, incluido el tuyo. Solo puede haber un propietario a la vez.")}</div>
 
           <label className="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer select-none">
             <input
@@ -1221,14 +1187,10 @@ function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onD
               checked={confirmChecked}
               onChange={(e) => setConfirmChecked(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-300"
-            />
-            Entiendo lo que implica y quiero ceder la propiedad.
-          </label>
+            />{t("Entiendo lo que implica y quiero ceder la propiedad.")}</label>
 
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Escribe <span className="text-slate-800 normal-case">{organizacionNombre}</span> para confirmar
-            </label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Escribe")}{" "}<span className="text-slate-800 normal-case">{organizacionNombre}</span>{" "}{t("para confirmar")}</label>
             <input
               value={typedNombre}
               onChange={(e) => setTypedNombre(e.target.value)}
@@ -1242,17 +1204,13 @@ function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onD
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">
-            Cancelar
-          </button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
             className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
           >
-            {busy && <Loader2 size={14} className="animate-spin" />}
-            Transferir propiedad
-          </button>
+            {busy && <Loader2 size={14} className="animate-spin" />}{t("Transferir propiedad")}</button>
         </div>
       </div>
     </div>
@@ -1325,17 +1283,14 @@ function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: 
             <Lock size={20} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-extrabold text-slate-900">Permisos individuales</h2>
+            <h2 className="text-base font-extrabold text-slate-900">{t("Permisos individuales")}</h2>
             <p className="text-sm text-slate-500 mt-0.5 truncate">{miembro.nombre} · <span className="capitalize">{miembro.rol}</span></p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
         </div>
 
         <div className="px-6 py-5">
-          <p className="text-xs text-slate-500 mb-4">
-            Por defecto tiene lo que le da su rol ({miembro.rol}). Cambia un módulo aquí para hacer una excepción solo para
-            esta persona — por ejemplo, un admin que no debe ver Tesorería.
-          </p>
+          <p className="text-xs text-slate-500 mb-4">{t("Por defecto tiene lo que le da su rol (")}{miembro.rol}{t("). Cambia un módulo aquí para hacer una excepción solo para esta persona — por ejemplo, un admin que no debe ver Tesorería.")}</p>
           {loading || !matriz ? (
             <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
           ) : (
@@ -1345,11 +1300,9 @@ function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: 
                 return (
                   <div key={m.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${isCustom ? 'bg-red-50/60' : ''}`}>
                     <span className="text-sm font-medium text-slate-700 flex items-center gap-2 min-w-0">
-                      <span className="truncate">{m.label}</span>
+                      <span className="truncate">{t(m.label)}</span>
                       {isCustom && (
-                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-[#ab0433] bg-red-100 px-1.5 py-0.5 rounded-full">
-                          Personalizado
-                        </span>
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-[#ab0433] bg-red-100 px-1.5 py-0.5 rounded-full">{t("Personalizado")}</span>
                       )}
                     </span>
                     <select
@@ -1359,7 +1312,7 @@ function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: 
                       className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white disabled:opacity-50"
                     >
                       {(['ninguno', 'lectura', 'edicion'] as NivelAcceso[]).map((n) => (
-                        <option key={n} value={n}>{NIVEL_LABEL[n]}</option>
+                        <option key={n} value={n}>{t(NIVEL_LABEL[n])}</option>
                       ))}
                     </select>
                   </div>
@@ -1375,11 +1328,9 @@ function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: 
             disabled={resetting || personalizados.length === 0}
             className="text-xs font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {resetting ? 'Restableciendo…' : `Quitar excepciones (${personalizados.length})`}
+            {resetting ? t("Restableciendo…") : t("Quitar excepciones ({length})", { length: personalizados.length })}
           </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors">
-            Cerrar
-          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors">{t("Cerrar")}</button>
         </div>
       </div>
     </div>
@@ -1388,9 +1339,9 @@ function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: 
 
 const NIVEL_LABEL: Record<NivelAcceso, string> = { ninguno: 'Ninguno', lectura: 'Solo ver', edicion: 'Editar' };
 const ROLES_EDITABLES: { rol: OrgRol; label: string }[] = [
-  { rol: 'admin',    label: 'Admin' },
-  { rol: 'miembro',  label: 'Miembro' },
-  { rol: 'soporte',  label: 'Soporte técnico' },
+  { rol: 'admin',    label: t("Admin") },
+  { rol: 'miembro',  label: t("Miembro") },
+  { rol: 'soporte',  label: t("Soporte técnico") },
 ];
 
 // Matriz módulo × rol, editable solo por el propietario. Solo guarda las
@@ -1434,12 +1385,8 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
 
   return (
     <section className="mt-8">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 border-b border-slate-200 pb-2">Roles y permisos</h3>
-      <p className="text-xs text-slate-500 mb-4 max-w-2xl">
-        Qué puede ver y editar cada rol en cada módulo. El propietario y los administradores siempre tienen acceso completo a todo;
-        aquí se ajusta lo que ven Miembro y Soporte técnico. El rol "Soporte técnico" está pensado para quien administra el sistema
-        sin ser abogado del despacho: por defecto no ve Clientes ni Expedientes, para no depender de su discreción el secreto profesional.
-      </p>
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 border-b border-slate-200 pb-2">{t("Roles y permisos")}</h3>
+      <p className="text-xs text-slate-500 mb-4 max-w-2xl">{t("Qué puede ver y editar cada rol en cada módulo. El propietario y los administradores siempre tienen acceso completo a todo; aquí se ajusta lo que ven Miembro y Soporte técnico. El rol \"Soporte técnico\" está pensado para quien administra el sistema sin ser abogado del despacho: por defecto no ve Clientes ni Expedientes, para no depender de su discreción el secreto profesional.")}</p>
       {loading || !matriz ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
       ) : (
@@ -1447,16 +1394,16 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">Módulo</th>
+                <th className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">{t("Módulo")}</th>
                 {ROLES_EDITABLES.map((r) => (
-                  <th key={r.rol} className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">{r.label}</th>
+                  <th key={r.rol} className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">{t(r.label)}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {modulos.map((m) => (
                 <tr key={m.id}>
-                  <td className="px-4 py-2.5 font-medium text-slate-700">{m.label}</td>
+                  <td className="px-4 py-2.5 font-medium text-slate-700">{t(m.label)}</td>
                   {ROLES_EDITABLES.map((r) => {
                     const cellKey = `${r.rol}:${m.id}`;
                     return (
@@ -1468,7 +1415,7 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
                           className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                         >
                           {(['ninguno', 'lectura', 'edicion'] as NivelAcceso[]).map((n) => (
-                            <option key={n} value={n}>{NIVEL_LABEL[n]}</option>
+                            <option key={n} value={n}>{t(NIVEL_LABEL[n])}</option>
                           ))}
                         </select>
                       </td>
@@ -1480,7 +1427,7 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
           </table>
         </div>
       )}
-      {!editable && <p className="text-xs text-slate-400 mt-2">Solo el propietario puede cambiar estos permisos.</p>}
+      {!editable && <p className="text-xs text-slate-400 mt-2">{t("Solo el propietario puede cambiar estos permisos.")}</p>}
     </section>
   );
 }
@@ -1498,14 +1445,8 @@ function SeguridadPanel() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">
-          Cuenta y autenticación
-        </h3>
-        <p className="text-xs text-slate-500 max-w-2xl mb-5">
-          Contraseña, verificación en dos pasos (2FA) y sesiones activas se gestionan aquí mismo —
-          es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios
-          son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.
-        </p>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">{t("Cuenta y autenticación")}</h3>
+        <p className="text-xs text-slate-500 max-w-2xl mb-5">{t("Contraseña, verificación en dos pasos (2FA) y sesiones activas se gestionan aquí mismo — es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.")}</p>
         <div className="mx-auto max-w-3xl flex justify-center">
           <UserProfile
             routing="hash"
@@ -1515,27 +1456,20 @@ function SeguridadPanel() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">
-          Actividad de la cuenta
-        </h3>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Actividad de la cuenta")}</h3>
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
             <History size={20} className="text-slate-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-800">Historial de accesos y acciones</p>
-            <p className="text-xs text-slate-500 mt-0.5 max-w-md">
-              Inicios de sesión, IP y dispositivo de cada acceso, y el registro de acciones de todo el
-              despacho, están en Trazabilidad.
-            </p>
+            <p className="text-sm font-semibold text-slate-800">{t("Historial de accesos y acciones")}</p>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-md">{t("Inicios de sesión, IP y dispositivo de cada acceso, y el registro de acciones de todo el despacho, están en Trazabilidad.")}</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/dashboard/config?section=trazabilidad')}
             className="shrink-0 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Ver Trazabilidad
-          </button>
+          >{t("Ver Trazabilidad")}</button>
         </div>
       </div>
     </div>
@@ -1582,10 +1516,10 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     setInstagramConnecting(true); setInstagramError('');
     try {
       const d = await apiFetch('/api/instagram/connect', { method: 'POST', getToken });
-      if (!d?.success || !d.data?.url) throw new Error(d?.error || 'No se pudo iniciar la conexión con Instagram.');
+      if (!d?.success || !d.data?.url) throw new Error(d?.error || t("No se pudo iniciar la conexión con Instagram."));
       window.location.href = d.data.url;
     } catch (e: any) {
-      setInstagramError(e.message || 'No se pudo iniciar la conexión con Instagram.');
+      setInstagramError(e.message || t("No se pudo iniciar la conexión con Instagram."));
       setInstagramConnecting(false);
     }
   };
@@ -1593,10 +1527,10 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     setTiktokConnecting(true); setTiktokError('');
     try {
       const d = await apiFetch('/api/tiktok/connect', { method: 'POST', getToken });
-      if (!d?.success || !d.data?.url) throw new Error(d?.error || 'No se pudo iniciar la conexión con TikTok.');
+      if (!d?.success || !d.data?.url) throw new Error(d?.error || t("No se pudo iniciar la conexión con TikTok."));
       window.location.href = d.data.url;
     } catch (e: any) {
-      setTiktokError(e.message || 'No se pudo iniciar la conexión con TikTok.');
+      setTiktokError(e.message || t("No se pudo iniciar la conexión con TikTok."));
       setTiktokConnecting(false);
     }
   };
@@ -1623,7 +1557,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       if (data?.success === false) throw new Error(data.error);
       window.location.reload();
     } catch (e: any) {
-      setDriveError(e.message || 'No se pudo desconectar Google Drive');
+      setDriveError(e.message || t("No se pudo desconectar Google Drive"));
       setDisconnectingDrive(false);
     }
   };
@@ -1650,7 +1584,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       if (data?.success === false) throw new Error(data.error);
       window.location.reload();
     } catch (e: any) {
-      setDropboxError(e.message || 'No se pudo desconectar Dropbox');
+      setDropboxError(e.message || t("No se pudo desconectar Dropbox"));
       setDisconnectingDropbox(false);
     }
   };
@@ -1705,7 +1639,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       setStorageSettingsSaved(true);
       setTimeout(() => setStorageSettingsSaved(false), 2000);
     } catch (e: any) {
-      setStorageSettingsError(e.message || 'No se pudo guardar.');
+      setStorageSettingsError(e.message || t("No se pudo guardar."));
     } finally {
       setSavingStorageSettings(false);
     }
@@ -1753,9 +1687,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       const data = await apiFetch('/api/whatsapp/config', { method: 'PUT', getToken, body: JSON.stringify(form) });
       if (data?.success === false) throw new Error(data.error);
       setStatus(data.data);
-      setMessage('Credenciales guardadas.');
+      setMessage(t("Credenciales guardadas."));
     } catch (e: any) {
-      setError(e.message || 'No se pudo guardar la configuración.');
+      setError(e.message || t("No se pudo guardar la configuración."));
     } finally {
       setSaving(false);
     }
@@ -1766,9 +1700,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     try {
       const data = await apiFetch('/api/whatsapp/config/test', { method: 'POST', getToken });
       if (data?.success === false) throw new Error(data.error);
-      setMessage(`Conexión verificada: ${data.data?.verifiedName || data.data?.displayPhoneNumber || 'número validado'}.`);
+      setMessage(t("Conexión verificada: {numero}.", { numero: data.data?.verifiedName || data.data?.displayPhoneNumber || t("número validado") }));
     } catch (e: any) {
-      setError(e.message || 'No se pudo verificar la conexión con WhatsApp Business.');
+      setError(e.message || t("No se pudo verificar la conexión con WhatsApp Business."));
     } finally {
       setTesting(false);
     }
@@ -1779,8 +1713,8 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Integraciones</h1>
-        <p className="text-sm text-slate-500">Conecta Vantia con canales de mensajería y servicios externos.</p>
+        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">{t("Integraciones")}</h1>
+        <p className="text-sm text-slate-500">{t("Conecta Vantia con canales de mensajería y servicios externos.")}</p>
       </div>
 
       {/* Correo y Quipu: se configuran en su módulo; aquí se ve su estado (14/10/2026). */}
@@ -1794,27 +1728,25 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <MessageCircle size={20} className="text-emerald-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">WhatsApp</p>
-                <p className="text-xs text-slate-400 truncate">WhatsApp Business Cloud API</p>
+                <p className="text-sm font-bold text-slate-800">{t("WhatsApp")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("WhatsApp Business Cloud API")}</p>
               </div>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${waConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {loading ? '…' : waConnected ? 'Conectado' : 'Pendiente'}
+              {loading ? '…' : waConnected ? t("Conectado") : t("Pendiente")}
             </span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Habla con tus clientes por WhatsApp desde Comunicación Externa, sin salir del ERP.
-          </p>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Habla con tus clientes por WhatsApp desde Comunicación Externa, sin salir del ERP.")}</p>
           {canManage ? (
             <button
               type="button"
               onClick={() => setExpanded(true)}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              <Link2 size={13} /> {waConnected ? 'Gestionar' : 'Conectar'}
+              <Link2 size={13} /> {waConnected ? t("Gestionar") : t("Conectar")}
             </button>
           ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+            <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden configurarlo.")}</p>
           )}
         </div>
 
@@ -1825,30 +1757,25 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <Instagram size={20} className="text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">Instagram</p>
-                <p className="text-xs text-slate-400 truncate">{instagram?.connected && instagram.account?.username ? `@${instagram.account.username}` : 'Mensajes, comentarios y publicaciones'}</p>
+                <p className="text-sm font-bold text-slate-800">{t("Instagram")}</p>
+                <p className="text-xs text-slate-400 truncate">{instagram?.connected && instagram.account?.username ? `@${instagram.account.username}` : t("Mensajes, comentarios y publicaciones")}</p>
               </div>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${instagram?.connected ? (instagram.webhookOk === false ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600') : 'bg-slate-100 text-slate-400'}`}>
-              {!instagram ? '…' : instagram.connected ? (instagram.webhookOk === false ? 'Sin mensajes' : 'Conectado') : 'Pendiente'}
+              {!instagram ? '…' : instagram.connected ? (instagram.webhookOk === false ? t("Sin mensajes") : t("Conectado")) : t("Pendiente")}
             </span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Recibe y contesta los mensajes directos, responde comentarios y publica reels, fotos e historias desde Comunicación Externa.
-            Hace falta una cuenta profesional (empresa o creador).
-            {instagram && !instagram.configured && ' Falta configurar Instagram en el servidor.'}
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Recibe y contesta los mensajes directos, responde comentarios y publica reels, fotos e historias desde Comunicación Externa. Hace falta una cuenta profesional (empresa o creador).")}{instagram && !instagram.configured && t(" Falta configurar Instagram en el servidor.")}
           </p>
           {instagramError && <p className="mt-2 text-[11px] text-red-600">{instagramError}</p>}
           {instagram?.connected ? (
             <button type="button" onClick={() => navigate('/dashboard/whatsapp?canal=instagram')} className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50">
-              <Link2 size={13} /> Gestionar
-            </button>
+              <Link2 size={13} />{" "}{t("Gestionar")}</button>
           ) : canManage ? (
             <button type="button" onClick={connectInstagram} disabled={instagramConnecting || !instagram?.configured} className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-              {instagramConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Conectar
-            </button>
+              {instagramConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}{" "}{t("Conectar")}</button>
           ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectarlo.</p>
+            <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden conectarlo.")}</p>
           )}
         </div>
 
@@ -1859,19 +1786,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <Facebook size={20} className="text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">Facebook</p>
-                <p className="text-xs text-slate-400 truncate">Messenger de la Página</p>
+                <p className="text-sm font-bold text-slate-800">{t("Facebook")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("Messenger de la Página")}</p>
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">{t("Próximamente")}</span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Canal independiente de Instagram: mensajes de Messenger a la Página de Facebook del despacho, dentro de la
-            misma bandeja de Comunicación Externa.
-          </p>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Canal independiente de Instagram: mensajes de Messenger a la Página de Facebook del despacho, dentro de la misma bandeja de Comunicación Externa.")}</p>
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} /> Conectar
-          </button>
+            <Link2 size={13} />{" "}{t("Conectar")}</button>
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
@@ -1881,18 +1804,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <TikTokIcon size={20} className="text-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">TikTok</p>
-                <p className="text-xs text-slate-400 truncate">{tiktok?.connected && tiktok.account?.displayName ? tiktok.account.displayName : 'Vídeos y estadísticas'}</p>
+                <p className="text-sm font-bold text-slate-800">{t("TikTok")}</p>
+                <p className="text-xs text-slate-400 truncate">{tiktok?.connected && tiktok.account?.displayName ? tiktok.account.displayName : t("Vídeos y estadísticas")}</p>
               </div>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${tiktok?.connected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {!tiktok ? '…' : tiktok.connected ? 'Conectado' : 'Pendiente'}
+              {!tiktok ? '…' : tiktok.connected ? t("Conectado") : t("Pendiente")}
             </span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Conecta la cuenta del despacho para ver tus vídeos con sus visualizaciones y publicar vídeos nuevos desde
-            Comunicación Externa.
-            {tiktok && !tiktok.configured && ' Falta configurar TikTok en el servidor.'}
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Conecta la cuenta del despacho para ver tus vídeos con sus visualizaciones y publicar vídeos nuevos desde Comunicación Externa.")}{tiktok && !tiktok.configured && t(" Falta configurar TikTok en el servidor.")}
           </p>
           {tiktokError && <p className="mt-2 text-[11px] text-red-600">{tiktokError}</p>}
           {tiktok?.connected ? (
@@ -1901,8 +1821,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               onClick={() => navigate('/dashboard/whatsapp?canal=tiktok')}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
             >
-              <Link2 size={13} /> Gestionar
-            </button>
+              <Link2 size={13} />{" "}{t("Gestionar")}</button>
           ) : canManage ? (
             <button
               type="button"
@@ -1910,10 +1829,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               disabled={tiktokConnecting || !tiktok?.configured}
               className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {tiktokConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />} Conectar
-            </button>
+              {tiktokConnecting ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}{" "}{t("Conectar")}</button>
           ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectarlo.</p>
+            <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden conectarlo.")}</p>
           )}
         </div>
 
@@ -1924,17 +1842,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <DriveLogo size={22} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">Google Drive</p>
-                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+                <p className="text-sm font-bold text-slate-800">{t("Google Drive")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("Documentos de expedientes")}</p>
               </div>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${driveConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {driveConnected ? 'Conectado' : 'Pendiente'}
+              {driveConnected ? t("Conectado") : t("Pendiente")}
             </span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            El servidor no guarda los archivos de forma permanente. Con Google Drive, los documentos de cada expediente se guardan en una carpeta propia y no se pierden.
-            {driveConnected && organizacion?.googleDriveEmail ? ` Cuenta: ${organizacion.googleDriveEmail}.` : ''}
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("El servidor no guarda los archivos de forma permanente. Con Google Drive, los documentos de cada expediente se guardan en una carpeta propia y no se pierden.")}{driveConnected && organizacion?.googleDriveEmail ? t(" Cuenta: {googleDriveEmail}.", { googleDriveEmail: organizacion.googleDriveEmail }) : ''}
           </p>
           {canManage ? (
             driveConnected ? (
@@ -1944,7 +1860,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 disabled={disconnectingDrive}
                 className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
               >
-                {disconnectingDrive ? 'Desconectando…' : 'Desconectar'}
+                {disconnectingDrive ? t("Desconectando…") : t("Desconectar")}
               </button>
             ) : (
               <button
@@ -1953,11 +1869,11 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 disabled={driveConnecting}
                 className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                <Link2 size={13} /> {driveConnecting ? 'Conectando…' : 'Conectar'}
+                <Link2 size={13} /> {driveConnecting ? t("Conectando…") : t("Conectar")}
               </button>
             )
           ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+            <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden configurarlo.")}</p>
           )}
           {driveError && <p className="mt-2 text-xs text-rose-600">{driveError}</p>}
         </div>
@@ -1969,18 +1885,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">OneDrive</p>
-                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+                <p className="text-sm font-bold text-slate-800">{t("OneDrive")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("Documentos de expedientes")}</p>
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">{t("Próximamente")}</span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Alternativa a Google Drive para guardar los documentos de cada expediente en tu cuenta de Microsoft.
-          </p>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Alternativa a Google Drive para guardar los documentos de cada expediente en tu cuenta de Microsoft.")}</p>
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} /> Conectar
-          </button>
+            <Link2 size={13} />{" "}{t("Conectar")}</button>
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
@@ -1990,17 +1903,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <DropboxLogo size={22} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">Dropbox</p>
-                <p className="text-xs text-slate-400 truncate">Vinculación de cuenta</p>
+                <p className="text-sm font-bold text-slate-800">{t("Dropbox")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("Vinculación de cuenta")}</p>
               </div>
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${dropboxConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {dropboxConnected ? 'Conectado' : 'Pendiente'}
+              {dropboxConnected ? t("Conectado") : t("Pendiente")}
             </span>
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Vincula tu cuenta de Dropbox. Por ahora solo conecta la cuenta -- todavía no guarda documentos de expedientes ahí (esa parte llega después).
-            {dropboxConnected && organizacion?.dropboxEmail ? ` Cuenta: ${organizacion.dropboxEmail}.` : ''}
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Vincula tu cuenta de Dropbox. Por ahora solo conecta la cuenta -- todavía no guarda documentos de expedientes ahí (esa parte llega después).")}{dropboxConnected && organizacion?.dropboxEmail ? t(" Cuenta: {dropboxEmail}.", { dropboxEmail: organizacion.dropboxEmail }) : ''}
           </p>
           {canManage ? (
             dropboxConnected ? (
@@ -2010,7 +1921,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 disabled={disconnectingDropbox}
                 className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
               >
-                {disconnectingDropbox ? 'Desconectando…' : 'Desconectar'}
+                {disconnectingDropbox ? t("Desconectando…") : t("Desconectar")}
               </button>
             ) : (
               <button
@@ -2019,11 +1930,11 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 disabled={dropboxConnecting}
                 className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                <Link2 size={13} /> {dropboxConnecting ? 'Conectando…' : 'Conectar'}
+                <Link2 size={13} /> {dropboxConnecting ? t("Conectando…") : t("Conectar")}
               </button>
             )
           ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+            <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden configurarlo.")}</p>
           )}
           {dropboxError && <p className="mt-2 text-xs text-rose-600">{dropboxError}</p>}
         </div>
@@ -2037,10 +1948,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
             className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 text-left transition-colors hover:bg-slate-100/70"
           >
             <span className="flex items-center gap-2 text-xs text-slate-500">
-              <Settings size={13} className="shrink-0 text-slate-400" />
-              Guardado de documentos:{' '}
+              <Settings size={13} className="shrink-0 text-slate-400" />{t("Guardado de documentos:")}{' '}
               <span className="font-semibold text-slate-700">
-                {storageMode === 'auto' ? `automático · ${storageDefault === 'drive' ? 'Google Drive' : 'Dropbox'}` : 'pregunta cada vez'}
+                {storageMode === 'auto' ? t("automático · {v}", { v: storageDefault === 'drive' ? 'Google Drive' : 'Dropbox' }) : t("pregunta cada vez")}
               </span>
             </span>
             <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${showStorageSettings ? 'rotate-180' : ''}`} />
@@ -2049,10 +1959,10 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           {showStorageSettings && (
             <div className="mt-2 rounded-xl border border-slate-200 bg-white p-5 animate-fade-in">
               {!canManage ? (
-                <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden cambiar esto.</p>
+                <p className="text-xs text-slate-400">{t("Solo el propietario o un administrador pueden cambiar esto.")}</p>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-slate-500">A qué nube van los documentos nuevos de un expediente, cuando hay más de una conectada.</p>
+                  <p className="text-xs text-slate-500">{t("A qué nube van los documentos nuevos de un expediente, cuando hay más de una conectada.")}</p>
                   <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
                     <button
                       type="button"
@@ -2062,8 +1972,8 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                         storageMode === 'auto' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      <p className="text-sm font-bold text-slate-800">Automático</p>
-                      <p className="mt-0.5 text-xs text-slate-500">Siempre la misma nube, sin preguntar.</p>
+                      <p className="text-sm font-bold text-slate-800">{t("Automático")}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{t("Siempre la misma nube, sin preguntar.")}</p>
                     </button>
                     <button
                       type="button"
@@ -2073,13 +1983,13 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                         storageMode === 'ask' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      <p className="text-sm font-bold text-slate-800">Preguntar cada vez</p>
-                      <p className="mt-0.5 text-xs text-slate-500">Al subir un documento, elige Drive, Dropbox u OneDrive.</p>
+                      <p className="text-sm font-bold text-slate-800">{t("Preguntar cada vez")}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{t("Al subir un documento, elige Drive, Dropbox u OneDrive.")}</p>
                     </button>
                   </div>
                   {storageMode === 'auto' && connectedStorageProviders.length > 1 && (
                     <div>
-                      <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
+                      <label className="mb-1.5 block text-xs font-bold text-slate-600">{t("Nube por defecto")}</label>
                       <div className="relative w-full max-w-xs" ref={providerPickerRef}>
                         <button
                           type="button"
@@ -2114,19 +2024,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                           </div>
                         )}
                       </div>
-                      <p className="mt-1.5 text-[11px] text-slate-400">
-                        Si la elegida deja de estar conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
-                      </p>
+                      <p className="mt-1.5 text-[11px] text-slate-400">{t("Si la elegida deja de estar conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.")}</p>
                     </div>
                   )}
                   {storageMode === 'auto' && connectedStorageProviders.length === 1 && (
                     <p className="flex items-center gap-2 text-xs text-slate-500">
-                      {connectedStorageProviders[0] === 'drive' ? <DriveLogo size={16} /> : <DropboxLogo size={16} />}
-                      Se guardará en <span className="font-semibold text-slate-700">{providerLabel(connectedStorageProviders[0])}</span>, tu única nube conectada.
-                    </p>
+                      {connectedStorageProviders[0] === 'drive' ? <DriveLogo size={16} /> : <DropboxLogo size={16} />}{t("Se guardará en")}{" "}<span className="font-semibold text-slate-700">{providerLabel(connectedStorageProviders[0])}</span>{t(", tu única nube conectada.")}</p>
                   )}
                   {storageSettingsError && <p className="text-xs text-rose-600">{storageSettingsError}</p>}
-                  {storageSettingsSaved && <p className="text-xs text-emerald-600">Guardado.</p>}
+                  {storageSettingsSaved && <p className="text-xs text-emerald-600">{t("Guardado.")}</p>}
                 </div>
               )}
             </div>
@@ -2146,30 +2052,26 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                   <MessageCircle size={18} className="text-emerald-600" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900">Configurar WhatsApp Business</h3>
-                  <p className="text-xs text-slate-400">{waConnected ? 'Conectado' : 'Pendiente de configurar'}</p>
+                  <h3 className="text-sm font-bold text-slate-900">{t("Configurar WhatsApp Business")}</h3>
+                  <p className="text-xs text-slate-400">{waConnected ? t("Conectado") : t("Pendiente de configurar")}</p>
                 </div>
               </div>
               <button onClick={() => setExpanded(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-              <p className="mb-4 text-xs text-slate-500">
-                El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app
-                conectada al número Business del despacho.
-              </p>
+              <p className="mb-4 text-xs text-slate-500">{t("El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app conectada al número Business del despacho.")}</p>
               {error && <p className="mb-3 text-xs font-medium text-rose-600">{error}</p>}
               {message && <p className="mb-3 text-xs font-medium text-emerald-600">{message}</p>}
               <div className="grid gap-4 sm:grid-cols-2">
-                <ConfigInput label="Access token" value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder="EAAG..." />
-                <ConfigInput label="Phone number id" value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
-                <ConfigInput label="Verify token" value={form.verifyToken} onChange={(v) => setForm((f) => ({ ...f, verifyToken: v }))} placeholder="token-seguro" />
-                <ConfigInput label="Webhook base URL" value={form.webhookBaseUrl} onChange={(v) => setForm((f) => ({ ...f, webhookBaseUrl: v }))} placeholder="https://tu-dominio.com" />
-                <ConfigInput label="Graph version" value={form.graphVersion} onChange={(v) => setForm((f) => ({ ...f, graphVersion: v }))} placeholder="v23.0" />
-                <ConfigInput label="Business account id" value={form.businessAccountId} onChange={(v) => setForm((f) => ({ ...f, businessAccountId: v }))} placeholder="opcional" />
+                <ConfigInput label={t("Access token")} value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder={t("EAAG...")} />
+                <ConfigInput label={t("Phone number id")} value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
+                <ConfigInput label={t("Verify token")} value={form.verifyToken} onChange={(v) => setForm((f) => ({ ...f, verifyToken: v }))} placeholder={t("token-seguro")} />
+                <ConfigInput label={t("Webhook base URL")} value={form.webhookBaseUrl} onChange={(v) => setForm((f) => ({ ...f, webhookBaseUrl: v }))} placeholder={t("https://tu-dominio.com")} />
+                <ConfigInput label={t("Graph version")} value={form.graphVersion} onChange={(v) => setForm((f) => ({ ...f, graphVersion: v }))} placeholder="v23.0" />
+                <ConfigInput label={t("Business account id")} value={form.businessAccountId} onChange={(v) => setForm((f) => ({ ...f, businessAccountId: v }))} placeholder={t("opcional")} />
               </div>
               {status?.webhookUrl && (
-                <p className="mt-4 text-[11px] text-slate-400">
-                  URL de webhook para pegar en Meta: <code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
+                <p className="mt-4 text-[11px] text-slate-400">{t("URL de webhook para pegar en Meta:")}{" "}<code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
                 </p>
               )}
             </div>
@@ -2180,18 +2082,14 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 disabled={testing || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
               >
-                {testing ? <Loader2 size={14} className="animate-spin" /> : <LockKeyhole size={14} />}
-                Probar conexión
-              </button>
+                {testing ? <Loader2 size={14} className="animate-spin" /> : <LockKeyhole size={14} />}{t("Probar conexión")}</button>
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#92042c] disabled:opacity-50"
               >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-                Guardar credenciales
-              </button>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}{t("Guardar credenciales")}</button>
             </div>
           </div>
         </div>,
@@ -2284,10 +2182,10 @@ function NotificacionesPanel() {
       const token = await getToken();
       const res = await fetch('/api/push/prueba', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const d = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(d?.error || 'No se pudo enviar');
+      if (!res.ok) throw new Error(d?.error || t("No se pudo enviar"));
       setPrueba('ok');
     } catch (e: any) {
-      setPrueba(e?.message || 'No se pudo enviar');
+      setPrueba(e?.message || t('No se pudo enviar'));
     }
   };
 
@@ -2301,33 +2199,33 @@ function NotificacionesPanel() {
     if (!okd) {
       setError(
         push.permission === 'denied'
-          ? 'Has bloqueado los avisos para este sitio en el navegador. Actívalos desde los ajustes de notificaciones del navegador y vuelve a intentarlo.'
-          : 'No se ha podido activar. Inténtalo de nuevo.',
+          ? t("Has bloqueado los avisos para este sitio en el navegador. Actívalos desde los ajustes de notificaciones del navegador y vuelve a intentarlo.")
+          : t("No se ha podido activar. Inténtalo de nuevo."),
       );
     }
   };
 
   const EVENTS: { key: TipoPrefAviso; icon: any; label: string; desc: string }[] = [
-    { key: 'chat', icon: MessageCircle, label: 'Mensajes del chat interno', desc: 'Cuando alguien te escribe en un canal o directo. No llegan si estás en "No molestar", "En juicio" o "En reunión".' },
-    { key: 'correo', icon: MailIcon, label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada (se revisa cada pocos minutos).' },
-    { key: 'whatsapp', icon: Phone, label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp (si puedes ver Comunicación externa).' },
-    { key: 'plazo', icon: Clock3, label: 'Plazos y recordatorios', desc: 'A 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios (uno por semana).' },
-    { key: 'vista', icon: Gavel, label: 'Vistas',                    desc: 'Vistas por confirmar, cambios y cancelaciones de las que te tocan.' },
-    { key: 'soporte', icon: LifeBuoy, label: 'Centro de soporte',         desc: 'Respuestas y cambios de estado en tus tickets.' },
+    { key: 'chat', icon: MessageCircle, label: t("Mensajes del chat interno"), desc: t("Cuando alguien te escribe en un canal o directo. No llegan si estás en \"No molestar\", \"En juicio\" o \"En reunión\".") },
+    { key: 'correo', icon: MailIcon, label: t("Correo nuevo"),              desc: t("Al llegar un correo a tu bandeja de entrada (se revisa cada pocos minutos).") },
+    { key: 'whatsapp', icon: Phone, label: t("WhatsApp entrante"),         desc: t("Cuando un cliente escribe por WhatsApp (si puedes ver Comunicación externa).") },
+    { key: 'plazo', icon: Clock3, label: t("Plazos y recordatorios"), desc: t("A 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios (uno por semana).") },
+    { key: 'vista', icon: Gavel, label: t("Vistas"),                    desc: t("Vistas por confirmar, cambios y cancelaciones de las que te tocan.") },
+    { key: 'soporte', icon: LifeBuoy, label: t("Centro de soporte"),         desc: t("Respuestas y cambios de estado en tus tickets.") },
   ];
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Avisos push del navegador</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{t("Avisos push del navegador")}</h3>
           <ComoFunciona capitulo="17" />
         </div>
 
         {!push.supported ? (
-          <p className="text-sm text-slate-500">Este navegador no admite notificaciones push.</p>
+          <p className="text-sm text-slate-500">{t("Este navegador no admite notificaciones push.")}</p>
         ) : !push.serverEnabled ? (
-          <p className="text-sm text-slate-500">Las notificaciones push todavía no están configuradas en el servidor.</p>
+          <p className="text-sm text-slate-500">{t("Las notificaciones push todavía no están configuradas en el servidor.")}</p>
         ) : (
           <div className="flex items-start gap-4">
             <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${push.subscribed ? 'bg-emerald-50' : 'bg-slate-100'}`}>
@@ -2335,19 +2233,17 @@ function NotificacionesPanel() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-800">
-                {push.subscribed ? 'Avisos activados en este dispositivo' : 'Avisos desactivados en este dispositivo'}
+                {push.subscribed ? t("Avisos activados en este dispositivo") : t("Avisos desactivados en este dispositivo")}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5 max-w-md">
-                Recibe un aviso del sistema aunque tengas Vantia cerrado o en segundo plano. Se activa por dispositivo/navegador, no por cuenta.
-              </p>
+              <p className="text-xs text-slate-500 mt-0.5 max-w-md">{t("Recibe un aviso del sistema aunque tengas Vantia cerrado o en segundo plano. Se activa por dispositivo/navegador, no por cuenta.")}</p>
               {error && <p className="peligro text-xs text-red-600 mt-2">{error}</p>}
               {push.subscribed && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => void enviarPrueba()} disabled={prueba === 'enviando'}
                     className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60">
-                    {prueba === 'enviando' ? 'Enviando…' : 'Enviar aviso de prueba'}
+                    {prueba === 'enviando' ? t("Enviando…") : t("Enviar aviso de prueba")}
                   </button>
-                  {prueba === 'ok' && <span className="text-xs text-emerald-700">Enviado: debería aparecer en unos segundos (con Vantia en segundo plano).</span>}
+                  {prueba === 'ok' && <span className="text-xs text-emerald-700">{t("Enviado: debería aparecer en unos segundos (con Vantia en segundo plano).")}</span>}
                   {prueba && prueba !== 'ok' && prueba !== 'enviando' && <span className="text-xs text-red-600">{prueba}</span>}
                 </div>
               )}
@@ -2362,7 +2258,7 @@ function NotificacionesPanel() {
                   : 'bg-red-600 text-white hover:bg-red-700'
               }`}
             >
-              {push.busy ? 'Un momento…' : push.subscribed ? 'Desactivar' : 'Activar avisos'}
+              {push.busy ? t("Un momento…") : push.subscribed ? t("Desactivar") : t("Activar avisos")}
             </button>
           </div>
         )}
@@ -2370,14 +2266,14 @@ function NotificacionesPanel() {
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Qué te avisa</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{t("Qué te avisa")}</h3>
           <span className="text-[11px] text-slate-400">
-            {guardado === 'guardando' ? 'Guardando…' : guardado === 'ok' ? 'Guardado' : guardado === 'error' ? 'No se pudo guardar' : 'Para todos tus dispositivos'}
+            {guardado === 'guardando' ? t("Guardando…") : guardado === 'ok' ? t("Guardado") : guardado === 'error' ? t("No se pudo guardar") : t("Para todos tus dispositivos")}
           </span>
         </div>
         <div className="mb-2 flex justify-end gap-3 pr-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          <span className="w-9 text-center">Aviso</span>
-          <span className="w-9 text-center">Correo</span>
+          <span className="w-9 text-center">{t("Aviso")}</span>
+          <span className="w-9 text-center">{t("Correo")}</span>
         </div>
         <div className="space-y-3">
           {EVENTS.map((e) => {
@@ -2385,7 +2281,7 @@ function NotificacionesPanel() {
             const porCorreo = Boolean(prefs?.email?.[e.key]);
             const interruptor = (activo: boolean, etiqueta: string, onClick: () => void, deshabilitado = false) => (
               <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} disabled={!prefs || deshabilitado} onClick={onClick}
-                title={deshabilitado ? 'Un correo para avisar de un correo no tiene sentido' : undefined}
+                title={deshabilitado ? t('Un correo para avisar de un correo no tiene sentido') : undefined}
                 className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 ${activo ? 'bg-red-600' : 'bg-slate-300'}`}>
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </button>
@@ -2394,12 +2290,12 @@ function NotificacionesPanel() {
               <div key={e.key} className="flex items-start gap-3">
                 <e.icon size={16} className="text-slate-400 mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-700">{e.label}</p>
-                  <p className="text-xs text-slate-500">{e.desc}</p>
+                  <p className="text-sm font-medium text-slate-700">{t(e.label)}</p>
+                  <p className="text-xs text-slate-500">{t(e.desc)}</p>
                 </div>
-                {interruptor(on, `${e.label}: aviso en el navegador`,
+                {interruptor(on, t('{tipo}: aviso en el navegador', { tipo: t(e.label) }),
                   () => prefs && cambiarPrefs({ ...prefs, tipos: { ...prefs.tipos, [e.key]: !on } }))}
-                {interruptor(porCorreo, `${e.label}: por correo`,
+                {interruptor(porCorreo, t('{tipo}: por correo', { tipo: t(e.label) }),
                   () => prefs && cambiarPrefs({ ...prefs, email: { ...(prefs.email || {} as Record<TipoPrefAviso, boolean>), [e.key]: !porCorreo } }),
                   e.key === 'correo')}
               </div>
@@ -2408,9 +2304,9 @@ function NotificacionesPanel() {
         </div>
         <p className="mt-4 text-xs text-slate-500">
           {cuentaCorreo
-            ? <>Los avisos por correo salen de tu cuenta <span className="font-semibold text-slate-700">{cuentaCorreo}</span> y te llegan a tu correo de acceso. El chat y WhatsApp, como mucho uno cada 15 minutos.</>
+            ? <>{t("Los avisos por correo salen de tu cuenta")}{" "}<span className="font-semibold text-slate-700">{cuentaCorreo}</span>{" "}{t("y te llegan a tu correo de acceso. El chat y WhatsApp, como mucho uno cada 15 minutos.")}</>
             : cuentaCorreo === null
-              ? <span className="text-amber-700">Para recibir avisos por correo necesitas una cuenta de correo conectada en <Link to="/dashboard/correo" className="font-semibold underline">Correo</Link>: los avisos salen desde ella.</span>
+              ? <span className="text-amber-700">{t("Para recibir avisos por correo necesitas una cuenta de correo conectada en")}{" "}<Link to="/dashboard/correo" className="font-semibold underline">{t("Correo")}</Link>{t(": los avisos salen desde ella.")}</span>
               : null}
         </p>
       </div>
@@ -2462,9 +2358,9 @@ function NotificacionesPanel() {
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Horario de silencio</h3>
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{t("Horario de silencio")}</h3>
           {prefs && (
-            <button type="button" role="switch" aria-checked={prefs.silencio.activo} aria-label="Horario de silencio"
+            <button type="button" role="switch" aria-checked={prefs.silencio.activo} aria-label={t("Horario de silencio")}
               onClick={() => cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, activo: !prefs.silencio.activo } })}
               className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${prefs.silencio.activo ? 'bg-red-600' : 'bg-slate-300'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${prefs.silencio.activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
@@ -2472,11 +2368,11 @@ function NotificacionesPanel() {
           )}
         </div>
         {!prefs ? (
-          <p className="text-sm text-slate-400">Cargando…</p>
+          <p className="text-sm text-slate-400">{t("Cargando…")}</p>
         ) : (
           <div className={prefs.silencio.activo ? '' : 'opacity-50'}>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-              <span>Sin avisos de</span>
+              <span>{t("Sin avisos de")}</span>
               <input type="time" value={prefs.silencio.desde} disabled={!prefs.silencio.activo}
                 onChange={(ev) => ev.target.value && cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, desde: ev.target.value } })}
                 className="rounded-lg border border-slate-200 px-2 py-1 text-sm" />
@@ -2484,16 +2380,12 @@ function NotificacionesPanel() {
               <input type="time" value={prefs.silencio.hasta} disabled={!prefs.silencio.activo}
                 onChange={(ev) => ev.target.value && cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, hasta: ev.target.value } })}
                 className="rounded-lg border border-slate-200 px-2 py-1 text-sm" />
-              <span className="text-xs text-slate-400">(hora de Madrid)</span>
+              <span className="text-xs text-slate-400">{t("(hora de Madrid)")}</span>
             </div>
             <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={prefs.silencio.finDeSemana} disabled={!prefs.silencio.activo} className="accent-red-600"
-                onChange={(ev) => cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, finDeSemana: ev.target.checked } })} />
-              Y todo el fin de semana
-            </label>
-            <p className="mt-3 text-xs text-slate-500">
-              Vale para el aviso y para el correo. Los mensajes directos del chat y las vistas llegan siempre: son lo urgente. Los plazos que caigan en silencio se avisan al terminar.
-              {prefs.silencio.activo && enSilencioAhora && <span className="ml-1 font-semibold text-slate-700">Ahora mismo estás en silencio.</span>}
+                onChange={(ev) => cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, finDeSemana: ev.target.checked } })} />{t("Y todo el fin de semana")}</label>
+            <p className="mt-3 text-xs text-slate-500">{t("Vale para el aviso y para el correo. Los mensajes directos del chat y las vistas llegan siempre: son lo urgente. Los plazos que caigan en silencio se avisan al terminar.")}{prefs.silencio.activo && enSilencioAhora && <span className="ml-1 font-semibold text-slate-700">{t("Ahora mismo estás en silencio.")}</span>}
             </p>
           </div>
         )}
@@ -2535,22 +2427,22 @@ export default function Configuracion() {
       {/* ── Sub-navegación de Ajustes ── */}
       <aside className="w-full md:w-64 flex-shrink-0 flex flex-col bg-white border-b md:border-b-0 md:border-r border-slate-200 z-10">
         <div className="px-4 pt-4 pb-1 md:p-6 md:pb-2">
-          <h2 className="text-lg font-extrabold text-slate-800">Ajustes</h2>
+          <h2 className="text-lg font-extrabold text-slate-800">{t("Ajustes")}</h2>
         </div>
         <div className="md:flex-1 md:overflow-y-auto modules-scrollbar p-3">
           <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar md:flex-col md:overflow-visible md:pb-0">
             {[
-              { titulo: 'Mi cuenta', items: SECCIONES_CUENTA },
-              { titulo: 'Despacho', items: SECCIONES_DESPACHO.filter((x) => !x.soloGestor || esGestor) },
+              { titulo: t("Mi cuenta"), items: SECCIONES_CUENTA },
+              { titulo: t("Despacho"), items: SECCIONES_DESPACHO.filter((x) => !x.soloGestor || esGestor) },
             ].map((grupo, gi) => (
               <React.Fragment key={grupo.titulo}>
                 {gi > 0 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
-                <p className={`hidden md:block px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${gi > 0 ? 'mt-5' : ''}`}>{grupo.titulo}</p>
+                <p className={`hidden md:block px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${gi > 0 ? 'mt-5' : ''}`}>{t(grupo.titulo)}</p>
                 {grupo.items.map((it) => {
                   const Icon = it.icon;
                   const active = activeSection === it.key;
                   // Para quien no es propietario/admin, Trazabilidad es solo su actividad.
-                  const label = it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label;
+                  const label = t(it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label);
                   return (
                     <button key={it.key} type="button" onClick={() => setActiveSection(it.key)}
                       className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left group ${
@@ -2576,8 +2468,8 @@ export default function Configuracion() {
 
           {activeSection === 'apariencia' ? (
             <>
-              <CabeceraAjuste icon={Palette} titulo="Apariencia"
-                descripcion="Modo claro u oscuro, tema de color, tamaño del texto y animaciones. Se guarda en tu cuenta y se aplica en todos tus dispositivos." />
+              <CabeceraAjuste icon={Palette} titulo={t("Apariencia")}
+                descripcion={t("Modo claro u oscuro, tema de color, tamaño del texto y animaciones. Se guarda en tu cuenta y se aplica en todos tus dispositivos.")} />
 
               {/* Ajustes a la izquierda y, a la derecha, una muestra en vivo
                   con piezas reales de la app (cambia al momento). */}
@@ -2594,7 +2486,7 @@ export default function Configuracion() {
 
               {/* Tema del sistema */}
               <section className="mb-10">
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tema del Entorno de Trabajo</h3>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Tema del Entorno de Trabajo")}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10 mt-6">
                   {PALETTES.map((p) => (
                     <PaletteCard
@@ -2609,9 +2501,7 @@ export default function Configuracion() {
 
               {/* 15/10/2026: sin colores a medida -- solo los temas predefinidos, cada
                   uno con su versión clara y oscura, para que todo se vea siempre bien. */}
-              <p className="text-xs text-slate-500">
-                Cada tema tiene su versión clara y oscura: elige el modo arriba y el tema aquí.
-              </p>
+              <p className="text-xs text-slate-500">{t("Cada tema tiene su versión clara y oscura: elige el modo arriba y el tema aquí.")}</p>
             </>
           ) : activeSection === 'manual' ? (
             <ManualPanel />
@@ -2648,9 +2538,9 @@ export default function Configuracion() {
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                 {activeOther && <activeOther.icon size={24} className="text-slate-400" />}
               </div>
-              <h1 className="text-xl font-extrabold text-slate-800 mb-1">{activeOther?.label}</h1>
-              <p className="text-sm text-slate-500 max-w-sm">{activeOther?.desc}</p>
-              <span className="mt-4 px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-full border border-slate-200">Próximamente</span>
+              <h1 className="text-xl font-extrabold text-slate-800 mb-1">{activeOther && t(activeOther.label)}</h1>
+              <p className="text-sm text-slate-500 max-w-sm">{activeOther && t(activeOther.desc)}</p>
+              <span className="mt-4 px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-full border border-slate-200">{t("Próximamente")}</span>
             </div>
           )}
 

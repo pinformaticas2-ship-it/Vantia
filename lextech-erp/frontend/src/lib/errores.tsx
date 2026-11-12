@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Home, RotateCcw, Copy, Check } from 'lucide-react';
 import { apiFetch } from './api';
+import { t } from './i18n';
 
 // ── Que un fallo no deje la página en blanco (16/10/2026) ───────────────────
 // Antes, un error en cualquier pantalla (p. ej. "Mi perfil" con un dato
@@ -18,7 +19,7 @@ const enviados = new Set<string>();
 
 export function reportarError(error: unknown, extra?: { tipo?: string; componentStack?: string }) {
   const e = error as any;
-  const mensaje = String(e?.message || e || 'Error desconocido').slice(0, 1000);
+  const mensaje = String(e?.message || e || t('Error desconocido')).slice(0, 1000);
   // Ruido que no es un fallo de la app.
   if (/ResizeObserver loop|AbortError|The user aborted|Load failed|NetworkError when attempting|Failed to fetch/i.test(mensaje)) return;
   const clave = `${extra?.tipo || 'pantalla'}|${mensaje}|${location.pathname}`;
@@ -87,30 +88,25 @@ class Barrera extends React.Component<Props, Estado> {
             <AlertTriangle size={26} />
           </span>
           <h1 className="text-lg font-semibold text-slate-900">
-            {completa ? 'Vantia ha tenido un problema' : 'Algo ha fallado en esta sección'}
+            {completa ? t("Vantia ha tenido un problema") : t("Algo ha fallado en esta sección")}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            No has perdido nada de lo que ya estaba guardado. Ya nos ha llegado el aviso del error;
-            prueba a reintentar y, si se repite, escríbenos desde el Centro de soporte.
-          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">{t("No has perdido nada de lo que ya estaba guardado. Ya nos ha llegado el aviso del error; prueba a reintentar y, si se repite, escríbenos desde el Centro de soporte.")}</p>
           <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
             <button
               type="button"
               onClick={() => (completa ? location.reload() : this.setState({ error: null }))}
               className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800"
             >
-              <RotateCcw size={15} /> Reintentar
-            </button>
+              <RotateCcw size={15} />{" "}{t("Reintentar")}</button>
             <a
               href="/dashboard"
               className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              <Home size={15} /> Ir al inicio
-            </a>
+              <Home size={15} />{" "}{t("Ir al inicio")}</a>
           </div>
           <button type="button" onClick={this.copiar} className="mt-4 inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800">
             {this.state.copiado ? <Check size={13} /> : <Copy size={13} />}
-            {this.state.copiado ? 'Copiado' : 'Copiar detalles para soporte'}
+            {this.state.copiado ? t("Copiado") : t("Copiar detalles para soporte")}
           </button>
         </div>
       </div>

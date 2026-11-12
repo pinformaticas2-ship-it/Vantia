@@ -6,6 +6,7 @@ import { apiFetch } from '../lib/api';
 import { notifyVistasChanged } from '../lib/useVistasStatus';
 import VistasCorreoConfigModal, { CorreoConfig } from '../components/VistasCorreoConfigModal';
 import DocsBaseAutomatizacion from '../components/DocsBaseAutomatizacion';
+import { t } from '../lib/i18n';
 
 // Configuración → Automatizaciones. Un único interruptor: al encenderlo se
 // activa la automatización de vistas por correo para la organización activa,
@@ -61,7 +62,7 @@ export default function AutomatizacionesPanel() {
       if (res?.success === false) throw new Error(res.error);
       setData(res.data);
     } catch (e: any) {
-      setError(e.message || 'No se pudo cargar la automatización');
+      setError(e.message || t("No se pudo cargar la automatización"));
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,7 @@ export default function AutomatizacionesPanel() {
       notifyVistasChanged();
       setEligiendoBuzon(false);
     } catch (e: any) {
-      setError(e.message || 'No se pudo cambiar');
+      setError(e.message || t("No se pudo cambiar"));
     } finally {
       setSaving(false);
     }
@@ -108,8 +109,8 @@ export default function AutomatizacionesPanel() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Automatizaciones</h1>
-        <p className="text-sm text-slate-500">Se activan para la organización en la que estás trabajando.</p>
+        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">{t("Automatizaciones")}</h1>
+        <p className="text-sm text-slate-500">{t("Se activan para la organización en la que estás trabajando.")}</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -119,9 +120,9 @@ export default function AutomatizacionesPanel() {
               <CalendarCheck size={20} className="text-red-600" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800">Vistas recibidas por correo</p>
+              <p className="text-sm font-bold text-slate-800">{t("Vistas recibidas por correo")}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                {enabled ? 'Activada en esta organización.' : 'Desactivada en esta organización.'}
+                {enabled ? t("Activada en esta organización.") : t("Desactivada en esta organización.")}
               </p>
             </div>
           </div>
@@ -129,8 +130,7 @@ export default function AutomatizacionesPanel() {
           {data?.config && (
             <button type="button" onClick={() => setConfigOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
-              <Settings2 size={14} /> Configurar correo
-            </button>
+              <Settings2 size={14} />{" "}{t("Configurar correo")}</button>
           )}
           <button
             type="button"
@@ -138,7 +138,7 @@ export default function AutomatizacionesPanel() {
             aria-checked={enabled}
             disabled={!canManage || saving}
             onClick={() => void toggle()}
-            title={canManage ? (enabled ? 'Desactivar' : 'Activar') : 'Solo el propietario o un administrador pueden cambiarlo'}
+            title={canManage ? (enabled ? t("Desactivar") : t("Activar")) : t("Solo el propietario o un administrador pueden cambiarlo")}
             className={`relative shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${enabled ? 'bg-red-600' : 'bg-slate-300'}`}
           >
             {saving
@@ -152,38 +152,34 @@ export default function AutomatizacionesPanel() {
           {PASOS.map((p, i) => (
             <li key={i} className="flex gap-2">
               <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">{i + 1}</span>
-              <span>{p}</span>
+              <span>{t(p)}</span>
             </li>
           ))}
         </ol>
 
         {!canManage && (
-          <p className="mt-4 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-            Solo el propietario o un administrador de la organización pueden activarla o desactivarla.
-          </p>
+          <p className="mt-4 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">{t("Solo el propietario o un administrador de la organización pueden activarla o desactivarla.")}</p>
         )}
 
         {enabled && (
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
             {data?.mailboxLabel && (
-              <span>Buzón vigilado: <b className="text-slate-700">{data.mailboxLabel}</b>
-                {canManage && <button type="button" onClick={() => setEligiendoBuzon(true)} className="ml-1.5 font-bold text-red-600 hover:underline">Cambiar</button>}
+              <span>{t("Buzón vigilado:")}{" "}<b className="text-slate-700">{data.mailboxLabel}</b>
+                {canManage && <button type="button" onClick={() => setEligiendoBuzon(true)} className="ml-1.5 font-bold text-red-600 hover:underline">{t("Cambiar")}</button>}
               </span>
             )}
-            <span>Desde: <b className="text-slate-700">{fmt(data?.activatedAt)}</b></span>
-            <span>Última revisión: <b className="text-slate-700">{fmt(data?.lastRunAt)}</b></span>
-            {data?.canSee && <Link to="/dashboard/vistas" className="font-bold text-red-600 hover:underline">Ver vistas →</Link>}
+            <span>{t("Desde:")}{" "}<b className="text-slate-700">{fmt(data?.activatedAt)}</b></span>
+            <span>{t("Última revisión:")}{" "}<b className="text-slate-700">{fmt(data?.lastRunAt)}</b></span>
+            {data?.canSee && <Link to="/dashboard/vistas" className="font-bold text-red-600 hover:underline">{t("Ver vistas →")}</Link>}
           </div>
         )}
         {enabled && (
-          <p className="mt-2 text-xs text-slate-500">
-            Por privacidad, las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón vigilado y el abogado responsable.
-          </p>
+          <p className="mt-2 text-xs text-slate-500">{t("Por privacidad, las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón vigilado y el abogado responsable.")}</p>
         )}
         {enabled && data?.mailboxCompartido && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-            <span>Este correo también se revisa en otra organización, así que las vistas pueden duplicarse. Elige otro correo aquí o pide que lo desactiven allí.</span>
+            <span>{t("Este correo también se revisa en otra organización, así que las vistas pueden duplicarse. Elige otro correo aquí o pide que lo desactiven allí.")}</span>
           </p>
         )}
         {enabled && (data?.mailboxWarning || data?.lastError) && (
@@ -193,8 +189,7 @@ export default function AutomatizacionesPanel() {
         )}
         {data && data.iaDisponible === false && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <Sparkles size={13} className="shrink-0 mt-0.5" /> La IA (Gemini) no está configurada en el servidor: los datos se leerán por patrones, con menos precisión. Revisa siempre la fecha antes de aceptar.
-          </p>
+            <Sparkles size={13} className="shrink-0 mt-0.5" />{" "}{t("La IA (Gemini) no está configurada en el servidor: los datos se leerán por patrones, con menos precisión. Revisa siempre la fecha antes de aceptar.")}</p>
         )}
 
         {error && !eligiendoBuzon && <p className="peligro mt-3 text-sm text-red-600">{error}</p>}
@@ -204,7 +199,7 @@ export default function AutomatizacionesPanel() {
 
       {eligiendoBuzon && data && (
         <ElegirBuzon
-          organizacion={data.organizacionNombre || 'esta organización'}
+          organizacion={data.organizacionNombre || t('esta organización')}
           opciones={data.mailboxOptions || []}
           actual={data.mailboxId || null}
           activando={!data.enabled}
@@ -246,17 +241,15 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
       <div className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-base font-bold text-slate-800">¿Qué correo se revisa para buscar vistas?</p>
-            <p className="mt-0.5 text-xs text-slate-500">En <b className="text-slate-700">{organizacion}</b>. Solo se leerá este buzón, y solo lo que llegue a partir de ahora.</p>
+            <p className="text-base font-bold text-slate-800">{t("¿Qué correo se revisa para buscar vistas?")}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{t("En")}{" "}<b className="text-slate-700">{organizacion}</b>{t(". Solo se leerá este buzón, y solo lo que llegue a partir de ahora.")}</p>
           </div>
-          <button type="button" onClick={onCancel} aria-label="Cerrar" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
+          <button type="button" onClick={onCancel} aria-label={t("Cerrar")} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
         </div>
         <div className="space-y-2 px-5 py-4">
           {opciones.length === 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              No tienes ningún correo conectado en esta organización.{' '}
-              <Link to="/dashboard/correo" className="font-bold underline">Conéctalo en Correo</Link> y vuelve aquí para activarla.
-            </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{t("No tienes ningún correo conectado en esta organización.")}{' '}
+              <Link to="/dashboard/correo" className="font-bold underline">{t("Conéctalo en Correo")}</Link>{" "}{t("y vuelve aquí para activarla.")}</div>
           )}
           {opciones.map((o) => {
             const activo = elegido === o.id;
@@ -268,12 +261,12 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><Mail size={14} className="shrink-0 text-slate-400" /><span className="truncate">{o.label}</span></span>
-                  {o.id === actualActivo && <span className="mt-0.5 block text-xs text-slate-500">Es el que se revisa ahora.</span>}
+                  {o.id === actualActivo && <span className="mt-0.5 block text-xs text-slate-500">{t("Es el que se revisa ahora.")}</span>}
                   {o.warning && <span className="mt-1 block text-xs text-amber-700">{o.warning}</span>}
                   {o.vigiladoEnOtra && o.id !== actualActivo && (
                     <span className="mt-1 flex items-start gap-1 text-xs text-amber-700">
                       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      <span>Este correo ya se revisa en otra organización. Para usarlo aquí, primero hay que desactivarlo allí.</span>
+                      <span>{t("Este correo ya se revisa en otra organización. Para usarlo aquí, primero hay que desactivarlo allí.")}</span>
                     </span>
                   )}
                 </span>
@@ -283,11 +276,11 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
           {error && <p className="peligro text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
+          <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{t("Cancelar")}</button>
           <button type="button" disabled={!sel || bloqueada(sel) || guardando} onClick={() => sel && onConfirm(sel)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
             {guardando && <Loader2 size={14} className="animate-spin" />}
-            {activando ? 'Activar con este correo' : 'Usar este correo'}
+            {activando ? t("Activar con este correo") : t("Usar este correo")}
           </button>
         </div>
       </div>

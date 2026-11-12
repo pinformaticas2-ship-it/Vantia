@@ -5,6 +5,7 @@ import { Cloud, Check, X, ExternalLink, Settings, Link2, Unlink } from "lucide-r
 import { startGoogleDriveConnect } from "../lib/googleDriveConnect";
 import { startDropboxConnect } from "../lib/dropboxConnect";
 import { apiFetch } from "../lib/api";
+import { t } from '../lib/i18n';
 
 export function DriveLogo({ size = 20 }: { size?: number }) {
   return (
@@ -110,7 +111,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
       if (data?.success === false) throw new Error(data.error);
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || "No se pudo desconectar Google Drive");
+      setError(e.message || t("No se pudo desconectar Google Drive"));
       setBusy(false);
     }
   };
@@ -128,7 +129,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
       if (data?.success === false) throw new Error(data.error);
       window.location.reload();
     } catch (e: any) {
-      setError(e.message || "No se pudo desconectar Dropbox");
+      setError(e.message || t("No se pudo desconectar Dropbox"));
       setBusy(false);
     }
   };
@@ -146,38 +147,38 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
       <StatusIcon
         connected={driveConnected}
         hasError={driveHasError}
-        title={driveConnected ? (driveHasError ? "Google Drive vinculado, pero con un error reciente" : "Google Drive vinculado") : "Google Drive no vinculado"}
+        title={driveConnected ? (driveHasError ? t("Google Drive vinculado, pero con un error reciente") : t("Google Drive vinculado")) : t("Google Drive no vinculado")}
         onClick={() => toggle("drive")}
       >
         <DriveLogo />
       </StatusIcon>
-      <StatusIcon connected={false} title="OneDrive no vinculado (próximamente)" onClick={() => toggle("onedrive")}>
+      <StatusIcon connected={false} title={t("OneDrive no vinculado (próximamente)")} onClick={() => toggle("onedrive")}>
         <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
       </StatusIcon>
-      <StatusIcon connected={!!dropboxConnected} title={dropboxConnected ? "Dropbox vinculado" : "Dropbox no vinculado"} onClick={() => toggle("dropbox")}>
+      <StatusIcon connected={!!dropboxConnected} title={dropboxConnected ? t("Dropbox vinculado") : t("Dropbox no vinculado")} onClick={() => toggle("dropbox")}>
         <DropboxLogo />
       </StatusIcon>
 
       {open === "drive" && (
         <div className={panel}>
-          {header("Google Drive", driveConnected ? (driveHasError ? "Vinculado · con error" : `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}`) : "No vinculado", driveConnected && !driveHasError)}
+          {header("Google Drive", driveConnected ? (driveHasError ? t("Vinculado · con error") : `${t("Vinculado")}${driveEmail ? ` · ${driveEmail}` : ""}`) : t("No vinculado"), driveConnected && !driveHasError)}
           {driveConnected && driveHasError && (
             <p className="peligro border-b border-slate-100 bg-red-50 px-4 py-2 text-xs text-red-700">
-              {driveErrorMessage || "Hubo un error reciente al hablar con Google Drive. Avisa a un administrador."}
+              {driveErrorMessage || t("Hubo un error reciente al hablar con Google Drive. Avisa a un administrador.")}
             </p>
           )}
           {driveConnected ? (
             <>
-              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Google Drive" onClick={() => { window.open(`https://drive.google.com/drive/my-drive${driveEmail ? `?authuser=${encodeURIComponent(driveEmail)}` : ""}`, "_blank", "noopener"); setOpen(null); }} />
-              <MenuItem icon={<Settings size={14} />} label="Gestionar en Integraciones" onClick={goIntegraciones} />
-              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? "Desconectando…" : "Desconectar"} onClick={disconnect} danger disabled={busy} />}
+              <MenuItem icon={<ExternalLink size={14} />} label={t("Abrir Google Drive")} onClick={() => { window.open(`https://drive.google.com/drive/my-drive${driveEmail ? `?authuser=${encodeURIComponent(driveEmail)}` : ""}`, "_blank", "noopener"); setOpen(null); }} />
+              <MenuItem icon={<Settings size={14} />} label={t("Gestionar en Integraciones")} onClick={goIntegraciones} />
+              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? t("Desconectando…") : t("Desconectar")} onClick={disconnect} danger disabled={busy} />}
             </>
           ) : (
             <>
               {canConnect
-                ? <MenuItem icon={<Link2 size={14} />} label={busy ? "Vinculando…" : "Vincular Google Drive"} onClick={connect} disabled={busy} />
-                : <p className="px-4 py-2.5 text-xs text-slate-400">Pide al propietario o a un administrador que lo vincule.</p>}
-              <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+                ? <MenuItem icon={<Link2 size={14} />} label={busy ? t("Vinculando…") : t("Vincular Google Drive")} onClick={connect} disabled={busy} />
+                : <p className="px-4 py-2.5 text-xs text-slate-400">{t("Pide al propietario o a un administrador que lo vincule.")}</p>}
+              <MenuItem icon={<Settings size={14} />} label={t("Ir a Integraciones")} onClick={goIntegraciones} />
             </>
           )}
           {error && <p className="peligro px-4 py-2 text-xs text-red-600">{error}</p>}
@@ -185,26 +186,26 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
       )}
       {open === "onedrive" && (
         <div className={panel}>
-          {header("OneDrive", "No vinculado · Próximamente", false)}
-          <p className="px-4 py-2.5 text-xs text-slate-500">Esta conexión aún no está disponible.</p>
-          <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+          {header("OneDrive", t("No vinculado · Próximamente"), false)}
+          <p className="px-4 py-2.5 text-xs text-slate-500">{t("Esta conexión aún no está disponible.")}</p>
+          <MenuItem icon={<Settings size={14} />} label={t("Ir a Integraciones")} onClick={goIntegraciones} />
         </div>
       )}
       {open === "dropbox" && (
         <div className={panel}>
-          {header("Dropbox", dropboxConnected ? `Vinculado${dropboxEmail ? ` · ${dropboxEmail}` : ""}` : "No vinculado", !!dropboxConnected)}
+          {header("Dropbox", dropboxConnected ? `${t("Vinculado")}${dropboxEmail ? ` · ${dropboxEmail}` : ""}` : t("No vinculado"), !!dropboxConnected)}
           {dropboxConnected ? (
             <>
-              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Dropbox" onClick={() => { window.open("https://www.dropbox.com/home", "_blank", "noopener"); setOpen(null); }} />
-              <MenuItem icon={<Settings size={14} />} label="Gestionar en Integraciones" onClick={goIntegraciones} />
-              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? "Desconectando…" : "Desconectar"} onClick={disconnectDbx} danger disabled={busy} />}
+              <MenuItem icon={<ExternalLink size={14} />} label={t("Abrir Dropbox")} onClick={() => { window.open("https://www.dropbox.com/home", "_blank", "noopener"); setOpen(null); }} />
+              <MenuItem icon={<Settings size={14} />} label={t("Gestionar en Integraciones")} onClick={goIntegraciones} />
+              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? t("Desconectando…") : t("Desconectar")} onClick={disconnectDbx} danger disabled={busy} />}
             </>
           ) : (
             <>
               {canConnect
-                ? <MenuItem icon={<Link2 size={14} />} label={busy ? "Vinculando…" : "Vincular Dropbox"} onClick={connectDbx} disabled={busy} />
-                : <p className="px-4 py-2.5 text-xs text-slate-400">Pide al propietario o a un administrador que lo vincule.</p>}
-              <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+                ? <MenuItem icon={<Link2 size={14} />} label={busy ? t("Vinculando…") : t("Vincular Dropbox")} onClick={connectDbx} disabled={busy} />
+                : <p className="px-4 py-2.5 text-xs text-slate-400">{t("Pide al propietario o a un administrador que lo vincule.")}</p>}
+              <MenuItem icon={<Settings size={14} />} label={t("Ir a Integraciones")} onClick={goIntegraciones} />
             </>
           )}
           {error && <p className="peligro px-4 py-2 text-xs text-red-600">{error}</p>}

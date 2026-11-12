@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { WifiOff, RefreshCw, ChevronDown } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // ── Aviso de "no se pudo cargar" reutilizable ────────────────────────────────
 // Antes cada listado (Clientes, Expedientes, Directorio...) tenía su propia
@@ -11,24 +12,24 @@ import { WifiOff, RefreshCw, ChevronDown } from "lucide-react";
 function friendlyConnectionError(raw?: string): string {
   const msg = (raw || "").toLowerCase();
   if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("network request failed")) {
-    return "No se ha podido conectar con el servidor. Comprueba tu conexión a internet e inténtalo de nuevo.";
+    return t("No se ha podido conectar con el servidor. Comprueba tu conexión a internet e inténtalo de nuevo.");
   }
   if (msg.includes("timeout") || msg.includes("timed out")) {
-    return "El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.";
+    return t("El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.");
   }
   if (msg.includes("401") || msg.includes("unauthorized")) {
-    return "Tu sesión ha caducado. Recarga la página para volver a iniciar sesión.";
+    return t("Tu sesión ha caducado. Recarga la página para volver a iniciar sesión.");
   }
   if (msg.includes("403") || msg.includes("forbidden") || msg.includes("permiso")) {
-    return "No tienes permiso para ver esto.";
+    return t("No tienes permiso para ver esto.");
   }
-  return raw?.trim() || "Ha ocurrido un error inesperado.";
+  return raw?.trim() || t("Ha ocurrido un error inesperado.");
 }
 
 export function ConnectionErrorBanner({
   error,
   onRetry,
-  title = "No se ha podido cargar",
+  title = t("No se ha podido cargar"),
 }: {
   error: string;
   onRetry: () => void;
@@ -69,8 +70,7 @@ export function ConnectionErrorBanner({
         onClick={handleRetry}
         className="relative mt-5 inline-flex items-center gap-2 rounded-full bg-rose-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-500/25 transition-colors hover:bg-rose-700 active:scale-95"
       >
-        <RefreshCw size={13} className={retrying ? "ceb-spin" : ""} /> Reintentar
-      </button>
+        <RefreshCw size={13} className={retrying ? "ceb-spin" : ""} />{" "}{t("Reintentar")}</button>
 
       {error && (
         <div className="relative mt-4">
@@ -78,9 +78,7 @@ export function ConnectionErrorBanner({
             onClick={() => setShowDetails((v) => !v)}
             className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 transition-colors hover:text-slate-500"
           >
-            <ChevronDown size={11} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />
-            Detalles técnicos
-          </button>
+            <ChevronDown size={11} className={`transition-transform ${showDetails ? "rotate-180" : ""}`} />{t("Detalles técnicos")}</button>
           {showDetails && (
             <p className="mt-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-left font-mono text-[11px] text-slate-400 break-all">
               {error}

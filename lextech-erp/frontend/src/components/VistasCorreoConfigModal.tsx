@@ -5,6 +5,7 @@ import { Loader2, RotateCcw, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { fetchSharedTemplates } from '../lib/sharedTemplates';
 import { ImagenesNoAccesibles, imagenesNoAccesibles, resolverImagenesPegadas, useFirmaUpload } from './SignatureEditor';
+import { t, t as tr } from '../lib/i18n';
 
 // Configuración → Automatizaciones → "Configurar correo": cómo se ve el correo
 // que Vantia envía al aceptar o rechazar una vista (textos, firma, tipo de
@@ -41,31 +42,31 @@ export interface CorreoConfig {
 }
 
 const FUENTES = [
-  { id: 'arial', label: 'Arial' },
-  { id: 'calibri', label: 'Calibri' },
-  { id: 'verdana', label: 'Verdana' },
-  { id: 'georgia', label: 'Georgia' },
-  { id: 'times', label: 'Times New Roman' },
+  { id: 'arial', label: t("Arial") },
+  { id: 'calibri', label: t("Calibri") },
+  { id: 'verdana', label: t("Verdana") },
+  { id: 'georgia', label: t("Georgia") },
+  { id: 'times', label: t("Times New Roman") },
 ];
 const TAMANOS = [
-  { id: 'pequeno', label: 'Pequeño' },
-  { id: 'normal', label: 'Normal' },
-  { id: 'grande', label: 'Grande' },
+  { id: 'pequeno', label: t("Pequeño") },
+  { id: 'normal', label: t("Normal") },
+  { id: 'grande', label: t("Grande") },
 ] as const;
 const COLORES = ['#1f2937', '#000000', '#1e3a8a', '#334155'];
 
 const VARIABLES: { key: string; label: string }[] = [
-  { key: '{fecha}', label: 'Fecha' },
-  { key: '{hora}', label: 'Hora' },
-  { key: '{juzgado_txt}', label: '" en el Juzgado…"' },
-  { key: '{autos_txt}', label: '" (autos …)"' },
-  { key: '{juzgado}', label: 'Juzgado' },
-  { key: '{autos}', label: 'Autos' },
-  { key: '{abogado}', label: 'Abogado' },
-  { key: '{despacho}', label: 'Despacho' },
-  { key: '{asunto_original}', label: 'Asunto recibido' },
-  { key: '{mensaje}', label: 'Nota del momento' },
-  { key: '{firma}', label: 'Firma' },
+  { key: '{fecha}', label: t("Fecha") },
+  { key: '{hora}', label: t("Hora") },
+  { key: '{juzgado_txt}', label: t("\" en el Juzgado…\"") },
+  { key: '{autos_txt}', label: t("\" (autos …)\"") },
+  { key: '{juzgado}', label: t("Juzgado") },
+  { key: '{autos}', label: t("Autos") },
+  { key: '{abogado}', label: t("Abogado") },
+  { key: '{despacho}', label: t("Despacho") },
+  { key: '{asunto_original}', label: t("Asunto recibido") },
+  { key: '{mensaje}', label: t("Nota del momento") },
+  { key: '{firma}', label: t("Firma") },
 ];
 
 const DEFAULTS: CorreoConfig = {
@@ -157,12 +158,12 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
       if (cfg.correo.firmaHtml) {
         // Imágenes incrustadas (data:) → se suben; las de tu ordenador hay que subirlas a mano.
         const r = await resolverImagenesPegadas(cfg.correo.firmaHtml, subirImagen);
-        if (imagenesNoAccesibles(r.html).length) throw new Error('La firma tiene imágenes que solo están en tu ordenador: súbelas o quítalas (aviso en amarillo).');
+        if (imagenesNoAccesibles(r.html).length) throw new Error(t("La firma tiene imágenes que solo están en tu ordenador: súbelas o quítalas (aviso en amarillo)."));
         final = { ...cfg, correo: { ...cfg.correo, firmaHtml: r.html } };
       }
       await onSave(final); onClose();
     }
-    catch (e: any) { setError(e?.message || 'No se pudo guardar'); }
+    catch (e: any) { setError(e?.message || t("No se pudo guardar")); }
     finally { setSaving(false); }
   };
 
@@ -178,8 +179,8 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
       <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="text-base font-extrabold text-slate-800">Configurar correo de respuesta</h2>
-            <p className="text-xs text-slate-500">Lo que se envía al remitente al aceptar o rechazar una vista. Al decidir cada vista aún podrás retocar el texto.</p>
+            <h2 className="text-base font-extrabold text-slate-800">{t("Configurar correo de respuesta")}</h2>
+            <p className="text-xs text-slate-500">{t("Lo que se envía al remitente al aceptar o rechazar una vista. Al decidir cada vista aún podrás retocar el texto.")}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
         </div>
@@ -188,15 +189,13 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
           {/* Formulario */}
           <div className="space-y-5 border-slate-200 p-5 lg:border-r">
             <section>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Formato</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{t("Formato")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="text-xs text-slate-600">Tipo de letra
-                  <select disabled={ro} value={cfg.correo.fuente} onChange={(e) => setFormato({ fuente: e.target.value })} className={`${input} mt-1`}>
-                    {FUENTES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                <label className="text-xs text-slate-600">{t("Tipo de letra")}<select disabled={ro} value={cfg.correo.fuente} onChange={(e) => setFormato({ fuente: e.target.value })} className={`${input} mt-1`}>
+                    {FUENTES.map((f) => <option key={f.id} value={f.id}>{tr(f.label)}</option>)}
                   </select>
                 </label>
-                <div className="text-xs text-slate-600">Tamaño
-                  <div className="mt-1 flex overflow-hidden rounded-lg border border-slate-300">
+                <div className="text-xs text-slate-600">{t("Tamaño")}<div className="mt-1 flex overflow-hidden rounded-lg border border-slate-300">
                     {TAMANOS.map((t) => (
                       <button key={t.id} type="button" disabled={ro} onClick={() => setFormato({ tamano: t.id })}
                         className={`flex-1 py-2 text-xs font-semibold ${cfg.correo.tamano === t.id ? 'bg-red-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}>{t.label}</button>
@@ -205,25 +204,23 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
-                <span>Color del texto</span>
+                <span>{t("Color del texto")}</span>
                 {COLORES.map((c) => (
                   <button key={c} type="button" disabled={ro} onClick={() => setFormato({ color: c })} title={c}
                     className={`h-6 w-6 rounded-full border-2 ${cfg.correo.color.toLowerCase() === c ? 'border-red-500' : 'border-white ring-1 ring-slate-200'}`} style={{ background: c }} />
                 ))}
-                <input type="color" disabled={ro} value={cfg.correo.color} onChange={(e) => setFormato({ color: e.target.value })} className="h-6 w-8 cursor-pointer rounded border border-slate-200" title="Otro color" />
+                <input type="color" disabled={ro} value={cfg.correo.color} onChange={(e) => setFormato({ color: e.target.value })} className="h-6 w-8 cursor-pointer rounded border border-slate-200" title={t("Otro color")} />
               </div>
               <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" disabled={ro} checked={cfg.correo.citarOriginal} onChange={(e) => setFormato({ citarOriginal: e.target.checked })} className="h-4 w-4 accent-red-600" />
-                Incluir el correo recibido citado debajo de la respuesta
-              </label>
+                <input type="checkbox" disabled={ro} checked={cfg.correo.citarOriginal} onChange={(e) => setFormato({ citarOriginal: e.target.checked })} className="h-4 w-4 accent-red-600" />{t("Incluir el correo recibido citado debajo de la respuesta")}</label>
             </section>
 
             <section>
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Firma</h3>
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{t("Firma")}</h3>
               <select disabled={ro} value={firmaSel} onChange={(e) => elegirFirma(e.target.value)} className={`${input} mb-2`}>
-                <option value="">Escribirla aquí</option>
-                {firmasRegistradas.map((f) => <option key={f.id} value={f.id}>{f.name}{f.isDefault ? ' (predeterminada)' : ''}</option>)}
-                {firmaSel === GUARDADA && <option value={GUARDADA}>{cfg.correo.firmaNombre === PEGADA ? 'Pegada como HTML' : `${cfg.correo.firmaNombre || 'Firma registrada'} (copia guardada)`}</option>}
+                <option value="">{t("Escribirla aquí")}</option>
+                {firmasRegistradas.map((f) => <option key={f.id} value={f.id}>{f.name}{f.isDefault ? t(" (predeterminada)") : ''}</option>)}
+                {firmaSel === GUARDADA && <option value={GUARDADA}>{cfg.correo.firmaNombre === PEGADA ? t("Pegada como HTML") : t("{v} (copia guardada)", { v: cfg.correo.firmaNombre || 'Firma registrada' })}</option>}
               </select>
               {cfg.correo.firmaHtml ? (
                 <>
@@ -231,8 +228,8 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
                   {!ro && <ImagenesNoAccesibles html={cfg.correo.firmaHtml} onChange={(h) => setFormato({ firmaHtml: h })} />}
                   <p className="mt-1 text-[11px] text-slate-400">
                     {cfg.correo.firmaNombre === PEGADA
-                      ? 'Firma pegada como HTML: se añade al final del correo con su formato. Para volver a escribirla como texto, elige «Escribirla aquí».'
-                      : 'Firma registrada en Correo → Firmas. Se añade al final del correo. Si la cambias allí, vuelve a elegirla aquí para actualizarla.'}
+                      ? t("Firma pegada como HTML: se añade al final del correo con su formato. Para volver a escribirla como texto, elige «Escribirla aquí».")
+                      : t("Firma registrada en Correo → Firmas. Se añade al final del correo. Si la cambias allí, vuelve a elegirla aquí para actualizarla.")}
                   </p>
                 </>
               ) : (
@@ -244,32 +241,30 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
                       if (/<\s*(div|p|table|span|br|img|a|b|strong|font|td|tr)\b[^>]*>/i.test(v)) setFormato({ firmaHtml: v, firmaNombre: PEGADA });
                       else setFormato({ firma: v });
                     }} className={`${input} font-mono text-xs`}
-                    placeholder="Un cordial saludo,&#10;{abogado}&#10;{despacho}&#10;Tel. …" />
-                  <p className="mt-1 text-[11px] text-slate-400">Se coloca donde la plantilla diga {'{firma}'}. Para una firma con logo y colores, créala en Correo → Firmas y elígela arriba; si pegas código HTML aquí, se usará con su formato.</p>
+                    placeholder={t("Un cordial saludo,\n{abogado}\n{despacho}\nTel. …")} />
+                  <p className="mt-1 text-[11px] text-slate-400">{t("Se coloca donde la plantilla diga")}{" "}{t("{firma}")}{t(". Para una firma con logo y colores, créala en Correo → Firmas y elígela arriba; si pegas código HTML aquí, se usará con su formato.")}</p>
                 </>
               )}
             </section>
 
             <section>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Texto del correo</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Texto del correo")}</h3>
                 <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
                   {(['aceptar', 'rechazar'] as const).map((t) => (
                     <button key={t} type="button" onClick={() => setTab(t)}
-                      className={`rounded-md px-3 py-1 ${tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{t === 'aceptar' ? 'Al aceptar' : 'Al rechazar'}</button>
+                      className={`rounded-md px-3 py-1 ${tab === t ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{t === 'aceptar' ? tr("Al aceptar") : tr("Al rechazar")}</button>
                   ))}
                 </div>
               </div>
-              <label className="text-xs text-slate-600">Asunto
-                <input disabled={ro} value={plantilla.asunto} onChange={(e) => setPlantilla(tab, { asunto: e.target.value })} className={`${input} mt-1`} />
+              <label className="text-xs text-slate-600">{t("Asunto")}<input disabled={ro} value={plantilla.asunto} onChange={(e) => setPlantilla(tab, { asunto: e.target.value })} className={`${input} mt-1`} />
               </label>
-              <label className="mt-2 block text-xs text-slate-600">Cuerpo
-                <textarea ref={refs[tab]} key={tab} disabled={ro} rows={8} value={plantilla.cuerpo} onFocus={() => setFocused(tab)}
+              <label className="mt-2 block text-xs text-slate-600">{t("Cuerpo")}<textarea ref={refs[tab]} key={tab} disabled={ro} rows={8} value={plantilla.cuerpo} onFocus={() => setFocused(tab)}
                   onChange={(e) => setPlantilla(tab, { cuerpo: e.target.value })} className={`${input} mt-1 font-mono text-xs`} />
               </label>
               {!ro && (
                 <div className="mt-2">
-                  <p className="mb-1 text-[11px] text-slate-400">Insertar dato (se rellena solo en cada vista):</p>
+                  <p className="mb-1 text-[11px] text-slate-400">{t("Insertar dato (se rellena solo en cada vista):")}</p>
                   <div className="flex flex-wrap gap-1">
                     {VARIABLES.map((v) => (
                       <button key={v.key} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertar(v.key)}
@@ -284,35 +279,34 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
           {/* Vista previa */}
           <div className="flex flex-col bg-slate-50 p-5">
             <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Vista previa · {tab === 'aceptar' ? 'al aceptar' : 'al rechazar'}</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Vista previa ·")}{" "}{tab === 'aceptar' ? t("al aceptar") : t("al rechazar")}</h3>
               {previewLoading && <Loader2 size={12} className="animate-spin text-slate-400" />}
             </div>
             {/* La tarjeta ocupa todo el alto de la columna (que es el del formulario)
                 y el correo, todo lo que queda: sin hueco en blanco debajo. */}
             <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="shrink-0 border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
-                <p><span className="text-slate-400">Para:</span> procurador@ejemplo.es</p>
-                <p><span className="text-slate-400">Asunto:</span> <b className="text-slate-700">{actual?.asunto || '…'}</b></p>
+                <p><span className="text-slate-400">{t("Para:")}</span>{" "}{t("procurador@ejemplo.es")}</p>
+                <p><span className="text-slate-400">{t("Asunto:")}</span> <b className="text-slate-700">{actual?.asunto || '…'}</b></p>
               </div>
-              <iframe title="Vista previa del correo" sandbox="" srcDoc={actual ? `<!doctype html><meta charset="utf-8"><body style="margin:16px">${actual.html}</body>` : ''}
+              <iframe title={t("Vista previa del correo")} sandbox="" srcDoc={actual ? `<!doctype html><meta charset="utf-8"><body style="margin:16px">${actual.html}</body>` : ''}
                 className="min-h-[min(420px,50vh)] w-full flex-1" />
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">Datos de ejemplo. En cada vista se usan los reales.</p>
+            <p className="mt-2 text-[11px] text-slate-400">{t("Datos de ejemplo. En cada vista se usan los reales.")}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-5 py-3">
           {canManage
-            ? <button type="button" onClick={() => setCfg(DEFAULTS)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700"><RotateCcw size={13} /> Volver a los valores por defecto</button>
-            : <p className="text-xs text-slate-500">Solo el propietario o un administrador pueden cambiarlo.</p>}
+            ? <button type="button" onClick={() => setCfg(DEFAULTS)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700"><RotateCcw size={13} />{" "}{t("Volver a los valores por defecto")}</button>
+            : <p className="text-xs text-slate-500">{t("Solo el propietario o un administrador pueden cambiarlo.")}</p>}
           <div className="flex items-center gap-2">
             {error && <span className="peligro text-xs text-red-600">{error}</span>}
-            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{canManage ? 'Cancelar' : 'Cerrar'}</button>
+            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{canManage ? t("Cancelar") : t("Cerrar")}</button>
             {canManage && (
               <button type="button" disabled={saving} onClick={() => void guardar()}
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                {saving && <Loader2 size={14} className="animate-spin" />} Guardar
-              </button>
+                {saving && <Loader2 size={14} className="animate-spin" />}{" "}{t("Guardar")}</button>
             )}
           </div>
         </div>

@@ -23,7 +23,7 @@ const Tarjeta = ({ titulo, children, extra }: { titulo: string; children: React.
 
 function useEstadoGuardado() {
   const [estado, setEstado] = useState<'' | 'guardando' | 'ok' | 'error'>('');
-  const texto = estado === 'guardando' ? 'Guardando…' : estado === 'ok' ? 'Guardado' : estado === 'error' ? 'No se pudo guardar' : '';
+  const texto = estado === 'guardando' ? t('Guardando…') : estado === 'ok' ? t('Guardado') : estado === 'error' ? t('No se pudo guardar') : '';
   return { estado, setEstado, etiqueta: <span className={`text-[11px] ${estado === 'error' ? 'text-red-600' : 'text-slate-400'}`}>{texto}</span> };
 }
 
@@ -31,13 +31,13 @@ function useEstadoGuardado() {
 export function SelectorModo() {
   const { prefs, guardar } = usePreferencias();
   const opciones: { v: Modo; label: string; Icon: any; desc: string }[] = [
-    { v: 'claro', label: 'Claro', Icon: Sun, desc: 'Fondo blanco' },
-    { v: 'oscuro', label: 'Oscuro', Icon: Moon, desc: 'Descansa la vista' },
-    { v: 'sistema', label: 'Como el sistema', Icon: Monitor, desc: 'Sigue a tu ordenador' },
+    { v: 'claro', label: t("Claro"), Icon: Sun, desc: t("Fondo blanco") },
+    { v: 'oscuro', label: t("Oscuro"), Icon: Moon, desc: t("Descansa la vista") },
+    { v: 'sistema', label: t("Como el sistema"), Icon: Monitor, desc: t("Sigue a tu ordenador") },
   ];
   return (
     <section className="mb-10">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Modo</h3>
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Modo")}</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {opciones.map(({ v, label, Icon, desc }) => {
           const activo = prefs.modo === v;
@@ -46,8 +46,8 @@ export function SelectorModo() {
               className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-600 bg-red-600/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
               <Icon size={18} className={activo ? 'text-red-600' : 'text-slate-400'} />
               <span>
-                <span className="block text-sm font-semibold text-slate-800">{label}</span>
-                <span className="block text-xs text-slate-500">{desc}</span>
+                <span className="block text-sm font-semibold text-slate-800">{t(label)}</span>
+                <span className="block text-xs text-slate-500">{t(desc)}</span>
               </span>
             </button>
           );
@@ -62,7 +62,7 @@ export function SelectorTexto() {
   const { prefs, guardar } = usePreferencias();
   return (
     <section className="mb-10">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tamaño del texto</h3>
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Tamaño del texto")}</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {TAMANOS_TEXTO.map(({ valor, label, px }) => {
           const activo = prefs.texto === valor;
@@ -71,12 +71,12 @@ export function SelectorTexto() {
               className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-600 bg-red-600/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
               <Type size={Math.round(16 * (px / 16))} className={activo ? 'text-red-600' : 'text-slate-400'} />
               {/* Cada opción en su propio tamaño, sin escalar con el elegido */}
-              <span className="block font-semibold text-slate-800" style={{ fontSize: `${px * 0.875}px` }}>{label}</span>
+              <span className="block font-semibold text-slate-800" style={{ fontSize: `${px * 0.875}px` }}>{t(label)}</span>
             </button>
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-slate-500">Agranda la letra de toda la aplicación en tus dispositivos. Si necesitas más, el zoom del navegador (Ctrl y +) también funciona.</p>
+      <p className="mt-2 text-xs text-slate-500">{t("Agranda la letra de toda la aplicación en tus dispositivos. Si necesitas más, el zoom del navegador (Ctrl y +) también funciona.")}</p>
     </section>
   );
 }
@@ -110,16 +110,16 @@ export function SelectorMovimiento() {
   const activo = prefs.menosAnimaciones;
   return (
     <section className="mb-10">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Movimiento</h3>
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Movimiento")}</h3>
       <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
         <span className="flex min-w-0 items-center gap-3">
           <Sparkles size={18} className="shrink-0 text-slate-400" />
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-800">Menos animaciones</span>
-            <span className="block text-xs text-slate-500">Quita los fundidos y desplazamientos: todo aparece al instante. Útil si te marean o en ordenadores lentos.</span>
+            <span className="block text-sm font-semibold text-slate-800">{t("Menos animaciones")}</span>
+            <span className="block text-xs text-slate-500">{t("Quita los fundidos y desplazamientos: todo aparece al instante. Útil si te marean o en ordenadores lentos.")}</span>
           </span>
         </span>
-        <button type="button" role="switch" aria-checked={activo} aria-label="Menos animaciones"
+        <button type="button" role="switch" aria-checked={activo} aria-label={t("Menos animaciones")}
           onClick={() => void guardar({ menosAnimaciones: !activo }).catch(() => {})}
           className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${activo ? 'bg-red-600' : 'bg-slate-300'}`}>
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
@@ -136,26 +136,24 @@ export function MuestraApariencia() {
   const [interruptor, setInterruptor] = useState(true);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Así se ve</p>
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Así se ve")}</p>
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600"><Scale size={17} /></div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-800">Exp. 2026/0142 · Reclamación de cantidad</p>
-          <p className="truncate text-xs text-slate-500">Juzgado de 1ª Instancia nº 3 · próxima vista el 18 nov.</p>
+          <p className="truncate text-sm font-bold text-slate-800">{t("Exp. 2026/0142 · Reclamación de cantidad")}</p>
+          <p className="truncate text-xs text-slate-500">{t("Juzgado de 1ª Instancia nº 3 · próxima vista el 18 nov.")}</p>
         </div>
       </div>
-      <p className="mt-4 text-sm leading-relaxed text-slate-600">
-        El texto de toda la aplicación se verá con este tamaño y estos colores, en el modo que hayas elegido.
-      </p>
+      <p className="mt-4 text-sm leading-relaxed text-slate-600">{t("El texto de toda la aplicación se verá con este tamaño y estos colores, en el modo que hayas elegido.")}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">En plazo</span>
-        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">Vence mañana</span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">Archivado</span>
+        <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">{t("En plazo")}</span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">{t("Vence mañana")}</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{t("Archivado")}</span>
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-2">
-        <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Botón principal</button>
-        <button type="button" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Secundario</button>
-        <button type="button" role="switch" aria-checked={interruptor} aria-label="Interruptor de ejemplo" onClick={() => setInterruptor((v) => !v)}
+        <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">{t("Botón principal")}</button>
+        <button type="button" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">{t("Secundario")}</button>
+        <button type="button" role="switch" aria-checked={interruptor} aria-label={t("Interruptor de ejemplo")} onClick={() => setInterruptor((v) => !v)}
           className={`relative ml-auto inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${interruptor ? 'bg-red-600' : 'bg-slate-300'}`}>
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${interruptor ? 'translate-x-4' : 'translate-x-0.5'}`} />
         </button>
@@ -208,9 +206,9 @@ export function PerfilPanel() {
     try {
       if (nombreCambiado) await user.update({ firstName: nombre.trim(), lastName: apellidos.trim() });
       if (prefsCambiadas) await guardar({ cargo: cargo.trim(), telefono: telefono.trim() });
-      aviso.ok('Perfil guardado');
+      aviso.ok(t("Perfil guardado"));
     } catch (e: any) {
-      aviso.error(e?.errors?.[0]?.longMessage || e?.message || 'No se pudo guardar el perfil');
+      aviso.error(e?.errors?.[0]?.longMessage || e?.message || t("No se pudo guardar el perfil"));
     } finally { setGuardando(false); }
   };
   const descartar = () => {
@@ -220,19 +218,19 @@ export function PerfilPanel() {
 
   const subirFoto = async (file: File | undefined) => {
     if (!file || !user) return;
-    if (!/^image\/(png|jpe?g|gif|webp)$/.test(file.type)) { aviso.error('Elige una imagen JPG, PNG, GIF o WebP.'); return; }
-    if (file.size > FOTO_MAX_MB * 1024 * 1024) { aviso.error(`La foto pesa demasiado (máximo ${FOTO_MAX_MB} MB).`); return; }
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(file.type)) { aviso.error(t("Elige una imagen JPG, PNG, GIF o WebP.")); return; }
+    if (file.size > FOTO_MAX_MB * 1024 * 1024) { aviso.error(t("La foto pesa demasiado (máximo {FOTO_MAX_MB} MB).", { FOTO_MAX_MB: FOTO_MAX_MB })); return; }
     setFoto('subiendo');
-    try { await user.setProfileImage({ file }); aviso.ok('Foto actualizada'); }
-    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || 'No se pudo cambiar la foto'); }
+    try { await user.setProfileImage({ file }); aviso.ok(t("Foto actualizada")); }
+    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || t("No se pudo cambiar la foto")); }
     finally { setFoto(''); }
   };
   const quitarFoto = async () => {
     if (!user) return;
-    if (!(await confirmar({ titulo: '¿Quitar tu foto?', mensaje: 'Se verán tus iniciales en su lugar.', confirmar: 'Quitar foto' }))) return;
+    if (!(await confirmar({ titulo: t("¿Quitar tu foto?"), mensaje: t("Se verán tus iniciales en su lugar."), confirmar: t("Quitar foto") }))) return;
     setFoto('quitando');
-    try { await user.setProfileImage({ file: null }); aviso.ok('Foto quitada'); }
-    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || 'No se pudo quitar la foto'); }
+    try { await user.setProfileImage({ file: null }); aviso.ok(t("Foto quitada")); }
+    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || t("No se pudo quitar la foto")); }
     finally { setFoto(''); }
   };
 
@@ -240,21 +238,21 @@ export function PerfilPanel() {
     return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-slate-300" size={26} /></div>;
   }
 
-  const nombreVisible = [nombre.trim(), apellidos.trim()].filter(Boolean).join(' ') || 'Sin nombre';
+  const nombreVisible = [nombre.trim(), apellidos.trim()].filter(Boolean).join(' ') || t('Sin nombre');
   const iniciales = nombreVisible.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('');
   const input = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300';
   const etiqueta = 'mb-1 block text-xs font-semibold text-slate-600';
 
   return (
     <div className="space-y-6">
-      <CabeceraAjuste icon={UserRound} titulo="Mi perfil"
-        descripcion="Tu nombre, tu foto y cómo te ven tus compañeros del despacho." />
+      <CabeceraAjuste icon={UserRound} titulo={t("Mi perfil")}
+        descripcion={t("Tu nombre, tu foto y cómo te ven tus compañeros del despacho.")} />
 
-      <Tarjeta titulo="Foto">
+      <Tarjeta titulo={t("Foto")}>
         <div className="flex flex-wrap items-center gap-5">
           <div className="relative h-20 w-20 shrink-0">
             {user.hasImage
-              ? <img src={user.imageUrl} alt="Tu foto" className="h-20 w-20 rounded-full object-cover ring-1 ring-slate-200" />
+              ? <img src={user.imageUrl} alt={t("Tu foto")} className="h-20 w-20 rounded-full object-cover ring-1 ring-slate-200" />
               : <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-xl font-bold text-slate-500">{iniciales || '?'}</div>}
             {foto && <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"><Loader2 size={18} className="animate-spin text-white" /></div>}
           </div>
@@ -262,75 +260,74 @@ export function PerfilPanel() {
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => fotoRef.current?.click()} disabled={!!foto}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                <Camera size={14} /> {user.hasImage ? 'Cambiar foto' : 'Subir foto'}
+                <Camera size={14} /> {user.hasImage ? t("Cambiar foto") : t("Subir foto")}
               </button>
               {user.hasImage && (
                 <button type="button" onClick={() => void quitarFoto()} disabled={!!foto}
                   className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60">
-                  <Trash2 size={14} /> Quitar
-                </button>
+                  <Trash2 size={14} />{" "}{t("Quitar")}</button>
               )}
             </div>
-            <p className="mt-2 text-xs text-slate-500">JPG, PNG, GIF o WebP, hasta {FOTO_MAX_MB} MB. Mejor una foto cuadrada de tu cara.</p>
+            <p className="mt-2 text-xs text-slate-500">{t("JPG, PNG, GIF o WebP, hasta")}{" "}{FOTO_MAX_MB}{" "}{t("MB. Mejor una foto cuadrada de tu cara.")}</p>
             <input ref={fotoRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void subirFoto(f); }} />
           </div>
         </div>
       </Tarjeta>
 
-      <Tarjeta titulo="Tus datos">
+      <Tarjeta titulo={t("Tus datos")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className={etiqueta}>Nombre</span>
+            <span className={etiqueta}>{t("Nombre")}</span>
             <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={60} autoComplete="given-name" className={input} />
-            {!nombreValido && <span className="peligro mt-1 block text-[11px] text-red-600">El nombre no puede quedar vacío.</span>}
+            {!nombreValido && <span className="peligro mt-1 block text-[11px] text-red-600">{t("El nombre no puede quedar vacío.")}</span>}
           </label>
           <label className="block">
-            <span className={etiqueta}>Apellidos</span>
+            <span className={etiqueta}>{t("Apellidos")}</span>
             <input value={apellidos} onChange={(e) => setApellidos(e.target.value)} maxLength={80} autoComplete="family-name" className={input} />
           </label>
           <label className="block">
-            <span className={etiqueta}>Cargo</span>
-            <input value={cargo} onChange={(e) => setCargo(e.target.value)} maxLength={100} placeholder="Ej. Abogada, Procuradora, Administración" className={input} />
-            <span className="mt-1 block text-[11px] text-slate-400">Se ve junto a tu nombre en el chat.</span>
+            <span className={etiqueta}>{t("Cargo")}</span>
+            <input value={cargo} onChange={(e) => setCargo(e.target.value)} maxLength={100} placeholder={t("Ej. Abogada, Procuradora, Administración")} className={input} />
+            <span className="mt-1 block text-[11px] text-slate-400">{t("Se ve junto a tu nombre en el chat.")}</span>
           </label>
           <label className="block">
-            <span className={etiqueta}>Teléfono de contacto</span>
+            <span className={etiqueta}>{t("Teléfono de contacto")}</span>
             <input value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={30} placeholder="+34 600 000 000" inputMode="tel" autoComplete="tel" className={input} />
-            {!telefonoValido && <span className="peligro mt-1 block text-[11px] text-red-600">Solo números, espacios, + ( ) y guiones.</span>}
+            {!telefonoValido && <span className="peligro mt-1 block text-[11px] text-red-600">{t("Solo números, espacios, + ( ) y guiones.")}</span>}
           </label>
           <div className="sm:col-span-2">
-            <span className={etiqueta}>Correo de acceso</span>
+            <span className={etiqueta}>{t("Correo de acceso")}</span>
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
               <span className="truncate text-sm text-slate-600">{user.primaryEmailAddress?.emailAddress || '—'}</span>
-              <Link to="/dashboard/config?section=seguridad" className="text-xs font-semibold text-red-600 hover:underline">Cambiar en Seguridad</Link>
+              <Link to="/dashboard/config?section=seguridad" className="text-xs font-semibold text-red-600 hover:underline">{t("Cambiar en Seguridad")}</Link>
             </div>
           </div>
         </div>
 
         {/* Así te ven los demás */}
         <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Así te ven en el despacho</p>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Así te ven en el despacho")}</p>
           <div className="flex items-center gap-3">
             {user.hasImage
               ? <img src={user.imageUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
               : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-slate-500">{iniciales || '?'}</div>}
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-slate-800">{nombreVisible}</p>
-              <p className="truncate text-xs text-slate-500">{[cargo.trim() || 'Sin cargo', telefono.trim()].filter(Boolean).join(' · ')}</p>
+              <p className="truncate text-xs text-slate-500">{[cargo.trim() || t('Sin cargo'), telefono.trim()].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <p className="text-xs text-slate-500">Tu firma de correo se gestiona en <Link to="/dashboard/correo" className="font-semibold text-red-600 hover:underline">Correo → Firmas</Link>.</p>
+          <p className="text-xs text-slate-500">{t("Tu firma de correo se gestiona en")}{" "}<Link to="/dashboard/correo" className="font-semibold text-red-600 hover:underline">{t("Correo → Firmas")}</Link>.</p>
           <div className="flex items-center gap-2">
             {cambiado && !guardando && (
-              <button type="button" onClick={descartar} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Descartar</button>
+              <button type="button" onClick={descartar} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">{t("Descartar")}</button>
             )}
             <button type="button" onClick={() => void onGuardar()} disabled={!cambiado || guardando || !nombreValido || !telefonoValido}
               className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
-              {guardando && <Loader2 size={14} className="animate-spin" />} {cambiado ? 'Guardar cambios' : 'Guardado'}
+              {guardando && <Loader2 size={14} className="animate-spin" />} {cambiado ? t("Guardar cambios") : t("Guardado")}
             </button>
           </div>
         </div>
@@ -495,13 +492,13 @@ export function PrivacidadPanel() {
       const res = await apiFetch('/api/privacidad', { getToken });
       if (res?.success === false) throw new Error(res.error);
       setDatos(res.data);
-    } catch (e: any) { setError(e?.message || 'No se pudo cargar'); }
+    } catch (e: any) { setError(e?.message || t("No se pudo cargar")); }
   };
   useEffect(() => { void cargar(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cambiarRetencion = async (valor: string) => {
     const meses = valor === '' ? null : Number(valor);
-    if (meses && datos?.desde && !(await confirmar({ titulo: `¿Borrar la trazabilidad de más de ${meses} meses?`, mensaje: "Los registros más antiguos se eliminarán para siempre. Esto no se puede deshacer.", confirmar: "Borrar y guardar", peligro: true }))) return;
+    if (meses && datos?.desde && !(await confirmar({ titulo: t("¿Borrar la trazabilidad de más de {meses} meses?", { meses: meses }), mensaje: t("Los registros más antiguos se eliminarán para siempre. Esto no se puede deshacer."), confirmar: t("Borrar y guardar"), peligro: true }))) return;
     g.setEstado('guardando');
     try {
       const res = await apiFetch('/api/privacidad', { method: 'PUT', getToken, body: JSON.stringify({ retencionMeses: meses }) });
@@ -516,47 +513,40 @@ export function PrivacidadPanel() {
     try {
       const token = await getToken();
       const res = await fetch(resolveApiUrl('/api/privacidad/exportar'), { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('No se pudo exportar');
+      if (!res.ok) throw new Error(t("No se pudo exportar"));
       const blob = await res.blob();
       const nombre = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || 'vantia-datos.json';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e: any) { setError(e?.message || 'No se pudo exportar'); } finally { setExportando(false); }
+    } catch (e: any) { setError(e?.message || t("No se pudo exportar")); } finally { setExportando(false); }
   };
 
   return (
     <div className="space-y-6">
-      <Tarjeta titulo="Cuánto se guarda la trazabilidad" extra={g.etiqueta}>
-        <p className="text-sm text-slate-600">
-          La trazabilidad guarda datos personales de quienes trabajan en el despacho (IP, dispositivo, horarios y acciones).
-          El RGPD pide no guardarlos más tiempo del necesario: lo habitual son 12 meses.
-        </p>
+      <Tarjeta titulo={t("Cuánto se guarda la trazabilidad")} extra={g.etiqueta}>
+        <p className="text-sm text-slate-600">{t("La trazabilidad guarda datos personales de quienes trabajan en el despacho (IP, dispositivo, horarios y acciones). El RGPD pide no guardarlos más tiempo del necesario: lo habitual son 12 meses.")}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <select value={datos?.retencionMeses ?? ''} disabled={!datos} onChange={(e) => void cambiarRetencion(e.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300">
-            <option value="">Sin límite</option>
-            {(datos?.opciones || [6, 12, 24, 36, 60]).map((m) => <option key={m} value={m}>{m} meses</option>)}
+            <option value="">{t("Sin límite")}</option>
+            {(datos?.opciones || [6, 12, 24, 36, 60]).map((m) => <option key={m} value={m}>{m}{" "}{t("meses")}</option>)}
           </select>
           {datos && (
             <span className="text-xs text-slate-500">
-              {datos.registros.toLocaleString('es-ES')} registros{datos.desde ? `, desde el ${new Date(datos.desde).toLocaleDateString('es-ES')}` : ''}.
+              {datos.registros.toLocaleString('es-ES')}{" "}{t("registros")}{datos.desde ? t(", desde el {toLocaleDateString}", { toLocaleDateString: new Date(datos.desde).toLocaleDateString('es-ES') }) : ''}.
             </span>
           )}
         </div>
-        <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500"><Trash2 size={12} className="mt-0.5 shrink-0" /> Lo que pase del plazo se borra solo cada día.</p>
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-500"><Trash2 size={12} className="mt-0.5 shrink-0" />{" "}{t("Lo que pase del plazo se borra solo cada día.")}</p>
       </Tarjeta>
-      <Tarjeta titulo="Exportar los datos del despacho">
-        <p className="text-sm text-slate-600">
-          Descarga un archivo con clientes y contactos, expedientes, tareas, agenda, facturación, vistas, miembros y trazabilidad del despacho.
-          No incluye los correos ni los chats: son de cada persona.
-        </p>
+      <Tarjeta titulo={t("Exportar los datos del despacho")}>
+        <p className="text-sm text-slate-600">{t("Descarga un archivo con clientes y contactos, expedientes, tareas, agenda, facturación, vistas, miembros y trazabilidad del despacho. No incluye los correos ni los chats: son de cada persona.")}</p>
         <button type="button" onClick={() => void exportar()} disabled={exportando}
           className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-          {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Descargar (JSON)
-        </button>
-        <p className="mt-2 text-xs text-slate-500">La exportación queda registrada en la trazabilidad.</p>
+          {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{" "}{t("Descargar (JSON)")}</button>
+        <p className="mt-2 text-xs text-slate-500">{t("La exportación queda registrada en la trazabilidad.")}</p>
       </Tarjeta>
       {error && <p className="peligro text-sm text-red-600">{error}</p>}
     </div>
@@ -589,31 +579,31 @@ export function IntegracionesPropias() {
       <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-slate-800">Correo</p>
+            <p className="text-sm font-bold text-slate-800">{t("Correo")}</p>
             <p className="mt-1 text-xs text-slate-500">
-              {correo === null ? 'Comprobando…' : correo.n === 0 ? 'Ninguna cuenta conectada en esta organización.'
-                : `${correo.n} cuenta${correo.n === 1 ? '' : 's'} conectada${correo.n === 1 ? '' : 's'}${correo.avisos ? ` · ${correo.avisos} con avisos` : ''}.`}
+              {correo === null ? t("Comprobando…") : correo.n === 0 ? t("Ninguna cuenta conectada en esta organización.")
+                : t("{n} cuenta{v} conectada{v2}{v3}.", { n: correo.n, v: correo.n === 1 ? '' : 's', v2: correo.n === 1 ? '' : 's', v3: correo.avisos ? ` · ${correo.avisos} con avisos` : '' })}
             </p>
           </div>
-          {correo && <Estado ok={correo.n > 0} aviso={correo.avisos > 0} texto={correo.avisos ? 'Revisar' : correo.n ? 'Conectado' : 'Sin conectar'} />}
+          {correo && <Estado ok={correo.n > 0} aviso={correo.avisos > 0} texto={correo.avisos ? t('Revisar') : correo.n ? t('Conectado') : t('Sin conectar')} />}
         </div>
         <Link to="/dashboard/correo" className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-          {correo?.n ? 'Gestionar cuentas y firmas' : 'Conectar una cuenta'}
+          {correo?.n ? t("Gestionar cuentas y firmas") : t("Conectar una cuenta")}
         </Link>
       </div>
       <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-slate-800">Quipu (facturación)</p>
+            <p className="text-sm font-bold text-slate-800">{t("Quipu (facturación)")}</p>
             <p className="mt-1 text-xs text-slate-500">
-              {quipu === null ? 'Comprobando…' : quipu.connected ? 'Las facturas se sincronizan con Quipu.'
-                : quipu.otra ? `Conectado en ${quipu.otra}, no en esta organización.` : 'Sin conectar.'}
+              {quipu === null ? t("Comprobando…") : quipu.connected ? t("Las facturas se sincronizan con Quipu.")
+                : quipu.otra ? t("Conectado en {otra}, no en esta organización.", { otra: quipu.otra }) : t("Sin conectar.")}
             </p>
           </div>
-          {quipu && <Estado ok={quipu.connected} texto={quipu.connected ? 'Conectado' : 'Sin conectar'} />}
+          {quipu && <Estado ok={quipu.connected} texto={quipu.connected ? t('Conectado') : t('Sin conectar')} />}
         </div>
         <Link to="/dashboard/facturacion" className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-          {quipu?.connected ? 'Ir a Facturación' : 'Conectar desde Facturación'}
+          {quipu?.connected ? t("Ir a Facturación") : t("Conectar desde Facturación")}
         </Link>
       </div>
     </div>
@@ -651,21 +641,21 @@ export function MisDatosPanel() {
     try {
       const token = await getToken();
       const res = await fetch(resolveApiUrl('/api/privacidad/mis-datos'), { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('No se pudieron descargar tus datos');
+      if (!res.ok) throw new Error(t("No se pudieron descargar tus datos"));
       const blob = await res.blob();
       const nombre = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || 'vantia-mis-datos.json';
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e: any) { setError(e?.message || 'No se pudieron descargar tus datos'); } finally { setDescargando(false); }
+    } catch (e: any) { setError(e?.message || t("No se pudieron descargar tus datos")); } finally { setDescargando(false); }
   };
 
   const borrarNavegador = async () => {
     if (!(await confirmar({
-      titulo: '¿Borrar los datos de este navegador?',
-      mensaje: 'Se borran las preferencias guardadas en este equipo, la caché y los borradores de correo sin guardar. Tu cuenta y todo lo del despacho no se tocan. La página se recargará.',
-      confirmar: 'Borrar y recargar',
+      titulo: t("¿Borrar los datos de este navegador?"),
+      mensaje: t("Se borran las preferencias guardadas en este equipo, la caché y los borradores de correo sin guardar. Tu cuenta y todo lo del despacho no se tocan. La página se recargará."),
+      confirmar: t("Borrar y recargar"),
     }))) return;
     await borrarDatosNavegador();
     window.location.reload();
@@ -678,56 +668,43 @@ export function MisDatosPanel() {
       if (res?.success === false) throw new Error(res.error);
       await borrarDatosNavegador();
       await clerk.signOut({ redirectUrl: '/' });
-    } catch (e: any) { setError(e?.message || 'No se pudo eliminar la cuenta'); setEliminando(false); }
+    } catch (e: any) { setError(e?.message || t("No se pudo eliminar la cuenta")); setEliminando(false); }
   };
 
   const boton = 'inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60';
   return (
     <div className="space-y-6">
-      <Tarjeta titulo="Descargar mis datos">
-        <p className="text-sm text-slate-600">
-          Un archivo con lo que Vantia guarda de ti: tu perfil, tus preferencias, los despachos a los que perteneces y tu actividad.
-          Lo que creas dentro de un despacho (clientes, expedientes, documentos) es del despacho: su propietario lo exporta desde Datos y privacidad.
-        </p>
+      <Tarjeta titulo={t("Descargar mis datos")}>
+        <p className="text-sm text-slate-600">{t("Un archivo con lo que Vantia guarda de ti: tu perfil, tus preferencias, los despachos a los que perteneces y tu actividad. Lo que creas dentro de un despacho (clientes, expedientes, documentos) es del despacho: su propietario lo exporta desde Datos y privacidad.")}</p>
         <button type="button" onClick={() => void descargar()} disabled={descargando} className={`mt-4 ${boton}`}>
-          {descargando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Descargar (JSON)
-        </button>
+          {descargando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{" "}{t("Descargar (JSON)")}</button>
       </Tarjeta>
 
-      <Tarjeta titulo="Cookies y este navegador">
-        <p className="text-sm text-slate-600">
-          Vantia no usa cookies de publicidad ni de analítica y no envía datos de uso a terceros. Solo guarda lo imprescindible:
-          la sesión iniciada y, en este navegador, tus preferencias y algo de caché para que todo cargue más rápido.
-        </p>
+      <Tarjeta titulo={t("Cookies y este navegador")}>
+        <p className="text-sm text-slate-600">{t("Vantia no usa cookies de publicidad ni de analítica y no envía datos de uso a terceros. Solo guarda lo imprescindible: la sesión iniciada y, en este navegador, tus preferencias y algo de caché para que todo cargue más rápido.")}</p>
         <button type="button" onClick={() => void borrarNavegador()} className={`mt-4 ${boton}`}>
-          <Trash2 size={14} /> Borrar los datos de este navegador
-        </button>
-        <p className="mt-2 text-xs text-slate-500">Útil si algo se ve raro o desactualizado. No cierra la sesión.</p>
+          <Trash2 size={14} />{" "}{t("Borrar los datos de este navegador")}</button>
+        <p className="mt-2 text-xs text-slate-500">{t("Útil si algo se ve raro o desactualizado. No cierra la sesión.")}</p>
       </Tarjeta>
 
-      <Tarjeta titulo="Sesión">
+      <Tarjeta titulo={t("Sesión")}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-slate-600">Cierra la sesión en este dispositivo. Las demás sesiones abiertas se ven y se cierran en Seguridad.</p>
+          <p className="text-sm text-slate-600">{t("Cierra la sesión en este dispositivo. Las demás sesiones abiertas se ven y se cierran en Seguridad.")}</p>
           <button type="button" onClick={() => void clerk.signOut({ redirectUrl: '/' })} className={boton}>
-            <LogOut size={14} /> Cerrar sesión
-          </button>
+            <LogOut size={14} />{" "}{t("Cerrar sesión")}</button>
         </div>
       </Tarjeta>
 
       <div className="rounded-2xl border border-red-200 bg-white p-5">
-        <h3 className="mb-4 border-b border-red-100 pb-2 text-sm font-bold uppercase tracking-wider text-red-700">Eliminar mi cuenta</h3>
-        <p className="text-sm text-slate-600">
-          Tu usuario se borra y ya no podrás entrar. Sales de todos tus despachos; lo que hiciste en ellos se queda, porque es del despacho.
-          Si eres propietario de un despacho, antes tienes que transferirlo a otra persona o eliminarlo. No se puede deshacer.
-        </p>
+        <h3 className="mb-4 border-b border-red-100 pb-2 text-sm font-bold uppercase tracking-wider text-red-700">{t("Eliminar mi cuenta")}</h3>
+        <p className="text-sm text-slate-600">{t("Tu usuario se borra y ya no podrás entrar. Sales de todos tus despachos; lo que hiciste en ellos se queda, porque es del despacho. Si eres propietario de un despacho, antes tienes que transferirlo a otra persona o eliminarlo. No se puede deshacer.")}</p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} placeholder="Escribe ELIMINAR"
-            aria-label="Escribe ELIMINAR para confirmar"
+          <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} placeholder={t("Escribe ELIMINAR")}
+            aria-label={t("Escribe ELIMINAR para confirmar")}
             className="w-48 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-300" />
           <button type="button" onClick={() => void eliminarCuenta()} disabled={confirmacion.trim().toUpperCase() !== 'ELIMINAR' || eliminando}
             className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
-            {eliminando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />} Eliminar mi cuenta
-          </button>
+            {eliminando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}{" "}{t("Eliminar mi cuenta")}</button>
         </div>
       </div>
       {error && <p className="peligro text-sm text-red-600">{error}</p>}
@@ -758,31 +735,31 @@ export function AyudaPanel() {
   };
   const enlace = 'flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50';
   const legal = (url: string | undefined, label: string) => url
-    ? <a href={url} target="_blank" rel="noopener noreferrer" className={enlace}>{label} <ExternalLink size={14} className="text-slate-400" /></a>
-    : <div className={`${enlace} cursor-default !text-slate-400 hover:bg-white`}>{label} <span className="text-[11px] font-normal">Pendiente de publicar</span></div>;
+    ? <a href={url} target="_blank" rel="noopener noreferrer" className={enlace}>{t(label)} <ExternalLink size={14} className="text-slate-400" /></a>
+    : <div className={`${enlace} cursor-default !text-slate-400 hover:bg-white`}>{t(label)} <span className="text-[11px] font-normal">{t("Pendiente de publicar")}</span></div>;
   return (
     <div className="space-y-6">
-      <Tarjeta titulo="Ayuda">
+      <Tarjeta titulo={t("Ayuda")}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Link to="/dashboard/config?section=manual" className={enlace}><span className="flex items-center gap-2"><BookOpen size={15} className="text-slate-400" /> Manual de usuario</span></Link>
-          <Link to="/dashboard/soporte" className={enlace}><span className="flex items-center gap-2"><LifeBuoy size={15} className="text-slate-400" /> Centro de soporte</span></Link>
+          <Link to="/dashboard/config?section=manual" className={enlace}><span className="flex items-center gap-2"><BookOpen size={15} className="text-slate-400" />{" "}{t("Manual de usuario")}</span></Link>
+          <Link to="/dashboard/soporte" className={enlace}><span className="flex items-center gap-2"><LifeBuoy size={15} className="text-slate-400" />{" "}{t("Centro de soporte")}</span></Link>
         </div>
-        <p className="mt-3 text-xs text-slate-500">¿Algo no funciona o tienes una duda? Abre un ticket en el Centro de soporte: te contestamos por ahí y por correo.</p>
+        <p className="mt-3 text-xs text-slate-500">{t("¿Algo no funciona o tienes una duda? Abre un ticket en el Centro de soporte: te contestamos por ahí y por correo.")}</p>
       </Tarjeta>
-      <Tarjeta titulo="Información legal">
+      <Tarjeta titulo={t("Información legal")}>
         <div className="grid gap-3 sm:grid-cols-2">
           {legal(URL_TERMINOS, 'Términos y condiciones')}
           {legal(URL_PRIVACIDAD, 'Política de privacidad')}
         </div>
       </Tarjeta>
-      <Tarjeta titulo="Versión">
-        <p className="text-sm text-slate-700">Vantia <span className="font-semibold">{version || '—'}</span>{commit && <span className="text-slate-400"> · {commit}</span>}</p>
-        {fechaBuild && <p className="mt-0.5 text-xs text-slate-500">Publicada el {fechaBuild}</p>}
+      <Tarjeta titulo={t("Versión")}>
+        <p className="text-sm text-slate-700">{t("Vantia")}{" "}<span className="font-semibold">{version || '—'}</span>{commit && <span className="text-slate-400"> · {commit}</span>}</p>
+        {fechaBuild && <p className="mt-0.5 text-xs text-slate-500">{t("Publicada el")}{" "}{fechaBuild}</p>}
         <button type="button" onClick={() => void copiar()}
           className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-          <Copy size={14} /> {copiado ? 'Copiado' : 'Copiar información para soporte'}
+          <Copy size={14} /> {copiado ? t("Copiado") : t("Copiar información para soporte")}
         </button>
-        <p className="mt-2 text-xs text-slate-500">Pégala en tu ticket: nos dice qué versión y qué navegador usas.</p>
+        <p className="mt-2 text-xs text-slate-500">{t("Pégala en tu ticket: nos dice qué versión y qué navegador usas.")}</p>
       </Tarjeta>
     </div>
   );
