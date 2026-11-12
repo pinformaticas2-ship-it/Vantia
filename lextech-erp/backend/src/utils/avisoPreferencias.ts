@@ -16,12 +16,20 @@ export interface AvisoPrefs {
    *  no se ofrece (sería un correo para avisar de un correo). */
   email: Record<TipoPref, boolean>;
   silencio: { activo: boolean; desde: string; hasta: string; finDeSemana: boolean };
+  /** Chat (12/11/2026, como en Slack): de los canales, todo o solo cuando te
+   *  mencionan. Los mensajes directos y los hilos en los que participas
+   *  avisan siempre. */
+  chatModo: 'todo' | 'menciones';
+  /** Sonido dentro de la app al llegar un mensaje del chat. */
+  sonido: boolean;
 }
 
 export const PREFS_POR_DEFECTO: AvisoPrefs = {
   tipos: { chat: true, correo: true, whatsapp: true, plazo: true, vista: true, soporte: true },
   email: { chat: false, correo: false, whatsapp: false, plazo: false, vista: false, soporte: false },
   silencio: { activo: true, desde: '21:00', hasta: '08:00', finDeSemana: true },
+  chatModo: 'todo',
+  sonido: false,
 };
 
 /** Los que atraviesan el horario de silencio. */
@@ -45,6 +53,8 @@ export function normalizarPrefs(raw: any): AvisoPrefs {
       hasta: HORA.test(s.hasta) ? s.hasta : PREFS_POR_DEFECTO.silencio.hasta,
       finDeSemana: typeof s.finDeSemana === 'boolean' ? s.finDeSemana : PREFS_POR_DEFECTO.silencio.finDeSemana,
     },
+    chatModo: p.chatModo === 'menciones' ? 'menciones' : 'todo',
+    sonido: p.sonido === true,
   };
 }
 
@@ -69,6 +79,25 @@ export function enSilencio(prefs: AvisoPrefs, ahora = new Date()): boolean {
   if (desde === hasta) return false;
   // Rango que cruza la medianoche (21:00 → 08:00) o dentro del mismo día.
   return desde > hasta ? (minutos >= desde || minutos < hasta) : (minutos >= desde && minutos < hasta);
+}
+
+function sinTildes(s: string) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+/** ¿El texto menciona a esta persona? (@su nombre, o @canal / @todos / @aquí,
+ *  que avisan a todo el canal). Sin distinguir tildes ni mayúsculas. */
+export function mencionaA(texto: string | null | undefined, nombres: (string | null | undefined)[]): boolean {
+  if (!texto || !texto.includes('@')) return false;
+  const t = sinTildes(texto);
+  if (/(^|[^\p{L}\p{N}])@(canal|todos|aqui)(?![\p{L}\p{N}])/u.test(t)) return true;
+  return nombres.some((n) => {
+    const nn = sinTildes(String(n || '')).trim();
+    if (!nn) return false;
+    const i = t.indexOf(`@${nn}`);
+    if (i < 0) return false;
+    const despues = t.charAt(i + nn.length + 1);
+    return !despues || !/[\p{L}\p{N}]/u.test(despues);
+  });
 }
 
 export async function prefsDe(userIds: string[]): Promise<Map<string, AvisoPrefs>> {

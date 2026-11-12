@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Camera, Copy, Download, ExternalLink, Keyboard, LifeBuoy, Loader2, LogOut, Moon, Monitor, Sparkles, Sun, Scale, Trash2, Type, UserRound, type LucideIcon } from 'lucide-react';
+import { BookOpen, Camera, Copy, Download, ExternalLink, Keyboard, LifeBuoy, Loader2, LogOut, Moon, Monitor, Sparkles, Sun, Globe, Scale, SlidersHorizontal, Trash2, Type, UserRound, type LucideIcon } from 'lucide-react';
 import { apiFetch, resolveApiUrl } from '../lib/api';
-import { PAGINAS_INICIO, TAMANOS_TEXTO, usePreferencias, Modo } from '../lib/preferencias';
+import { DURACIONES_EVENTO, PAGINAS_INICIO, TAMANOS_TEXTO, usePreferencias, Modo } from '../lib/preferencias';
+import { IDIOMAS, locale, t } from '../lib/i18n';
 import { AyudaAtajos } from './AtajosTeclado';
 import { aviso, confirmar } from "../lib/avisos";
 
@@ -339,6 +340,27 @@ export function PerfilPanel() {
 }
 
 // ── Preferencias de trabajo ───────────────────────────────────────────────
+// 12/11/2026: idioma, zona horaria, formato de hora, duración de los eventos,
+// vista inicial de la Agenda y confirmar antes de enviar correos.
+const ZONAS_HABITUALES = ['Europe/Madrid', 'Atlantic/Canary', 'Europe/Lisbon', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Mexico_City', 'America/Bogota', 'America/Buenos_Aires'];
+
+function nombreZona(z: string): string {
+  try {
+    const desfase = new Intl.DateTimeFormat('en-GB', { timeZone: z, timeZoneName: 'shortOffset' })
+      .formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value || '';
+    return `${z.replace(/_/g, ' ').replace('/', ' · ')} (${desfase.replace('GMT', 'UTC')})`;
+  } catch { return z; }
+}
+
+function Interruptor({ activo, etiqueta, onClick }: { activo: boolean; etiqueta: string; onClick: () => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={activo} aria-label={etiqueta} onClick={onClick}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${activo ? 'bg-red-600' : 'bg-slate-300'}`}>
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+    </button>
+  );
+}
+
 export function PreferenciasTrabajoPanel() {
   const { prefs, guardar } = usePreferencias();
   const g = useEstadoGuardado();
@@ -347,46 +369,113 @@ export function PreferenciasTrabajoPanel() {
     g.setEstado('guardando');
     try { await guardar(c); g.setEstado('ok'); } catch { g.setEstado('error'); }
   };
+  const zonaOrdenador = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const todasLasZonas = useMemo<string[]>(() => {
+    try { return (Intl as any).supportedValuesOf?.('timeZone') || []; } catch { return []; }
+  }, []);
+  const otrasZonas = todasLasZonas.filter((z) => !ZONAS_HABITUALES.includes(z));
+  const ahora = new Date();
   const fila = 'flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0';
+  const select = 'max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300';
+  const Texto = ({ titulo, desc }: { titulo: string; desc: React.ReactNode }) => (
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-medium text-slate-700">{titulo}</p>
+      <p className="text-xs text-slate-500">{desc}</p>
+    </div>
+  );
   return (
     <div className="space-y-6">
-      <Tarjeta titulo="Al trabajar" extra={g.etiqueta}>
+      <CabeceraAjuste icon={SlidersHorizontal} titulo={t('Preferencias de trabajo')}
+        descripcion={t('Idioma, horarios y cómo se comportan la Agenda y el Correo. Se guarda en tu cuenta y vale en todos tus dispositivos.')}
+        extra={g.etiqueta} />
+
+      <Tarjeta titulo={t('Idioma y región')}>
         <div className={fila}>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-700">Página de inicio</p>
-            <p className="text-xs text-slate-500">Lo primero que ves al entrar en Vantia.</p>
+          <Texto titulo={t('Idioma de la aplicación')}
+            desc={t('Los documentos que genera la app (escritos, plantillas, facturas y correos a clientes) siguen en español.')} />
+          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="radiogroup" aria-label={t('Idioma de la aplicación')}>
+            {IDIOMAS.map((i) => (
+              <button key={i.valor} type="button" role="radio" aria-checked={prefs.idioma === i.valor}
+                onClick={() => void cambiar({ idioma: i.valor })}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${prefs.idioma === i.valor ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <Globe size={13} className="opacity-60" /> {i.nativo}
+              </button>
+            ))}
           </div>
-          <select value={prefs.inicio} onChange={(e) => void cambiar({ inicio: e.target.value })}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300">
-            {PAGINAS_INICIO.map((p) => <option key={p.path} value={p.path}>{p.label}</option>)}
+        </div>
+        <div className={fila}>
+          <Texto titulo={t('Zona horaria')}
+            desc={t('Para mostrar las horas de la Agenda, los correos y los avisos. Ahora son las {hora}.', { hora: ahora.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', timeZone: prefs.zonaHoraria || undefined, hour12: prefs.formatoHora === '12h' }) })} />
+          <select value={prefs.zonaHoraria} onChange={(e) => void cambiar({ zonaHoraria: e.target.value })} className={`${select} w-72`} aria-label={t('Zona horaria')}>
+            <option value="">{t('Automática (la de este ordenador: {zona})', { zona: zonaOrdenador })}</option>
+            <optgroup label={t('Habituales')}>
+              {ZONAS_HABITUALES.map((z) => <option key={z} value={z}>{nombreZona(z)}</option>)}
+            </optgroup>
+            {otrasZonas.length > 0 && (
+              <optgroup label={t('Todas')}>
+                {otrasZonas.map((z) => <option key={z} value={z}>{nombreZona(z)}</option>)}
+              </optgroup>
+            )}
           </select>
         </div>
         <div className={fila}>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-700">La semana empieza en</p>
-            <p className="text-xs text-slate-500">En el calendario de la Agenda.</p>
-          </div>
-          <select value={prefs.primerDia} onChange={(e) => void cambiar({ primerDia: e.target.value as 'lunes' | 'domingo' })}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300">
-            <option value="lunes">Lunes</option>
-            <option value="domingo">Domingo</option>
+          <Texto titulo={t('Formato de hora')} desc={t('Cómo se escriben las horas en toda la aplicación.')} />
+          <select value={prefs.formatoHora} onChange={(e) => void cambiar({ formatoHora: e.target.value as '24h' | '12h' })} className={select} aria-label={t('Formato de hora')}>
+            <option value="24h">{t('24 horas (17:30)')}</option>
+            <option value="12h">{t('12 horas (5:30 p. m.)')}</option>
           </select>
         </div>
       </Tarjeta>
-      <Tarjeta titulo="Atajos de teclado">
+
+      <Tarjeta titulo={t('Al trabajar')}>
         <div className={fila}>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-700">Usar atajos de teclado</p>
-            <p className="text-xs text-slate-500">Por ejemplo, G y luego A para ir a la Agenda, o / para buscar.</p>
-          </div>
-          <button type="button" role="switch" aria-checked={prefs.atajos} aria-label="Usar atajos de teclado"
-            onClick={() => void cambiar({ atajos: !prefs.atajos })}
-            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${prefs.atajos ? 'bg-red-600' : 'bg-slate-300'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${prefs.atajos ? 'translate-x-4' : 'translate-x-0.5'}`} />
-          </button>
+          <Texto titulo={t('Página de inicio')} desc={t('Lo primero que ves al entrar en Vantia.')} />
+          <select value={prefs.inicio} onChange={(e) => void cambiar({ inicio: e.target.value })} className={select} aria-label={t('Página de inicio')}>
+            {PAGINAS_INICIO.map((p) => <option key={p.path} value={p.path}>{t(p.label)}</option>)}
+          </select>
+        </div>
+      </Tarjeta>
+
+      <Tarjeta titulo={t('Agenda')}>
+        <div className={fila}>
+          <Texto titulo={t('Vista al abrir la Agenda')} desc={t('Mes, semana o día.')} />
+          <select value={prefs.vistaAgenda} onChange={(e) => void cambiar({ vistaAgenda: e.target.value as 'month' | 'week' | 'day' })} className={select} aria-label={t('Vista al abrir la Agenda')}>
+            <option value="month">{t('Mes')}</option>
+            <option value="week">{t('Semana')}</option>
+            <option value="day">{t('Día')}</option>
+          </select>
+        </div>
+        <div className={fila}>
+          <Texto titulo={t('Duración de un evento nuevo')} desc={t('Al crear un evento, la hora de fin se pone sola con esta duración.')} />
+          <select value={prefs.duracionEvento} onChange={(e) => void cambiar({ duracionEvento: Number(e.target.value) })} className={select} aria-label={t('Duración de un evento nuevo')}>
+            {DURACIONES_EVENTO.map((m) => (
+              <option key={m} value={m}>{m < 60 ? t('{n} minutos', { n: m }) : m === 60 ? t('1 hora') : m % 60 ? t('{h} h y {m} min', { h: Math.floor(m / 60), m: m % 60 }) : t('{n} horas', { n: m / 60 })}</option>
+            ))}
+          </select>
+        </div>
+        <div className={fila}>
+          <Texto titulo={t('La semana empieza en')} desc={t('En el calendario de la Agenda.')} />
+          <select value={prefs.primerDia} onChange={(e) => void cambiar({ primerDia: e.target.value as 'lunes' | 'domingo' })} className={select} aria-label={t('La semana empieza en')}>
+            <option value="lunes">{t('Lunes')}</option>
+            <option value="domingo">{t('Domingo')}</option>
+          </select>
+        </div>
+      </Tarjeta>
+
+      <Tarjeta titulo={t('Correo')}>
+        <div className={fila}>
+          <Texto titulo={t('Confirmar antes de enviar')} desc={t('Antes de enviar un correo te pregunta, con el destinatario y el asunto a la vista. Evita envíos por error.')} />
+          <Interruptor activo={prefs.confirmarEnvio} etiqueta={t('Confirmar antes de enviar')} onClick={() => void cambiar({ confirmarEnvio: !prefs.confirmarEnvio })} />
+        </div>
+      </Tarjeta>
+
+      <Tarjeta titulo={t('Atajos de teclado')}>
+        <div className={fila}>
+          <Texto titulo={t('Usar atajos de teclado')} desc={t('Por ejemplo, G y luego A para ir a la Agenda, o / para buscar.')} />
+          <Interruptor activo={prefs.atajos} etiqueta={t('Usar atajos de teclado')} onClick={() => void cambiar({ atajos: !prefs.atajos })} />
         </div>
         <button type="button" onClick={() => setAyuda(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline">
-          <Keyboard size={13} /> Ver todos los atajos (o pulsa ?)
+          <Keyboard size={13} /> {t('Ver todos los atajos (o pulsa ?)')}
         </button>
         {ayuda && <AyudaAtajos onClose={() => setAyuda(false)} />}
       </Tarjeta>

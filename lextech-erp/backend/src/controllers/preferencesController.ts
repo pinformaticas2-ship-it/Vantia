@@ -105,6 +105,16 @@ export interface PrefsExtras {
   texto: 'normal' | 'grande' | 'muy_grande';
   /** Quitar animaciones y transiciones (accesibilidad, 12/11/2026). */
   menosAnimaciones: boolean;
+  /** Idioma de la interfaz (los documentos generados siguen en español). */
+  idioma: 'es' | 'en';
+  /** Zona horaria para mostrar horas ('' = la del ordenador). */
+  zonaHoraria: string;
+  formatoHora: '24h' | '12h';
+  /** Duración por defecto de un evento nuevo en la Agenda, en minutos. */
+  duracionEvento: number;
+  vistaAgenda: 'month' | 'week' | 'day';
+  /** Pedir confirmación antes de enviar un correo. */
+  confirmarEnvio: boolean;
   /** Datos de letrado para notas de honorarios y escritos (Calculadora). */
   letradoNombre: string;
   colegiado: string;
@@ -113,8 +123,15 @@ export interface PrefsExtras {
 
 export const EXTRAS_POR_DEFECTO: PrefsExtras = {
   modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', menosAnimaciones: false,
+  idioma: 'es', zonaHoraria: '', formatoHora: '24h', duracionEvento: 60, vistaAgenda: 'week', confirmarEnvio: false,
   letradoNombre: '', colegiado: '', colegio: '',
 };
+
+export const DURACIONES_EVENTO = [15, 30, 45, 60, 90, 120];
+function zonaValida(z: string): boolean {
+  if (z.length > 64) return false;
+  try { new Intl.DateTimeFormat('es-ES', { timeZone: z }); return true; } catch { return false; }
+}
 
 export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECTO): PrefsExtras {
   const r = raw && typeof raw === 'object' ? raw : {};
@@ -127,6 +144,12 @@ export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECT
     telefono: typeof r.telefono === 'string' ? r.telefono.replace(/[^\d+()\s-]/g, '').trim().slice(0, 30) : base.telefono,
     texto: ['normal', 'grande', 'muy_grande'].includes(r.texto) ? r.texto : base.texto,
     menosAnimaciones: typeof r.menosAnimaciones === 'boolean' ? r.menosAnimaciones : base.menosAnimaciones,
+    idioma: r.idioma === 'es' || r.idioma === 'en' ? r.idioma : base.idioma,
+    zonaHoraria: typeof r.zonaHoraria === 'string' && (r.zonaHoraria === '' || zonaValida(r.zonaHoraria)) ? r.zonaHoraria : base.zonaHoraria,
+    formatoHora: r.formatoHora === '12h' || r.formatoHora === '24h' ? r.formatoHora : base.formatoHora,
+    duracionEvento: DURACIONES_EVENTO.includes(r.duracionEvento) ? r.duracionEvento : base.duracionEvento,
+    vistaAgenda: ['month', 'week', 'day'].includes(r.vistaAgenda) ? r.vistaAgenda : base.vistaAgenda,
+    confirmarEnvio: typeof r.confirmarEnvio === 'boolean' ? r.confirmarEnvio : base.confirmarEnvio,
     letradoNombre: typeof r.letradoNombre === 'string' ? r.letradoNombre.trim().slice(0, 150) : base.letradoNombre,
     colegiado: typeof r.colegiado === 'string' ? r.colegiado.trim().slice(0, 30) : base.colegiado,
     colegio: typeof r.colegio === 'string' ? r.colegio.trim().slice(0, 200) : base.colegio,

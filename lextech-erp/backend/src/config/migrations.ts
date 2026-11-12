@@ -1062,6 +1062,8 @@ export async function runMigrations(): Promise<void> {
     for (const [col, def] of chatMiembrosCols) {
       try { await client.query(`ALTER TABLE chat_miembros ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
     }
+    // Canal silenciado por esta persona (12/11/2026): sin avisos salvo que la mencionen.
+    try { await client.query(`ALTER TABLE chat_miembros ADD COLUMN IF NOT EXISTS silenciado BOOLEAN NOT NULL DEFAULT false`); } catch (_e: any) {}
     const chatMensajesCols: [string, string][] = [
       ['avatar_url', `VARCHAR(500)`],
       ['gif_url',    `VARCHAR(1000)`],
@@ -1073,6 +1075,12 @@ export async function runMigrations(): Promise<void> {
     for (const [col, def] of chatMensajesCols) {
       try { await client.query(`ALTER TABLE chat_mensajes ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
     }
+    // Hilos (11/11/2026, como en Slack): una respuesta en hilo apunta a su
+    // mensaje principal y no sale en la conversación, solo en el panel del hilo.
+    try {
+      await client.query(`ALTER TABLE chat_mensajes ADD COLUMN IF NOT EXISTS hilo_id UUID REFERENCES chat_mensajes(id) ON DELETE CASCADE`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_chat_mensajes_hilo ON chat_mensajes (hilo_id, created_at) WHERE hilo_id IS NOT NULL`);
+    } catch (_e: any) {}
 
     // ── Limpieza automática de activity_log (solo últimas 10.000 entradas) ──
     try {

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { iniciarTiempoReal, suscribirTiempoReal } from "../lib/realtime";
+import { sonarAviso, AVISOS_CAMBIADOS } from "../lib/sonido";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 interface ChatUnreadCtx {
@@ -28,6 +29,8 @@ interface UnreadRow {
   tipo: string;
   no_leidos: number;
   dm_target_user_id: string | null;
+  /** Canal silenciado por mí: no cuenta en el total ni suena. */
+  silenciado?: boolean;
 }
 
 // ── Provider ─────────────────────────────────────────────────────────────────
@@ -36,6 +39,11 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
   const [unreadByCanal, setUnreadByCanal] = useState<Record<string, number>>({});
   const [unreadDMs, setUnreadDMs]         = useState<Record<string, number>>({});
   const [unreadLoaded, setUnreadLoaded]   = useState(false);
+  // Canales silenciados (no cuentan en el total) y lo último visto de cada
+  // canal, para el sonido al llegar un mensaje (12/11/2026).
+  const [silenciados, setSilenciados]     = useState<Set<string>>(new Set());
+  const anteriorRef = useRef<Record<string, number> | null>(null);
+  const avisosRef = useRef<{ sonido: boolean; chatModo: "todo" | "menciones"; tipoChat: boolean }>({ sonido: false, chatModo: "todo", tipoChat: true });
 
   const getTokenRef = useRef(getToken);
   const isLoadedRef = useRef(isLoaded);
@@ -61,6 +69,19 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
 
       const nextByCanal: Record<string, number> = {};
       const nextDMs: Record<string, number> = {};
+      const nextSilenciados = new Set(items.filter((it) => it.silenciado).map((it) => it.canal_id));
+      setSilenciados((prev) => (prev.size === nextSilenciados.size && [...prev].every((id) => nextSilenciados.has(id)) ? prev : nextSilenciados));
+      // Sonido: algún canal (no silenciado) con más sin leer que antes. Con
+      // "solo menciones", solo los directos.
+      const antes = anteriorRef.current;
+      if (antes && avisosRef.current.sonido && avisosRef.current.tipoChat) {
+        // La conversación que estás mirando no suena.
+        const mirando = document.visibilityState === "visible" ? (window as any).__vantiaCanalActivo : null;
+        const suena = items.some((it) => !it.silenciado && it.canal_id !== mirando && it.no_leidos > (antes[it.canal_id] ?? 0)
+          && (avisosRef.current.chatModo === "todo" || it.tipo === "directo"));
+        if (suena) sonarAviso();
+      }
+      anteriorRef.current = Object.fromEntries(items.map((it) => [it.canal_id, it.no_leidos]));
       for (const it of items) {
         if (it.no_leidos > 0) {
           nextByCanal[it.canal_id] = it.no_leidos;
@@ -200,9 +221,28 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
+  // Preferencias de avisos (sonido y "solo menciones"): al entrar y cada vez
+  // que se cambian en Ajustes → Notificaciones.
+  useEffect(() => {
+    if (!isLoaded) return;
+    const cargar = async () => {
+      try {
+        const token = await getTokenRef.current();
+        if (!token) return;
+        const res = await fetch("/api/push/preferencias", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await res.json().catch(() => null);
+        const p = d?.data?.prefs;
+        if (p) avisosRef.current = { sonido: p.sonido === true, chatModo: p.chatModo === "menciones" ? "menciones" : "todo", tipoChat: p.tipos?.chat !== false };
+      } catch { /* sin preferencias: sin sonido */ }
+    };
+    void cargar();
+    window.addEventListener(AVISOS_CAMBIADOS, cargar);
+    return () => window.removeEventListener(AVISOS_CAMBIADOS, cargar);
+  }, [isLoaded]);
+
   const totalUnread = useMemo(
-    () => Object.values(unreadByCanal).reduce((a, b) => a + b, 0),
-    [unreadByCanal],
+    () => Object.entries(unreadByCanal).reduce((a, [id, n]) => a + (silenciados.has(id) ? 0 : n), 0),
+    [unreadByCanal, silenciados],
   );
 
   return (

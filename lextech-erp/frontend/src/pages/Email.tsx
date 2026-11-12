@@ -33,6 +33,7 @@ import { getActiveOrganizacionId } from '../lib/api';
 import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 import { confirmar } from "../lib/avisos";
+import { confirmarAntesDeEnviar } from "../lib/preferencias";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -896,6 +897,13 @@ function ComposeWindow({
       setError('Los adjuntos suman más de 25 MB: compártelos con un enlace o envíalos en varios correos.');
       return;
     }
+    // Ajustes → Preferencias de trabajo → "Confirmar antes de enviar".
+    if (confirmarAntesDeEnviar() && !(await confirmar({
+      titulo: '¿Enviar este correo?',
+      mensaje: `Para: ${to.trim()}${attachments.length ? ` · ${attachments.length} adjunto${attachments.length === 1 ? '' : 's'}` : ''}
+Asunto: ${subject.trim()}`,
+      confirmar: 'Enviar',
+    }))) return;
     setSending(true); setError('');
     try {
       const html = bodyRef.current?.innerHTML || '';

@@ -1,3 +1,5 @@
+// Primero las traducciones: hay textos que se calculan al cargar cada módulo.
+import './i18n/en'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
@@ -7,6 +9,8 @@ import './lib/temasExtra.css'
 import './lib/temasOscuroColores.css'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { clerkEs } from './lib/clerkEs'
+import { enGB } from '@clerk/localizations'
+import { idioma } from './lib/i18n'
 import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
 import { AppSegura, instalarCapturaGlobal } from './lib/errores'
 
@@ -39,7 +43,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter> 
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
-        localization={clerkEs}
+        localization={idioma() === 'en' ? enGB : clerkEs}
         appearance={{
           variables: {
             colorPrimary: '#1e2f45',

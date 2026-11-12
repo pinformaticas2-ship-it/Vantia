@@ -77,6 +77,7 @@ import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { PlazoCalculator } from "../components/PlazoCalculator";
 import { aviso, confirmar } from "../lib/avisos";
+import { confirmarAntesDeEnviar } from "../lib/preferencias";
 import { useAvisoSalida } from "../lib/borradores";
 import RellenarPlantilla from "../components/RellenarPlantilla";
 import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
@@ -3585,6 +3586,12 @@ function TabCorreoExpediente({
     if (!composeForm.to.trim() || !composeForm.subject.trim() || !composeForm.body.trim()) {
       setComposeError("Para, asunto y cuerpo son obligatorios."); return;
     }
+    if (confirmarAntesDeEnviar() && !(await confirmar({
+      titulo: "¿Enviar este correo?",
+      mensaje: `Para: ${composeForm.to.trim()}
+Asunto: ${composeForm.subject.trim()}`,
+      confirmar: "Enviar",
+    }))) return;
     setSending(true); setComposeError("");
     try {
       const headers = await authHdr();

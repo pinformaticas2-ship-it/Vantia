@@ -17,7 +17,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
-import { primerDiaSemana } from "../lib/preferencias";
+import { primerDiaSemana, duracionEventoMin, vistaAgendaInicial } from "../lib/preferencias";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
 import { useAvisoSalida } from "../lib/borradores";
 import "./agenda.css";
@@ -333,11 +333,18 @@ const emptyForm = (date?: string) => {
   const startAt = date
     ? (hasTime ? date : `${date}T09:00`)
     : localDatetimeInput(new Date().toISOString());
+  // La duración sale de Ajustes → Preferencias de trabajo (antes, 1 hora fija);
+  // si se pasa de medianoche, se queda en las 23:59 del mismo día.
+  const dur = duracionEventoMin();
+  const sumar = (local: string) => {
+    const [d, h] = local.split("T");
+    const [hh, mm] = h.split(":").map((x) => parseInt(x, 10));
+    const total = Math.min(hh * 60 + mm + dur, 23 * 60 + 59);
+    return `${d}T${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  };
   const endAt = !date
-    ? localDatetimeInput(new Date(Date.now() + 3600000).toISOString())
-    : hasTime
-      ? `${date.slice(0, 10)}T${String(Math.min(parseInt(date.slice(11, 13), 10) + 1, 23)).padStart(2, "0")}:00`
-      : `${date}T10:00`;
+    ? localDatetimeInput(new Date(Date.now() + dur * 60_000).toISOString())
+    : sumar(startAt);
   return {
     title: "",
     description: "",
@@ -2847,7 +2854,7 @@ export default function Agenda() {
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string>(isoDate(today));
-  const [view, setView] = useState<"month" | "week" | "day">("week");
+  const [view, setView] = useState<"month" | "week" | "day">(vistaAgendaInicial);
   const isMobile = useIsMobile();
 
   // En móvil la vista semana/mes no cabe: por defecto se muestra solo el día.

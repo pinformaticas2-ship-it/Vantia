@@ -4,7 +4,7 @@ import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Sparkles, Trash2, UsersRound, X, Zap } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Sparkles, Trash2, UsersRound, Volume2, X, Zap } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -20,6 +20,8 @@ import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, SelectorMovimiento, MuestraApariencia, CabeceraAjuste, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
 import { usePreferencias, esOscuro, useAparienciaClerk } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
+import { sonarAviso, AVISOS_CAMBIADOS } from '../lib/sonido';
+import { t } from '../lib/i18n';
 import { TikTokIcon } from '../components/TikTokPanel';
 
 const PALETTES: {
@@ -2220,6 +2222,10 @@ interface AvisoPrefs {
   tipos: Record<TipoPrefAviso, boolean>;
   email?: Record<TipoPrefAviso, boolean>;
   silencio: { activo: boolean; desde: string; hasta: string; finDeSemana: boolean };
+  /** Chat: de los canales, todo o solo menciones (los directos, siempre). */
+  chatModo?: 'todo' | 'menciones';
+  /** Sonido dentro de la app al llegar un mensaje del chat. */
+  sonido?: boolean;
 }
 
 function NotificacionesPanel() {
@@ -2265,6 +2271,7 @@ function NotificacionesPanel() {
         if (!res.ok) throw new Error();
         setEnSilencioAhora(Boolean(d?.data?.enSilencioAhora));
         setGuardado('ok');
+        window.dispatchEvent(new Event(AVISOS_CAMBIADOS));
       } catch {
         setGuardado('error');
       }
@@ -2406,6 +2413,51 @@ function NotificacionesPanel() {
               ? <span className="text-amber-700">Para recibir avisos por correo necesitas una cuenta de correo conectada en <Link to="/dashboard/correo" className="font-semibold underline">Correo</Link>: los avisos salen desde ella.</span>
               : null}
         </p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{t('Chat interno')}</h3>
+        </div>
+        {!prefs ? (
+          <p className="text-sm text-slate-400">{t('Cargando…')}</p>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-slate-700">{t('De los canales, avísame de')}</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t('De los canales, avísame de')}>
+                {([
+                  ['todo', t('Todos los mensajes'), t('Cada mensaje nuevo de los canales en los que estás.')],
+                  ['menciones', t('Solo menciones y mensajes directos'), t('Cuando escriben @tu nombre o @canal, en tus mensajes directos y en los hilos en los que participas.')],
+                ] as const).map(([valor, titulo, desc]) => {
+                  const activo = (prefs.chatModo || 'todo') === valor;
+                  return (
+                    <button key={valor} type="button" role="radio" aria-checked={activo}
+                      onClick={() => cambiarPrefs({ ...prefs, chatModo: valor })}
+                      className={`rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-600 bg-red-600/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                      <span className="block text-sm font-semibold text-slate-800">{titulo}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500">{desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{t('Para silenciar un canal concreto, ábrelo en el Chat y en su menú (⋯) elige «Silenciar canal»: no te avisará salvo que te mencionen.')}</p>
+            </div>
+            <div className="flex items-start gap-3 border-t border-slate-100 pt-4">
+              <Volume2 size={16} className="mt-0.5 shrink-0 text-slate-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-slate-700">{t('Sonido al llegar un mensaje')}</p>
+                <p className="text-xs text-slate-500">{t('Un sonido breve dentro de Vantia cuando te llega un mensaje del chat (con la app abierta). Respeta lo que hayas elegido arriba y los canales silenciados.')}</p>
+                <button type="button" onClick={() => sonarAviso()} className="mt-1 text-xs font-semibold text-red-600 hover:underline">{t('Probar el sonido')}</button>
+              </div>
+              <button type="button" role="switch" aria-checked={!!prefs.sonido} aria-label={t('Sonido al llegar un mensaje')}
+                onClick={() => cambiarPrefs({ ...prefs, sonido: !prefs.sonido })}
+                className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${prefs.sonido ? 'bg-red-600' : 'bg-slate-300'}`}>
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${prefs.sonido ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">

@@ -1,6 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from './api';
+import { cambiarIdioma, fijarFormatoFechas, idioma as idiomaActual, type Idioma } from './i18n';
+
+export const DURACIONES_EVENTO = [15, 30, 45, 60, 90, 120];
 
 // ── Preferencias personales (14/10/2026) ─────────────────────────────────────
 // Modo claro/oscuro/sistema, página de inicio, primer día de la semana en la
@@ -19,6 +22,16 @@ export interface Preferencias {
   texto: TamanoTexto;
   /** Quitar animaciones y transiciones (accesibilidad, 12/11/2026). */
   menosAnimaciones: boolean;
+  /** Idioma de la interfaz (los documentos generados siguen en español). */
+  idioma: Idioma;
+  /** Zona horaria para mostrar horas ('' = la del ordenador). */
+  zonaHoraria: string;
+  formatoHora: '24h' | '12h';
+  /** Duración por defecto de un evento nuevo en la Agenda, en minutos. */
+  duracionEvento: number;
+  vistaAgenda: 'month' | 'week' | 'day';
+  /** Pedir confirmación antes de enviar un correo. */
+  confirmarEnvio: boolean;
   /** Datos de letrado para notas de honorarios y escritos (Calculadora). */
   letradoNombre: string;
   colegiado: string;
@@ -35,6 +48,7 @@ export const TAMANOS_TEXTO: { valor: TamanoTexto; label: string; px: number }[] 
 
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
   modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', menosAnimaciones: false,
+  idioma: 'es', zonaHoraria: '', formatoHora: '24h', duracionEvento: 60, vistaAgenda: 'week', confirmarEnvio: false,
   letradoNombre: '', colegiado: '', colegio: '',
 };
 
@@ -63,6 +77,12 @@ function normalizar(raw: any): Preferencias {
     telefono: typeof p.telefono === 'string' ? p.telefono : '',
     texto: p.texto === 'grande' || p.texto === 'muy_grande' ? p.texto : 'normal',
     menosAnimaciones: p.menosAnimaciones === true,
+    idioma: p.idioma === 'en' ? 'en' : 'es',
+    zonaHoraria: typeof p.zonaHoraria === 'string' ? p.zonaHoraria : '',
+    formatoHora: p.formatoHora === '12h' ? '12h' : '24h',
+    duracionEvento: DURACIONES_EVENTO.includes(p.duracionEvento) ? p.duracionEvento : 60,
+    vistaAgenda: p.vistaAgenda === 'month' || p.vistaAgenda === 'day' ? p.vistaAgenda : 'week',
+    confirmarEnvio: p.confirmarEnvio === true,
     letradoNombre: typeof p.letradoNombre === 'string' ? p.letradoNombre : '',
     colegiado: typeof p.colegiado === 'string' ? p.colegiado : '',
     colegio: typeof p.colegio === 'string' ? p.colegio : '',
@@ -123,7 +143,12 @@ export function aplicarMovimiento(menos: boolean) {
 }
 
 // Lo antes posible (al importar el módulo): el modo y el tamaño guardados, sin parpadeo.
-if (typeof document !== 'undefined') { const c = leerCache(); aplicarMovimiento(c.menosAnimaciones); aplicarModo(c.modo); aplicarTexto(c.texto); }
+if (typeof document !== 'undefined') { const c = leerCache(); aplicarMovimiento(c.menosAnimaciones); aplicarModo(c.modo); aplicarTexto(c.texto); fijarFormatoFechas(c); }
+
+/** Lecturas directas (sin contexto) de Preferencias de trabajo. */
+export function duracionEventoMin(): number { return leerCache().duracionEvento; }
+export function vistaAgendaInicial(): 'month' | 'week' | 'day' { return leerCache().vistaAgenda; }
+export function confirmarAntesDeEnviar(): boolean { return leerCache().confirmarEnvio; }
 
 /** Primer día de la semana para la Agenda (lectura directa, sin contexto). */
 export function primerDiaSemana(): 'lunes' | 'domingo' {
@@ -151,6 +176,7 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
     setPrefs(p);
     try { localStorage.setItem(CLAVE, JSON.stringify(p)); } catch { /* sin almacenamiento */ }
     aplicarMovimiento(p.menosAnimaciones);
+    fijarFormatoFechas(p);
     aplicarModo(p.modo);
     aplicarTexto(p.texto);
   }, []);
@@ -158,7 +184,13 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     apiFetch('/api/preferences/extras', { getToken })
-      .then((res) => { if (res?.data) fijar(normalizar(res.data)); })
+      .then((res) => {
+        if (!res?.data) return;
+        const p = normalizar(res.data);
+        fijar(p);
+        // Idioma elegido en otro dispositivo: se recarga con él.
+        if (p.idioma !== idiomaActual()) cambiarIdioma(p.idioma);
+      })
       .catch(() => {})
       .finally(() => setCargado(true));
   }, [isLoaded, isSignedIn, getToken, fijar]);
@@ -179,6 +211,9 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
       const res = await apiFetch('/api/preferences/extras', { method: 'PUT', getToken, body: JSON.stringify(cambios) });
       if (res?.success === false) throw new Error(res.error);
       if (res?.data) fijar(normalizar(res.data));
+      // El idioma se aplica recargando, y solo cuando ya está guardado.
+      const elegido = res?.data ? normalizar(res.data).idioma : (cambios.idioma ?? prefs.idioma);
+      if (elegido !== idiomaActual()) cambiarIdioma(elegido);
     } catch (e) {
       fijar(anterior);
       throw e;

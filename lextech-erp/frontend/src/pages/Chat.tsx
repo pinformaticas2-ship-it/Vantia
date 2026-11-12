@@ -15,7 +15,7 @@ import {
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
   PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, Briefcase, type LucideIcon,
-  ArrowLeft, Camera,
+  ArrowLeft, Camera, MessageSquareText, Keyboard, CheckCheck, Quote, CornerUpLeft,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl, getActiveOrganizacionId } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -24,7 +24,8 @@ import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
 import { useOrganizacion } from "../lib/useOrganizacion";
-import { aviso } from "../lib/avisos";
+import { aviso, confirmar } from "../lib/avisos";
+import { abrirPaleta } from "../components/PaletaComandos";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -44,6 +45,8 @@ interface Canal {
   dm_target_user_name?: string | null;
   dm_target_avatar_url?: string | null;
   foto_url?: string | null;
+  /** Silenciado por mí: sin avisos salvo menciones, atenuado en la lista. */
+  silenciado?: boolean;
 }
 interface CanalBuscado {
   id: string; nombre: string; descripcion: string | null;
@@ -58,6 +61,12 @@ interface Mensaje {
   reply_to: Mensaje | null;
   reacciones: { emoji: string; user_id: string; user_name: string }[] | null;
   editado: boolean; deleted_at: string | null; created_at: string;
+  /** Respuesta en hilo: id del mensaje principal (no sale en la conversación). */
+  hilo_id?: string | null;
+  /** Resumen del hilo de un mensaje principal (lo manda el servidor). */
+  respuestas?: number | null;
+  ultima_respuesta_at?: string | null;
+  hilo_autores?: { user_id: string; user_name: string; avatar_url: string | null }[] | null;
   /** Solo en mensajes propios que aún no ha confirmado el servidor. */
   _envio?: "enviando" | "error";
 }
@@ -68,6 +77,8 @@ interface EnvioNuevo {
   replyId?: string;
   imagen?: { file: File; previewUrl: string };
   archivo?: File;
+  /** Respuesta dentro de un hilo (id del mensaje principal). */
+  hiloId?: string;
 }
 /** Quita los mensajes provisionales que ya han llegado de verdad (mismo
  *  autor y mismo texto) -- por si el aviso en tiempo real o el sondeo traen
@@ -270,6 +281,7 @@ const CHAT_CUSTOM_STATUS_KEY = "chat-custom-status-v1";
 const CHAT_CUSTOM_STATUS_EMOJI_KEY = "chat-custom-status-emoji-v1";
 const CHAT_CUSTOM_STATUS_COLOR_KEY = "chat-custom-status-color-v1";
 const CHAT_NOTIFICATIONS_PAUSED_KEY = "chat-notifications-paused-v1";
+const CHAT_BORRADORES_KEY = "vantia.chat.borradores";
 const API_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const MAX_RECENT_EMOJIS = 24;
 const EMOJI_API_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -432,6 +444,23 @@ const EmojiImg = React.memo(function EmojiImg({
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
+
+/** "hace 5 min", "ayer a las 18:20", "el 3 nov." */
+function haceRato(iso: string): string {
+  const t = new Date(iso).getTime();
+  const min = Math.round((Date.now() - t) / 60_000);
+  if (min < 1) return "ahora mismo";
+  if (min < 60) return `hace ${min} min`;
+  const d = new Date(t);
+  const hoy = new Date();
+  if (d.toDateString() === hoy.toDateString()) return `hoy a las ${fmtTime(iso)}`;
+  const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+  if (d.toDateString() === ayer.toDateString()) return `ayer a las ${fmtTime(iso)}`;
+  return `el ${d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`;
+}
+
+/** Reacciones de un clic en la barra de cada mensaje. */
+const REACCIONES_RAPIDAS = ["✅", "👀", "👍"];
 
 const mediaUrl = (url?: string | null) => resolveUploadUrl(url);
 
@@ -843,8 +872,30 @@ function sortByDmOrder<T extends { user: { user_id: string; user_name: string } 
   });
 }
 
-function renderText(s: string): React.ReactNode {
-  const renderEmojiRichText = (text: string, keyPrefix: string) => text
+// ── Texto de los mensajes (11/11/2026, formato como en Slack) ──────────────
+// En línea: **negrita**, *cursiva* o _cursiva_, ~tachado~, `código`,
+// [texto](enlace), enlaces sueltos y @menciones (el nombre entero, aunque
+// tenga apellidos). Por líneas: ```bloque de código```, > cita, listas con
+// "- " y numeradas con "1. ".
+interface ContextoTexto { nombres: string[]; miNombre: string }
+const ContextoTextoChat = React.createContext<ContextoTexto>({ nombres: [], miNombre: "" });
+const MENCIONES_GRUPO = ["canal", "todos", "aqui"];
+
+function sinTildes(s: string) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/** ¿Este texto me menciona? (@mi nombre, @canal, @todos o @aquí) */
+function mencionaA(texto: string | null | undefined, miNombre: string): boolean {
+  if (!texto || !texto.includes("@")) return false;
+  const t = sinTildes(texto);
+  if (/(^|[^\p{L}\p{N}])@(canal|todos|aqui)(?![\p{L}\p{N}])/u.test(t)) return true;
+  const yo = sinTildes(miNombre || "").trim();
+  return !!yo && t.includes(`@${yo}`);
+}
+
+function conEmojis(text: string, keyPrefix: string): React.ReactNode[] {
+  return text
     .split(EMOJI_TEXT_SEGMENT_REGEX)
     .filter(Boolean)
     .map((segment, index) => (
@@ -852,24 +903,121 @@ function renderText(s: string): React.ReactNode {
         ? <EmojiImg key={`${keyPrefix}-emoji-${index}`} emoji={segment} size={18} className="mx-[1px] inline-block align-[-0.2em]" />
         : <React.Fragment key={`${keyPrefix}-text-${index}`}>{segment}</React.Fragment>
     ));
+}
 
-  return s.split(/(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|https?:\/\/\S+|@\S+)/g)
-    .map((p, i) => {
-      const markdownLink = p.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
-      if (markdownLink) {
-        return (
-          <a key={i} href={markdownLink[2]} target="_blank" rel="noreferrer" className="text-blue-500 underline hover:text-blue-600">
-            {renderEmojiRichText(markdownLink[1], `link-label-${i}`)}
-          </a>
-        );
+const TROZOS_EN_LINEA = /(\[[^\]\n]+\]\(https?:\/\/[^)\s]+\)|`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\s][^*\n]*\*|(?<![\p{L}\p{N}])_[^_\n]+_(?![\p{L}\p{N}])|~[^~\n]+~|https?:\/\/[^\s<]+|@[\p{L}\p{N}_.-]+(?: [\p{L}\p{N}_.-]+){0,3})/gu;
+
+function renderEnLinea(s: string, ctx: ContextoTexto, kp: string): React.ReactNode[] {
+  return s.split(TROZOS_EN_LINEA).filter((p) => p !== "").map((p, i) => {
+    const key = `${kp}-${i}`;
+    const enlace = p.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+    if (enlace) return <a key={key} href={enlace[2]} target="_blank" rel="noreferrer" className="text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-700">{conEmojis(enlace[1], key)}</a>;
+    if (p.length > 2 && p.startsWith("`") && p.endsWith("`")) return <code key={key} className="rounded border border-slate-200 bg-slate-100 px-1 py-px font-mono text-[13px] text-rose-700">{p.slice(1, -1)}</code>;
+    if (p.length > 4 && p.startsWith("**") && p.endsWith("**")) return <strong key={key} className="font-semibold text-slate-900">{renderEnLinea(p.slice(2, -2), ctx, key)}</strong>;
+    if (p.length > 2 && p.startsWith("*") && p.endsWith("*")) return <em key={key}>{renderEnLinea(p.slice(1, -1), ctx, key)}</em>;
+    if (p.length > 2 && p.startsWith("_") && p.endsWith("_")) return <em key={key}>{renderEnLinea(p.slice(1, -1), ctx, key)}</em>;
+    if (p.length > 2 && p.startsWith("~") && p.endsWith("~")) return <s key={key} className="text-slate-500">{renderEnLinea(p.slice(1, -1), ctx, key)}</s>;
+    if (/^https?:\/\//.test(p)) {
+      // Un punto o paréntesis al final suele ser de la frase, no del enlace.
+      const m = p.match(/^(.*?)([.,;:!?)\]]*)$/)!;
+      return (
+        <React.Fragment key={key}>
+          <a href={m[1]} target="_blank" rel="noreferrer" className="break-all text-blue-600 underline decoration-blue-300 underline-offset-2 hover:text-blue-700">{m[1]}</a>{m[2]}
+        </React.Fragment>
+      );
+    }
+    if (p.startsWith("@") && p.length > 1) {
+      const cuerpo = p.slice(1);
+      const n = sinTildes(cuerpo);
+      // El nombre conocido más largo con el que empieza ("@Ana López García").
+      let largo = 0;
+      for (const nombre of ctx.nombres) {
+        const nn = sinTildes(nombre);
+        if (nn && (n === nn || n.startsWith(`${nn} `)) && nn.length > largo) largo = nn.length;
       }
-      if (p.startsWith("**")&&p.endsWith("**")) return <strong key={i}>{renderEmojiRichText(p.slice(2,-2), `strong-${i}`)}</strong>;
-      if (p.startsWith("*") &&p.endsWith("*"))  return <em key={i}>{renderEmojiRichText(p.slice(1,-1), `em-${i}`)}</em>;
-      if (p.startsWith("`") &&p.endsWith("`"))  return <code key={i} className="bg-slate-100 text-red-700 px-1 rounded font-mono text-[13px]">{renderEmojiRichText(p.slice(1,-1), `code-${i}`)}</code>;
-      if (p.startsWith("http")) return <a key={i} href={p} target="_blank" rel="noreferrer" className="text-blue-500 underline hover:text-blue-600">{renderEmojiRichText(p, `link-${i}`)}</a>;
-      if (p.startsWith("@")) return <span key={i} className="text-blue-600 font-semibold bg-blue-50 px-0.5 rounded">{renderEmojiRichText(p, `mention-${i}`)}</span>;
-      return <React.Fragment key={i}>{renderEmojiRichText(p, `plain-${i}`)}</React.Fragment>;
-    });
+      const grupo = !largo && MENCIONES_GRUPO.find((g) => n === g || n.startsWith(`${g} `));
+      if (!largo) largo = grupo ? grupo.length : cuerpo.split(" ")[0].length;
+      const nombre = cuerpo.slice(0, largo);
+      const resto = cuerpo.slice(largo);
+      const mia = !!grupo || (!!ctx.miNombre && sinTildes(nombre) === sinTildes(ctx.miNombre));
+      return (
+        <React.Fragment key={key}>
+          <span className={`rounded px-0.5 font-semibold ${mia ? "bg-amber-100 text-amber-800" : "bg-blue-50 text-blue-700"}`}>@{nombre}</span>
+          {resto && renderEnLinea(resto, ctx, `${key}r`)}
+        </React.Fragment>
+      );
+    }
+    return <React.Fragment key={key}>{conEmojis(p, key)}</React.Fragment>;
+  });
+}
+
+function renderTexto(s: string, ctx: ContextoTexto): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  const lineas = (s || "").replace(/\r\n/g, "\n").split("\n");
+  let parrafo: string[] = [];
+  let k = 0;
+  const cerrarParrafo = () => {
+    if (!parrafo.length) return;
+    const n = k++;
+    out.push(<span key={n} className="block whitespace-pre-wrap">{renderEnLinea(parrafo.join("\n"), ctx, `p${n}`)}</span>);
+    parrafo = [];
+  };
+  let i = 0;
+  while (i < lineas.length) {
+    const l = lineas[i];
+    // ```bloque de código``` (también en una sola línea)
+    if (/^\s*```/.test(l)) {
+      cerrarParrafo();
+      const cod: string[] = [];
+      const primera = l.replace(/^\s*```/, "");
+      if (primera.length > 3 && /```\s*$/.test(primera)) {
+        cod.push(primera.replace(/```\s*$/, ""));
+        i++;
+      } else {
+        if (primera.trim()) cod.push(primera);
+        i++;
+        while (i < lineas.length && !/```\s*$/.test(lineas[i])) { cod.push(lineas[i]); i++; }
+        if (i < lineas.length) { const ultima = lineas[i].replace(/```\s*$/, ""); if (ultima.trim()) cod.push(ultima); i++; }
+      }
+      out.push(<pre key={k++} className="my-1 overflow-x-auto whitespace-pre rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-[13px] leading-snug text-slate-700">{cod.join("\n")}</pre>);
+      continue;
+    }
+    if (/^>\s?/.test(l)) {
+      cerrarParrafo();
+      const cita: string[] = [];
+      while (i < lineas.length && /^>\s?/.test(lineas[i])) { cita.push(lineas[i].replace(/^>\s?/, "")); i++; }
+      const n = k++;
+      out.push(<blockquote key={n} className="my-0.5 whitespace-pre-wrap border-l-[3px] border-slate-300 pl-3 text-slate-600">{renderEnLinea(cita.join("\n"), ctx, `q${n}`)}</blockquote>);
+      continue;
+    }
+    if (/^\s*[-•*]\s+\S/.test(l)) {
+      cerrarParrafo();
+      const items: string[] = [];
+      while (i < lineas.length && /^\s*[-•*]\s+\S/.test(lineas[i])) { items.push(lineas[i].replace(/^\s*[-•*]\s+/, "")); i++; }
+      const n = k++;
+      out.push(<ul key={n} className="my-0.5 list-disc space-y-0.5 pl-5 marker:text-slate-400">{items.map((it, j) => <li key={j}>{renderEnLinea(it, ctx, `u${n}-${j}`)}</li>)}</ul>);
+      continue;
+    }
+    if (/^\s*\d+[.)]\s+\S/.test(l)) {
+      cerrarParrafo();
+      const items: string[] = [];
+      const inicio = parseInt(l.trim(), 10) || 1;
+      while (i < lineas.length && /^\s*\d+[.)]\s+\S/.test(lineas[i])) { items.push(lineas[i].replace(/^\s*\d+[.)]\s+/, "")); i++; }
+      const n = k++;
+      out.push(<ol key={n} start={inicio} className="my-0.5 list-decimal space-y-0.5 pl-6 marker:text-slate-400">{items.map((it, j) => <li key={j}>{renderEnLinea(it, ctx, `o${n}-${j}`)}</li>)}</ol>);
+      continue;
+    }
+    parrafo.push(l);
+    i++;
+  }
+  cerrarParrafo();
+  return out;
+}
+
+function TextoMensaje({ texto }: { texto: string }) {
+  const ctx = React.useContext(ContextoTextoChat);
+  const nodos = useMemo(() => renderTexto(texto, ctx), [texto, ctx]);
+  return <>{nodos}</>;
 }
 
 function buildTypingLabel(names: string[]) {
@@ -1834,21 +1982,6 @@ function GifPicker({
 // ══════════════════════════════════════════════════════════════════════════════
 // MENTION DROPDOWN
 // ══════════════════════════════════════════════════════════════════════════════
-function MentionDropdown({ miembros, query, onSelect }: { miembros: Miembro[]; query: string; onSelect:(n:string)=>void }) {
-  const filtered = miembros.filter(m=>m.user_name.toLowerCase().includes(query.toLowerCase())).slice(0,6);
-  if (!filtered.length) return null;
-  return (
-    <div className="absolute bottom-full mb-1 left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl w-56 overflow-hidden">
-      {filtered.map(m=>(
-        <button key={m.user_id} onClick={()=>onSelect(m.user_name)}
-          className="flex items-center gap-2 w-full px-3 py-2 hover:bg-slate-50 text-left transition-colors">
-          <Av url={m.avatar_url} name={m.user_name} size={6}/>
-          <div><p className="text-slate-800 text-sm font-medium">{m.user_name}</p><p className="text-slate-400 text-xs">{m.role_label}</p></div>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // STATUS SELECTOR
@@ -2143,6 +2276,8 @@ function ChannelMenu({
   onRefresh,
   onLeave,
   onClose,
+  onToggleSilencio,
+  onAtajos,
 }: {
   canal: Canal;
   onMembers: ()=>void;
@@ -2151,6 +2286,8 @@ function ChannelMenu({
   onRefresh: ()=>void;
   onLeave: ()=>void;
   onClose: ()=>void;
+  onToggleSilencio: ()=>void;
+  onAtajos: ()=>void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -2175,9 +2312,21 @@ function ChannelMenu({
         <Star size={14} className="text-amber-400" />
         Ver favoritos
       </button>
+      <button onClick={() => { onToggleSilencio(); onClose(); }}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
+        {canal.silenciado ? <Bell size={14} className="text-slate-400" /> : <BellOff size={14} className="text-slate-400" />}
+        {canal.silenciado
+          ? (canal.tipo === "directo" ? "Volver a avisarme" : "Quitar silencio")
+          : (canal.tipo === "directo" ? "Silenciar conversación" : "Silenciar canal")}
+      </button>
+      <button onClick={() => { onAtajos(); onClose(); }}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
+        <Keyboard size={14} className="text-slate-400" />
+        Atajos de teclado
+      </button>
       <button onClick={() => { onRefresh(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <Loader2 size={14} className="text-slate-400" />
+        <RotateCcw size={14} className="text-slate-400" />
         Actualizar
       </button>
       {canal.tipo !== "directo" && (
@@ -2717,11 +2866,15 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
 // elementos y el componente padre repinta con cada poll (cada ~700ms
 // mientras la pestaña está visible) -- sin memo, cada mensaje se volvía a
 // renderizar entero en cada ciclo aunque su contenido no hubiera cambiado.
-const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReintentar, onDescartar, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl, getToken }: {
+const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReintentar, onDescartar, onReply, onThread, enHilo = false, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl, getToken }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
   showReadReceipt?: boolean; isReadByRecipient?: boolean;
   onReintentar?:(id:string)=>void; onDescartar?:(id:string)=>void;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
+  /** Abrir el hilo de este mensaje (no se pasa dentro del propio hilo). */
+  onThread?:(m:Mensaje)=>void;
+  /** Se pinta dentro del panel del hilo: sin resumen de respuestas. */
+  enHilo?: boolean;
   onEdit:(m:Mensaje)=>void; onDelete:(id:string)=>void; onPin:(id:string)=>void; onFavorite:(id:string)=>void;
   isFavorite?: boolean; isPinned?: boolean;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
@@ -2738,6 +2891,8 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   const dragStartRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const didTriggerReplyRef = useRef(false);
   const isMe = msg.user_id === currentUserId;
+  const { miNombre } = React.useContext(ContextoTextoChat);
+  const meMenciona = !isMe && !msg.deleted_at && mencionaA(msg.contenido, miNombre);
   const sameAuthor = !!(prevMsg &&
     prevMsg.user_id === msg.user_id &&
     (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) < 5*60*1000);
@@ -2856,7 +3011,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
     <div id={`msg-${msg.id}`}
       onMouseEnter={()=>setHover(true)}
       onMouseLeave={()=>{ if (!showEmoji) setHover(false); }}
-      className={`relative group px-4 transition-colors duration-100 ${isHighlighted?"bg-yellow-50":"hover:bg-slate-50/80"} ${!sameAuthor?"mt-3 pt-2 pb-1":"py-0.5"} ${
+      className={`relative group px-4 transition-colors duration-100 ${isHighlighted?"bg-yellow-50":meMenciona?"bg-amber-50/70 hover:bg-amber-50 shadow-[inset_3px_0_0_0_#f59e0b]":"hover:bg-slate-50/80"} ${!sameAuthor?"mt-3 pt-2 pb-1":"py-0.5"} ${
         isFreshIncoming ? "animate-in fade-in slide-in-from-bottom-1" : ""
       }`}>
       {/* Drag reply hint */}
@@ -3012,7 +3167,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 </>
               )
               : !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
-                <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
+                <div className="text-slate-700 text-[15px] leading-relaxed break-words"><TextoMensaje texto={msg.contenido}/></div>
               )
             }
             {previewUrl && !msg._envio && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
@@ -3038,21 +3193,64 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                   <span>{r.count}</span>
                 </button>
               ))}
+              {!msg._envio && (
+                <button onClick={()=>setShowEmoji(true)} title="Añadir reacción"
+                  className="flex items-center rounded-full border border-dashed border-slate-200 px-1.5 py-0.5 text-slate-400 opacity-0 transition-opacity hover:border-slate-300 hover:text-slate-600 group-hover:opacity-100">
+                  <Smile size={13}/><Plus size={9} className="-ml-0.5"/>
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Resumen del hilo (como en Slack): quién ha contestado, cuántas
+              respuestas y cuándo la última. Abre el hilo al pulsar. */}
+          {!enHilo && !!msg.respuestas && msg.respuestas > 0 && onThread && (
+            <button type="button" onClick={()=>onThread(msg)}
+              className="group/hilo mt-1.5 -ml-1 flex max-w-md items-center gap-2 rounded-lg border border-transparent px-1 py-1 text-left transition-all hover:border-slate-200 hover:bg-white hover:shadow-sm">
+              <span className="flex -space-x-1.5">
+                {(msg.hilo_autores || []).slice(0, 4).map((a) => (
+                  <span key={a.user_id} className="rounded-md ring-2 ring-white">
+                    <Av url={resolveAvatarUrl?.(a.user_id, a.avatar_url, a.user_id === currentUserId) ?? a.avatar_url} name={resolveDisplayName(a.user_id, a.user_name, a.user_id === currentUserId)} size={5}/>
+                  </span>
+                ))}
+              </span>
+              <span className="text-xs font-bold text-blue-600 group-hover/hilo:underline">
+                {msg.respuestas} {msg.respuestas === 1 ? "respuesta" : "respuestas"}
+              </span>
+              {msg.ultima_respuesta_at && (
+                <span className="text-xs text-slate-400 group-hover/hilo:hidden">Última {haceRato(msg.ultima_respuesta_at)}</span>
+              )}
+              <span className="hidden text-xs text-slate-400 group-hover/hilo:inline">Ver hilo</span>
+              <ChevronRight size={13} className="text-slate-300 opacity-0 transition-opacity group-hover/hilo:opacity-100"/>
+            </button>
           )}
         </div>
       </div>
 
       {/* Hover toolbar */}
       {(hover || showEmoji) && !msg._envio && (
-        <div className="absolute right-4 -top-4 flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-md px-1 py-0.5 z-20">
+        <div className="absolute right-4 -top-4 flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-md px-1 py-0.5 z-20 animate-in fade-in zoom-in-95 duration-100">
+          {/* Reacciones rápidas (un clic, sin abrir el selector). */}
+          {REACCIONES_RAPIDAS.map((e) => (
+            <button key={e} onClick={()=>onReact(msg.id, e)} title={`Reaccionar con ${e}`}
+              className="hidden rounded-md p-1 transition-transform hover:scale-110 hover:bg-slate-100 sm:block">
+              <EmojiImg emoji={e} size={16} />
+            </button>
+          ))}
+          <span className="mx-0.5 hidden h-4 w-px bg-slate-200 sm:block"/>
           <div className="relative">
             <button ref={emojiButtonRef} onClick={()=>setShowEmoji(v=>!v)} title="Reaccionar"
               className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Smile size={14}/></button>
             {showEmoji&&<EmojiPicker anchorRef={emojiButtonRef} align="right" onPick={e=>{onReact(msg.id,e);setShowEmoji(false);setHover(false);}} onClose={()=>{setShowEmoji(false);setHover(false);}}/>}
           </div>
-          <button onClick={()=>onReply(msg)} title="Responder"
+          {onThread && !enHilo && (
+            <button onClick={()=>onThread(msg)} title="Responder en hilo"
+              className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-blue-600 transition-colors"><MessageSquareText size={14}/></button>
+          )}
+          <button onClick={()=>onReply(msg)} title="Citar y responder"
             className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><CornerDownRight size={14}/></button>
+          <button onClick={()=>{ void navigator.clipboard?.writeText(msg.contenido || "").then(()=>aviso.ok("Texto copiado"), ()=>{}); }} title="Copiar texto"
+            className="hidden p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors sm:block"><Copy size={14}/></button>
           <button onClick={()=>onFavorite(msg.id)} title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
             className={`p-1.5 rounded-md transition-colors ${isFavorite ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}><Star size={14} className={isFavorite ? "fill-amber-300" : ""}/></button>
           <button onClick={()=>onPin(msg.id)} title={isPinned ? "Desfijar" : "Fijar"}
@@ -3087,20 +3285,72 @@ function DateSep({ date }: { date: string }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MESSAGE INPUT
 // ══════════════════════════════════════════════════════════════════════════════
-function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onSendOptimista, onCancelReply, onCancelEdit }: {
+/** Lo que se escribe tras "@" (vale con tildes y con nombre y apellidos). */
+const MENCION_EN_CURSO = /(^|\s)@([\p{L}\p{N}_.-]*(?: [\p{L}\p{N}_.-]*){0,2})$/u;
+
+interface CandidatoMencion { key: string; nombre: string; detalle: string; avatar: string | null; grupo?: boolean }
+
+function ListaMenciones({ items, activo, onSelect, onHover }: {
+  items: CandidatoMencion[]; activo: number; onSelect: (n: string) => void; onHover: (i: number) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <div className="absolute bottom-full left-2 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-2xl animate-in fade-in slide-in-from-bottom-1 duration-150">
+      <p className="px-3 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Mencionar</p>
+      {items.map((m, i) => (
+        <button key={m.key} type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => onHover(i)}
+          onClick={() => onSelect(m.nombre)}
+          className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors ${i === activo ? "bg-slate-100" : ""}`}>
+          {m.grupo
+            ? <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-100 text-amber-700"><AtSign size={13}/></span>
+            : <Av url={m.avatar} name={m.nombre} size={6}/>}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-slate-800">{m.grupo ? `@${m.nombre}` : m.nombre}</span>
+          </span>
+          <span className="shrink-0 truncate text-[11px] text-slate-400">{m.detalle}</span>
+        </button>
+      ))}
+      <p className="border-t border-slate-100 px-3 pt-1.5 pb-1 text-[10px] text-slate-400">↑↓ para elegir · Intro o Tab para mencionar · Esc para cerrar</p>
+    </div>
+  );
+}
+
+/** Botón de la barra de formato. */
+function BotonFormato({ titulo, onClick, children }: { titulo: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" title={titulo} aria-label={titulo}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800">
+      {children}
+    </button>
+  );
+}
+
+const MOD = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+
+function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onSendOptimista, onCancelReply, onCancelEdit, borradorInicial = "", onBorrador, onEditarUltimo, placeholder, compacto = false }: {
   canalId: string; canalNombre: string; isDirect?: boolean; replyTo: Mensaje|null; editingMsg: Mensaje|null; miembros: Miembro[]; currentUserId: string;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   onTypingChange:(canalId: string, typing: boolean)=>void;
   onSend:(text:string,gifUrl?:string,replyId?:string,editId?:string,imageUrl?:string,fileUrl?:string,fileName?:string,fileMime?:string)=>Promise<void>;
   onSendOptimista:(items: EnvioNuevo[])=>void;
   onCancelReply:()=>void; onCancelEdit:()=>void;
+  /** Borrador guardado de esta conversación (se recupera al volver). */
+  borradorInicial?: string;
+  onBorrador?:(texto: string)=>void;
+  /** Flecha arriba con el cuadro vacío: editar mi último mensaje. */
+  onEditarUltimo?:()=>void;
+  placeholder?: string;
+  /** Versión del panel del hilo (más estrecha). */
+  compacto?: boolean;
 }) {
-  const [text, setText] = useState("");
-  // El envío ya no bloquea el cuadro (09/10/2026): el mensaje sale en pantalla
-  // al momento y el servidor lo confirma por detrás (ver enviarOptimista).
-  const sending = false;
+  const [text, setText] = useState(borradorInicial);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
+  const [mencionIdx, setMencionIdx] = useState(0);
   // Arrays (antes admitían solo uno) -- cada imagen / archivo se manda como
   // su propio mensaje al pulsar enviar, ver doSend.
   const [selectedImages, setSelectedImages] = useState<{ file: File; previewUrl: string }[]>([]);
@@ -3115,21 +3365,54 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dragCounterRef = useRef(0);
-  const sendLockRef = useRef(false);
-  const { getToken } = useAuth();
+  // Lo que había escrito antes de ponerse a editar un mensaje: vuelve al terminar.
+  const textoAntesDeEditarRef = useRef<string | null>(null);
+  // Al desmontar (cambiar de conversación) se guarda lo último escrito.
+  const ultimoTextoRef = useRef(text);
+  ultimoTextoRef.current = editingMsg ? (textoAntesDeEditarRef.current ?? "") : text;
+  const onBorradorRef = useRef(onBorrador);
+  onBorradorRef.current = onBorrador;
+  useEffect(() => () => { onBorradorRef.current?.(ultimoTextoRef.current); }, []);
+
+  const autoResize = useCallback(() => {
+    const t = taRef.current;
+    if (t) { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, compacto ? 200 : 240)+"px"; }
+  }, [compacto]);
 
   useEffect(() => {
     if (editingMsg) {
+      if (textoAntesDeEditarRef.current === null) textoAntesDeEditarRef.current = text;
       setText(editingMsg.contenido);
-      taRef.current?.focus();
-    } else {
-      setText("");
+      requestAnimationFrame(() => {
+        const ta = taRef.current;
+        if (!ta) return;
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+        autoResize();
+      });
+    } else if (textoAntesDeEditarRef.current !== null) {
+      setText(textoAntesDeEditarRef.current);
+      textoAntesDeEditarRef.current = null;
+      requestAnimationFrame(autoResize);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingMsg?.id]);
+
+  // El borrador se guarda solo (no mientras se edita un mensaje).
+  useEffect(() => {
+    if (editingMsg || !onBorrador) return;
+    const t = window.setTimeout(() => onBorrador(text), 250);
+    return () => clearTimeout(t);
+  }, [text, editingMsg, onBorrador]);
+
+  useEffect(() => { requestAnimationFrame(autoResize); }, [autoResize]);
 
   useEffect(() => () => {
     for (const img of selectedImages) URL.revokeObjectURL(img.previewUrl);
   }, [selectedImages]);
+
+  // Al responder o citar, el cursor va al cuadro.
+  useEffect(() => { if (replyTo) taRef.current?.focus(); }, [replyTo?.id]);
 
   const stopTypingSignal = useCallback(() => {
     if (typingStopTimeoutRef.current) {
@@ -3168,11 +3451,6 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     stopTypingSignal();
   }, [canalId, stopTypingSignal]);
 
-  const autoResize = () => {
-    const t = taRef.current;
-    if (t) { t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160)+"px"; }
-  };
-
   const syncSelection = useCallback(() => {
     const ta = taRef.current;
     if (!ta) return;
@@ -3182,24 +3460,167 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     };
   }, [text.length]);
 
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key==="Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (sending || sendLockRef.current) return;
-      void doSend();
+  /** Cambia el texto y deja la selección donde se diga. */
+  const aplicar = (nuevo: string, selIni: number, selFin = selIni) => {
+    // La selección se pone YA en el cuadro (no en el siguiente fotograma): si
+    // no, lo que se teclea justo después caía fuera (p. ej. tras Ctrl+B).
+    const taAhora = taRef.current;
+    if (taAhora) { taAhora.value = nuevo; taAhora.setSelectionRange(selIni, selFin); }
+    setText(nuevo);
+    selectionRef.current = { start: selIni, end: selFin };
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(selIni, selFin);
+      autoResize();
+    });
+    if (nuevo.trim()) startTypingSignal(); else stopTypingSignal();
+  };
+
+  /** **negrita**, _cursiva_, ~tachado~, `código`: si ya estaba, lo quita. */
+  const envolver = (izq: string, der = izq, relleno = "texto") => {
+    const ta = taRef.current; if (!ta) return;
+    const s = ta.selectionStart ?? text.length, e = ta.selectionEnd ?? text.length;
+    const antes = text.slice(0, s), sel = text.slice(s, e), despues = text.slice(e);
+    if (sel && antes.endsWith(izq) && despues.startsWith(der)) {
+      aplicar(antes.slice(0, -izq.length) + sel + despues.slice(der.length), s - izq.length, e - izq.length);
+      return;
     }
-    if (e.key==="Escape") { onCancelReply(); onCancelEdit(); setText(""); stopTypingSignal(); }
+    if (sel.length > izq.length + der.length && sel.startsWith(izq) && sel.endsWith(der)) {
+      const dentro = sel.slice(izq.length, sel.length - der.length);
+      aplicar(antes + dentro + despues, s, s + dentro.length);
+      return;
+    }
+    const contenido = sel || relleno;
+    aplicar(antes + izq + contenido + der + despues, s + izq.length, s + izq.length + contenido.length);
+  };
+
+  /** Listas y citas: pone (o quita) el prefijo a cada línea seleccionada. */
+  const prefijarLineas = (tipo: "lista" | "numerada" | "cita") => {
+    const ta = taRef.current; if (!ta) return;
+    const s = ta.selectionStart ?? text.length, e = ta.selectionEnd ?? text.length;
+    const ini = text.lastIndexOf("\n", s - 1) + 1;
+    const finIdx = text.indexOf("\n", e);
+    const fin = finIdx === -1 ? text.length : finIdx;
+    const lineas = text.slice(ini, fin).split("\n");
+    const patron = tipo === "lista" ? /^\s*[-•*]\s+/ : tipo === "numerada" ? /^\s*\d+[.)]\s+/ : /^>\s?/;
+    const todas = lineas.every((l) => patron.test(l));
+    const nuevas = lineas.map((l, i) => (todas
+      ? l.replace(patron, "")
+      : (tipo === "lista" ? "- " : tipo === "numerada" ? `${i + 1}. ` : "> ") + l.replace(/^\s*(?:[-•*]|\d+[.)]|>)\s?/, "")));
+    const bloque = nuevas.join("\n");
+    aplicar(text.slice(0, ini) + bloque + text.slice(fin), ini + bloque.length);
+  };
+
+  /** [texto](enlace): deja seleccionada la parte que falta por escribir. */
+  const insertarEnlace = () => {
+    const ta = taRef.current; if (!ta) return;
+    const s = ta.selectionStart ?? text.length, e = ta.selectionEnd ?? text.length;
+    const sel = text.slice(s, e);
+    if (/^https?:\/\/\S+$/.test(sel)) {
+      const nuevo = `${text.slice(0, s)}[enlace](${sel})${text.slice(e)}`;
+      aplicar(nuevo, s + 1, s + 7);
+      return;
+    }
+    const etiqueta = sel || "texto";
+    const nuevo = `${text.slice(0, s)}[${etiqueta}](https://)${text.slice(e)}`;
+    const urlIni = s + etiqueta.length + 3;
+    aplicar(nuevo, urlIni, urlIni + 8);
+  };
+
+  const codigo = () => {
+    const ta = taRef.current; if (!ta) return;
+    const sel = text.slice(ta.selectionStart ?? 0, ta.selectionEnd ?? 0);
+    if (sel.includes("\n")) envolver("```\n", "\n```", "código");
+    else envolver("`", "`", "código");
+  };
+
+  const candidatosMencion = useMemo<CandidatoMencion[]>(() => {
+    if (mentionQ === null) return [];
+    const q = sinTildes(mentionQ.trim());
+    const gente = miembros
+      .filter((m) => m.user_id !== currentUserId && sinTildes(m.user_name || "").includes(q))
+      .slice(0, 7)
+      .map((m) => ({ key: m.user_id, nombre: m.user_name, detalle: m.role_label || "", avatar: m.avatar_url }));
+    const grupos: CandidatoMencion[] = isDirect ? [] : [
+      { key: "@canal", nombre: "canal", detalle: "Avisa a todo el canal", avatar: null, grupo: true },
+    ].filter((g) => g.nombre.startsWith(q) || (q && "todos".startsWith(q)));
+    return [...gente, ...grupos];
+  }, [mentionQ, miembros, currentUserId, isDirect]);
+
+  useEffect(() => { setMencionIdx(0); }, [mentionQ]);
+
+  const insertMention = (name: string) => {
+    const ta = taRef.current; if (!ta) return;
+    const cur = ta.selectionStart ?? text.length;
+    const before = text.slice(0, cur).replace(MENCION_EN_CURSO, (_m, pre) => `${pre}@${name} `);
+    const after = text.slice(cur);
+    setMentionQ(null);
+    aplicar(before + after, before.length);
+  };
+
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Lista de menciones abierta: se maneja con el teclado.
+    if (mentionQ !== null && candidatosMencion.length) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setMencionIdx((i) => (i + 1) % candidatosMencion.length); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMencionIdx((i) => (i - 1 + candidatosMencion.length) % candidatosMencion.length); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(candidatosMencion[mencionIdx]?.nombre || candidatosMencion[0].nombre); return; }
+      if (e.key === "Escape") { e.preventDefault(); setMentionQ(null); return; }
+    }
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if (!e.shiftKey && k === "b") { e.preventDefault(); envolver("**"); return; }
+      if (!e.shiftKey && k === "i") { e.preventDefault(); envolver("_"); return; }
+      if (e.shiftKey && k === "x") { e.preventDefault(); envolver("~"); return; }
+      if (e.shiftKey && k === "u") { e.preventDefault(); insertarEnlace(); return; }
+      if (e.shiftKey && e.code === "Digit7") { e.preventDefault(); prefijarLineas("numerada"); return; }
+      if (e.shiftKey && e.code === "Digit8") { e.preventDefault(); prefijarLineas("lista"); return; }
+      if (e.shiftKey && e.code === "Digit9") { e.preventDefault(); prefijarLineas("cita"); return; }
+    }
+    if (e.key === "Enter" && e.shiftKey) {
+      // En una lista, la línea nueva sigue la lista (y una vacía la termina).
+      const ta = e.currentTarget;
+      const pos = ta.selectionStart ?? text.length;
+      if (pos !== (ta.selectionEnd ?? pos)) return;
+      const ini = text.lastIndexOf("\n", pos - 1) + 1;
+      const linea = text.slice(ini, pos);
+      const vineta = linea.match(/^(\s*[-•*]\s+)(.*)$/);
+      const numero = linea.match(/^(\s*)(\d+)([.)]\s+)(.*)$/);
+      const cita = linea.match(/^(>\s?)(.*)$/);
+      const vacia = (vineta && !vineta[2].trim()) || (numero && !numero[4].trim()) || (cita && !cita[2].trim());
+      if (vacia) { e.preventDefault(); aplicar(text.slice(0, ini) + text.slice(pos), ini); return; }
+      const prefijo = vineta ? vineta[1] : numero ? `${numero[1]}${parseInt(numero[2], 10) + 1}${numero[3]}` : cita ? cita[1] : null;
+      if (prefijo) { e.preventDefault(); aplicar(`${text.slice(0, pos)}\n${prefijo}${text.slice(pos)}`, pos + 1 + prefijo.length); }
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      void doSend();
+      return;
+    }
+    if (e.key === "ArrowUp" && !text && !editingMsg && !selectedImages.length && !selectedFiles.length && onEditarUltimo) {
+      e.preventDefault();
+      onEditarUltimo();
+      return;
+    }
+    if (e.key === "Escape") {
+      // Esc ya no borra lo escrito: solo cancela la edición o la cita.
+      if (editingMsg) { e.preventDefault(); onCancelEdit(); }
+      else if (replyTo) { e.preventDefault(); onCancelReply(); }
+    }
   };
 
   const doSend = async () => {
     const trimmed = text.trim();
     if (!trimmed && !editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) return;
     stopTypingSignal();
+    setMentionQ(null);
     if (editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) {
       // La edición también se ve al instante (handleSend la aplica antes de esperar).
-      void onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id).catch(() => {});
-      setText("");
-      taRef.current && (taRef.current.style.height="auto");
+      if (trimmed && trimmed !== editingMsg.contenido) void onSend(trimmed, undefined, undefined, editingMsg.id).catch(() => {});
+      else onCancelEdit();
       return;
     }
     // Cada imagen y cada archivo van en su propio mensaje (el modelo de
@@ -3214,21 +3635,13 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     // Las vistas previas de las imágenes las sigue usando el mensaje
     // provisional; se liberan cuando llega la imagen de verdad.
     setText("");
+    onBorrador?.("");
     setSelectedImages([]);
     setSelectedFiles([]);
     if (fileRef.current) fileRef.current.value = "";
     if (attachFileRef.current) attachFileRef.current.value = "";
     taRef.current && (taRef.current.style.height="auto");
     taRef.current?.focus();
-  };
-
-  const insertFmt = (wrap: string) => {
-    const ta = taRef.current; if (!ta) return;
-    const s = ta.selectionStart, e2 = ta.selectionEnd;
-    const sel = text.slice(s,e2)||"texto";
-    const n = text.slice(0,s)+wrap+sel+wrap+text.slice(e2);
-    setText(n);
-    setTimeout(()=>{ ta.focus(); ta.setSelectionRange(s+wrap.length, s+wrap.length+sel.length); },0);
   };
 
   const insertEmojiAtCursor = (emoji: string) => {
@@ -3240,14 +3653,8 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     const safeEnd = Math.max(safeStart, Math.min(end, text.length));
     const nextText = `${text.slice(0, safeStart)}${emoji}${text.slice(safeEnd)}`;
     const cursor = safeStart + emoji.length;
-    selectionRef.current = { start: cursor, end: cursor };
-    setText(nextText);
     setShowMediaPicker(false);
-    requestAnimationFrame(() => {
-      taRef.current?.focus();
-      taRef.current?.setSelectionRange(cursor, cursor);
-      autoResize();
-    });
+    aplicar(nextText, cursor);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -3257,8 +3664,8 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
       start: e.target.selectionStart ?? e.target.value.length,
       end: e.target.selectionEnd ?? e.target.value.length,
     };
-    const m = e.target.value.slice(0,cursor).match(/@(\w[\w ]*)$/);
-    setMentionQ(m?m[1]:null);
+    const m = e.target.value.slice(0,cursor).match(MENCION_EN_CURSO);
+    setMentionQ(m ? m[2] : null);
     if (e.target.value.trim()) startTypingSignal();
     else stopTypingSignal();
   };
@@ -3272,42 +3679,29 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
       chooseImages(pastedImages);
       return;
     }
+    const ta = taRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart ?? text.length;
+    const end = ta.selectionEnd ?? text.length;
+    const plain = e.clipboardData.getData("text/plain");
+    // Pegar un enlace con texto seleccionado lo convierte en [texto](enlace), como en Slack.
+    if (start !== end && /^https?:\/\/\S+$/.test(plain.trim()) && !/\n/.test(text.slice(start, end))) {
+      e.preventDefault();
+      const etiqueta = text.slice(start, end);
+      const nuevo = `${text.slice(0, start)}[${etiqueta}](${plain.trim()})${text.slice(end)}`;
+      aplicar(nuevo, start + etiqueta.length + plain.trim().length + 4);
+      return;
+    }
 
     const html = e.clipboardData.getData("text/html");
     if (!html) return;
-
-    const plain = e.clipboardData.getData("text/plain");
     const formatted = htmlToComposerText(html, plain);
     if (!formatted || formatted === plain) return;
 
     e.preventDefault();
-    const ta = taRef.current;
-    if (!ta) return;
-
-    const start = ta.selectionStart ?? text.length;
-    const end = ta.selectionEnd ?? text.length;
     const nextText = `${text.slice(0, start)}${formatted}${text.slice(end)}`;
-    const cursor = start + formatted.length;
-
-    setText(nextText);
-    selectionRef.current = { start: cursor, end: cursor };
     setMentionQ(null);
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.setSelectionRange(cursor, cursor);
-      autoResize();
-    });
-    if (nextText.trim()) startTypingSignal();
-    else stopTypingSignal();
-  };
-
-  const insertMention = (name: string) => {
-    const ta = taRef.current; if (!ta) return;
-    const cur = ta.selectionStart;
-    const before = text.slice(0,cur).replace(/@(\w[\w ]*)$/, `@${name} `);
-    const after = text.slice(cur);
-    setText(before+after); setMentionQ(null);
-    setTimeout(()=>{ ta.focus(); ta.setSelectionRange(before.length, before.length); },0);
+    aplicar(nextText, start + formatted.length);
   };
 
   const sendGif = (url: string) => {
@@ -3320,22 +3714,27 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     const imgs = files.filter((f): f is File => !!f && f.type.startsWith("image/"));
     if (!imgs.length) return;
     stopTypingSignal();
-    setSelectedFiles([]);
     setSelectedImages(prev => [...prev, ...imgs.map(file => ({ file, previewUrl: URL.createObjectURL(file) }))]);
     setShowMediaPicker(false);
   };
 
+  const chooseFiles = (files: File[]) => {
+    if (!files.length) return;
+    setSelectedFiles(prev => [...prev, ...files.map(f => ({ file: f, name: f.name, size: f.size, mime: f.type }))]);
+  };
+
+  // Arrastrar archivos al cuadro: las imágenes van como imagen y el resto
+  // (PDF, Word...) como archivo adjunto (antes solo se aceptaban imágenes).
+  const hayArchivos = (e: React.DragEvent) => [...e.dataTransfer.items].some((item) => item.kind === "file");
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    const hasImage = [...e.dataTransfer.items].some((item) => item.type.startsWith("image/"));
-    if (!hasImage) return;
+    if (!hayArchivos(e)) return;
     e.preventDefault();
     dragCounterRef.current += 1;
     setIsDraggingImage(true);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    const hasImage = [...e.dataTransfer.items].some((item) => item.type.startsWith("image/"));
-    if (!hasImage) return;
+    if (!hayArchivos(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     if (!isDraggingImage) setIsDraggingImage(true);
@@ -3349,24 +3748,26 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    const imageFiles = [...e.dataTransfer.files].filter((file) => file.type.startsWith("image/"));
+    const todos = [...e.dataTransfer.files];
     dragCounterRef.current = 0;
     setIsDraggingImage(false);
-    if (!imageFiles.length) return;
+    if (!todos.length) return;
     e.preventDefault();
-    chooseImages(imageFiles);
+    chooseImages(todos.filter((f) => f.type.startsWith("image/")));
+    chooseFiles(todos.filter((f) => !f.type.startsWith("image/")));
   };
 
   const canSend = !!text.trim() || !!editingMsg || selectedImages.length > 0 || selectedFiles.length > 0;
+  const textoPlaceholder = placeholder || (editingMsg ? "Editar mensaje..." : isDirect ? `Escribe a ${canalNombre}...` : `Escribe en #${canalNombre}...`);
 
   return (
-    <div className="px-4 pb-4 pt-3 shrink-0">
+    <div className={`${compacto ? "px-3 pb-3 pt-2" : "px-4 pb-4 pt-3"} shrink-0`}>
       {(replyTo||editingMsg)&&(
-        <div className="flex items-center gap-2 mb-3 px-3 py-2.5 bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 rounded-2xl text-xs text-blue-700 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CornerDownRight size={11} className="shrink-0"/>
-          {replyTo&&<span>Respondiendo a <strong>{resolveDisplayName(replyTo.user_id, replyTo.user_name, replyTo.user_id === currentUserId)}</strong>: <span className="opacity-70">{replyTo.contenido.slice(0,60)}{replyTo.contenido.length>60?"...":""}</span></span>}
-          {editingMsg&&<span className="font-semibold">Editando mensaje</span>}
-          <button onClick={()=>{onCancelReply();onCancelEdit();setText("");}} className="ml-auto hover:text-red-500 transition-colors"><X size={12}/></button>
+        <div className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200 ${editingMsg ? "border-amber-200 bg-amber-50 text-amber-800" : "border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700"}`}>
+          {editingMsg ? <Edit3 size={12} className="shrink-0"/> : <CornerDownRight size={12} className="shrink-0"/>}
+          {replyTo && !editingMsg && <span className="min-w-0 truncate">Citando a <strong>{resolveDisplayName(replyTo.user_id, replyTo.user_name, replyTo.user_id === currentUserId)}</strong>: <span className="opacity-70">{replyTo.contenido.slice(0,80)}{replyTo.contenido.length>80?"…":""}</span></span>}
+          {editingMsg && <span><span className="font-semibold">Editando mensaje</span> <span className="opacity-70">· Intro para guardar · Esc para cancelar</span></span>}
+          <button type="button" onClick={()=>{ if (editingMsg) onCancelEdit(); else onCancelReply(); }} title="Cancelar (Esc)" className="ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/70 hover:text-red-500"><X size={12}/></button>
         </div>
       )}
       <div
@@ -3374,73 +3775,49 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative bg-white rounded-[1.35rem] border focus-within:border-red-300 focus-within:shadow-[0_12px_40px_-18px_rgba(220,38,38,0.45)] transition-all overflow-hidden shadow-lg shadow-slate-200/60 ${
+        className={`relative bg-white rounded-[1.1rem] border focus-within:border-slate-300 focus-within:shadow-[0_10px_34px_-18px_rgba(15,23,42,0.35)] transition-all shadow-sm ${
           isDraggingImage
             ? "border-red-300 bg-red-50/80 shadow-[0_18px_50px_-22px_rgba(220,38,38,0.45)]"
-            : "border-slate-200"
+            : editingMsg ? "border-amber-300" : "border-slate-200"
         }`}
       >
         {isDraggingImage && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-50/75">
-            <div className="rounded-3xl border border-red-200 bg-white/95 px-5 py-4 text-center shadow-xl">
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[1.1rem] bg-red-50/80">
+            <div className="rounded-2xl border border-red-200 bg-white/95 px-5 py-4 text-center shadow-xl">
               <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-500">
-                <ImageIcon size={20} />
+                <Paperclip size={20} />
               </div>
-              <p className="text-sm font-semibold text-slate-800">Suelta la imagen para adjuntarla</p>
-              <p className="mt-1 text-xs text-slate-500">Se cargará en la vista previa antes de enviarla</p>
+              <p className="text-sm font-semibold text-slate-800">Suelta para adjuntar</p>
+              <p className="mt-1 text-xs text-slate-500">Imágenes, PDF, Word, Excel…</p>
             </div>
           </div>
         )}
-        {/* Formatting toolbar — top row */}
-        <div className="flex items-center gap-px px-2.5 pt-2.5 pb-1.5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100">
-          {/* Text format */}
-          <button onClick={()=>insertFmt("**")} title="Negrita (Ctrl+B)"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <Bold size={14}/>
-          </button>
-          <button onClick={()=>insertFmt("`")} title="Código"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <Italic size={14}/>
-          </button>
-          <button title="Subrayado"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <Underline size={14}/>
-          </button>
-          <button title="Tachado"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <Strikethrough size={14}/>
-          </button>
-          {/* Divider */}
-          <span className="w-px h-4 bg-slate-200 mx-1 shrink-0"/>
-          <button title="Enlace"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <Link2 size={14}/>
-          </button>
-          <span className="w-px h-4 bg-slate-200 mx-1 shrink-0"/>
-          <button title="Lista con viñetas"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <List size={14}/>
-          </button>
-          <button title="Lista numerada"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors">
-            <ListOrdered size={14}/>
-          </button>
-          <span className="w-px h-4 bg-slate-200 mx-1 shrink-0"/>
-          <button onClick={()=>insertFmt("`")} title="Código"
-            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-slate-800 transition-colors font-mono">
-            <Code size={14}/>
-          </button>
+        {/* Barra de formato */}
+        <div className="flex items-center gap-px overflow-x-auto rounded-t-[1.1rem] border-b border-slate-100 bg-slate-50/70 px-2 py-1">
+          <BotonFormato titulo={`Negrita (${MOD}+B)`} onClick={()=>envolver("**")}><Bold size={14}/></BotonFormato>
+          <BotonFormato titulo={`Cursiva (${MOD}+I)`} onClick={()=>envolver("_")}><Italic size={14}/></BotonFormato>
+          <BotonFormato titulo={`Tachado (${MOD}+Mayús+X)`} onClick={()=>envolver("~")}><Strikethrough size={14}/></BotonFormato>
+          <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
+          <BotonFormato titulo={`Enlace (${MOD}+Mayús+U)`} onClick={insertarEnlace}><Link2 size={14}/></BotonFormato>
+          <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
+          <BotonFormato titulo={`Lista numerada (${MOD}+Mayús+7)`} onClick={()=>prefijarLineas("numerada")}><ListOrdered size={14}/></BotonFormato>
+          <BotonFormato titulo={`Lista con viñetas (${MOD}+Mayús+8)`} onClick={()=>prefijarLineas("lista")}><List size={14}/></BotonFormato>
+          <BotonFormato titulo={`Cita (${MOD}+Mayús+9)`} onClick={()=>prefijarLineas("cita")}><Quote size={14}/></BotonFormato>
+          <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
+          <BotonFormato titulo="Código (selecciona varias líneas para un bloque)" onClick={codigo}><Code size={14}/></BotonFormato>
         </div>
 
         {/* Textarea */}
         <div className="relative px-1">
-          {mentionQ!==null&&<MentionDropdown miembros={miembros} query={mentionQ} onSelect={insertMention}/>}
+          {mentionQ!==null && (
+            <ListaMenciones items={candidatosMencion} activo={mencionIdx} onSelect={insertMention} onHover={setMencionIdx}/>
+          )}
           {selectedImages.length > 0 && (
             <div className="mx-3 mt-3 flex flex-wrap gap-2">
               {selectedImages.map((img, i) => (
                 <div key={`${img.file.name}-${i}`} className="relative rounded-xl border border-slate-200 bg-white p-1 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-                  <img src={img.previewUrl} alt="Vista previa" className="h-24 w-24 rounded-lg object-cover" />
-                  <button onClick={()=>{
+                  <img src={img.previewUrl} alt="Vista previa" className="h-20 w-20 rounded-lg object-cover" />
+                  <button type="button" title="Quitar" onClick={()=>{
                     URL.revokeObjectURL(img.previewUrl);
                     setSelectedImages(prev => prev.filter((_, idx) => idx !== i));
                     if (fileRef.current) fileRef.current.value = "";
@@ -3453,40 +3830,45 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
             </div>
           )}
           {selectedFiles.length > 0 && (
-            <div className="mx-3 mt-3 flex flex-col gap-2">
-              {selectedFiles.map((sf, i) => (
-                <div key={`${sf.name}-${i}`} className="flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-                  <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                    <FileText size={16}/>
+            <div className="mx-3 mt-3 flex flex-wrap gap-2">
+              {selectedFiles.map((sf, i) => {
+                const icono = getFileTypeIcon(sf.name, sf.mime);
+                return (
+                  <div key={`${sf.name}-${i}`} className="flex max-w-[260px] items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${icono.iconBg} ${icono.iconColor}`}>
+                      <icono.Icon size={15}/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-xs font-semibold text-slate-700">{sf.name}</p>
+                      <p className="text-[10px] text-slate-400">{sf.size >= 1024 * 1024 ? `${(sf.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(sf.size / 1024))} KB`}</p>
+                    </div>
+                    <button type="button" title="Quitar" onClick={()=>{
+                      setSelectedFiles(prev => prev.filter((_, idx) => idx !== i));
+                      if (attachFileRef.current) attachFileRef.current.value = "";
+                    }}
+                      className="shrink-0 rounded-full bg-slate-200 p-1 text-slate-500 hover:bg-slate-300 transition-colors">
+                      <X size={11}/>
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-700">{sf.name}</p>
-                    <p className="text-[11px] text-slate-400">{(sf.size / 1024).toFixed(0)} KB · {sf.mime}</p>
-                  </div>
-                  <button onClick={()=>{
-                    setSelectedFiles(prev => prev.filter((_, idx) => idx !== i));
-                    if (attachFileRef.current) attachFileRef.current.value = "";
-                  }}
-                    className="shrink-0 rounded-full bg-slate-200 p-1 text-slate-500 hover:bg-slate-300 transition-colors">
-                    <X size={12}/>
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <textarea ref={taRef} value={text} onChange={handleChange} onKeyDown={handleKey} onPaste={handlePaste}
             onClick={syncSelection}
             onKeyUp={syncSelection}
             onSelect={syncSelection}
-            placeholder={editingMsg ? `Editar mensaje...` : isDirect ? `Escribe a ${canalNombre}...` : `Escribe en #${canalNombre}...`}
+            onBlur={() => window.setTimeout(() => setMentionQ(null), 150)}
+            placeholder={textoPlaceholder}
+            aria-label={textoPlaceholder}
             rows={1}
-            className="w-full bg-transparent resize-none px-3.5 py-3 text-slate-700 text-sm outline-none placeholder-slate-400 max-h-40 overflow-y-auto leading-relaxed"
-            style={{ minHeight:"42px" }}
+            className="w-full bg-transparent resize-none px-3 py-2.5 text-slate-700 text-[15px] outline-none placeholder-slate-400 overflow-y-auto leading-relaxed"
+            style={{ minHeight:"42px", maxHeight: compacto ? 200 : 240 }}
           />
         </div>
 
         {/* Bottom bar */}
-        <div className="flex items-center justify-between px-2.5 pb-2.5 pt-1.5 bg-white">
+        <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-0.5">
           <div className="flex items-center gap-px relative">
             <input
               ref={fileRef}
@@ -3500,41 +3882,40 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               ref={attachFileRef}
               type="file"
               multiple
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.odt,.ods,.rtf,.zip"
               className="hidden"
-              onChange={e => {
-                const picked = Array.from(e.target.files || []);
-                if (!picked.length) return;
-                setSelectedFiles(prev => [...prev, ...picked.map(f => ({ file: f, name: f.name, size: f.size, mime: f.type }))]);
-                setSelectedImages([]);
-              }}
+              onChange={e => chooseFiles(Array.from(e.target.files || []))}
             />
+            <button type="button" title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>attachFileRef.current?.click()}
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+              <Plus size={17}/>
+            </button>
             <button
+              type="button"
               ref={emojiButtonRef}
               onMouseDown={(event)=>event.preventDefault()}
               onClick={() => {
                 syncSelection();
                 setShowMediaPicker((prev) => !prev);
               }}
-              title="Emoji"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+              title="Emoji y GIF"
+              className={`p-1.5 rounded-lg transition-colors ${showMediaPicker ? "bg-slate-100 text-slate-700" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}>
               <Smile size={16}/>
             </button>
-            <button onClick={()=>{ const ta=taRef.current; if(!ta) return; const s=ta.selectionStart; setText(t=>t.slice(0,s)+"@"+t.slice(s)); setTimeout(()=>{ta.focus(); ta.setSelectionRange(s+1,s+1);},0); }} title="Mencionar"
+            <button type="button" onMouseDown={(e)=>e.preventDefault()} onClick={()=>{
+                const ta=taRef.current; if(!ta) return;
+                const s=ta.selectionStart ?? text.length;
+                const pre = s > 0 && !/\s/.test(text[s-1]) ? " @" : "@";
+                const nuevo = text.slice(0,s)+pre+text.slice(s);
+                aplicar(nuevo, s+pre.length);
+                setMentionQ("");
+              }} title="Mencionar a alguien"
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <AtSign size={16}/>
             </button>
-            <button title="Adjuntar imagen" onClick={()=>{ setSelectedFiles([]); fileRef.current?.click(); }}
+            <button type="button" title="Adjuntar imagen" onClick={()=>fileRef.current?.click()}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <ImageIcon size={16}/>
-            </button>
-            <button title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>{ setSelectedImages([]); attachFileRef.current?.click(); }}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-              <Paperclip size={16}/>
-            </button>
-            <button title="Nota de voz"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-              <Mic size={16}/>
             </button>
             {showMediaPicker&&(
               <EmojiPicker
@@ -3549,17 +3930,21 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               />
             )}
           </div>
-          <button onClick={doSend} disabled={!canSend||sending}
-            className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
-              canSend&&!sending
-                ? "bg-[#ab0433] hover:bg-[#92042c] text-white shadow-lg shadow-red-200"
-                : "bg-slate-100 text-slate-300 cursor-not-allowed"
-            }`}>
-            {sending
-              ? <Loader2 size={14} className="animate-spin"/>
-              : editingMsg ? <Check size={14}/> : <Send size={14}/>
-            }
-          </button>
+          <div className="flex items-center gap-2">
+            {!compacto && canSend && (
+              <span className="hidden select-none text-[11px] text-slate-400 lg:block">
+                <kbd className="font-sans font-semibold">Mayús</kbd> + <kbd className="font-sans font-semibold">Intro</kbd> para otra línea
+              </span>
+            )}
+            <button type="button" onClick={()=>void doSend()} disabled={!canSend} title={editingMsg ? "Guardar (Intro)" : "Enviar (Intro)"}
+              className={`h-8 w-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-150 ${
+                canSend
+                  ? (editingMsg ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md" : "bg-[#ab0433] hover:bg-[#92042c] text-white shadow-md shadow-red-200 active:scale-95")
+                  : "bg-slate-100 text-slate-300 cursor-not-allowed"
+              }`}>
+              {editingMsg ? <Check size={14}/> : <Send size={14}/>}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3580,15 +3965,15 @@ function IconoCanal({ canal, size, className = "" }: { canal: Canal; size: numbe
     : <Hash size={size} className={`shrink-0 ${className}`}/>;
 }
 
-function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; activo: boolean; onClick:()=>void; unreadCount?: number }) {
-  const hasUnread = unreadCount > 0 && !activo;
+function CanalItem({ canal, activo, onClick, unreadCount = 0, borrador = false }: { canal: Canal; activo: boolean; onClick:()=>void; unreadCount?: number; borrador?: boolean }) {
+  const hasUnread = unreadCount > 0 && !activo && !canal.silenciado;
   return (
     <button onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-200 text-sm ${
         activo ? "border border-red-200 bg-white text-slate-800 shadow-sm ring-1 ring-red-100" :
         hasUnread ? "border border-slate-200 bg-white text-slate-800 shadow-sm" :
         "border border-transparent text-slate-500 hover:bg-white hover:text-slate-800 hover:border-slate-200"
-      }`}>
+      } ${canal.silenciado && !activo ? "opacity-60" : ""}`}>
       {canal.foto_url
         ? <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100"><IconoCanal canal={canal} size={11} className="text-slate-400"/></span>
         : canal.tipo==="privado"
@@ -3596,6 +3981,8 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
         : <Hash size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
       }
       <span className={`flex-1 truncate ${activo || hasUnread ? "font-semibold" : "font-medium"}`}>{canal.nombre}</span>
+      {borrador && !activo && <span title="Tienes un borrador sin enviar" className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
+      {canal.silenciado && <span title="Silenciado" className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
         <span className="shrink-0 bg-[#dc2626] text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold">
           {unreadCount>99?"99+":unreadCount}
@@ -3606,9 +3993,9 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
 }
 
 // UserDMItem — muestra un usuario del sistema en la sección DMs
-function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0, presenceByUserId }: {
+function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0, presenceByUserId, borrador = false }: {
   user: SysUser; dmCanal?: Canal; activo: boolean; loading: boolean; onClick:()=>void; unreadCount?: number;
-  presenceByUserId: MapaPresencia;
+  presenceByUserId: MapaPresencia; borrador?: boolean;
 }) {
   const st = estadoVisible(u.user_id, presenceByUserId);
   const safeUnreadCount = loading ? 0 : unreadCount;
@@ -3633,6 +4020,8 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
         <p className={`truncate text-[11px] ${activo || hasUnread ? "text-slate-400" : "text-slate-400 group-hover:text-slate-500"}`}>{displayRole}</p>
       </div>
       {loading && <Loader2 size={10} className="animate-spin shrink-0 opacity-60"/>}
+      {borrador && !activo && <span title="Tienes un borrador sin enviar" className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
+      {dmCanal?.silenciado && <span title="Silenciado" className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
         <div className="shrink-0 flex items-center gap-1">
           <span className="rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-[#dc2626] text-white">
@@ -3673,6 +4062,261 @@ function CanalSearchResult({ c, onJoin, onSelect, joining }: {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// HILO (panel derecho, como en Slack)
+// ══════════════════════════════════════════════════════════════════════════════
+function PanelHilo({ canalTitulo, isDirect, datos, cargando, isMobile, currentUserId, miembros, favoriteIds, pinnedIds,
+  editandoMsg, borradorInicial, onBorrador, onClose, onReact, onEdit, onCancelEdit, onDelete, onPin, onFavorite,
+  onReintentar, onDescartar, onSend, onSendOptimista, onEditarUltimo, resolveDisplayName, resolveAvatarUrl, getToken }: {
+  canalTitulo: string; isDirect: boolean;
+  datos: { principal: Mensaje; respuestas: Mensaje[] } | null; cargando: boolean; isMobile: boolean;
+  currentUserId: string; miembros: Miembro[]; favoriteIds: Set<string>; pinnedIds: Set<string>;
+  editandoMsg: Mensaje | null; borradorInicial: string; onBorrador: (t: string) => void;
+  onClose: () => void; onReact: (id: string, e: string) => void; onEdit: (m: Mensaje) => void; onCancelEdit: () => void;
+  onDelete: (id: string) => void; onPin: (id: string) => void; onFavorite: (id: string) => void;
+  onReintentar: (id: string) => void; onDescartar: (id: string) => void;
+  onSend: (text: string, gifUrl?: string, replyId?: string, editId?: string) => Promise<void>;
+  onSendOptimista: (items: EnvioNuevo[]) => void; onEditarUltimo: () => void;
+  resolveDisplayName: (userId?: string | null, name?: string | null, isSelf?: boolean) => string;
+  resolveAvatarUrl: (userId?: string | null, avatarUrl?: string | null, isSelf?: boolean) => string | null;
+  getToken: () => Promise<string | null>;
+}) {
+  const listaRef = useRef<HTMLDivElement>(null);
+  const alFondoRef = useRef(true);
+  const n = datos?.respuestas.length ?? 0;
+  const noop = useCallback(() => {}, []);
+  // Al llegar respuestas nuevas, el hilo baja solo (si ya estaba abajo).
+  useLayoutEffect(() => {
+    const el = listaRef.current;
+    if (el && alFondoRef.current) el.scrollTop = el.scrollHeight;
+  }, [n, datos?.principal.id]);
+  useEffect(() => { alFondoRef.current = true; }, [datos?.principal.id]);
+  const principal = datos?.principal;
+  return (
+    <aside className={`${isMobile ? "fixed inset-0 z-40" : "w-[min(420px,40vw)] min-w-[320px] border-l border-slate-200"} flex min-h-0 shrink-0 flex-col bg-white animate-in fade-in slide-in-from-right-4 duration-200`}>
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3">
+        {isMobile && (
+          <button type="button" onClick={onClose} title="Volver" className="-ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowLeft size={18}/></button>
+        )}
+        <MessageSquareText size={16} className="shrink-0 text-slate-400"/>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-slate-800">Hilo</p>
+          <p className="truncate text-[11px] text-slate-400">{isDirect ? `Con ${canalTitulo}` : `#${canalTitulo}`}</p>
+        </div>
+        {!isMobile && (
+          <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
+        )}
+      </div>
+      <div ref={listaRef} onScroll={(e) => { const el = e.currentTarget; alFondoRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
+        className="min-h-0 flex-1 overflow-y-auto pb-2 pt-1">
+        {principal && (
+          <MensajeItem msg={principal} prevMsg={null} currentUserId={currentUserId} isHighlighted={false}
+            enHilo onReply={noop} onReact={onReact} onEdit={onEdit} onDelete={onDelete} onPin={onPin} onFavorite={onFavorite}
+            isFavorite={favoriteIds.has(principal.id)} isPinned={pinnedIds.has(principal.id)}
+            resolveDisplayName={resolveDisplayName} resolveAvatarUrl={resolveAvatarUrl} getToken={getToken}/>
+        )}
+        <div className="flex items-center gap-3 px-4 py-2">
+          <span className="shrink-0 text-xs font-semibold text-slate-500">
+            {cargando && !n ? "Cargando respuestas…" : n ? `${n} ${n === 1 ? "respuesta" : "respuestas"}` : "Sin respuestas todavía"}
+          </span>
+          <div className="h-px flex-1 bg-slate-200"/>
+        </div>
+        {cargando && !n && <div className="flex justify-center py-4"><Spinner size="sm" muted /></div>}
+        {datos?.respuestas.map((m, i) => (
+          <MensajeItem key={m.id} msg={m} prevMsg={i ? datos.respuestas[i - 1] : null} currentUserId={currentUserId} isHighlighted={false}
+            enHilo onReintentar={onReintentar} onDescartar={onDescartar}
+            onReply={noop} onReact={onReact} onEdit={onEdit} onDelete={onDelete} onPin={onPin} onFavorite={onFavorite}
+            isFavorite={favoriteIds.has(m.id)} isPinned={pinnedIds.has(m.id)}
+            resolveDisplayName={resolveDisplayName} resolveAvatarUrl={resolveAvatarUrl} getToken={getToken}/>
+        ))}
+      </div>
+      {principal && !principal.deleted_at && (
+        <MessageInput
+          key={`hilo-${principal.id}`}
+          compacto
+          canalId={principal.canal_id}
+          canalNombre={canalTitulo}
+          isDirect={isDirect}
+          replyTo={null}
+          editingMsg={editandoMsg}
+          miembros={miembros}
+          currentUserId={currentUserId}
+          resolveDisplayName={resolveDisplayName}
+          onTypingChange={noop}
+          onSend={onSend}
+          onSendOptimista={onSendOptimista}
+          onCancelReply={noop}
+          onCancelEdit={onCancelEdit}
+          borradorInicial={borradorInicial}
+          onBorrador={onBorrador}
+          onEditarUltimo={onEditarUltimo}
+          placeholder={editandoMsg ? "Editar respuesta..." : "Responder en el hilo..."}
+        />
+      )}
+    </aside>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SALTAR A (Ctrl+K dentro del chat, como en Slack)
+// ══════════════════════════════════════════════════════════════════════════════
+interface DestinoSalto {
+  key: string; tipo: "canal" | "dm" | "persona";
+  titulo: string; detalle: string; noLeidos: number; reciente: number;
+  canal?: Canal; persona?: SysUser; avatar?: string | null; estadoColor?: string;
+}
+
+function SaltarA({ destinos, onElegir, onClose, onBuscarEnApp }: {
+  destinos: DestinoSalto[]; onElegir: (d: DestinoSalto) => void; onClose: () => void; onBuscarEnApp: (q: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [foco, setFoco] = useState(0);
+  const listaRef = useRef<HTMLDivElement>(null);
+  const filtrados = useMemo(() => {
+    const t = sinTildes(q.trim());
+    const lista = t
+      ? destinos.filter((d) => sinTildes(d.titulo).includes(t) || sinTildes(d.detalle).includes(t))
+      : destinos;
+    return [...lista].sort((a, b) => {
+      if (t) {
+        const pa = sinTildes(a.titulo).startsWith(t) ? 0 : 1;
+        const pb = sinTildes(b.titulo).startsWith(t) ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+      }
+      if (!!a.noLeidos !== !!b.noLeidos) return a.noLeidos ? -1 : 1;
+      return b.reciente - a.reciente;
+    }).slice(0, 12);
+  }, [destinos, q]);
+  useEffect(() => { setFoco(0); }, [q]);
+  useEffect(() => {
+    listaRef.current?.querySelector<HTMLElement>(`[data-idx="${foco}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [foco]);
+  const teclas = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setFoco((f) => Math.min(f + 1, filtrados.length)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFoco((f) => Math.max(f - 1, 0)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (foco < filtrados.length) onElegir(filtrados[foco]); else onBuscarEnApp(q);
+    } else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+  };
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-start justify-center bg-slate-900/40 px-4 pt-[12vh] backdrop-blur-[2px] animate-in fade-in duration-150" onMouseDown={onClose}>
+      <div className="w-full max-w-[560px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 slide-in-from-top-2 duration-150" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+          <Search size={17} className="shrink-0 text-slate-400"/>
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={teclas}
+            placeholder="Saltar a un canal o a una persona…" aria-label="Saltar a una conversación"
+            className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-400"/>
+          <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">Esc</kbd>
+        </div>
+        <div ref={listaRef} className="max-h-[52vh] overflow-y-auto py-1.5">
+          {!q.trim() && <p className="px-4 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Recientes</p>}
+          {filtrados.length === 0 && (
+            <p className="px-4 py-3 text-sm text-slate-500">Nadie ni ningún canal se llama así.</p>
+          )}
+          {filtrados.map((d, i) => (
+            <button key={d.key} type="button" data-idx={i}
+              onMouseEnter={() => setFoco(i)} onClick={() => onElegir(d)}
+              className={`flex w-full items-center gap-3 px-4 py-2 text-left transition-colors ${foco === i ? "bg-slate-100" : ""}`}>
+              {d.tipo === "canal" && d.canal
+                ? <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100"><IconoCanal canal={d.canal} size={13} className="text-slate-500"/></span>
+                : (
+                  <span className="relative shrink-0">
+                    <Av url={d.avatar ?? null} name={d.titulo} size={7}/>
+                    {d.estadoColor && <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white ${d.estadoColor}`}/>}
+                  </span>
+                )}
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate text-sm ${d.noLeidos ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>{d.titulo}</span>
+                {d.detalle && <span className="block truncate text-[11px] text-slate-400">{d.detalle}</span>}
+              </span>
+              {d.noLeidos > 0 && (
+                <span className="shrink-0 rounded-full bg-[#dc2626] px-1.5 text-[10px] font-bold leading-[18px] text-white">{d.noLeidos > 99 ? "99+" : d.noLeidos}</span>
+              )}
+              {foco === i && <CornerDownRight size={13} className="shrink-0 text-slate-400"/>}
+            </button>
+          ))}
+          <button type="button" data-idx={filtrados.length}
+            onMouseEnter={() => setFoco(filtrados.length)} onClick={() => onBuscarEnApp(q)}
+            className={`mt-1 flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-slate-500 transition-colors ${foco === filtrados.length ? "bg-slate-100" : ""}`}>
+            <Sparkles size={15} className="shrink-0 text-slate-400"/>
+            <span className="min-w-0 flex-1 truncate">{q.trim() ? <>Buscar «{q.trim()}» en toda la aplicación</> : "Buscar en toda la aplicación (expedientes, clientes…)"}</span>
+          </button>
+        </div>
+        <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400">
+          <span><kbd className="font-sans font-semibold">↑↓</kbd> moverse</span>
+          <span><kbd className="font-sans font-semibold">Intro</kbd> abrir</span>
+          <span className="ml-auto"><kbd className="font-sans font-semibold">Alt + ↑↓</kbd> conversación anterior / siguiente</span>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ATAJOS DEL CHAT
+// ══════════════════════════════════════════════════════════════════════════════
+const ATAJOS_CHAT: { grupo: string; items: [string, string][] }[] = [
+  { grupo: "Moverse", items: [
+    [`${MOD} + K`, "Saltar a un canal o a una persona"],
+    ["Alt + ↑ / ↓", "Conversación anterior / siguiente"],
+    ["Alt + Mayús + ↑ / ↓", "Siguiente conversación sin leer"],
+    ["Esc", "Cerrar el hilo o el panel abierto"],
+  ] },
+  { grupo: "Escribir", items: [
+    ["Intro", "Enviar"],
+    ["Mayús + Intro", "Otra línea (en una lista, sigue la lista)"],
+    ["↑ (cuadro vacío)", "Editar tu último mensaje"],
+    ["@", "Mencionar a alguien (@canal avisa a todos)"],
+    ["Esc", "Cancelar la edición o la cita"],
+  ] },
+  { grupo: "Formato", items: [
+    [`${MOD} + B`, "**Negrita**"],
+    [`${MOD} + I`, "_Cursiva_"],
+    [`${MOD} + Mayús + X`, "~Tachado~"],
+    [`${MOD} + Mayús + U`, "Enlace (o pega un enlace sobre el texto seleccionado)"],
+    [`${MOD} + Mayús + 7 / 8`, "Lista numerada / con viñetas"],
+    [`${MOD} + Mayús + 9`, "> Cita"],
+    ["` y ```", "Código y bloque de código"],
+  ] },
+];
+
+function AyudaAtajosChat({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px] animate-in fade-in duration-150" onMouseDown={onClose}>
+      <div className="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center gap-2">
+          <Keyboard size={18} className="text-slate-500"/>
+          <h2 className="flex-1 text-base font-bold text-slate-800">Atajos de teclado del chat</h2>
+          <button type="button" onClick={onClose} title="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          {ATAJOS_CHAT.map((g) => (
+            <section key={g.grupo} className={g.grupo === "Formato" ? "sm:col-span-2" : ""}>
+              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{g.grupo}</h3>
+              <ul className={`grid gap-1.5 ${g.grupo === "Formato" ? "sm:grid-cols-2 sm:gap-x-6" : ""}`}>
+                {g.items.map(([tecla, que]) => (
+                  <li key={tecla + que} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-600">{que}</span>
+                    <kbd className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-sans text-[11px] font-semibold text-slate-500">{tecla}</kbd>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // MAIN CHAT
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Chat() {
@@ -3698,7 +4342,7 @@ export default function Chat() {
   const [sysUsersCargados, setSysUsersCargados] = useState(false);
   const { organizacion } = useOrganizacion();
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
-  const [rightPanel, setRightPanel]       = useState<"members"|"pinned"|"favorites"|null>(null);
+  const [rightPanel, setRightPanel]       = useState<"members"|"pinned"|"favorites"|"hilo"|null>(null);
   const [sesionExpediente, setSesionExpediente] = useState<SesionExpediente|null>(null);
   const [showExpSearchModal, setShowExpSearchModal] = useState(false);
   const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
@@ -3709,6 +4353,20 @@ export default function Chat() {
   const [pinnedIds, setPinnedIds]         = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo]             = useState<Mensaje|null>(null);
   const [editingMsg, setEditingMsg]       = useState<Mensaje|null>(null);
+  // Hilo abierto en el panel derecho (como en Slack): su mensaje principal y
+  // las respuestas. Se edita aparte de la conversación.
+  const [hilo, setHilo]                   = useState<{ principal: Mensaje; respuestas: Mensaje[] } | null>(null);
+  const [hiloCargando, setHiloCargando]   = useState(false);
+  const [editandoHilo, setEditandoHilo]   = useState<Mensaje|null>(null);
+  const hiloRef = useRef<{ principal: Mensaje; respuestas: Mensaje[] } | null>(null);
+  const hiloIdRef = useRef<string | null>(null);
+  useEffect(() => { hiloRef.current = hilo; }, [hilo]);
+  const [saltarAbierto, setSaltarAbierto] = useState(false);
+  const [ayudaAtajos, setAyudaAtajos]     = useState(false);
+  const [menuEspacio, setMenuEspacio]     = useState(false);
+  // Borradores por conversación (y por hilo): lo escrito y no enviado se
+  // recupera al volver, y la lista lo marca con un lápiz (como en Slack).
+  const [borradores, setBorradores]       = useState<Record<string, string>>({});
   const [highlightId, setHighlightId]     = useState<string|null>(null);
   // null = sin aviso manual puesto (el estado se calcula solo a partir de la
   // presencia real). Solo tiene un valor no-null si elegiste a propósito
@@ -3793,7 +4451,7 @@ export default function Chat() {
   const enviosRef = useRef(new Map<string, { canalId: string; item: EnvioNuevo; msg: Mensaje }>());
   const colaEnvioRef = useRef<Promise<void>>(Promise.resolve());
   const conProvisionales = useCallback((canalId: string, msgs: Mensaje[]): Mensaje[] => {
-    const pend = [...enviosRef.current.values()].filter((e) => e.canalId === canalId).map((e) => e.msg);
+    const pend = [...enviosRef.current.values()].filter((e) => e.canalId === canalId && !e.item.hiloId).map((e) => e.msg);
     if (!pend.length) return msgs;
     const pendientes = quitarProvisionalesConfirmados(pend, msgs, currentUserId);
     return pendientes.length ? [...msgs, ...pendientes] : msgs;
@@ -4332,7 +4990,11 @@ export default function Chat() {
       const esActivo = !!activo && (!ev.canalId || ev.canalId === activo);
       switch (ev.kind) {
         case "mensajes":
-          if (esActivo) { traerMensajes(); void pollCambiosRef.current(); }
+          if (esActivo) {
+            traerMensajes();
+            void pollCambiosRef.current();
+            if (hiloIdRef.current) void fetchHiloRef.current(hiloIdRef.current);
+          }
           refrescarSidebar();
           break;
         case "typing":
@@ -4501,6 +5163,7 @@ export default function Chat() {
       void pollMensajesRef.current();
       if (pollCycleRef.current % 4 === 0) {
         void pollCambiosRef.current();
+        if (hiloIdRef.current) void fetchHiloRef.current(hiloIdRef.current);
         void fetchMiembrosRef.current(canalActivoId);
         // Fijados es un estado compartido por todo el canal (no por usuario,
         // como favoritos) -- se refresca aquí para que si otra persona fija/
@@ -4633,15 +5296,123 @@ export default function Chat() {
     setSesionExpediente(null);
   };
 
+  // ── Un mensaje puede estar en la conversación o en el hilo abierto: estas
+  // dos ayudas los tratan igual (reaccionar, editar, borrar, enviar...).
+  const actualizarMensajes = useCallback((fn: (m: Mensaje) => Mensaje) => {
+    setMensajes((prev) => {
+      let cambio = false;
+      const next = prev.map((m) => { const r = fn(m); if (r !== m) cambio = true; return r; });
+      return cambio ? next : prev;
+    });
+    setHilo((h) => {
+      if (!h) return h;
+      const principal = fn(h.principal);
+      let cambio = principal !== h.principal;
+      const respuestas = h.respuestas.map((m) => { const r = fn(m); if (r !== m) cambio = true; return r; });
+      return cambio ? { principal, respuestas } : h;
+    });
+  }, []);
+  const buscarMensaje = useCallback((id: string): Mensaje | undefined => {
+    const h = hiloRef.current;
+    return mensajesRef.current.find((m) => m.id === id)
+      || (h ? (h.principal.id === id ? h.principal : h.respuestas.find((m) => m.id === id)) : undefined);
+  }, []);
+
+  // ── Hilos ────────────────────────────────────────────────────────────────
+  const fetchHilo = useCallback(async (id: string) => {
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/mensajes/${id}/hilo`, { headers: h });
+      const d = await safeJson(res);
+      if (hiloIdRef.current !== id) return;
+      if (!res.ok || !d?.data?.principal) {
+        if (res.status === 404) { aviso.error("Ese hilo ya no existe."); setRightPanel((p) => (p === "hilo" ? null : p)); }
+        return;
+      }
+      const principal: Mensaje = d.data.principal;
+      const reales: Mensaje[] = d.data.respuestas || [];
+      // Las respuestas mías aún sin confirmar se quedan al final.
+      const pend = [...enviosRef.current.values()].filter((e) => e.item.hiloId === id).map((e) => e.msg);
+      const pendientes = quitarProvisionalesConfirmados(pend, reales, currentUserId);
+      setHilo({ principal, respuestas: pendientes.length ? [...reales, ...pendientes] : reales });
+      // El resumen bajo el mensaje de la conversación, al día.
+      setMensajes((prev) => prev.map((m) => (m.id === principal.id
+        ? { ...m, respuestas: principal.respuestas, ultima_respuesta_at: principal.ultima_respuesta_at, hilo_autores: principal.hilo_autores }
+        : m)));
+    } catch { /* se reintenta con el siguiente aviso */ } finally {
+      if (hiloIdRef.current === id) setHiloCargando(false);
+    }
+  }, [hdr, currentUserId]);
+  const fetchHiloRef = useRef(fetchHilo);
+  useEffect(() => { fetchHiloRef.current = fetchHilo; }, [fetchHilo]);
+
+  const abrirHilo = useCallback((m: Mensaje | string) => {
+    const id = typeof m === "string" ? m : (m.hilo_id || m.id);
+    if (typeof m !== "string" && m.id.startsWith("tmp-")) return;
+    hiloIdRef.current = id;
+    setEditandoHilo(null);
+    setHilo(typeof m !== "string" && !m.hilo_id ? { principal: m, respuestas: [] } : null);
+    setHiloCargando(true);
+    setRightPanel("hilo");
+    void fetchHiloRef.current(id);
+  }, []);
+  // Al cerrar el panel (o cambiar de conversación) el hilo se olvida.
+  useEffect(() => {
+    if (rightPanel === "hilo") return;
+    hiloIdRef.current = null;
+    setHilo(null);
+    setEditandoHilo(null);
+  }, [rightPanel]);
+
+  // ── Borradores
+  const borradoresKey = currentUserId ? cacheKey(`${CHAT_BORRADORES_KEY}.${currentUserId}`) : null;
+  useEffect(() => {
+    if (!borradoresKey) return;
+    try {
+      const raw = window.localStorage.getItem(borradoresKey);
+      const obj = raw ? JSON.parse(raw) : {};
+      setBorradores(obj && typeof obj === "object" ? obj : {});
+    } catch { setBorradores({}); }
+  }, [borradoresKey]);
+  const guardarBorrador = useCallback((clave: string, texto: string) => {
+    setBorradores((prev) => {
+      const t = texto.trim() ? texto : "";
+      if ((prev[clave] || "") === t) return prev;
+      const next = { ...prev };
+      if (t) next[clave] = t; else delete next[clave];
+      try { if (borradoresKey) window.localStorage.setItem(borradoresKey, JSON.stringify(next)); } catch { /* sin almacenamiento */ }
+      return next;
+    });
+  }, [borradoresKey]);
+  const guardarBorradorCanal = useCallback((t: string) => { if (canalActivoId) guardarBorrador(canalActivoId, t); }, [canalActivoId, guardarBorrador]);
+  const hiloActivoId = hilo?.principal.id ?? null;
+  const guardarBorradorHilo = useCallback((t: string) => { if (hiloActivoId) guardarBorrador(`hilo:${hiloActivoId}`, t); }, [hiloActivoId, guardarBorrador]);
+
+  /** Flecha arriba con el cuadro vacío: editar mi último mensaje de texto. */
+  const ultimoMio = (lista: Mensaje[]) => [...lista].reverse().find((m) => (
+    m.user_id === currentUserId && !m.deleted_at && !m._envio && !m.id.startsWith("tmp-") && (m.tipo === "texto" || !m.tipo)
+  ));
+  const editarUltimo = useCallback(() => {
+    const m = ultimoMio(mensajesRef.current);
+    if (m) setEditingMsg(m);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+  const editarUltimoHilo = useCallback(() => {
+    const m = ultimoMio(hiloRef.current?.respuestas || []);
+    if (m) setEditandoHilo(m);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
+
   const handleSend = async (
     text: string, gifUrl?: string, replyId?: string, editId?: string,
     imageUrl?: string, fileUrl?: string, fileName?: string, fileMime?: string
   ) => {
     if (editId) {
       // Se ve al instante; si el servidor no lo acepta, vuelve a como estaba.
-      const antes = mensajesRef.current.find(m=>m.id===editId);
-      setMensajes(prev=>prev.map(m=>m.id===editId?{...m,contenido:text,editado:true}:m));
+      const antes = buscarMensaje(editId);
+      actualizarMensajes((m) => (m.id === editId ? { ...m, contenido: text, editado: true } : m));
       setEditingMsg(null);
+      setEditandoHilo(null);
       try {
         const h = await hdr();
         const res = await fetch(`/api/chat/mensajes/${editId}`, {
@@ -4649,10 +5420,10 @@ export default function Chat() {
         });
         const d = await safeJson(res);
         if (!res.ok) throw new Error(d?.error || "No se pudo guardar el cambio");
-        setMensajes(prev=>prev.map(m=>m.id===editId?{...m,...d.data,editado:true}:m));
+        actualizarMensajes((m) => (m.id === editId ? { ...m, contenido: d.data?.contenido ?? text, editado: true } : m));
       } catch (e: any) {
-        if (antes) setMensajes(prev=>prev.map(m=>m.id===editId?antes:m));
-        aviso(e?.message || "No se pudo guardar el cambio");
+        if (antes) actualizarMensajes((m) => (m.id === editId ? antes : m));
+        aviso.error(e?.message || "No se pudo guardar el cambio");
       }
       return;
     }
@@ -4690,14 +5461,15 @@ export default function Chat() {
   // El mensaje sale en la conversación en cuanto pulsas enviar y el cuadro
   // queda libre para el siguiente; la subida del adjunto y la petición van
   // por detrás, en cola (para que lleguen en orden). Antes había que esperar
-  // a la respuesta del servidor con el texto aún en el cuadro.
+  // a la respuesta del servidor con el texto aún en el cuadro. Lo mismo para
+  // las respuestas en un hilo (11/11/2026).
   const procesarEnvio = useCallback(async (tmpId: string) => {
     const env = enviosRef.current.get(tmpId);
     if (!env) return;
     const { canalId, item } = env;
     const marcar = (estado: "enviando" | "error") => {
       env.msg = { ...env.msg, _envio: estado };
-      setMensajes(prev => prev.map(m => m.id === tmpId ? env.msg : m));
+      actualizarMensajes((m) => (m.id === tmpId ? env.msg : m));
     };
     try {
       const subir = async (ruta: string, campo: string, file: File) => {
@@ -4714,6 +5486,7 @@ export default function Chat() {
       };
       if (item.gifUrl) body.gif_url = item.gifUrl;
       if (item.replyId) body.reply_to_id = item.replyId;
+      if (item.hiloId) body.hilo_id = item.hiloId;
       if (item.imagen) body.image_url = (await subir("/api/chat/uploads/image", "image", item.imagen.file))?.image_url;
       if (item.archivo) {
         const up = await subir("/api/chat/uploads/file", "file", item.archivo);
@@ -4736,13 +5509,19 @@ export default function Chat() {
         });
       }
       enviosRef.current.delete(tmpId);
+      if (item.imagen) window.setTimeout(() => URL.revokeObjectURL(item.imagen!.previewUrl), 1000);
+      if (item.hiloId) {
+        setHilo((hh) => (hh && hh.principal.id === item.hiloId
+          ? { ...hh, respuestas: hh.respuestas.some((m) => m.id === real.id) ? hh.respuestas.filter((m) => m.id !== tmpId) : hh.respuestas.map((m) => (m.id === tmpId ? real : m)) }
+          : hh));
+        return;
+      }
       mensajesIdsRef.current.add(real.id);
       if (canalActivoIdRef.current === canalId) {
         setMensajes(prev => prev.some(m => m.id === real.id)
           ? prev.filter(m => m.id !== tmpId)
           : prev.map(m => m.id === tmpId ? real : m));
       }
-      if (item.imagen) window.setTimeout(() => URL.revokeObjectURL(item.imagen!.previewUrl), 1000);
       setCanales(prev => prev.map(c => c.id === canalId ? {
         ...c, ultimo_mensaje: real.contenido, ultimo_mensaje_autor: real.user_name, ultimo_mensaje_at: real.created_at,
       } : c));
@@ -4751,14 +5530,15 @@ export default function Chat() {
     } catch {
       marcar("error");
     }
-  }, [clearUnread, getAuthToken, hdr, refreshUnread]);
+  }, [actualizarMensajes, clearUnread, getAuthToken, hdr, refreshUnread]);
 
-  const enviarOptimista = useCallback((items: EnvioNuevo[]) => {
+  const enviarOptimista = useCallback((items: EnvioNuevo[], hiloId?: string) => {
     const canal = canalActivoRef.current;
     if (!canal || !items.length) return;
     const yo = user?.fullName || user?.username || "Tú";
     const base = Date.now();
-    const nuevos = items.map((item, i) => {
+    const nuevos = items.map((it, i) => {
+      const item: EnvioNuevo = hiloId ? { ...it, hiloId, replyId: undefined } : it;
       const tmpId = `tmp-${base}-${i}-${Math.random().toString(36).slice(2, 8)}`;
       const msg: Mensaje = {
         id: tmpId, canal_id: canal.id, user_id: currentUserId, user_name: yo, avatar_url: user?.imageUrl || null,
@@ -4769,6 +5549,7 @@ export default function Chat() {
         file_url: null, file_name: item.archivo?.name || null, file_mime: item.archivo?.type || null,
         reply_to_id: item.replyId || null,
         reply_to: item.replyId ? mensajesRef.current.find(m => m.id === item.replyId) || null : null,
+        hilo_id: hiloId || null,
         reacciones: null, editado: false, deleted_at: null,
         created_at: new Date(base + i).toISOString(),
         _envio: "enviando",
@@ -4776,25 +5557,50 @@ export default function Chat() {
       enviosRef.current.set(tmpId, { canalId: canal.id, item, msg });
       return msg;
     });
-    setMensajes(prev => [...prev, ...nuevos]);
-    setReplyTo(null);
-    setTimeout(() => scrollToBottom("instant"), 0);
+    if (hiloId) {
+      const ahora = new Date(base).toISOString();
+      setHilo((h) => (h && h.principal.id === hiloId ? { ...h, respuestas: [...h.respuestas, ...nuevos] } : h));
+      // El contador del mensaje principal sube al momento.
+      actualizarMensajes((m) => {
+        if (m.id !== hiloId) return m;
+        const autores = m.hilo_autores || [];
+        return {
+          ...m,
+          respuestas: (m.respuestas || 0) + nuevos.length,
+          ultima_respuesta_at: ahora,
+          hilo_autores: autores.some((a) => a.user_id === currentUserId) ? autores : [{ user_id: currentUserId, user_name: yo, avatar_url: user?.imageUrl || null }, ...autores],
+        };
+      });
+    } else {
+      setMensajes(prev => [...prev, ...nuevos]);
+      setReplyTo(null);
+      setTimeout(() => scrollToBottom("instant"), 0);
+    }
     for (const m of nuevos) colaEnvioRef.current = colaEnvioRef.current.then(() => procesarEnvio(m.id));
-  }, [currentUserId, procesarEnvio, user]);
+  }, [actualizarMensajes, currentUserId, procesarEnvio, user]);
+  const enviarEnHilo = useCallback((items: EnvioNuevo[]) => {
+    const id = hiloIdRef.current;
+    if (id) enviarOptimista(items, id);
+  }, [enviarOptimista]);
 
   const reintentarEnvio = useCallback((tmpId: string) => {
     const env = enviosRef.current.get(tmpId);
     if (!env) return;
     env.msg = { ...env.msg, _envio: "enviando" };
-    setMensajes(prev => prev.map(m => m.id === tmpId ? env.msg : m));
+    actualizarMensajes((m) => (m.id === tmpId ? env.msg : m));
     colaEnvioRef.current = colaEnvioRef.current.then(() => procesarEnvio(tmpId));
-  }, [procesarEnvio]);
+  }, [actualizarMensajes, procesarEnvio]);
   const descartarEnvio = useCallback((tmpId: string) => {
     const env = enviosRef.current.get(tmpId);
     enviosRef.current.delete(tmpId);
     if (env?.item.imagen) URL.revokeObjectURL(env.item.imagen.previewUrl);
     setMensajes(prev => prev.filter(m => m.id !== tmpId));
-  }, []);
+    setHilo((h) => (h ? { ...h, respuestas: h.respuestas.filter((m) => m.id !== tmpId) } : h));
+    if (env?.item.hiloId) {
+      const hid = env.item.hiloId;
+      actualizarMensajes((m) => (m.id === hid ? { ...m, respuestas: Math.max(0, (m.respuestas || 1) - 1) } : m));
+    }
+  }, [actualizarMensajes]);
 
   // useCallback con identidad estable: se pasan como prop a MensajeItem
   // (envuelto en React.memo), y una función recreada en cada render del
@@ -4806,7 +5612,7 @@ export default function Chat() {
   // marcar favorito se sentía "no funciona" cuando en realidad solo iba lento.
   const handleReact = useCallback(async (msgId: string, emoji: string) => {
     const myName = user?.fullName || user?.username || "Tú";
-    const toggle = (removed: boolean) => setMensajes(prev=>prev.map(m=>{
+    const toggle = (removed: boolean) => actualizarMensajes((m) => {
       if (m.id!==msgId) return m;
       const reac = m.reacciones||[];
       if (removed) {
@@ -4814,8 +5620,8 @@ export default function Chat() {
       }
       if (reac.some(r => r.emoji === emoji && r.user_id === currentUserId)) return m;
       return {...m, reacciones:[...reac,{emoji, user_id:currentUserId, user_name: myName}]};
-    }));
-    const alreadyMine = mensajesRef.current.find(m=>m.id===msgId)?.reacciones?.some(r => r.emoji === emoji && r.user_id === currentUserId) ?? false;
+    });
+    const alreadyMine = buscarMensaje(msgId)?.reacciones?.some(r => r.emoji === emoji && r.user_id === currentUserId) ?? false;
     toggle(alreadyMine);
     try {
       const h = await hdr();
@@ -4826,13 +5632,17 @@ export default function Chat() {
     } catch {
       toggle(!alreadyMine); // revertir
     }
-  }, [hdr, currentUserId, user]);
+  }, [actualizarMensajes, buscarMensaje, hdr, currentUserId, user]);
 
   const handleDelete = useCallback(async (msgId: string) => {
+    const ok = await confirmar({ titulo: "¿Eliminar este mensaje?", mensaje: "Se quitará para todos los miembros de la conversación.", confirmar: "Eliminar", peligro: true });
+    if (!ok) return;
     const h = await hdr();
     const res = await fetch(`/api/chat/mensajes/${msgId}`, { method:"DELETE", headers: h });
-    if (res.ok) setMensajes(prev=>prev.map(m=>m.id===msgId?{...m,deleted_at:new Date().toISOString()}:m));
-  }, [hdr]);
+    if (!res.ok) { aviso.error("No se pudo eliminar el mensaje"); return; }
+    actualizarMensajes((m) => (m.id === msgId ? { ...m, deleted_at: new Date().toISOString() } : m));
+    if (hiloIdRef.current) void fetchHiloRef.current(hiloIdRef.current);
+  }, [actualizarMensajes, hdr]);
 
   const handlePin = useCallback(async (msgId: string) => {
     const canal = canalActivoRef.current;
@@ -4877,6 +5687,45 @@ export default function Chat() {
       });
     }
   }, [hdr]);
+
+  // Silenciar (12/11/2026): sin avisos salvo menciones; solo para mí.
+  const toggleSilencio = useCallback(async (canal: Canal) => {
+    const nuevo = !canal.silenciado;
+    const aplicar = (v: boolean) => {
+      setCanales((prev) => prev.map((c) => (c.id === canal.id ? { ...c, silenciado: v } : c)));
+      setCanalActivo((prev) => (prev && prev.id === canal.id ? { ...prev, silenciado: v } : prev));
+    };
+    aplicar(nuevo);
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/canales/${canal.id}/silenciar`, { method: "PUT", headers: h, body: JSON.stringify({ silenciado: nuevo }) });
+      if (!res.ok) throw new Error();
+      aviso.ok(nuevo ? "Silenciado: solo te avisará si te mencionan." : "Vuelve a avisarte de todo.");
+      void refreshUnread();
+    } catch {
+      aplicar(!nuevo);
+      aviso.error("No se pudo cambiar el aviso de esta conversación");
+    }
+  }, [hdr, refreshUnread]);
+
+  const marcarTodoLeido = useCallback(async () => {
+    setMenuEspacio(false);
+    try {
+      const h = await hdr();
+      const res = await fetch("/api/chat/leido", { method: "PUT", headers: h });
+      if (!res.ok) throw new Error();
+      setCanales((prev) => prev.map((c) => ({ ...c, no_leidos: 0 })));
+      await refreshUnread();
+      aviso.ok("Todo marcado como leído");
+    } catch { aviso.error("No se pudo marcar todo como leído"); }
+  }, [hdr, refreshUnread]);
+
+  // El sonido de aviso (ChatUnreadContext) no suena por la conversación que
+  // estás mirando.
+  useEffect(() => {
+    (window as any).__vantiaCanalActivo = canalActivoId;
+    return () => { (window as any).__vantiaCanalActivo = null; };
+  }, [canalActivoId]);
 
   const handleLeave = async () => {
     if (!canalActivo) return;
@@ -5004,6 +5853,30 @@ export default function Chat() {
     }
     setJoiningId(null);
   };
+
+  // ── Enlace directo: /dashboard/chat?canal=<id>[&hilo=<id>] (las
+  // notificaciones del chat llevan aquí y antes se abría la lista sin más).
+  const enlacePendienteRef = useRef<{ canal: string; hilo: string | null } | null>((() => {
+    if (typeof window === "undefined") return null;
+    const p = new URLSearchParams(window.location.search);
+    const canal = p.get("canal");
+    return canal ? { canal, hilo: p.get("hilo") } : null;
+  })());
+  useEffect(() => {
+    const enlace = enlacePendienteRef.current;
+    if (!enlace || !canales.length) return;
+    const c = canales.find((x) => x.id === enlace.canal);
+    if (!c) return;
+    enlacePendienteRef.current = null;
+    seleccionar(c);
+    if (enlace.hilo) abrirHilo(enlace.hilo);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("canal"); url.searchParams.delete("hilo");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    } catch { /* nada */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canales]);
 
   const goToMsg = (id: string) => {
     setHighlightId(id);
@@ -5176,10 +6049,81 @@ export default function Chat() {
 
   const firstUnreadMessageId = firstUnreadMarkerId;
 
+  // Nombres para pintar las @menciones enteras, y el mío para resaltarlas.
+  const miNombre = user?.fullName?.trim() || sysUsersById.get(currentUserId)?.user_name || "";
+  const contextoTexto = useMemo(() => {
+    const nombres = new Set<string>();
+    for (const u of sysUsers) if (u.user_name?.trim()) nombres.add(u.user_name.trim());
+    for (const m of miembros) if (m.user_name?.trim()) nombres.add(m.user_name.trim());
+    if (miNombre) nombres.add(miNombre);
+    return { nombres: [...nombres], miNombre };
+  }, [sysUsers, miembros, miNombre]);
+
+  // Ctrl+K: canales, conversaciones y gente con la que aún no hay conversación.
+  const destinosSalto = useMemo<DestinoSalto[]>(() => {
+    const t = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
+    return [
+      ...[...canalesPublicos, ...canalesPrivados].map((c) => ({
+        key: c.id, tipo: "canal" as const, titulo: c.nombre,
+        detalle: c.descripcion || `${c.total_miembros} miembro${c.total_miembros === 1 ? "" : "s"}`,
+        noLeidos: c.silenciado ? 0 : getUnreadCountForCanal(c), reciente: t(c.ultimo_mensaje_at), canal: c,
+      })),
+      ...dmConversationEntries.map(({ user: u, dmCanal, unreadCount }) => ({
+        key: dmCanal.id, tipo: "dm" as const, titulo: u.user_name, detalle: estadoVisible(u.user_id, presenceByUserId).label,
+        noLeidos: unreadCount, reciente: t(dmCanal.ultimo_mensaje_at), canal: dmCanal, avatar: u.avatar_url,
+        estadoColor: estadoVisible(u.user_id, presenceByUserId).color,
+      })),
+      ...dmProspectUsers.map((u) => ({
+        key: `u-${u.user_id}`, tipo: "persona" as const, titulo: u.user_name, detalle: u.role_label || "Nuevo mensaje directo",
+        noLeidos: 0, reciente: 0, persona: u, avatar: u.avatar_url, estadoColor: estadoVisible(u.user_id, presenceByUserId).color,
+      })),
+    ];
+  }, [canalesPublicos, canalesPrivados, dmConversationEntries, dmProspectUsers, getUnreadCountForCanal, presenceByUserId]);
+
+  // Alt+↑/↓: conversación anterior/siguiente en el orden de la lista
+  // (con Mayús, solo las que tienen algo sin leer).
+  const moverConversacionRef = useRef<(dir: 1 | -1, soloSinLeer: boolean) => void>(() => {});
+  moverConversacionRef.current = (dir, soloSinLeer) => {
+    const orden = [...canalesPublicos, ...canalesPrivados, ...dmConversationEntries.map((e) => e.dmCanal)];
+    if (!orden.length) return;
+    const i = canalActivo ? orden.findIndex((c) => c.id === canalActivo.id) : -1;
+    for (let paso = 1; paso <= orden.length; paso++) {
+      const c = orden[(i + dir * paso + orden.length * 2) % orden.length];
+      if (!soloSinLeer || (getUnreadCountForCanal(c) > 0 && !c.silenciado)) { seleccionar(c); return; }
+    }
+  };
+  useEffect(() => {
+    // Fase de captura: en el chat, Ctrl+K salta de conversación (como en
+    // Slack) en vez de abrir la paleta general de la app.
+    const captura = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault(); e.stopImmediatePropagation();
+        setSaltarAbierto((v) => !v);
+      } else if (mod && !e.altKey && e.key === "/") {
+        e.preventDefault(); e.stopImmediatePropagation();
+        setAyudaAtajos((v) => !v);
+      } else if (e.altKey && !mod && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        moverConversacionRef.current(e.key === "ArrowUp" ? -1 : 1, e.shiftKey);
+      }
+    };
+    // Esc (si nadie lo ha usado antes, p. ej. para cancelar una edición): cierra el panel.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector("[role=dialog], .fixed.inset-0.z-\\[90\\]")) return;
+      setRightPanel((p) => (p ? null : p));
+    };
+    window.addEventListener("keydown", captura, true);
+    window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("keydown", captura, true); window.removeEventListener("keydown", esc); };
+  }, []);
+
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════════════════════
   return (
+    <ContextoTextoChat.Provider value={contextoTexto}>
     <div className="flex h-full min-h-0 overflow-hidden bg-white animate-in fade-in duration-300">
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
@@ -5187,7 +6131,9 @@ export default function Chat() {
 
         {/* Workspace header — estilo Slack */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0 bg-white">
-          <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-slate-100 rounded-xl px-2.5 py-2 transition-all duration-200 group">
+          <div className="relative min-w-0 flex-1">
+          <button type="button" onClick={() => setMenuEspacio((v) => !v)} aria-expanded={menuEspacio}
+            className="flex w-full items-center gap-2 min-w-0 hover:bg-slate-100 rounded-xl px-2.5 py-2 transition-all duration-200 group">
             <div className="w-8 h-8 rounded-xl bg-[#dc2626] flex items-center justify-center shrink-0 text-white font-bold text-sm">
               {(organizacion?.nombre || "V").trim().charAt(0).toUpperCase()}
             </div>
@@ -5201,6 +6147,38 @@ export default function Chat() {
               )}
             </div>
           </button>
+          {menuEspacio && (
+            <>
+              <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuEspacio(false)}/>
+              <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100">
+                <button type="button" onClick={() => { setMenuEspacio(false); setSaltarAbierto(true); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+                  <Search size={14} className="text-slate-400"/> <span className="flex-1">Saltar a una conversación</span>
+                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-400">{MOD} K</kbd>
+                </button>
+                <button type="button" onClick={() => void marcarTodoLeido()} disabled={totalUnread === 0}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                  <CheckCheck size={14} className="text-slate-400"/> Marcar todo como leído
+                </button>
+                <button type="button" onClick={() => { setMenuEspacio(false); setNotificationsPaused((v) => !v); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+                  {notificationsPaused ? <Bell size={14} className="text-slate-400"/> : <BellOff size={14} className="text-slate-400"/>}
+                  {notificationsPaused ? "Reanudar avisos en pantalla" : "Pausar avisos en pantalla"}
+                </button>
+                <button type="button" onClick={() => { setMenuEspacio(false); setAyudaAtajos(true); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+                  <Keyboard size={14} className="text-slate-400"/> <span className="flex-1">Atajos de teclado</span>
+                  <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-400">{MOD} /</kbd>
+                </button>
+                <div className="my-1 border-t border-slate-100"/>
+                <button type="button" onClick={() => { setMenuEspacio(false); window.location.assign("/dashboard/config?section=notificaciones"); }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+                  <Settings size={14} className="text-slate-400"/> Preferencias de avisos
+                </button>
+              </div>
+            </>
+          )}
+          </div>
           <button title="Nuevo mensaje" onClick={()=>setShowCrear(true)}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-all duration-200 shrink-0 shadow-sm">
             <Pencil size={15}/>
@@ -5217,7 +6195,7 @@ export default function Chat() {
               <input
                 value={canalQ}
                 onChange={e=>setCanalQ(e.target.value)}
-                placeholder="Buscar personas, canales..."
+                placeholder={`Buscar… (${MOD} K)`}
               className="w-full bg-white border border-slate-200 text-slate-700 text-xs pl-8 pr-3 py-2.5 rounded-md outline-none placeholder-slate-400 focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all shadow-sm"
               />
               {canalQ&&<button onClick={()=>{setCanalQ("");setCanalResults([]);}} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={11}/></button>}
@@ -5264,7 +6242,7 @@ export default function Chat() {
                 return (
                   <button onClick={()=>setSecOpen(s=>({...s,canales:!s.canales}))}
                     className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
-                    <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.canales?"":"−rotate-90"}`}/>
+                    <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.canales?"":"-rotate-90"}`}/>
                     <Layers size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
                     <span className="flex-1 text-left">Canales</span>
                     {!secOpen.canales && totalUnreadCanales>0 && (
@@ -5283,6 +6261,7 @@ export default function Chat() {
                       canal={c}
                       activo={canalActivo?.id===c.id}
                       unreadCount={getUnreadCountForCanal(c)}
+                      borrador={!!borradores[c.id]}
                       onClick={()=>seleccionar(c)}
                     />
                   ))}
@@ -5308,7 +6287,7 @@ export default function Chat() {
                 return (
                   <button onClick={()=>setSecOpen(s=>({...s,dms:!s.dms}))}
                     className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
-                    <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.dms?"":"−rotate-90"}`}/>
+                    <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.dms?"":"-rotate-90"}`}/>
                     <MessagesSquare size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
                     <span className="flex-1 text-left">Mensajes directos</span>
                     {!secOpen.dms && totalUnreadDMs>0 && (
@@ -5334,6 +6313,7 @@ export default function Chat() {
                         activo={isActivo}
                         loading={dmLoadingId===u.user_id}
                         unreadCount={unreadCount}
+                        borrador={!!(dmCanal && borradores[dmCanal.id])}
                         onClick={()=>{ if (dmCanal) seleccionar(dmCanal); else handleDMUser(u); }}
                         presenceByUserId={presenceByUserId}
                       />
@@ -5351,7 +6331,8 @@ export default function Chat() {
                     />
                   ))}
                   {/* Invitar a otros */}
-                  <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-colors text-sm group">
+                  <button type="button" onClick={() => window.location.assign("/dashboard/config?section=usuarios")}
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-colors text-sm group">
                     <div className="w-7 h-7 rounded-md bg-slate-200 group-hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
                       <UserPlus size={11} className="text-slate-500 group-hover:text-slate-700"/>
                     </div>
@@ -5539,6 +6520,8 @@ export default function Chat() {
                     onRefresh={()=>{ void Promise.all([fetchCanales(), fetchMiembros(canalActivo.id), lastAt.current ? pollMensajes() : fetchMensajes(canalActivo), refreshUnread()]); }}
                     onLeave={()=>{ void handleLeave(); }}
                     onClose={()=>setShowChannelMenu(false)}
+                    onToggleSilencio={()=>{ void toggleSilencio(canalActivo); }}
+                    onAtajos={()=>setAyudaAtajos(true)}
                   />
                 )}
               </div>
@@ -5651,7 +6634,7 @@ export default function Chat() {
                             showReadReceipt={canalActivo.tipo==="directo"}
                             isReadByRecipient={readReceiptByMessageId.get(m.id) ?? false}
                             onReintentar={reintentarEnvio} onDescartar={descartarEnvio}
-                            onReply={setReplyTo} onReact={handleReact}
+                            onReply={setReplyTo} onReact={handleReact} onThread={abrirHilo}
                             onEdit={setEditingMsg} onDelete={handleDelete} onPin={handlePin} onFavorite={handleFavorite}
                             isFavorite={favoriteIds.has(m.id)}
                             isPinned={pinnedIds.has(m.id)}
@@ -5706,6 +6689,9 @@ export default function Chat() {
                     onSendOptimista={enviarOptimista}
                     onCancelReply={()=>setReplyTo(null)}
                     onCancelEdit={()=>setEditingMsg(null)}
+                    borradorInicial={borradores[canalActivo.id] || ""}
+                    onBorrador={guardarBorradorCanal}
+                    onEditarUltimo={editarUltimo}
                   />
                 </div>
               </div>
@@ -5731,6 +6717,37 @@ export default function Chat() {
                   onGoTo={goToMsg}
                   onTogglePinned={handlePin}
                   resolveDisplayName={resolveDisplayName}
+                />
+              )}
+              {rightPanel==="hilo"&&(
+                <PanelHilo
+                  canalTitulo={activeChatTitle}
+                  isDirect={canalActivo.tipo === "directo"}
+                  datos={hilo}
+                  cargando={hiloCargando}
+                  isMobile={isMobile}
+                  currentUserId={currentUserId}
+                  miembros={miembros}
+                  favoriteIds={favoriteIds}
+                  pinnedIds={pinnedIds}
+                  editandoMsg={editandoHilo}
+                  borradorInicial={hilo ? (borradores[`hilo:${hilo.principal.id}`] || "") : ""}
+                  onBorrador={guardarBorradorHilo}
+                  onClose={()=>setRightPanel(null)}
+                  onReact={handleReact}
+                  onEdit={setEditandoHilo}
+                  onCancelEdit={()=>setEditandoHilo(null)}
+                  onDelete={handleDelete}
+                  onPin={handlePin}
+                  onFavorite={handleFavorite}
+                  onReintentar={reintentarEnvio}
+                  onDescartar={descartarEnvio}
+                  onSend={handleSend}
+                  onSendOptimista={enviarEnHilo}
+                  onEditarUltimo={editarUltimoHilo}
+                  resolveDisplayName={resolveDisplayName}
+                  resolveAvatarUrl={resolveAvatarUrl}
+                  getToken={getToken}
                 />
               )}
               {rightPanel==="favorites"&&(
@@ -5766,7 +6783,22 @@ export default function Chat() {
           onClose={() => setShowExpSearchModal(false)}
         />
       )}
+
+      {saltarAbierto && (
+        <SaltarA
+          destinos={destinosSalto}
+          onClose={() => setSaltarAbierto(false)}
+          onElegir={(d) => {
+            setSaltarAbierto(false);
+            if (d.canal) seleccionar(d.canal);
+            else if (d.persona) void handleDMUser(d.persona);
+          }}
+          onBuscarEnApp={(q) => { setSaltarAbierto(false); abrirPaleta(q); }}
+        />
+      )}
+      {ayudaAtajos && <AyudaAtajosChat onClose={() => setAyudaAtajos(false)} />}
     </div>
+    </ContextoTextoChat.Provider>
   );
 }
 

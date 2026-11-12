@@ -6,6 +6,7 @@ import pool from '../config/database';
 import { sendPushToUsers } from '../utils/webPush';
 import { resolveUserName } from './activityController';
 import { avisarOrganizacionChat } from '../utils/chatRealtime';
+import { mencionaA, prefsDe } from '../utils/avisoPreferencias';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const ok  = (res: Response, data: any, status = 200) => res.status(status).json({ success: true,  data });
@@ -21,10 +22,13 @@ const resolveAuthDisplayName = (auth: any) => {
   ].find(value => typeof value === 'string' && value.trim());
   return resolved || 'Sin nombre';
 };
+// Las respuestas en hilo no cuentan como "sin leer" de la conversación (como
+// en Slack): se ven en el hilo, y a quien participa le llega el aviso.
 const unreadCountExpr = (userParam = '$1') => `
   (SELECT COUNT(*) FROM chat_mensajes msg
     WHERE msg.canal_id = c.id
       AND msg.deleted_at IS NULL
+      AND msg.hilo_id IS NULL
       AND msg.user_id != ${userParam}
       AND (m.last_read_at IS NULL OR msg.created_at > m.last_read_at)
   )::int
@@ -49,6 +53,38 @@ async function assertMensajeInOrg(mensajeId: string, organizacionId: string | un
   `, [mensajeId, organizacionId]);
   return rows.length > 0;
 }
+/** Además de ser de la organización, un canal privado o un mensaje directo
+ *  solo lo puede leer o escribir quien es miembro (antes bastaba con conocer
+ *  su id). Los públicos se pueden ver sin haberse unido. */
+async function puedeUsarCanal(canalId: string, organizacionId: string | undefined, userId: string): Promise<boolean> {
+  if (!canalId || !organizacionId) return false;
+  const { rows } = await pool.query(
+    `SELECT c.tipo, EXISTS (SELECT 1 FROM chat_miembros mb WHERE mb.canal_id = c.id AND mb.user_id = $3) AS miembro
+       FROM chat_canales c WHERE c.id = $1 AND c.organizacion_id = $2`,
+    [canalId, organizacionId, userId],
+  );
+  if (!rows.length) return false;
+  return rows[0].miembro || (rows[0].tipo !== 'privado' && rows[0].tipo !== 'directo');
+}
+
+/** Un mensaje con sus reacciones, la cita a la que responde y el resumen de
+ *  su hilo (cuántas respuestas, la última y quién ha contestado). */
+const SEL_MENSAJE = `
+  SELECT m.*,
+    (SELECT json_agg(json_build_object('emoji', r.emoji, 'user_id', r.user_id, 'user_name', r.user_name))
+       FROM chat_reacciones r WHERE r.mensaje_id = m.id) AS reacciones,
+    (SELECT row_to_json(r2.*) FROM chat_mensajes r2 WHERE r2.id = m.reply_to_id AND r2.canal_id = m.canal_id) AS reply_to,
+    h.respuestas, h.ultima_respuesta_at, h.hilo_autores
+  FROM chat_mensajes m
+  LEFT JOIN LATERAL (
+    SELECT COUNT(*)::int AS respuestas, MAX(hr.created_at) AS ultima_respuesta_at,
+      (SELECT json_agg(a) FROM (
+         SELECT DISTINCT ON (ha.user_id) ha.user_id, ha.user_name, ha.avatar_url
+           FROM chat_mensajes ha WHERE ha.hilo_id = m.id AND ha.deleted_at IS NULL
+          ORDER BY ha.user_id, ha.created_at DESC LIMIT 4) a) AS hilo_autores
+      FROM chat_mensajes hr WHERE hr.hilo_id = m.id AND hr.deleted_at IS NULL
+  ) h ON true
+`;
 
 // ── Canales ───────────────────────────────────────────────────────────────────
 
@@ -60,18 +96,18 @@ export async function getCanales(req: Request, res: Response) {
       SELECT
         c.id, c.nombre, c.descripcion, c.tipo, c.foto_url,
         c.expediente_id, c.cliente_id, c.archivado, c.created_at,
-        m.last_read_at, m.role_label, m.status AS my_status,
+        m.last_read_at, m.role_label, m.status AS my_status, m.silenciado,
         ${unreadCountExpr('$1')} AS no_leidos,
         (SELECT contenido FROM chat_mensajes msg
-          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL
+          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL AND msg.hilo_id IS NULL
           ORDER BY msg.created_at DESC LIMIT 1
         ) AS ultimo_mensaje,
         (SELECT user_name FROM chat_mensajes msg
-          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL
+          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL AND msg.hilo_id IS NULL
           ORDER BY msg.created_at DESC LIMIT 1
         ) AS ultimo_mensaje_autor,
         (SELECT created_at FROM chat_mensajes msg
-          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL
+          WHERE msg.canal_id = c.id AND msg.deleted_at IS NULL AND msg.hilo_id IS NULL
           ORDER BY msg.created_at DESC LIMIT 1
         ) AS ultimo_mensaje_at,
         (SELECT COUNT(*) FROM chat_miembros WHERE canal_id = c.id)::int AS total_miembros,
@@ -408,6 +444,23 @@ export async function getPresence(req: Request, res: Response) {
 }
 
 /** PUT /api/chat/me/role */
+/** PUT /canales/:id/silenciar { silenciado } — silenciar un canal para mí
+ *  (12/11/2026): sin avisos salvo que me mencionen; en la lista sale atenuado. */
+export async function silenciarCanal(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const silenciado = req.body?.silenciado === true;
+  try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    const { rowCount } = await pool.query(`UPDATE chat_miembros SET silenciado = $3 WHERE canal_id = $1 AND user_id = $2`, [id, userId, silenciado]);
+    if (!rowCount) return err(res, 'No eres miembro de este canal', 403);
+    return ok(res, { canal_id: id, silenciado });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
 export async function updateMyRole(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
@@ -434,25 +487,20 @@ export async function getMensajes(req: Request, res: Response) {
   const { before, since, limit = '60' } = req.query as Record<string, string>;
   const lim = Math.min(parseInt(limit) || 60, 100);
   try {
-    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    if (!(await puedeUsarCanal(id, (req as any).organizacionId, userId))) return err(res, 'Canal no encontrado', 404);
     let query: string;
     let params: any[];
-    const SEL = `
-      SELECT m.*,
-        (SELECT json_agg(json_build_object('emoji', r.emoji, 'user_id', r.user_id, 'user_name', r.user_name))
-         FROM chat_reacciones r WHERE r.mensaje_id = m.id
-        ) AS reacciones,
-        (SELECT row_to_json(r2.*) FROM chat_mensajes r2 WHERE r2.id = m.reply_to_id) AS reply_to
-      FROM chat_mensajes m
-    `;
+    // Las respuestas en hilo no salen en la conversación (solo su resumen
+    // bajo el mensaje principal) -- ver getHilo.
+    const BASE = `${SEL_MENSAJE} WHERE m.canal_id = $1 AND m.deleted_at IS NULL AND m.hilo_id IS NULL`;
     if (since) {
-      query = `${SEL} WHERE m.canal_id = $1 AND m.created_at > $2 AND m.deleted_at IS NULL ORDER BY m.created_at ASC LIMIT $3`;
+      query = `${BASE} AND m.created_at > $2 ORDER BY m.created_at ASC LIMIT $3`;
       params = [id, since, lim];
     } else if (before) {
-      query = `${SEL} WHERE m.canal_id = $1 AND m.created_at < (SELECT created_at FROM chat_mensajes WHERE id = $2) AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT $3`;
+      query = `${BASE} AND m.created_at < (SELECT created_at FROM chat_mensajes WHERE id = $2) ORDER BY m.created_at DESC LIMIT $3`;
       params = [id, before, lim];
     } else {
-      query = `${SEL} WHERE m.canal_id = $1 AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT $2`;
+      query = `${BASE} ORDER BY m.created_at DESC LIMIT $2`;
       params = [id, lim];
     }
     const { rows } = await pool.query(query, params);
@@ -463,11 +511,34 @@ export async function getMensajes(req: Request, res: Response) {
   }
 }
 
+/** GET /mensajes/:id/hilo — el mensaje principal y todas sus respuestas. */
+export async function getHilo(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    const { rows: base } = await pool.query(`SELECT canal_id, hilo_id FROM chat_mensajes WHERE id = $1`, [id]);
+    if (!base.length) return err(res, 'Mensaje no encontrado', 404);
+    // Si piden el hilo desde una respuesta, se abre el de su mensaje principal.
+    const principalId = base[0].hilo_id || id;
+    if (!(await puedeUsarCanal(base[0].canal_id, (req as any).organizacionId, userId))) return err(res, 'Mensaje no encontrado', 404);
+    const [{ rows: principal }, { rows: respuestas }] = await Promise.all([
+      pool.query(`${SEL_MENSAJE} WHERE m.id = $1`, [principalId]),
+      pool.query(`${SEL_MENSAJE} WHERE m.hilo_id = $1 AND m.deleted_at IS NULL ORDER BY m.created_at ASC LIMIT 500`, [principalId]),
+    ]);
+    if (!principal.length) return err(res, 'Mensaje no encontrado', 404);
+    return ok(res, { principal: principal[0], respuestas });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
 /** GET /canales/:id/cambios?desde=ISO — mensajes EDITADOS o con reacciones
  *  nuevas y mensajes BORRADOS desde esa hora (09/10/2026: "since" solo traía
  *  mensajes nuevos; las ediciones, borrados y reacciones de los demás no se
  *  veían hasta cambiar de conversación). "ahora" es la hora del servidor, para
- *  la siguiente consulta (sin depender del reloj del navegador). */
+ *  la siguiente consulta (sin depender del reloj del navegador). Una respuesta
+ *  nueva en un hilo también "cambia" su mensaje principal (el contador). */
 export async function getCambiosMensajes(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
@@ -475,16 +546,12 @@ export async function getCambiosMensajes(req: Request, res: Response) {
   const desde = new Date(String(req.query.desde || ''));
   if (Number.isNaN(desde.getTime())) return err(res, 'Parámetro "desde" no válido', 400);
   try {
-    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    if (!(await puedeUsarCanal(id, (req as any).organizacionId, userId))) return err(res, 'Canal no encontrado', 404);
     const [{ rows: ahora }, { rows: cambiados }, { rows: borrados }] = await Promise.all([
       pool.query(`SELECT NOW() AS ahora`),
       pool.query(
-        `SELECT m.*,
-           (SELECT json_agg(json_build_object('emoji', r.emoji, 'user_id', r.user_id, 'user_name', r.user_name))
-              FROM chat_reacciones r WHERE r.mensaje_id = m.id) AS reacciones,
-           (SELECT row_to_json(r2.*) FROM chat_mensajes r2 WHERE r2.id = m.reply_to_id) AS reply_to
-           FROM chat_mensajes m
-          WHERE m.canal_id = $1 AND m.deleted_at IS NULL AND m.updated_at > $2 AND m.updated_at > m.created_at
+        `${SEL_MENSAJE}
+          WHERE m.canal_id = $1 AND m.deleted_at IS NULL AND m.hilo_id IS NULL AND m.updated_at > $2 AND m.updated_at > m.created_at
           ORDER BY m.updated_at ASC LIMIT 200`,
         [id, desde],
       ),
@@ -502,33 +569,59 @@ export async function sendMensaje(req: Request, res: Response) {
   const avatarUrl = (req as any).auth?.sessionClaims?.picture || null;
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
-  const { contenido, tipo = 'texto', reply_to_id, gif_url, image_url, file_url, file_name, file_mime } = req.body;
+  const { contenido, tipo = 'texto', reply_to_id, hilo_id, gif_url, image_url, file_url, file_name, file_mime } = req.body;
   if (!contenido?.trim() && !gif_url && !image_url && !file_url) return err(res, 'Contenido vacío', 400);
   try {
-    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    if (!(await puedeUsarCanal(id, (req as any).organizacionId, userId))) return err(res, 'Canal no encontrado', 404);
+    // La cita y el hilo tienen que ser de ESTE canal (antes no se miraba: con
+    // el id de un mensaje de otro canal, u otra organización, su texto salía
+    // como cita en la respuesta).
+    let hiloAutorId: string | null = null;
+    if (hilo_id) {
+      const { rows: h } = await pool.query(
+        `SELECT user_id FROM chat_mensajes WHERE id = $1 AND canal_id = $2 AND hilo_id IS NULL AND deleted_at IS NULL`,
+        [hilo_id, id],
+      );
+      if (!h.length) return err(res, 'El mensaje del hilo ya no existe', 404);
+      hiloAutorId = h[0].user_id;
+    }
+    if (reply_to_id) {
+      const { rows: r } = await pool.query(`SELECT 1 FROM chat_mensajes WHERE id = $1 AND canal_id = $2`, [reply_to_id, id]);
+      if (!r.length) return err(res, 'El mensaje citado no es de esta conversación', 400);
+    }
     const normalizedType = file_url ? 'archivo' : image_url ? 'imagen' : gif_url ? 'gif' : tipo;
     const fallbackContent = gif_url ? 'GIF' : image_url ? 'Imagen' : file_url ? (file_name || 'Archivo') : '';
     const { rows } = await pool.query(`
-      INSERT INTO chat_mensajes (canal_id, user_id, user_name, avatar_url, contenido, tipo, reply_to_id, gif_url, image_url, file_url, file_name, file_mime)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
-    `, [id, userId, userName, avatarUrl, (contenido || '').trim() || fallbackContent, normalizedType, reply_to_id || null, gif_url || null, image_url || null, file_url || null, file_name || null, file_mime || null]);
+      INSERT INTO chat_mensajes (canal_id, user_id, user_name, avatar_url, contenido, tipo, reply_to_id, hilo_id, gif_url, image_url, file_url, file_name, file_mime)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *
+    `, [id, userId, userName, avatarUrl, (contenido || '').trim() || fallbackContent, normalizedType, reply_to_id || null, hilo_id || null, gif_url || null, image_url || null, file_url || null, file_name || null, file_mime || null]);
     const msg: any = { ...rows[0], reacciones: null, reply_to: null };
     // 19/10/2026: lo que va después del mensaje, en un solo viaje a la base de
     // datos (antes eran cuatro seguidos, y cada uno cuesta un viaje de ida y
     // vuelta al servidor de Supabase): leído y avatar del autor, fuera su
-    // "escribiendo..." y el canal sube en la lista.
+    // "escribiendo..." y el canal sube en la lista. Una respuesta en hilo no
+    // marca la conversación como leída ni la sube: solo "toca" el mensaje
+    // principal para que los demás vean el contador nuevo.
     const [replyRows] = await Promise.all([
       reply_to_id ? pool.query(`SELECT * FROM chat_mensajes WHERE id = $1`, [reply_to_id]).then((r) => r.rows) : Promise.resolve([]),
-      pool.query(
-        `WITH autor AS (
-           UPDATE chat_miembros SET last_read_at = NOW(), avatar_url = COALESCE($1, avatar_url), user_name = $2
-            WHERE canal_id = $3 AND user_id = $4 RETURNING 1
-         ), escribiendo AS (
-           DELETE FROM chat_typing_status WHERE canal_id = $3 AND user_id = $4 RETURNING 1
-         )
-         UPDATE chat_canales SET updated_at = NOW() WHERE id = $3`,
-        [avatarUrl, userName, id, userId],
-      ),
+      hilo_id
+        ? pool.query(
+          `WITH escribiendo AS (
+             DELETE FROM chat_typing_status WHERE canal_id = $2 AND user_id = $3 RETURNING 1
+           )
+           UPDATE chat_mensajes SET updated_at = NOW() WHERE id = $1`,
+          [hilo_id, id, userId],
+        )
+        : pool.query(
+          `WITH autor AS (
+             UPDATE chat_miembros SET last_read_at = NOW(), avatar_url = COALESCE($1, avatar_url), user_name = $2
+              WHERE canal_id = $3 AND user_id = $4 RETURNING 1
+           ), escribiendo AS (
+             DELETE FROM chat_typing_status WHERE canal_id = $3 AND user_id = $4 RETURNING 1
+           )
+           UPDATE chat_canales SET updated_at = NOW() WHERE id = $3`,
+          [avatarUrl, userName, id, userId],
+        ),
     ]);
     msg.reply_to = replyRows[0] || null;
 
@@ -542,28 +635,47 @@ export async function sendMensaje(req: Request, res: Response) {
         if (!canal) return;
         // Quien se puso "No molestar", "En juicio" o "En reunión" (y sigue
         // vigente) no recibe push del chat: lo verá al volver (13/10/2026).
-        const { rows: miembros } = await pool.query(
-          `SELECT m.user_id FROM chat_miembros m
+        // En un hilo solo se avisa a quien escribió el mensaje principal y a
+        // quien ya ha contestado en él (como en Slack), no a todo el canal.
+        const { rows: candidatos } = await pool.query(
+          `SELECT m.user_id, m.user_name, m.silenciado FROM chat_miembros m
              LEFT JOIN chat_presence p ON p.user_id = m.user_id AND p.organizacion_id = $3
             WHERE m.canal_id = $1 AND m.user_id <> $2
               AND NOT (COALESCE(p.estado, '') IN ('no_molestar', 'en_juicio', 'en_reunion')
-                       AND (p.estado_hasta IS NULL OR p.estado_hasta > NOW()))`,
-          [id, userId, canal.organizacion_id],
+                       AND (p.estado_hasta IS NULL OR p.estado_hasta > NOW()))
+              AND ($4::uuid IS NULL OR m.user_id = $5 OR EXISTS (
+                    SELECT 1 FROM chat_mensajes hm WHERE hm.hilo_id = $4::uuid AND hm.user_id = m.user_id))`,
+          [id, userId, canal.organizacion_id, hilo_id || null, hiloAutorId],
         );
-        if (!miembros.length) return;
+        if (!candidatos.length) return;
         const isDM = canal.tipo === 'directo';
+        // 12/11/2026, como en Slack: en un canal silenciado, o con "solo
+        // menciones", solo avisa si te mencionan. Los directos y los hilos en
+        // los que participas, siempre.
+        let miembros: any[] = candidatos;
+        if (!isDM && !hilo_id) {
+          const prefs = await prefsDe(candidatos.map((m: any) => m.user_id));
+          const vivos = new Map<string, string>((await getCachedSystemUsers().catch(() => [] as any[])).map((u: any) => [u.user_id, u.user_name]));
+          miembros = candidatos.filter((m: any) => {
+            if (mencionaA(contenido, [m.user_name, vivos.get(m.user_id)])) return true;
+            if (m.silenciado) return false;
+            return prefs.get(m.user_id)?.chatModo !== 'menciones';
+          });
+        }
+        if (!miembros.length) return;
         const preview = (msg.contenido || fallbackContent || '').slice(0, 140);
         // userName sale de las claims de la sesión (resolveAuthDisplayName), que en
         // muchas cuentas no llevan nombre y caen en "Sin nombre" -- para el push se
         // resuelve el nombre real contra la propia API de Clerk (igual que ya hace
         // el resto de la app para mostrar nombres de otros usuarios).
         const senderName = await resolveUserName(userId);
+        const enHilo = hilo_id ? ' (hilo)' : '';
         await sendPushToUsers(
           miembros.map((m: any) => m.user_id),
           {
-            title: isDM ? senderName : `#${canal.nombre || 'canal'}`,
+            title: isDM ? `${senderName}${enHilo}` : `#${canal.nombre || 'canal'}${enHilo}`,
             body: isDM ? preview : `${senderName}: ${preview}`,
-            url: `/dashboard/chat?canal=${id}`,
+            url: `/dashboard/chat?canal=${id}${hilo_id ? `&hilo=${hilo_id}` : ''}`,
             tag: `chat-${id}`,
             tipo: isDM ? 'chat_dm' : 'chat',
           },
@@ -892,6 +1004,8 @@ export async function deleteMensaje(req: Request, res: Response) {
     }
 
     await pool.query(`UPDATE chat_mensajes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`, [id]);
+    // Si era una respuesta en hilo, el contador del mensaje principal cambia.
+    await pool.query(`UPDATE chat_mensajes SET updated_at = NOW() WHERE id = (SELECT hilo_id FROM chat_mensajes WHERE id = $1)`, [id]);
     return ok(res, { id });
   } catch (e: any) {
     return err(res, e.message);
@@ -949,7 +1063,11 @@ export async function fijarMensaje(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id, mensajeId } = req.params;
   try {
-    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    if (!(await puedeUsarCanal(id, (req as any).organizacionId, userId))) return err(res, 'Canal no encontrado', 404);
+    // El mensaje tiene que ser de este canal (antes se podía fijar el de otro
+    // canal u organización, y el panel de fijados mostraba su texto).
+    const { rows: delCanal } = await pool.query(`SELECT 1 FROM chat_mensajes WHERE id = $1 AND canal_id = $2`, [mensajeId, id]);
+    if (!delCanal.length) return err(res, 'Mensaje no encontrado', 404);
     // "Fijar" es compartido por todo el canal (cualquiera lo ve, no es como
     // los favoritos que son por usuario) -- por eso el toggle mira si YA hay
     // una fila, sin filtrar por quién lo fijó. El botón de la barra de un
@@ -1388,6 +1506,7 @@ export async function getUnreadCounts(req: Request, res: Response) {
     const { rows } = await pool.query(`
       SELECT c.id AS canal_id,
         c.tipo,
+        m.silenciado,
         ${unreadCountExpr('$1')} AS no_leidos,
         (SELECT dm.user_id FROM chat_miembros dm
           WHERE dm.canal_id = c.id AND dm.user_id != $1

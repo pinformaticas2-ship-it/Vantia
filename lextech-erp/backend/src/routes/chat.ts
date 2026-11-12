@@ -5,7 +5,7 @@ import { requireModulePermission } from '../middleware/requireModulePermission';
 import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
-  getMensajes, sendMensaje, editMensaje, deleteMensaje, getCambiosMensajes,
+  getMensajes, sendMensaje, editMensaje, deleteMensaje, getCambiosMensajes, getHilo, silenciarCanal,
   toggleReaccion,
   getFijados, fijarMensaje, desfijarMensaje, getFavoritos, toggleFavorito,
   buscarMensajes, getMiembrosGlobal, getOrCreateDM,
@@ -68,6 +68,7 @@ router.get   ('/canales',                        requireAuth, getCanales);
 router.post  ('/canales',                        requireAuth, createCanal);
 router.put   ('/canales/:id',                    requireAuth, updateCanal);
 router.delete('/canales/:id',                    requireAuth, archivarCanal);
+router.put   ('/canales/:id/silenciar',          requireAuth, silenciarCanal);
 router.put   ('/canales/:id/leido',              requireAuth, marcarLeido);
 router.post  ('/canales/:id/join',               requireAuth, joinCanal);
 router.delete('/canales/:id/leave',              requireAuth, leaveCanal);
@@ -91,6 +92,7 @@ router.post  ('/uploads/image',                  requireAuth, chatUpload.single(
 router.post  ('/uploads/file',                   requireAuth, chatFileUpload.single('file'), uploadChatFile);
 
 // Mensajes (editar / borrar)
+router.get   ('/mensajes/:id/hilo',              requireAuth, getHilo);
 router.put   ('/mensajes/:id',                   requireAuth, editMensaje);
 router.delete('/mensajes/:id',                   requireAuth, deleteMensaje);
 
