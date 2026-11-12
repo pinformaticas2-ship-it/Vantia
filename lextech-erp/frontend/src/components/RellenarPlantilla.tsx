@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, FileText, Loader2, Sparkles, AlertCircle, Buil
 import { Link } from 'react-router-dom';
 import { safeJson, resolveUploadUrl } from '../lib/api';
 import { aviso } from '../lib/avisos';
+import { t } from '../lib/i18n';
 
 // ── Revisar los datos antes de generar un documento (15/10/2026) ─────────────
 // Las plantillas del despacho (de MN Program) llevan campos como
@@ -65,11 +66,11 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
         });
         const d = await safeJson(res);
         if (!vivo) return;
-        if (!res.ok || !d?.success) throw new Error(d?.error || 'No se pudo leer la plantilla.');
+        if (!res.ok || !d?.success) throw new Error(d?.error || t("No se pudo leer la plantilla."));
         setCampos(d.data.campos);
         setConvertida(!!d.data.convertida);
         setValores(Object.fromEntries(d.data.campos.map((c: Campo) => [c.clave, c.valor || ''])));
-      } catch (e: any) { if (vivo) setError(e?.message || 'No se pudo leer la plantilla.'); }
+      } catch (e: any) { if (vivo) setError(e?.message || t("No se pudo leer la plantilla.")); }
     })();
     return () => { vivo = false; };
   }, [path, expedienteId, clienteId, getToken]);
@@ -102,15 +103,15 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, expedienteId, clienteId, valores: enviar }),
       });
-      if (!res.ok) { const d = await safeJson(res); throw new Error(d?.error || 'No se pudo generar el documento.'); }
+      if (!res.ok) { const d = await safeJson(res); throw new Error(d?.error || t("No se pudo generar el documento.")); }
       const blob = await res.blob();
       const archivo = new File([blob], nombre.replace(/\.docx?$/i, '') + '.docx', {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       });
       await onGenerado?.(archivo);
-      aviso.ok('Documento generado con los datos y adjuntado');
+      aviso.ok(t("Documento generado con los datos y adjuntado"));
     } catch (e: any) {
-      aviso.error(e?.message || 'No se pudo generar el documento.');
+      aviso.error(e?.message || t("No se pudo generar el documento."));
     } finally { setGenerando(false); }
   };
 
@@ -118,14 +119,14 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
     <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 px-8">
       <AlertCircle size={22} className="text-red-500" />
       <p className="text-sm text-slate-700">{error}</p>
-      <button type="button" onClick={onVolver} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Volver</button>
+      <button type="button" onClick={onVolver} className="text-xs font-semibold text-slate-500 hover:text-slate-800">{t("Volver")}</button>
     </div>
   );
   if (!campos) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500">
       <Loader2 size={20} className="animate-spin" />
-      <p className="text-sm">Leyendo la plantilla…</p>
-      <p className="text-xs text-slate-400">Las plantillas .doc antiguas tardan unos segundos la primera vez.</p>
+      <p className="text-sm">{t("Leyendo la plantilla…")}</p>
+      <p className="text-xs text-slate-400">{t("Las plantillas .doc antiguas tardan unos segundos la primera vez.")}</p>
     </div>
   );
 
@@ -133,23 +134,21 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex items-start gap-3 pb-3">
-        <button type="button" onClick={onVolver} title="Volver" className="mt-0.5 h-8 w-8 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800">
+        <button type="button" onClick={onVolver} title={t("Volver")} className="mt-0.5 h-8 w-8 shrink-0 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800">
           <ArrowLeft size={15} />
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-800 truncate" title={nombre}><FileText size={14} className="inline -mt-0.5 mr-1 text-slate-400" />{nombre}</p>
           <p className="text-xs text-slate-500 mt-0.5">
             {campos.length === 0
-              ? 'Esta plantilla no tiene campos para rellenar.'
-              : <>{campos.length} campos · <span className="text-emerald-700 font-semibold">{rellenos} rellenos</span>{faltan > 0 && <> · <span className="text-amber-700 font-semibold">{faltan} por completar</span></>}</>}
-            {convertida && ' · plantilla .doc: se entregará como .docx'}
+              ? t("Esta plantilla no tiene campos para rellenar.")
+              : <>{campos.length}{" "}{t("campos ·")}{" "}<span className="text-emerald-700 font-semibold">{rellenos}{" "}{t("rellenos")}</span>{faltan > 0 && <> · <span className="text-amber-700 font-semibold">{faltan}{" "}{t("por completar")}</span></>}</>}
+            {convertida && t(" · plantilla .doc: se entregará como .docx")}
           </p>
         </div>
         {faltan > 0 && (
           <label className="shrink-0 inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-            <input type="checkbox" checked={soloFaltan} onChange={(e) => setSoloFaltan(e.target.checked)} className="accent-red-600" />
-            Solo los que faltan
-          </label>
+            <input type="checkbox" checked={soloFaltan} onChange={(e) => setSoloFaltan(e.target.checked)} className="accent-red-600" />{t("Solo los que faltan")}</label>
         )}
       </div>
 
@@ -171,28 +170,27 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                       <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-semibold ${o.cls}`}>
                         {origen === 'vantia' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{o.label}
                       </span>
-                      {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title="Lo que escribas aquí se recuerda para todo el despacho"><Building2 size={9} /> despacho</span>}
+                      {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title={t("Lo que escribas aquí se recuerda para todo el despacho")}><Building2 size={9} />{" "}{t("despacho")}</span>}
                     </div>
                     {c.imagen ? (
                       c.imagenUrl ? (
                         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
-                          <img src={resolveUploadUrl(c.imagenUrl) || undefined} alt="Logo del despacho" className="h-9 max-w-[140px] object-contain" />
-                          <span className="text-xs text-slate-500">Se pondrá el logo de Mi Despacho.</span>
+                          <img src={resolveUploadUrl(c.imagenUrl) || undefined} alt={t("Logo del despacho")} className="h-9 max-w-[140px] object-contain" />
+                          <span className="text-xs text-slate-500">{t("Se pondrá el logo de Mi Despacho.")}</span>
                         </div>
                       ) : (
                         <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-                          {c.avisoImagen === 'formato' ? 'El logo del despacho está en un formato que Word no muestra (usa PNG o JPG): vuelve a subirlo en '
-                            : c.avisoImagen === 'perdido' ? 'No se encuentra el archivo del logo del despacho: vuelve a subirlo en '
-                            : 'El despacho no tiene logo: súbelo en '}
-                          <Link to="/dashboard/config?section=despacho" className="font-semibold underline">Ajustes → Mi Despacho</Link> y saldrá en todos los documentos.
-                        </p>
+                          {c.avisoImagen === 'formato' ? t("El logo del despacho está en un formato que Word no muestra (usa PNG o JPG): vuelve a subirlo en ")
+                            : c.avisoImagen === 'perdido' ? t("No se encuentra el archivo del logo del despacho: vuelve a subirlo en ")
+                            : t("El despacho no tiene logo: súbelo en ")}
+                          <Link to="/dashboard/config?section=despacho" className="font-semibold underline">{t("Ajustes → Mi Despacho")}</Link>{" "}{t("y saldrá en todos los documentos.")}</p>
                       )
                     ) : largo ? (
                       <textarea value={v} rows={Math.min(5, Math.max(2, v.split('\n').length))}
                         onChange={(e) => setValores((p) => ({ ...p, [c.clave]: e.target.value }))}
                         className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-800 focus:bg-white focus:border-red-300 outline-none" />
                     ) : (
-                      <input value={v} placeholder={c.conoceVantia ? 'Vantia no tiene este dato en el expediente' : 'Escríbelo (se recordará)'}
+                      <input value={v} placeholder={c.conoceVantia ? t("Vantia no tiene este dato en el expediente") : t("Escríbelo (se recordará)")}
                         onChange={(e) => setValores((p) => ({ ...p, [c.clave]: e.target.value }))}
                         className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-red-300 outline-none" />
                     )}
@@ -202,18 +200,16 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
             </div>
           </section>
         ))}
-        {soloFaltan && grupos.length === 0 && <p className="py-8 text-center text-sm text-emerald-700">Todos los campos tienen dato. ✓</p>}
+        {soloFaltan && grupos.length === 0 && <p className="py-8 text-center text-sm text-emerald-700">{t("Todos los campos tienen dato. ✓")}</p>}
       </div>
 
       <div className="pt-4 flex flex-col sm:flex-row sm:items-center gap-3">
         {faltan > 0 && (
-          <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none" title="Si no, los campos vacíos desaparecen del documento">
-            <input type="checkbox" checked={dejarMarcados} onChange={(e) => setDejarMarcados(e.target.checked)} className="accent-red-600" />
-            Dejar marcados los vacíos para completarlos en Word
-          </label>
+          <label className="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none" title={t("Si no, los campos vacíos desaparecen del documento")}>
+            <input type="checkbox" checked={dejarMarcados} onChange={(e) => setDejarMarcados(e.target.checked)} className="accent-red-600" />{t("Dejar marcados los vacíos para completarlos en Word")}</label>
         )}
         <div className="sm:ml-auto flex gap-2">
-          <button type="button" onClick={onVolver} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Volver</button>
+          <button type="button" onClick={onVolver} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">{t("Volver")}</button>
           <button type="button" onClick={generar} disabled={generando}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-xl">
             {generando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} {textoBoton}

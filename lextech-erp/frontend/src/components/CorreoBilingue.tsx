@@ -2,6 +2,7 @@ import { useEffect, useState, type RefObject } from "react";
 import { Globe2, Loader2, Check, Undo2 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { IDIOMAS, nombreEspanol } from "../lib/idiomas";
+import { t } from '../lib/i18n';
 
 // Barra de traducción del redactor de Correo. Escribes en tu idioma, eliges
 // a cuál traducirlo y pulsas «Traducir»: el mensaje (y el asunto) se cambian
@@ -66,7 +67,7 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
     // Los <br> que separan el texto de la firma se quedan con la firma.
     const colaBr = cuerpo.match(/(?:<br\s*\/?>\s*)+$/i)?.[0] || "";
     cuerpo = cuerpo.slice(0, cuerpo.length - colaBr.length);
-    if (!cuerpo.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim()) { setError("Escribe primero el mensaje."); return; }
+    if (!cuerpo.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim()) { setError(t("Escribe primero el mensaje.")); return; }
     setEstado("traduciendo"); setError("");
     try {
       // Cuerpo y asunto en UNA sola petición a la IA (el cupo de Gemini va por peticiones).
@@ -74,7 +75,7 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
         getToken: getToken as any, method: "POST",
         body: JSON.stringify({ texto: cuerpo, asunto: subject.trim() || undefined, idioma, html: true }),
       });
-      if (!rc?.success) throw new Error(rc?.error || "No se pudo traducir.");
+      if (!rc?.success) throw new Error(rc?.error || t("No se pudo traducir."));
       const traducido = `<div lang="${idioma}"${idioma === "ar" ? ' dir="rtl"' : ""}>${rc.data.traduccion}</div>`;
       setDeshacer({ html, asunto: subject, idioma });
       el.innerHTML = mantenerOriginal
@@ -88,7 +89,7 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
       if (asuntoT) setSubject(mantenerOriginal ? `${asuntoT} / ${subject.trim()}` : asuntoT);
       setEstado("hecho");
     } catch (e: any) {
-      setError(e?.message || "No se pudo traducir.");
+      setError(e?.message || t("No se pudo traducir."));
       setEstado("");
     }
   };
@@ -109,28 +110,24 @@ export function CorreoBilingue({ destinatarios, getToken, bodyRef, subject, setS
       {estado === "hecho" && deshacer ? (
         <>
           <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
-            <Check size={13} /> Traducido al {nombreEspanol(deshacer.idioma)}{mantenerOriginal ? " (con el original debajo)" : ""} — revísalo antes de enviar
-          </span>
+            <Check size={13} />{" "}{t("Traducido al")}{" "}{nombreEspanol(deshacer.idioma)}{mantenerOriginal ? t(" (con el original debajo)") : ""}{" "}{t("— revísalo antes de enviar")}</span>
           <button type="button" onClick={volverAlOriginal}
             className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-slate-500 hover:bg-white">
-            <Undo2 size={13} /> Deshacer
-          </button>
+            <Undo2 size={13} />{" "}{t("Deshacer")}</button>
         </>
       ) : (
         <>
-          <span>Traducir mi mensaje al</span>
+          <span>{t("Traducir mi mensaje al")}</span>
           <select value={idioma} onChange={(e) => elegir(e.target.value)} disabled={estado === "traduciendo"}
             className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-semibold text-slate-700 outline-none">
             {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{nombreEspanol(i.codigo)}</option>)}
           </select>
           <label className="inline-flex cursor-pointer items-center gap-1.5">
-            <input type="checkbox" checked={mantenerOriginal} onChange={(e) => setMantenerOriginal(e.target.checked)} />
-            mantener también el original
-          </label>
-          {sugerido && <span className="text-sky-700">· {sugerido.nombre} prefiere {sugerido.idiomaNombre}</span>}
+            <input type="checkbox" checked={mantenerOriginal} onChange={(e) => setMantenerOriginal(e.target.checked)} />{t("mantener también el original")}</label>
+          {sugerido && <span className="text-sky-700">· {sugerido.nombre}{" "}{t("prefiere")}{" "}{sugerido.idiomaNombre}</span>}
           <button type="button" disabled={estado === "traduciendo"} onClick={() => void traducir()}
             className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-2.5 py-1 font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
-            {estado === "traduciendo" ? <><Loader2 size={13} className="animate-spin" /> Traduciendo…</> : <>Traducir</>}
+            {estado === "traduciendo" ? <><Loader2 size={13} className="animate-spin" />{" "}{t("Traduciendo…")}</> : <>{t("Traducir")}</>}
           </button>
         </>
       )}

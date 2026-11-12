@@ -10,6 +10,7 @@ import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand,
 import { VantiaHistoryModal } from '../components/VantiaHistoryPanel';
 import PanelDocumento from '../components/PanelDocumento';
 import { useIsMobile } from '../lib/useIsMobile';
+import { t } from '../lib/i18n';
 
 // ─── Keyframe styles ──────────────────────────────────────────────────────────
 
@@ -115,10 +116,10 @@ function DocumentoCard({ doc, abierto, onAbrir }: { doc: DocumentoCreado; abiert
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-slate-800">{doc.titulo}</span>
-        <span className="block text-[11px] text-slate-400">{abierto ? 'Abierto en el editor' : 'Documento · Clic para abrir en el editor'}</span>
+        <span className="block text-[11px] text-slate-400">{abierto ? t("Abierto en el editor") : t("Documento · Clic para abrir en el editor")}</span>
       </span>
       <span className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold ${abierto ? 'bg-[#ab0433] text-white' : 'bg-slate-100 text-slate-600 group-hover/doc:bg-slate-200'}`}>
-        {abierto ? 'Abierto' : 'Abrir'}
+        {abierto ? t("Abierto") : t("Abrir")}
       </span>
     </button>
   );
@@ -135,19 +136,17 @@ function ActionProposalCard({ proposal, onConfirm, onCancel }: {
     <div className={`rounded-xl border p-3 text-[12px] ${boxCls}`}>
       <p className="font-semibold text-slate-700">{proposal.titulo}</p>
       <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
-      {proposal.resolved === 'confirmed' && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700">✓ Hecho</p>}
-      {proposal.resolved === 'cancelled' && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
-      {proposal.resolved === 'error' && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || 'No se pudo completar.'}</p>}
+      {proposal.resolved === 'confirmed' && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700">{t("✓ Hecho")}</p>}
+      {proposal.resolved === 'cancelled' && <p className="mt-1.5 text-slate-400">{t("Cancelado.")}</p>}
+      {proposal.resolved === 'error' && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || t("No se pudo completar.")}</p>}
       {!proposal.resolved && (
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={proposal.resolving} onClick={onConfirm}
             className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 disabled:opacity-50">
-            {proposal.resolving ? 'Aplicando…' : 'Confirmar'}
+            {proposal.resolving ? t("Aplicando…") : t("Confirmar")}
           </button>
           <button type="button" disabled={proposal.resolving} onClick={onCancel}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50">
-            Cancelar
-          </button>
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50">{t("Cancelar")}</button>
         </div>
       )}
     </div>
@@ -408,7 +407,7 @@ export default function ChatIA() {
     });
     if (!res.ok || !res.body) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
+      throw new Error(data.error || t("HTTP {status}", { status: res.status }));
     }
 
     // Revelado suave: Gemini no manda el texto letra a letra, sino en trozos de
@@ -478,7 +477,7 @@ export default function ChatIA() {
           } else if (evt.type === 'done') {
             finalReply = evt.reply;
           } else if (evt.type === 'error') {
-            throw new Error(evt.message || 'Error al generar la respuesta.');
+            throw new Error(evt.message || t("Error al generar la respuesta."));
           }
         }
       }
@@ -502,7 +501,7 @@ export default function ChatIA() {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo completar la acción.');
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo completar la acción."));
       setMessages(prev => prev.map((m, i) => (i !== msgIdx ? m : {
         ...m, actionProposals: m.actionProposals?.map(a => (a.token === actionToken
           ? { ...a, resolving: false, resolved: decision === 'confirm' ? 'confirmed' : 'cancelled' } : a)),
@@ -616,7 +615,7 @@ export default function ChatIA() {
     if (!file) return;
     setAttachError(null);
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      setAttachError(`"${file.name}" pesa demasiado (máx. ${Math.round(MAX_ATTACHMENT_BYTES / 1000)} KB de texto).`);
+      setAttachError(t("\"{name}\" pesa demasiado (máx. {round} KB de texto).", { name: file.name, round: Math.round(MAX_ATTACHMENT_BYTES / 1000) }));
       setTimeout(() => setAttachError(null), 4000);
       return;
     }
@@ -624,7 +623,7 @@ export default function ChatIA() {
       const content = await file.text();
       setAttachedFile({ name: file.name, content });
     } catch {
-      setAttachError(`No se pudo leer "${file.name}".`);
+      setAttachError(t("No se pudo leer \"{name}\".", { name: file.name }));
       setTimeout(() => setAttachError(null), 4000);
     }
   };
@@ -858,8 +857,8 @@ export default function ChatIA() {
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800 leading-tight tracking-tight">Vantia</p>
-                <p className="text-[10px] text-slate-400 leading-tight">Legal Pro · Gemini 2.5</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight tracking-tight">{t("Vantia")}</p>
+                <p className="text-[10px] text-slate-400 leading-tight">{t("Legal Pro · Gemini 2.5")}</p>
               </div>
             </div>
 
@@ -867,9 +866,7 @@ export default function ChatIA() {
               onClick={() => newConversation()}
               className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 active:scale-[.97] text-white text-sm font-medium rounded-xl py-2.5 px-4 transition-all duration-150 shadow-sm shadow-red-200"
             >
-              <Plus className="h-4 w-4" />
-              Nuevo Chat
-            </button>
+              <Plus className="h-4 w-4" />{t("Nuevo Chat")}</button>
           </div>
 
           <div className="h-px bg-slate-100 mx-4" />
@@ -890,8 +887,8 @@ export default function ChatIA() {
                 <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
                   <MessageSquare className="h-5 w-5 opacity-40" />
                 </div>
-                <p className="text-xs font-medium">Sin conversaciones</p>
-                <p className="text-[10px] text-slate-300 mt-0.5">Empieza un nuevo chat</p>
+                <p className="text-xs font-medium">{t("Sin conversaciones")}</p>
+                <p className="text-[10px] text-slate-300 mt-0.5">{t("Empieza un nuevo chat")}</p>
               </div>
             ) : (
               groups.map(group => (
@@ -952,7 +949,7 @@ export default function ChatIA() {
           {/* Topbar */}
           <div className="cia-topbar shrink-0 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 border-b border-slate-100 bg-white/90 backdrop-blur-sm z-10">
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <button type="button" onClick={() => setConvsAbiertas(true)} title="Conversaciones"
+              <button type="button" onClick={() => setConvsAbiertas(true)} title={t("Conversaciones")}
                 className="md:hidden shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50">
                 <Menu className="h-4 w-4" />
               </button>
@@ -960,7 +957,7 @@ export default function ChatIA() {
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-sm font-bold text-slate-800 leading-tight">Vantia Legal Pro</h1>
+                <h1 className="truncate text-sm font-bold text-slate-800 leading-tight">{t("Vantia Legal Pro")}</h1>
                 <div className="relative mt-0.5" ref={modelPickerRef}>
                   <button
                     onClick={() => setShowModelPicker(v => !v)}
@@ -969,7 +966,7 @@ export default function ChatIA() {
                     <span className="relative h-1.5 w-1.5 inline-block cia-ring">
                       <span className="block h-1.5 w-1.5 rounded-full bg-green-500" />
                     </span>
-                    <span className="truncate">En línea · {activeModel.label}</span>
+                    <span className="truncate">{t("En línea ·")}{" "}{activeModel.label}</span>
                     <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showModelPicker ? 'rotate-180' : ''}`} />
                   </button>
                   {showModelPicker && (
@@ -995,7 +992,7 @@ export default function ChatIA() {
                   className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>Copiar chat</span>
+                  <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>{t("Copiar chat")}</span>
                 </button>
               )}
               {docsChat.length > 0 && (
@@ -1003,17 +1000,17 @@ export default function ChatIA() {
                   <button
                     onClick={() => setVerDocsChat(v => !v)}
                     className={`flex items-center gap-1.5 text-xs border px-3 py-1.5 rounded-lg transition-all active:scale-95 ${verDocsChat || docAbierto ? 'border-[#ab0433]/40 bg-red-50 text-[#ab0433]' : 'text-slate-500 hover:text-slate-800 border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
-                    title="Documentos creados en esta conversación"
+                    title={t("Documentos creados en esta conversación")}
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Documentos</span>
+                    <span className="hidden sm:inline">{t("Documentos")}</span>
                     <span className="rounded-full bg-white/80 px-1.5 text-[10px] font-bold">{docsChat.length}</span>
                   </button>
                   {verDocsChat && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setVerDocsChat(false)} />
                       <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-                        <p className="border-b border-slate-100 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Documentos de este chat</p>
+                        <p className="border-b border-slate-100 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Documentos de este chat")}</p>
                         <div className="max-h-72 overflow-y-auto py-1">
                           {docsChat.map(d => (
                             <button key={d.id} onClick={() => { setDocAbierto(d.id); setVerDocsChat(false); }}
@@ -1033,7 +1030,7 @@ export default function ChatIA() {
                 className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
               >
                 <History className="h-3.5 w-3.5" />
-                <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>Historial</span>
+                <span className={docAbierto ? "hidden 2xl:inline" : "hidden sm:inline"}>{t("Historial")}</span>
               </button>
               <div className="relative" ref={topMenuRef}>
                 <button
@@ -1050,16 +1047,12 @@ export default function ChatIA() {
                       disabled={messages.length === 0}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors disabled:opacity-40"
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      Exportar conversación (.txt)
-                    </button>
+                      <Download className="h-3.5 w-3.5" />{t("Exportar conversación (.txt)")}</button>
                     <button
                       onClick={deleteCurrentConversation}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Eliminar esta conversación
-                    </button>
+                      <Trash2 className="h-3.5 w-3.5" />{t("Eliminar esta conversación")}</button>
                   </div>
                 )}
               </div>
@@ -1081,12 +1074,8 @@ export default function ChatIA() {
                     </div>
                   </div>
 
-                  <h2 className="text-2xl font-bold text-slate-800 mb-2 cia-fade-up" style={{animationDelay:'.12s'}}>
-                    ¿En qué puedo ayudarte?
-                  </h2>
-                  <p className="text-sm text-slate-400 max-w-xs mb-8 cia-fade-up" style={{animationDelay:'.2s'}}>
-                    Tu asistente jurídico con acceso real a los datos del despacho.
-                  </p>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2 cia-fade-up" style={{animationDelay:'.12s'}}>{t("¿En qué puedo ayudarte?")}</h2>
+                  <p className="text-sm text-slate-400 max-w-xs mb-8 cia-fade-up" style={{animationDelay:'.2s'}}>{t("Tu asistente jurídico con acceso real a los datos del despacho.")}</p>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full max-w-xl">
                     {PROMPTS.map(({ icon, label, text }, i) => (
@@ -1195,13 +1184,13 @@ export default function ChatIA() {
                     <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${msg.role==='user'?'flex-row-reverse':''}`}>
                       <button onClick={() => copyText(msg.text, idx)}
                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors active:scale-95"
-                        title="Copiar">
+                        title={t("Copiar")}>
                         <Copy className="h-3.5 w-3.5" />
                       </button>
                       {msg.role === 'model' && idx === messages.length - 1 && !sending && (
                         <button onClick={regenerate}
                           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors active:scale-95"
-                          title="Regenerar">
+                          title={t("Regenerar")}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </button>
                       )}
@@ -1210,21 +1199,19 @@ export default function ChatIA() {
                           <button onClick={() => rateMessage(idx, 'up')}
                             className={`p-1.5 rounded-lg transition-colors active:scale-95 ${
                               feedback[idx] === 'up' ? 'text-green-600 bg-green-50' : 'text-slate-300 hover:bg-slate-100 hover:text-green-500'
-                            }`} title="Útil">
+                            }`} title={t("Útil")}>
                             <ThumbsUp className="h-3.5 w-3.5" fill={feedback[idx] === 'up' ? 'currentColor' : 'none'} />
                           </button>
                           <button onClick={() => rateMessage(idx, 'down')}
                             className={`p-1.5 rounded-lg transition-colors active:scale-95 ${
                               feedback[idx] === 'down' ? 'text-red-600 bg-red-50' : 'text-slate-300 hover:bg-slate-100 hover:text-red-400'
-                            }`} title="No útil">
+                            }`} title={t("No útil")}>
                             <ThumbsDown className="h-3.5 w-3.5" fill={feedback[idx] === 'down' ? 'currentColor' : 'none'} />
                           </button>
                         </>
                       )}
                       {copiedIdx === idx && (
-                        <span className="text-[10px] text-green-600 font-medium px-1.5 py-0.5 bg-green-50 rounded-md">
-                          ¡Copiado!
-                        </span>
+                        <span className="text-[10px] text-green-600 font-medium px-1.5 py-0.5 bg-green-50 rounded-md">{t("¡Copiado!")}</span>
                       )}
                     </div>
                   </div>
@@ -1277,7 +1264,7 @@ export default function ChatIA() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95 shrink-0 mb-0.5"
-                    title="Adjuntar archivo de texto"
+                    title={t("Adjuntar archivo de texto")}
                   >
                     <Paperclip className="h-4 w-4" />
                   </button>
@@ -1289,8 +1276,8 @@ export default function ChatIA() {
                     onChange={e => { setInput(e.target.value); autoResize(e.target); }}
                     onKeyDown={handleKey}
                     placeholder={activeModuleId
-                      ? 'Escribe un mensaje… (↵ enviar · ⇧↵ nueva línea)'
-                      : 'Inicia una conversación con Vantia…'}
+                      ? t("Escribe un mensaje… (↵ enviar · ⇧↵ nueva línea)")
+                      : t("Inicia una conversación con Vantia…")}
                     className="flex-1 resize-none bg-transparent outline-none focus:shadow-none text-sm text-slate-700 placeholder:text-slate-300 leading-relaxed py-0.5"
                     style={{ maxHeight: 152, overflowY: 'auto' }}
                     disabled={sending}
@@ -1303,7 +1290,7 @@ export default function ChatIA() {
                         className={`p-2 rounded-xl transition-colors active:scale-95 ${
                           linkedExpediente ? 'text-red-600 bg-red-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
                         }`}
-                        title="Vincular expediente"
+                        title={t("Vincular expediente")}
                       >
                         <Link2 className="h-4 w-4" />
                       </button>
@@ -1315,7 +1302,7 @@ export default function ChatIA() {
                               autoFocus
                               value={linkQuery}
                               onChange={e => setLinkQuery(e.target.value)}
-                              placeholder="Buscar expediente…"
+                              placeholder={t("Buscar expediente…")}
                               className="flex-1 min-w-0 bg-transparent outline-none focus:shadow-none text-xs text-slate-700 placeholder:text-slate-400"
                             />
                           </div>
@@ -1323,7 +1310,7 @@ export default function ChatIA() {
                             {linkSearching ? (
                               <div className="px-2.5 py-3 text-center"><Loader2 className="h-4 w-4 mx-auto text-slate-300 cia-spin" /></div>
                             ) : linkResults.length === 0 ? (
-                              <p className="px-2.5 py-3 text-center text-xs text-slate-400">Sin resultados</p>
+                              <p className="px-2.5 py-3 text-center text-xs text-slate-400">{t("Sin resultados")}</p>
                             ) : (
                               linkResults.map(exp => (
                                 <button
@@ -1350,7 +1337,7 @@ export default function ChatIA() {
                             ? 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-sm shadow-red-200 hover:shadow-md'
                             : 'bg-slate-200 cursor-not-allowed'
                       }`}
-                      title={sending ? 'Detener' : 'Enviar'}
+                      title={sending ? t("Detener") : t("Enviar")}
                     >
                       {sending ? <StopCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                     </button>
@@ -1358,9 +1345,7 @@ export default function ChatIA() {
                 </div>
 
                 <div className="px-4 pb-2.5">
-                  <p className="text-[10px] text-slate-300 text-center">
-                    Vantia puede cometer errores · Verifica información crítica antes de actuar
-                  </p>
+                  <p className="text-[10px] text-slate-300 text-center">{t("Vantia puede cometer errores · Verifica información crítica antes de actuar")}</p>
                 </div>
               </div>
             </div>

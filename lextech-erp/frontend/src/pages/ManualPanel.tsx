@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search, X } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // ── Bloques reutilizables para reproducir el manual ─────────────
 
@@ -167,48 +168,40 @@ export default function ManualPanel() {
       <div className="sticky top-0 z-10 -mx-1 mb-6 bg-[#f4f6f8] px-1 pb-2 pt-1">
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar en el manual (p. ej. vistas, plazos, oscuro)…"
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("Buscar en el manual (p. ej. vistas, plazos, oscuro)…")}
             className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm outline-none focus:border-red-300" />
           {busqueda && (
-            <button type="button" onClick={() => setBusqueda("")} aria-label="Borrar búsqueda" className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={() => setBusqueda("")} aria-label={t("Borrar búsqueda")} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600">
               <X size={14} />
             </button>
           )}
         </div>
-        {sinResultados && <p className="mt-2 text-xs text-slate-500">No hay nada en el manual sobre «{busqueda}».</p>}
+        {sinResultados && <p className="mt-2 text-xs text-slate-500">{t("No hay nada en el manual sobre «")}{busqueda}».</p>}
       </div>
       {/* ── Portada ── */}
       <div className="mb-10 rounded-3xl border border-slate-200 bg-white p-8">
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Manual de usuario · Versión 2.0 · octubre de 2026</p>
-        <h1 className="mt-2 font-serif text-3xl font-bold text-slate-900">
-          Vantia Legis
-          <br />
-          Guía completa del ERP legal
-        </h1>
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-500">
-          Todo lo que necesita el equipo del despacho para gestionar clientes, expedientes, agenda, facturación,
-          documentación y comunicaciones desde una sola plataforma, con el apoyo del asistente de inteligencia
-          artificial Vantia.
-        </p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{t("Manual de usuario · Versión 2.0 · octubre de 2026")}</p>
+        <h1 className="mt-2 font-serif text-3xl font-bold text-slate-900">{t("Vantia Legis")}<br />{t("Guía completa del ERP legal")}</h1>
+        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-500">{t("Todo lo que necesita el equipo del despacho para gestionar clientes, expedientes, agenda, facturación, documentación y comunicaciones desde una sola plataforma, con el apoyo del asistente de inteligencia artificial Vantia.")}</p>
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
           <div>
-            <p className="text-sm font-bold text-slate-800">21 capítulos</p>
-            <p className="text-xs text-slate-400">De la primera sesión a la auditoría de uso</p>
+            <p className="text-sm font-bold text-slate-800">{t("21 capítulos")}</p>
+            <p className="text-xs text-slate-400">{t("De la primera sesión a la auditoría de uso")}</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">10 módulos operativos</p>
-            <p className="text-xs text-slate-400">Clientes, expedientes, agenda, tareas, facturación…</p>
+            <p className="text-sm font-bold text-slate-800">{t("10 módulos operativos")}</p>
+            <p className="text-xs text-slate-400">{t("Clientes, expedientes, agenda, tareas, facturación…")}</p>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">Perfil de lectura</p>
-            <p className="text-xs text-slate-400">Abogados, procuradores y personal administrativo</p>
+            <p className="text-sm font-bold text-slate-800">{t("Perfil de lectura")}</p>
+            <p className="text-xs text-slate-400">{t("Abogados, procuradores y personal administrativo")}</p>
           </div>
         </div>
       </div>
 
       {/* ── Índice ── */}
       <div className="mb-10 rounded-3xl border border-slate-200 bg-white p-6">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-800">Índice</h3>
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-800">{t("Índice")}</h3>
         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
           {TOC.map((c) => (
             <a
@@ -226,50 +219,21 @@ export default function ManualPanel() {
       </div>
 
       {/* ── 01 Introducción a Vantia ── */}
-      <Chapter n="01" title="Introducción a Vantia">
-        <P>
-          Vantia (también identificada internamente como LexTech AI ERP) es el sistema de gestión del despacho: reúne
-          en una sola aplicación la ficha de cada cliente y expediente, el calendario, las tareas con plazo, la
-          facturación, el correo, WhatsApp, el chat interno y un buscador jurídico, y añade sobre todo ello un
-          asistente de inteligencia artificial que conoce los datos reales del despacho.
-        </P>
-        <P>
-          Este manual describe, módulo por módulo, qué puede hacer cada persona del equipo dentro de la aplicación:
-          qué ve, qué botones tiene disponibles y qué flujo de trabajo debe seguir para completar las tareas más
-          habituales de un despacho de abogados: dar de alta un cliente, abrir un expediente, programar una vista,
-          facturar una provisión de fondos o responder un correo sin salir de Vantia.
-        </P>
-        <Callout tone="green" label="Cómo usar este manual">
-          Los capítulos 4 a 13 corresponden uno a uno con los módulos del menú lateral de la aplicación, en el mismo
-          orden en que aparecen agrupados dentro de Vantia. Puede leerlos en orden o ir directamente al módulo que
-          necesite desde el índice de la izquierda.
-        </Callout>
-        <SubHeading>¿Para quién es Vantia?</SubHeading>
-        <P>
-          La aplicación está pensada para todo el personal del despacho: abogados y abogadas que llevan expedientes,
-          procuradores, personal administrativo que gestiona la agenda y la facturación, y responsables del despacho
-          que necesitan una visión de conjunto y trazabilidad de lo que ocurre en el sistema.
-        </P>
+      <Chapter n="01" title={t("Introducción a Vantia")}>
+        <P>{t("Vantia (también identificada internamente como LexTech AI ERP) es el sistema de gestión del despacho: reúne en una sola aplicación la ficha de cada cliente y expediente, el calendario, las tareas con plazo, la facturación, el correo, WhatsApp, el chat interno y un buscador jurídico, y añade sobre todo ello un asistente de inteligencia artificial que conoce los datos reales del despacho.")}</P>
+        <P>{t("Este manual describe, módulo por módulo, qué puede hacer cada persona del equipo dentro de la aplicación: qué ve, qué botones tiene disponibles y qué flujo de trabajo debe seguir para completar las tareas más habituales de un despacho de abogados: dar de alta un cliente, abrir un expediente, programar una vista, facturar una provisión de fondos o responder un correo sin salir de Vantia.")}</P>
+        <Callout tone="green" label={t("Cómo usar este manual")}>{t("Los capítulos 4 a 13 corresponden uno a uno con los módulos del menú lateral de la aplicación, en el mismo orden en que aparecen agrupados dentro de Vantia. Puede leerlos en orden o ir directamente al módulo que necesite desde el índice de la izquierda.")}</Callout>
+        <SubHeading>{t("¿Para quién es Vantia?")}</SubHeading>
+        <P>{t("La aplicación está pensada para todo el personal del despacho: abogados y abogadas que llevan expedientes, procuradores, personal administrativo que gestiona la agenda y la facturación, y responsables del despacho que necesitan una visión de conjunto y trazabilidad de lo que ocurre en el sistema.")}</P>
       </Chapter>
 
       {/* ── 02 Acceso y navegación general ── */}
-      <Chapter n="02" title="Acceso y navegación general">
-        <P>
-          Estos elementos son comunes a toda la aplicación: aparecen en cualquier módulo en el que se encuentre, y
-          conviene conocerlos bien antes de entrar en el detalle de cada sección.
-        </P>
-        <SubHeading>2.1 Iniciar sesión</SubHeading>
-        <P>
-          Al abrir Vantia sin haber iniciado sesión, se muestra la página de acceso: a la derecha, el formulario de
-          inicio de sesión; a la izquierda, un panel de marca con citas de juristas y tres características del
-          producto (cifrado extremo a extremo, extracción de expedientes con IA y trazabilidad total). Si ya tiene
-          una sesión activa en el navegador, verá directamente un botón «Entrar al dashboard».
-        </P>
-        <SubHeading>2.2 El menú lateral</SubHeading>
-        <P>
-          La barra lateral izquierda es el punto de partida para moverse por la aplicación. Puede plegarse para
-          ganar espacio de pantalla y se organiza en tres bloques:
-        </P>
+      <Chapter n="02" title={t("Acceso y navegación general")}>
+        <P>{t("Estos elementos son comunes a toda la aplicación: aparecen en cualquier módulo en el que se encuentre, y conviene conocerlos bien antes de entrar en el detalle de cada sección.")}</P>
+        <SubHeading>{t("2.1 Iniciar sesión")}</SubHeading>
+        <P>{t("Al abrir Vantia sin haber iniciado sesión, se muestra la página de acceso: a la derecha, el formulario de inicio de sesión; a la izquierda, un panel de marca con citas de juristas y tres características del producto (cifrado extremo a extremo, extracción de expedientes con IA y trazabilidad total). Si ya tiene una sesión activa en el navegador, verá directamente un botón «Entrar al dashboard».")}</P>
+        <SubHeading>{t("2.2 El menú lateral")}</SubHeading>
+        <P>{t("La barra lateral izquierda es el punto de partida para moverse por la aplicación. Puede plegarse para ganar espacio de pantalla y se organiza en tres bloques:")}</P>
         <InfoTable
           headers={["Bloque", "Módulos"]}
           rows={[
@@ -278,72 +242,32 @@ export default function ManualPanel() {
             ["Gestión", "Tesorería (facturación), Documental, Chat IA"],
           ]}
         />
-        <P>
-          En la parte inferior de la barra lateral encontrará el selector de despacho/empresa (si trabaja con
-          varios), su perfil de usuario con la opción de cerrar sesión, el acceso a Configuración y una insignia de
-          «Conexión Segura». Los iconos de Chat, WhatsApp y Correo muestran una burbuja roja con el número de
-          mensajes no leídos.
-        </P>
-        <SubHeading>2.3 Buscador global y notificaciones</SubHeading>
-        <P>
-          En la cabecera superior, el buscador global permite escribir el nombre de cualquier módulo (por ejemplo
-          «factura» o «agenda») y saltar directamente a él sin usar el menú lateral. Junto al buscador, el icono de
-          campana abre el panel de notificaciones, que agrupa avisos de chat, correo y WhatsApp con la indicación de
-          cuánto tiempo hace que llegaron.
-        </P>
-        <SubHeading>2.4 El widget Vantia</SubHeading>
-        <P>
-          En la esquina inferior derecha, visible en cualquier pantalla de la aplicación, hay un botón circular rojo
-          que abre el asistente de inteligencia artificial Vantia. Se explica en detalle en el capítulo 13, pero
-          conviene saber desde ya que está siempre a mano: cambia de «especialidad» según el módulo en el que se
-          encuentre (especialista en clientes, en expedientes, en agenda, en correo…) y puede consultar datos reales
-          del despacho para responder.
-        </P>
-        <SubHeading>2.5 Atajos personalizados</SubHeading>
-        <P>
-          Desde los módulos de Clientes y Expedientes, el sistema de Atajos permite crear accesos rápidos que
-          combinan una acción habitual (enviar correo, SMS o WhatsApp, imprimir, generar un PDF, crear una tarea,
-          dar de alta o cerrar un expediente, solicitar documentación o provisión de fondos, enviar a firma…) con
-          una plantilla y, si procede, una carpeta de archivo concreta. Un atajo bien configurado convierte un
-          proceso de varios pasos en un solo clic.
-        </P>
-        <Callout tone="green" label="Consejo">
-          Si su despacho repite a menudo el mismo trámite (por ejemplo, «enviar hoja de encargo y crear tarea de
-          seguimiento a 15 días»), merece la pena invertir cinco minutos en crear un atajo la primera vez: se
-          amortiza rápidamente.
-        </Callout>
+        <P>{t("En la parte inferior de la barra lateral encontrará el selector de despacho/empresa (si trabaja con varios), su perfil de usuario con la opción de cerrar sesión, el acceso a Configuración y una insignia de «Conexión Segura». Los iconos de Chat, WhatsApp y Correo muestran una burbuja roja con el número de mensajes no leídos.")}</P>
+        <SubHeading>{t("2.3 Buscador global y notificaciones")}</SubHeading>
+        <P>{t("En la cabecera superior, el buscador global permite escribir el nombre de cualquier módulo (por ejemplo «factura» o «agenda») y saltar directamente a él sin usar el menú lateral. Junto al buscador, el icono de campana abre el panel de notificaciones, que agrupa avisos de chat, correo y WhatsApp con la indicación de cuánto tiempo hace que llegaron.")}</P>
+        <SubHeading>{t("2.4 El widget Vantia")}</SubHeading>
+        <P>{t("En la esquina inferior derecha, visible en cualquier pantalla de la aplicación, hay un botón circular rojo que abre el asistente de inteligencia artificial Vantia. Se explica en detalle en el capítulo 13, pero conviene saber desde ya que está siempre a mano: cambia de «especialidad» según el módulo en el que se encuentre (especialista en clientes, en expedientes, en agenda, en correo…) y puede consultar datos reales del despacho para responder.")}</P>
+        <SubHeading>{t("2.5 Atajos personalizados")}</SubHeading>
+        <P>{t("Desde los módulos de Clientes y Expedientes, el sistema de Atajos permite crear accesos rápidos que combinan una acción habitual (enviar correo, SMS o WhatsApp, imprimir, generar un PDF, crear una tarea, dar de alta o cerrar un expediente, solicitar documentación o provisión de fondos, enviar a firma…) con una plantilla y, si procede, una carpeta de archivo concreta. Un atajo bien configurado convierte un proceso de varios pasos en un solo clic.")}</P>
+        <Callout tone="green" label={t("Consejo")}>{t("Si su despacho repite a menudo el mismo trámite (por ejemplo, «enviar hoja de encargo y crear tarea de seguimiento a 15 días»), merece la pena invertir cinco minutos en crear un atajo la primera vez: se amortiza rápidamente.")}</Callout>
       </Chapter>
 
       {/* ── 03 Panel principal ── */}
-      <Chapter n="03" title="Panel principal">
-        <P>
-          El Dashboard es la pantalla de inicio tras acceder a Vantia: un resumen configurable de lo que está
-          pasando en el despacho hoy.
-        </P>
-        <SubHeading>3.1 Cabecera y altas rápidas</SubHeading>
-        <P>
-          En la parte superior del panel encontrará un saludo personalizado según la hora del día y un pequeño
-          widget de clima basado en su ubicación. Junto a él, dos botones concentran las altas más frecuentes:
-        </P>
+      <Chapter n="03" title={t("Panel principal")}>
+        <P>{t("El Dashboard es la pantalla de inicio tras acceder a Vantia: un resumen configurable de lo que está pasando en el despacho hoy.")}</P>
+        <SubHeading>{t("3.1 Cabecera y altas rápidas")}</SubHeading>
+        <P>{t("En la parte superior del panel encontrará un saludo personalizado según la hora del día y un pequeño widget de clima basado en su ubicación. Junto a él, dos botones concentran las altas más frecuentes:")}</P>
         <Bullets
           items={[
             <>
-              <strong>Nuevo Cliente</strong>, con tres opciones: crear manualmente, dar de alta con lectura de DNI
-              (OCR) o generar un enlace para que el propio cliente rellene sus datos.
-            </>,
+              <strong>{t("Nuevo Cliente")}</strong>{t(", con tres opciones: crear manualmente, dar de alta con lectura de DNI (OCR) o generar un enlace para que el propio cliente rellene sus datos.")}</>,
             <>
-              <strong>Nuevo Expediente</strong>, con tres opciones: crear manualmente, importar desde un archivo
-              CSV, o crear automáticamente a partir de un conjunto de documentos mediante inteligencia artificial.
-            </>,
+              <strong>{t("Nuevo Expediente")}</strong>{t(", con tres opciones: crear manualmente, importar desde un archivo CSV, o crear automáticamente a partir de un conjunto de documentos mediante inteligencia artificial.")}</>,
           ]}
         />
-        <P>Estas mismas opciones se detallan paso a paso en los capítulos 4 y 5.</P>
-        <SubHeading>3.2 Widgets configurables</SubHeading>
-        <P>
-          El cuerpo del panel es una cuadrícula de widgets que usted mismo elige y ordena, mediante el menú «···» →
-          Elegir elementos. Puede arrastrarlos para reordenarlos; la selección y la disposición se guardan por
-          usuario, de modo que cada persona del despacho puede tener su propio panel.
-        </P>
+        <P>{t("Estas mismas opciones se detallan paso a paso en los capítulos 4 y 5.")}</P>
+        <SubHeading>{t("3.2 Widgets configurables")}</SubHeading>
+        <P>{t("El cuerpo del panel es una cuadrícula de widgets que usted mismo elige y ordena, mediante el menú «···» → Elegir elementos. Puede arrastrarlos para reordenarlos; la selección y la disposición se guardan por usuario, de modo que cada persona del despacho puede tener su propio panel.")}</P>
         <InfoTable
           headers={["Widget", "Qué muestra"]}
           rows={[
@@ -360,413 +284,232 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 04 Clientes ── */}
-      <Chapter n="04" title="Clientes">
-        <P>
-          El módulo de Clientes centraliza la ficha de cada persona o empresa con la que trabaja el despacho, con
-          tres formas distintas de darla de alta y un conjunto de herramientas heredado de los programas de gestión
-          clásicos.
-        </P>
-        <SubHeading>4.1 Listado de clientes</SubHeading>
-        <P>
-          La pantalla principal muestra el contador de clientes totales, activos y de baja, y una barra de
-          herramientas con las acciones disponibles sobre el registro seleccionado: Alta (manual, con DNI o con
-          enlace), Baja, Modificar, Enviar Correo, Enviar WhatsApp, Sign (firma electrónica), Tareas, Adjuntos,
-          Imprimir, Excel y Atajos.
-        </P>
-        <P>
-          El menú Opciones añade funciones adicionales: marcar opciones como favoritas, elegir qué columnas se
-          muestran en la tabla, ir directamente a la ficha, a los expedientes o a las notas del cliente, asignar un
-          color al registro, crear un recall, duplicar o fusionar clientes, enviar un SMS y comparar versiones
-          anteriores del registro.
-        </P>
-        <P>
-          Puede combinar varios filtros a la vez y alternar entre tres vistas: listado simple, listado con detalle
-          expandible, o selección múltiple para aplicar una acción a varios clientes a la vez.
-        </P>
-        <SubHeading>4.2 Exportar a Excel</SubHeading>
-        <P>
-          Al exportar, usted elige qué columnas incluir y puede guardar esa selección como una plantilla de
-          exportación reutilizable, para no tener que configurar las columnas cada vez que necesite el mismo tipo de
-          listado.
-        </P>
-        <SubHeading>4.3 Dar de alta un cliente</SubHeading>
-        <P>Vantia ofrece tres caminos para crear un cliente nuevo, pensados para situaciones distintas:</P>
-        <p className="!mt-6 text-sm font-bold text-slate-800">A. Alta manual</p>
+      <Chapter n="04" title={t("Clientes")}>
+        <P>{t("El módulo de Clientes centraliza la ficha de cada persona o empresa con la que trabaja el despacho, con tres formas distintas de darla de alta y un conjunto de herramientas heredado de los programas de gestión clásicos.")}</P>
+        <SubHeading>{t("4.1 Listado de clientes")}</SubHeading>
+        <P>{t("La pantalla principal muestra el contador de clientes totales, activos y de baja, y una barra de herramientas con las acciones disponibles sobre el registro seleccionado: Alta (manual, con DNI o con enlace), Baja, Modificar, Enviar Correo, Enviar WhatsApp, Sign (firma electrónica), Tareas, Adjuntos, Imprimir, Excel y Atajos.")}</P>
+        <P>{t("El menú Opciones añade funciones adicionales: marcar opciones como favoritas, elegir qué columnas se muestran en la tabla, ir directamente a la ficha, a los expedientes o a las notas del cliente, asignar un color al registro, crear un recall, duplicar o fusionar clientes, enviar un SMS y comparar versiones anteriores del registro.")}</P>
+        <P>{t("Puede combinar varios filtros a la vez y alternar entre tres vistas: listado simple, listado con detalle expandible, o selección múltiple para aplicar una acción a varios clientes a la vez.")}</P>
+        <SubHeading>{t("4.2 Exportar a Excel")}</SubHeading>
+        <P>{t("Al exportar, usted elige qué columnas incluir y puede guardar esa selección como una plantilla de exportación reutilizable, para no tener que configurar las columnas cada vez que necesite el mismo tipo de listado.")}</P>
+        <SubHeading>{t("4.3 Dar de alta un cliente")}</SubHeading>
+        <P>{t("Vantia ofrece tres caminos para crear un cliente nuevo, pensados para situaciones distintas:")}</P>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("A. Alta manual")}</p>
         <Steps
           items={[
-            <>Pulse Nuevo Cliente → Crear manualmente desde el Dashboard o desde el listado de Clientes.</>,
-            <>Rellene los datos de identificación, dirección y contacto en el formulario.</>,
-            <>Añada notas internas si lo necesita.</>,
-            <>Guarde el registro.</>,
+            <>{t("Pulse Nuevo Cliente → Crear manualmente desde el Dashboard o desde el listado de Clientes.")}</>,
+            <>{t("Rellene los datos de identificación, dirección y contacto en el formulario.")}</>,
+            <>{t("Añada notas internas si lo necesita.")}</>,
+            <>{t("Guarde el registro.")}</>,
           ]}
         />
-        <p className="!mt-6 text-sm font-bold text-slate-800">B. Alta con lectura de DNI (OCR con IA)</p>
-        <P>Pensada para cuando el cliente está físicamente en el despacho y trae su documento de identidad.</P>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("B. Alta con lectura de DNI (OCR con IA)")}</p>
+        <P>{t("Pensada para cuando el cliente está físicamente en el despacho y trae su documento de identidad.")}</P>
         <Steps
           items={[
-            <>Pulse Nuevo Cliente → Con DNI.</>,
-            <>Fotografíe o suba el anverso y el reverso del DNI, NIE, TIE o pasaporte.</>,
-            <>
-              El sistema escanea el documento y muestra los campos detectados automáticamente (nombre, apellidos,
-              NIF, fecha de nacimiento, dirección…) junto con un porcentaje de confianza de la lectura.
-            </>,
-            <>Revise y corrija los campos si es necesario: están resaltados para que sepa cuáles ha rellenado el escáner.</>,
-            <>Complete los datos de contacto que falten (teléfono, correo) y guarde el alta.</>,
+            <>{t("Pulse Nuevo Cliente → Con DNI.")}</>,
+            <>{t("Fotografíe o suba el anverso y el reverso del DNI, NIE, TIE o pasaporte.")}</>,
+            <>{t("El sistema escanea el documento y muestra los campos detectados automáticamente (nombre, apellidos, NIF, fecha de nacimiento, dirección…) junto con un porcentaje de confianza de la lectura.")}</>,
+            <>{t("Revise y corrija los campos si es necesario: están resaltados para que sepa cuáles ha rellenado el escáner.")}</>,
+            <>{t("Complete los datos de contacto que falten (teléfono, correo) y guarde el alta.")}</>,
           ]}
         />
-        <Callout tone="pink" label="Con inteligencia artificial">
-          La lectura del documento combina reconocimiento óptico de caracteres, lectura de la banda MRZ del
-          documento y visión por IA para maximizar el acierto. Aun así, el sistema siempre le deja revisar y
-          corregir antes de guardar: la IA no da el alta por usted, se la propone.
-        </Callout>
-        <p className="!mt-6 text-sm font-bold text-slate-800">C. Alta con enlace</p>
-        <P>Útil cuando el cliente no está presente y prefiere que rellene sus propios datos desde casa.</P>
+        <Callout tone="pink" label={t("Con inteligencia artificial")}>{t("La lectura del documento combina reconocimiento óptico de caracteres, lectura de la banda MRZ del documento y visión por IA para maximizar el acierto. Aun así, el sistema siempre le deja revisar y corregir antes de guardar: la IA no da el alta por usted, se la propone.")}</Callout>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("C. Alta con enlace")}</p>
+        <P>{t("Útil cuando el cliente no está presente y prefiere que rellene sus propios datos desde casa.")}</P>
         <Steps
           items={[
-            <>Vaya a Nuevo Cliente → Con enlace.</>,
-            <>Ponga una etiqueta identificativa al enlace, por ejemplo «Juan García – Divorcio».</>,
-            <>Genere el enlace: es de un solo uso y caduca a los 30 días.</>,
-            <>Envíe el enlace al cliente por el canal que prefiera (correo, WhatsApp…).</>,
-            <>
-              El cliente accede sin necesidad de cuenta a un formulario público (nombre, apellidos, correo, teléfono,
-              NIF/CIF y observaciones, con aviso de cumplimiento RGPD/LOPDGDD).
-            </>,
-            <>En cuanto lo envía, el alta aparece automáticamente en su listado de Clientes.</>,
+            <>{t("Vaya a Nuevo Cliente → Con enlace.")}</>,
+            <>{t("Ponga una etiqueta identificativa al enlace, por ejemplo «Juan García – Divorcio».")}</>,
+            <>{t("Genere el enlace: es de un solo uso y caduca a los 30 días.")}</>,
+            <>{t("Envíe el enlace al cliente por el canal que prefiera (correo, WhatsApp…).")}</>,
+            <>{t("El cliente accede sin necesidad de cuenta a un formulario público (nombre, apellidos, correo, teléfono, NIF/CIF y observaciones, con aviso de cumplimiento RGPD/LOPDGDD).")}</>,
+            <>{t("En cuanto lo envía, el alta aparece automáticamente en su listado de Clientes.")}</>,
           ]}
         />
-        <P>
-          Desde la pantalla de enlaces generados puede ver su estado (pendiente, completado o expirado), quién lo
-          completó y cuándo, copiar el enlace de nuevo o eliminarlo.
-        </P>
-        <SubHeading>4.4 Ficha del cliente</SubHeading>
-        <P>Al abrir un cliente, la información se organiza en pestañas:</P>
+        <P>{t("Desde la pantalla de enlaces generados puede ver su estado (pendiente, completado o expirado), quién lo completó y cuándo, copiar el enlace de nuevo o eliminarlo.")}</P>
+        <SubHeading>{t("4.4 Ficha del cliente")}</SubHeading>
+        <P>{t("Al abrir un cliente, la información se organiza en pestañas:")}</P>
         <Pills items={["Perfil", "Expedientes", "Adjuntos", "Agenda", "Tareas/Plazos", "Económico", "Notas", "Historial"]} />
         <Bullets
           items={[
-            <><strong>Perfil:</strong> datos de identificación, dirección y contacto, editables directamente sobre la ficha.</>,
-            <><strong>Expedientes:</strong> todos los expedientes vinculados a este cliente.</>,
+            <><strong>{t("Perfil:")}</strong>{" "}{t("datos de identificación, dirección y contacto, editables directamente sobre la ficha.")}</>,
+            <><strong>{t("Expedientes:")}</strong>{" "}{t("todos los expedientes vinculados a este cliente.")}</>,
             <>
-              <strong>Adjuntos:</strong> el gestor documental del cliente, con generación de documentos a partir de
-              plantillas del despacho ya listas para rellenar: hoja de encargo profesional, contrato de prestación
-              de servicios jurídicos, poder de representación apud acta, acuerdo de confidencialidad, cláusula de
-              protección de datos (RGPD) y requerimiento previo o carta de reclamación.
-            </>,
-            <><strong>Agenda:</strong> citas y eventos relacionados con este cliente.</>,
+              <strong>{t("Adjuntos:")}</strong>{" "}{t("el gestor documental del cliente, con generación de documentos a partir de plantillas del despacho ya listas para rellenar: hoja de encargo profesional, contrato de prestación de servicios jurídicos, poder de representación apud acta, acuerdo de confidencialidad, cláusula de protección de datos (RGPD) y requerimiento previo o carta de reclamación.")}</>,
+            <><strong>{t("Agenda:")}</strong>{" "}{t("citas y eventos relacionados con este cliente.")}</>,
             <>
-              <strong>Tareas/Plazos:</strong> tareas asociadas, que pueden vincularse además a un expediente,
-              juzgado, número de procedimiento e importe.
-            </>,
-            <><strong>Económico:</strong> facturas emitidas al cliente.</>,
-            <><strong>Notas:</strong> anotaciones internas con fecha, editables y con historial.</>,
-            <><strong>Historial:</strong> línea temporal de todos los cambios realizados sobre el registro.</>,
+              <strong>{t("Tareas/Plazos:")}</strong>{" "}{t("tareas asociadas, que pueden vincularse además a un expediente, juzgado, número de procedimiento e importe.")}</>,
+            <><strong>{t("Económico:")}</strong>{" "}{t("facturas emitidas al cliente.")}</>,
+            <><strong>{t("Notas:")}</strong>{" "}{t("anotaciones internas con fecha, editables y con historial.")}</>,
+            <><strong>{t("Historial:")}</strong>{" "}{t("línea temporal de todos los cambios realizados sobre el registro.")}</>,
           ]}
         />
       </Chapter>
 
       {/* ── 05 Expedientes ── */}
-      <Chapter n="05" title="Expedientes">
-        <P>
-          El módulo de Expedientes gestiona los casos del despacho, desde el alta hasta el cierre, con la
-          posibilidad más singular de Vantia: crear expedientes automáticamente a partir de la documentación
-          judicial recibida.
-        </P>
-        <SubHeading>5.1 Listado de expedientes</SubHeading>
-        <P>
-          Comparte la filosofía del listado de Clientes: barra de herramientas con Baja, Modificar, Enviar Correo,
-          Enviar WhatsApp, Sign, Tareas, Asociar (para vincular expedientes entre sí), Adjuntos, Excel, Imprimir,
-          Informes y Atajos; tres vistas (listado, detalle, multiselección); y una tabla configurable por columnas:
-          año, número de expediente, referencia propia, descripción, tipo, cliente, contrario, procurador, juzgado,
-          tipo de procedimiento, número de autos, NIG y estado, entre otras.
-        </P>
-        <SubHeading>5.2 Dar de alta un expediente</SubHeading>
-        <p className="!mt-6 text-sm font-bold text-slate-800">A. Alta manual</p>
-        <P>
-          Se abre un formulario completo con el tipo de expediente (judicial, extrajudicial, monitorio, obligación
-          de hacer, prejudicial, diligencias previas, penal, laboral, contencioso-administrativo u otro), la etapa
-          del procedimiento, el juzgado, las cuantías, las partes intervinientes y notas.
-        </P>
-        <p className="!mt-6 text-sm font-bold text-slate-800">B. Importación masiva por CSV</p>
-        <P>
-          Pensada para migrar un volumen de expedientes desde otro sistema o desde una hoja de cálculo, en tres
-          pasos guiados:
-        </P>
+      <Chapter n="05" title={t("Expedientes")}>
+        <P>{t("El módulo de Expedientes gestiona los casos del despacho, desde el alta hasta el cierre, con la posibilidad más singular de Vantia: crear expedientes automáticamente a partir de la documentación judicial recibida.")}</P>
+        <SubHeading>{t("5.1 Listado de expedientes")}</SubHeading>
+        <P>{t("Comparte la filosofía del listado de Clientes: barra de herramientas con Baja, Modificar, Enviar Correo, Enviar WhatsApp, Sign, Tareas, Asociar (para vincular expedientes entre sí), Adjuntos, Excel, Imprimir, Informes y Atajos; tres vistas (listado, detalle, multiselección); y una tabla configurable por columnas: año, número de expediente, referencia propia, descripción, tipo, cliente, contrario, procurador, juzgado, tipo de procedimiento, número de autos, NIG y estado, entre otras.")}</P>
+        <SubHeading>{t("5.2 Dar de alta un expediente")}</SubHeading>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("A. Alta manual")}</p>
+        <P>{t("Se abre un formulario completo con el tipo de expediente (judicial, extrajudicial, monitorio, obligación de hacer, prejudicial, diligencias previas, penal, laboral, contencioso-administrativo u otro), la etapa del procedimiento, el juzgado, las cuantías, las partes intervinientes y notas.")}</P>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("B. Importación masiva por CSV")}</p>
+        <P>{t("Pensada para migrar un volumen de expedientes desde otro sistema o desde una hoja de cálculo, en tres pasos guiados:")}</P>
         <Steps
           items={[
-            <><strong>Subir archivo:</strong> seleccione el CSV con sus expedientes.</>,
-            <><strong>Configurar columnas:</strong> mapee cada columna del archivo con el campo correspondiente en Vantia.</>,
+            <><strong>{t("Subir archivo:")}</strong>{" "}{t("seleccione el CSV con sus expedientes.")}</>,
+            <><strong>{t("Configurar columnas:")}</strong>{" "}{t("mapee cada columna del archivo con el campo correspondiente en Vantia.")}</>,
             <>
-              <strong>Revisar e importar:</strong> compruebe una vista previa antes de confirmar. El sistema
-              conserva un historial de importaciones con el detalle de cualquier error encontrado.
-            </>,
+              <strong>{t("Revisar e importar:")}</strong>{" "}{t("compruebe una vista previa antes de confirmar. El sistema conserva un historial de importaciones con el detalle de cualquier error encontrado.")}</>,
           ]}
         />
-        <p className="!mt-6 text-sm font-bold text-slate-800">C. Importación desde documentos, con inteligencia artificial</p>
-        <P>
-          Esta es la vía más avanzada: en lugar de introducir los datos a mano, se le entrega el trabajo ya hecho a
-          partir de los propios documentos judiciales.
-        </P>
+        <p className="!mt-6 text-sm font-bold text-slate-800">{t("C. Importación desde documentos, con inteligencia artificial")}</p>
+        <P>{t("Esta es la vía más avanzada: en lugar de introducir los datos a mano, se le entrega el trabajo ya hecho a partir de los propios documentos judiciales.")}</P>
         <Steps
           items={[
-            <>Prepare un archivo ZIP con los documentos judiciales del caso (PDF o imágenes escaneadas).</>,
-            <>Vaya a Nuevo Expediente → Desde documentos y suba el ZIP.</>,
-            <>Siga el progreso en pantalla: «Subiendo ZIP…» y después «Procesando documentos…».</>,
-            <>
-              El sistema analiza cada documento con inteligencia artificial y crea un expediente por documento,
-              completando automáticamente tipo de procedimiento, descripción, demandantes y demandados, abogados y
-              procuradores de cada parte, juzgado, número de autos, NIG, fecha de inicio, cuantía y observaciones.
-            </>,
-            <>
-              Opcionalmente, indique un cliente y un procurador por defecto para que se asignen automáticamente a
-              todos los expedientes generados en esa importación.
-            </>,
-            <>Revise el resultado antes de darlo por definitivo, como con cualquier proceso automático.</>,
+            <>{t("Prepare un archivo ZIP con los documentos judiciales del caso (PDF o imágenes escaneadas).")}</>,
+            <>{t("Vaya a Nuevo Expediente → Desde documentos y suba el ZIP.")}</>,
+            <>{t("Siga el progreso en pantalla: «Subiendo ZIP…» y después «Procesando documentos…».")}</>,
+            <>{t("El sistema analiza cada documento con inteligencia artificial y crea un expediente por documento, completando automáticamente tipo de procedimiento, descripción, demandantes y demandados, abogados y procuradores de cada parte, juzgado, número de autos, NIG, fecha de inicio, cuantía y observaciones.")}</>,
+            <>{t("Opcionalmente, indique un cliente y un procurador por defecto para que se asignen automáticamente a todos los expedientes generados en esa importación.")}</>,
+            <>{t("Revise el resultado antes de darlo por definitivo, como con cualquier proceso automático.")}</>,
           ]}
         />
-        <Callout tone="pink" label="Con inteligencia artificial">
-          El sistema combina OCR con modelos de IA en texto y en visión, con reintentos automáticos si un documento
-          es difícil de leer. Presta especial atención a la fecha de notificación, que suele ser la más importante
-          para no perder un plazo: la busca aunque no esté explícitamente rotulada, a partir de sellos, fechas
-          manuscritas o menciones como «Notificado», «Emplazado» o «Recibido el…».
-        </Callout>
-        <SubHeading>5.3 Ficha del expediente</SubHeading>
+        <Callout tone="pink" label={t("Con inteligencia artificial")}>{t("El sistema combina OCR con modelos de IA en texto y en visión, con reintentos automáticos si un documento es difícil de leer. Presta especial atención a la fecha de notificación, que suele ser la más importante para no perder un plazo: la busca aunque no esté explícitamente rotulada, a partir de sellos, fechas manuscritas o menciones como «Notificado», «Emplazado» o «Recibido el…».")}</Callout>
+        <SubHeading>{t("5.3 Ficha del expediente")}</SubHeading>
         <Pills
           items={[
             "Datos", "Propio (clientes)", "Contrarios", "Adjuntos", "Agenda", "Actuaciones", "Tareas/Plazos",
             "Económico", "Notas", "Correo", "Conversaciones", "Historial", "Cronología",
           ]}
         />
-        <P>Dos pestañas merecen especial atención:</P>
+        <P>{t("Dos pestañas merecen especial atención:")}</P>
         <Bullets
           items={[
             <>
-              <strong>Cronología:</strong> línea de tiempo de las notificaciones judiciales del expediente (cédulas
-              de emplazamiento, providencias, autos, sentencias, diligencias de ordenación, decretos, citaciones,
-              requerimientos, exhortos…), cada una con su fecha de recepción, fecha límite y estado, y filtrable por
-              estado.
-            </>,
+              <strong>{t("Cronología:")}</strong>{" "}{t("línea de tiempo de las notificaciones judiciales del expediente (cédulas de emplazamiento, providencias, autos, sentencias, diligencias de ordenación, decretos, citaciones, requerimientos, exhortos…), cada una con su fecha de recepción, fecha límite y estado, y filtrable por estado.")}</>,
             <>
-              <strong>Historial del expediente:</strong> registro categorizado de todo lo ocurrido: altas, cierres,
-              reaperturas, cambios, notas, tareas, actuaciones, archivos, facturas, presupuestos, correos y eventos
-              de agenda vinculados.
-            </>,
+              <strong>{t("Historial del expediente:")}</strong>{" "}{t("registro categorizado de todo lo ocurrido: altas, cierres, reaperturas, cambios, notas, tareas, actuaciones, archivos, facturas, presupuestos, correos y eventos de agenda vinculados.")}</>,
           ]}
         />
-        <Callout tone="amber" label="Importante">
-          Cuando un expediente se cierra, quedan bloqueadas la edición de notificaciones, los adjuntos y las tareas
-          asociadas. Antes de cerrar un expediente, compruebe que no queda ningún plazo ni documento pendiente.
-        </Callout>
+        <Callout tone="amber" label={t("Importante")}>{t("Cuando un expediente se cierra, quedan bloqueadas la edición de notificaciones, los adjuntos y las tareas asociadas. Antes de cerrar un expediente, compruebe que no queda ningún plazo ni documento pendiente.")}</Callout>
       </Chapter>
 
       {/* ── 06 Agenda ── */}
-      <Chapter n="06" title="Agenda">
-        <P>
-          El calendario del despacho, con vista de mes, semana o día, pensado para no perder de vista vistas orales,
-          reuniones y plazos.
-        </P>
+      <Chapter n="06" title={t("Agenda")}>
+        <P>{t("El calendario del despacho, con vista de mes, semana o día, pensado para no perder de vista vistas orales, reuniones y plazos.")}</P>
         <Bullets
           items={[
-            <>Cambie entre las vistas de mes, semana y día, y reprograme un evento arrastrándolo directamente sobre el calendario.</>,
-            <>Cree un evento indicando título, fecha y hora de inicio y fin (o «todo el día»), lugar y notas.</>,
-            <>
-              Elija el tipo de evento: Cita, Vista oral, Reunión, Plazo, Llamada, Videollamada u Otro; cada tipo
-              tiene un color distintivo que puede personalizar con una paleta de 15 colores.
-            </>,
-            <>
-              En la pestaña Organización del evento, vincúlelo a un expediente existente y a un usuario del
-              despacho — muy útil para eventos ligados a un plazo procesal o a la reunión de un caso concreto.
-            </>,
-            <>Cada evento tiene un estado: pendiente, completado o cancelado.</>,
+            <>{t("Cambie entre las vistas de mes, semana y día, y reprograme un evento arrastrándolo directamente sobre el calendario.")}</>,
+            <>{t("Cree un evento indicando título, fecha y hora de inicio y fin (o «todo el día»), lugar y notas.")}</>,
+            <>{t("Elija el tipo de evento: Cita, Vista oral, Reunión, Plazo, Llamada, Videollamada u Otro; cada tipo tiene un color distintivo que puede personalizar con una paleta de 15 colores.")}</>,
+            <>{t("En la pestaña Organización del evento, vincúlelo a un expediente existente y a un usuario del despacho — muy útil para eventos ligados a un plazo procesal o a la reunión de un caso concreto.")}</>,
+            <>{t("Cada evento tiene un estado: pendiente, completado o cancelado.")}</>,
           ]}
         />
       </Chapter>
 
       {/* ── 07 Tareas y plazos ── */}
-      <Chapter n="07" title="Tareas y plazos">
-        <P>
-          El módulo de Tareas permite trabajar con listas, tablero o diagrama de tiempos, según lo que mejor se
-          adapte a cada equipo.
-        </P>
+      <Chapter n="07" title={t("Tareas y plazos")}>
+        <P>{t("El módulo de Tareas permite trabajar con listas, tablero o diagrama de tiempos, según lo que mejor se adapte a cada equipo.")}</P>
         <Bullets
           items={[
-            <><strong>Lista:</strong> vista tradicional, con filtros por estado, prioridad y búsqueda de texto, y ordenación por plazo, título o prioridad.</>,
-            <><strong>Kanban:</strong> columnas de Pendientes, Urgentes y Completadas; arrastre una tarea de columna para cambiar su estado.</>,
-            <><strong>Gantt:</strong> línea temporal de todas las tareas; arrastre la barra de una tarea para mover su plazo.</>,
+            <><strong>{t("Lista:")}</strong>{" "}{t("vista tradicional, con filtros por estado, prioridad y búsqueda de texto, y ordenación por plazo, título o prioridad.")}</>,
+            <><strong>{t("Kanban:")}</strong>{" "}{t("columnas de Pendientes, Urgentes y Completadas; arrastre una tarea de columna para cambiar su estado.")}</>,
+            <><strong>{t("Gantt:")}</strong>{" "}{t("línea temporal de todas las tareas; arrastre la barra de una tarea para mover su plazo.")}</>,
           ]}
         />
-        <P>
-          Al crear una tarea indique título, descripción o instrucciones, prioridad (alta, media o baja), tipo,
-          plazo y aviso, y —si corresponde— vincúlela a un expediente, juzgado, número de procedimiento e importe.
-          Puede marcar tareas como completadas de una en una o en lote.
-        </P>
+        <P>{t("Al crear una tarea indique título, descripción o instrucciones, prioridad (alta, media o baja), tipo, plazo y aviso, y —si corresponde— vincúlela a un expediente, juzgado, número de procedimiento e importe. Puede marcar tareas como completadas de una en una o en lote.")}</P>
       </Chapter>
 
       {/* ── 08 Facturación ── */}
-      <Chapter n="08" title="Facturación">
-        <P>El módulo económico del despacho, con conexión directa a Quipu para no llevar la contabilidad por duplicado.</P>
+      <Chapter n="08" title={t("Facturación")}>
+        <P>{t("El módulo económico del despacho, con conexión directa a Quipu para no llevar la contabilidad por duplicado.")}</P>
         <Pills items={["Dashboard", "Facturas", "Gastos", "Presupuestos", "Contactos", "Cuentas bancarias", "Cobros", "Configuración"]} />
-        <SubHeading>8.1 Conexión con Quipu</SubHeading>
+        <SubHeading>{t("8.1 Conexión con Quipu")}</SubHeading>
         <Steps
           items={[
-            <>
-              Vaya a Facturación → Configuración e introduzca las credenciales de conexión (<code>app_id</code> y{" "}
-              <code>app_secret</code>) de su cuenta de Quipu.
-            </>,
-            <>
-              Una vez conectado, un indicador de estado le confirma que la sincronización está activa; desde ahí
-              puede reconectar o desconectar la cuenta cuando lo necesite.
-            </>,
-            <>Los contactos, cuentas bancarias, movimientos y cobros se sincronizan automáticamente.</>,
+            <>{t("Vaya a Facturación → Configuración e introduzca las credenciales de conexión (")}<code>app_id</code> y{" "}
+              <code>app_secret</code>{t(") de su cuenta de Quipu.")}</>,
+            <>{t("Una vez conectado, un indicador de estado le confirma que la sincronización está activa; desde ahí puede reconectar o desconectar la cuenta cuando lo necesite.")}</>,
+            <>{t("Los contactos, cuentas bancarias, movimientos y cobros se sincronizan automáticamente.")}</>,
           ]}
         />
-        <P>
-          Las facturas creadas en Vantia pueden enviarse a Quipu, y puede abrir directamente el PDF que Quipu genera
-          para cada factura.
-        </P>
-        <SubHeading>8.2 Dar de alta una factura, gasto o presupuesto</SubHeading>
-        <P>
-          Indique el concepto, el importe base, el porcentaje de IVA y el porcentaje de IRPF: Vantia calcula los
-          totales automáticamente. Puede añadir observaciones que aparecerán impresas en la factura.
-        </P>
-        <SubHeading>8.3 Panel económico</SubHeading>
-        <P>
-          El dashboard de Facturación resume ingresos, gastos, total, IVA e IRPF a liquidar, con un selector de año
-          y de periodo (trimestre o mes concreto) para consultar cualquier momento del ejercicio.
-        </P>
+        <P>{t("Las facturas creadas en Vantia pueden enviarse a Quipu, y puede abrir directamente el PDF que Quipu genera para cada factura.")}</P>
+        <SubHeading>{t("8.2 Dar de alta una factura, gasto o presupuesto")}</SubHeading>
+        <P>{t("Indique el concepto, el importe base, el porcentaje de IVA y el porcentaje de IRPF: Vantia calcula los totales automáticamente. Puede añadir observaciones que aparecerán impresas en la factura.")}</P>
+        <SubHeading>{t("8.3 Panel económico")}</SubHeading>
+        <P>{t("El dashboard de Facturación resume ingresos, gastos, total, IVA e IRPF a liquidar, con un selector de año y de periodo (trimestre o mes concreto) para consultar cualquier momento del ejercicio.")}</P>
       </Chapter>
 
       {/* ── 09 Documental ── */}
-      <Chapter n="09" title="Documental">
-        <P>Un buscador jurídico integrado, con tres fuentes distintas en la misma pantalla.</P>
-        <SubHeading>9.1 BOE</SubHeading>
-        <P>
-          Busque por identificador oficial (por ejemplo <code>BOE-A-2020-8099</code>) o por texto libre, con filtros
-          avanzados de título, texto, rango normativo, departamento, materia y años. Cada resultado abre una ficha
-          con el rango, la fecha, el estado de consolidación y las materias de la norma, y su estructura por
-          bloques y artículos, consultables en un modal con el texto íntegro y enlaces al BOE oficial y al PDF.
-        </P>
-        <SubHeading>9.2 CENDOJ</SubHeading>
-        <P>
-          Busque jurisprudencia por texto libre y filtros avanzados de órgano judicial, tipo de resolución, ponente
-          y año. Los resultados muestran ROJ, ECLI, órgano, ponente y resumen, con enlace directo al portal oficial
-          del CGPJ. Cuando no hay una búsqueda activa, se muestran resoluciones destacadas.
-        </P>
-        <SubHeading>9.3 LexNET</SubHeading>
-        <P>
-          Panel informativo del estado de la integración con LexNET, el sistema de comunicaciones judiciales
-          electrónicas: indica si está «Preparado» o «Pendiente de configuración» (esta última requiere el
-          certificado digital del despacho), con enlace al portal oficial.
-        </P>
+      <Chapter n="09" title={t("Documental")}>
+        <P>{t("Un buscador jurídico integrado, con tres fuentes distintas en la misma pantalla.")}</P>
+        <SubHeading>{t("9.1 BOE")}</SubHeading>
+        <P>{t("Busque por identificador oficial (por ejemplo")}{" "}<code>BOE-A-2020-8099</code>{t(") o por texto libre, con filtros avanzados de título, texto, rango normativo, departamento, materia y años. Cada resultado abre una ficha con el rango, la fecha, el estado de consolidación y las materias de la norma, y su estructura por bloques y artículos, consultables en un modal con el texto íntegro y enlaces al BOE oficial y al PDF.")}</P>
+        <SubHeading>{t("9.2 CENDOJ")}</SubHeading>
+        <P>{t("Busque jurisprudencia por texto libre y filtros avanzados de órgano judicial, tipo de resolución, ponente y año. Los resultados muestran ROJ, ECLI, órgano, ponente y resumen, con enlace directo al portal oficial del CGPJ. Cuando no hay una búsqueda activa, se muestran resoluciones destacadas.")}</P>
+        <SubHeading>{t("9.3 LexNET")}</SubHeading>
+        <P>{t("Panel informativo del estado de la integración con LexNET, el sistema de comunicaciones judiciales electrónicas: indica si está «Preparado» o «Pendiente de configuración» (esta última requiere el certificado digital del despacho), con enlace al portal oficial.")}</P>
       </Chapter>
 
       {/* ── 10 Correo ── */}
-      <Chapter n="10" title="Correo">
-        <P>
-          Un cliente de correo de tres paneles, al estilo de las bandejas de entrada más habituales, integrado en el
-          propio ERP.
-        </P>
+      <Chapter n="10" title={t("Correo")}>
+        <P>{t("Un cliente de correo de tres paneles, al estilo de las bandejas de entrada más habituales, integrado en el propio ERP.")}</P>
         <Bullets
           items={[
-            <><strong>Conexión de cuentas:</strong> Gmail/Google mediante OAuth («conexión segura, sin contraseñas») o cualquier cuenta IMAP/POP3 genérica.</>,
-            <><strong>Multi-cuenta:</strong> conecte varias cuentas (Gmail e IMAP a la vez) y cambie entre ellas.</>,
+            <><strong>{t("Conexión de cuentas:")}</strong>{" "}{t("Gmail/Google mediante OAuth («conexión segura, sin contraseñas») o cualquier cuenta IMAP/POP3 genérica.")}</>,
+            <><strong>{t("Multi-cuenta:")}</strong>{" "}{t("conecte varias cuentas (Gmail e IMAP a la vez) y cambie entre ellas.")}</>,
             <>
-              <strong>Carpetas:</strong> las carpetas de sistema habituales (Bandeja de entrada, Enviados,
-              Borradores, Papelera, Destacados) y carpetas personalizadas que puede crear tanto en Vantia como en el
-              propio servidor de correo.
-            </>,
-            <><strong>Acciones sobre mensajes:</strong> redactar, responder, responder a todos, reenviar, adjuntar archivos, marcar como leído o no leído y mover a otra carpeta.</>,
+              <strong>{t("Carpetas:")}</strong>{" "}{t("las carpetas de sistema habituales (Bandeja de entrada, Enviados, Borradores, Papelera, Destacados) y carpetas personalizadas que puede crear tanto en Vantia como en el propio servidor de correo.")}</>,
+            <><strong>{t("Acciones sobre mensajes:")}</strong>{" "}{t("redactar, responder, responder a todos, reenviar, adjuntar archivos, marcar como leído o no leído y mover a otra carpeta.")}</>,
           ]}
         />
-        <P>
-          Recuerde que también puede enviar correos directamente desde la ficha de un cliente o de un expediente,
-          quedando vinculados a ese registro.
-        </P>
+        <P>{t("Recuerde que también puede enviar correos directamente desde la ficha de un cliente o de un expediente, quedando vinculados a ese registro.")}</P>
       </Chapter>
 
       {/* ── 11 WhatsApp ── */}
-      <Chapter n="11" title="WhatsApp">
-        <P>Integración con WhatsApp Cloud API para atender a los clientes por el canal que ya usan a diario.</P>
-        <SubHeading>11.1 Conectar el canal</SubHeading>
-        <P>
-          A diferencia de otras aplicaciones de mensajería, la conexión no se hace escaneando un código QR, sino
-          configurando un canal de WhatsApp Business: token de acceso, identificador del número de teléfono y
-          webhook. La pantalla de conexión muestra el estado de cada uno de estos tres elementos.
-        </P>
-        <SubHeading>11.2 Uso diario</SubHeading>
+      <Chapter n="11" title={t("WhatsApp")}>
+        <P>{t("Integración con WhatsApp Cloud API para atender a los clientes por el canal que ya usan a diario.")}</P>
+        <SubHeading>{t("11.1 Conectar el canal")}</SubHeading>
+        <P>{t("A diferencia de otras aplicaciones de mensajería, la conexión no se hace escaneando un código QR, sino configurando un canal de WhatsApp Business: token de acceso, identificador del número de teléfono y webhook. La pantalla de conexión muestra el estado de cada uno de estos tres elementos.")}</P>
+        <SubHeading>{t("11.2 Uso diario")}</SubHeading>
         <Bullets
           items={[
-            <>
-              Una vez conectado, el panel de conversaciones muestra, a la izquierda, la lista de clientes con foto,
-              último mensaje y fecha; cada conversación se vincula automáticamente al expediente del cliente si
-              existe un número interno asociado.
-            </>,
-            <>
-              La ventana de chat muestra los mensajes entrantes y salientes en burbujas, con respuestas rápidas
-              predefinidas y un campo de composición libre.
-            </>,
-            <>
-              Desde el listado de Clientes o de Expedientes puede iniciar una conversación nueva, enviar con
-              plantilla, programar un envío o abrir directamente una conversación existente.
-            </>,
+            <>{t("Una vez conectado, el panel de conversaciones muestra, a la izquierda, la lista de clientes con foto, último mensaje y fecha; cada conversación se vincula automáticamente al expediente del cliente si existe un número interno asociado.")}</>,
+            <>{t("La ventana de chat muestra los mensajes entrantes y salientes en burbujas, con respuestas rápidas predefinidas y un campo de composición libre.")}</>,
+            <>{t("Desde el listado de Clientes o de Expedientes puede iniciar una conversación nueva, enviar con plantilla, programar un envío o abrir directamente una conversación existente.")}</>,
           ]}
         />
       </Chapter>
 
       {/* ── 12 Chat interno ── */}
-      <Chapter n="12" title="Chat interno">
-        <P>
-          Un espacio de mensajería de equipo, con canales públicos, privados, mensajes directos y canales vinculados
-          a un expediente concreto.
-        </P>
+      <Chapter n="12" title={t("Chat interno")}>
+        <P>{t("Un espacio de mensajería de equipo, con canales públicos, privados, mensajes directos y canales vinculados a un expediente concreto.")}</P>
         <Steps
           items={[
-            <>Pulse crear canal y siga el asistente de dos pasos: nombre, privacidad y descripción del canal.</>,
-            <>Invite a los miembros que deban participar.</>,
-            <>Escriba con texto enriquecido (negrita, cursiva, código, enlaces), mencione a compañeros con @ y reaccione a los mensajes con emoji o GIFs.</>,
+            <>{t("Pulse crear canal y siga el asistente de dos pasos: nombre, privacidad y descripción del canal.")}</>,
+            <>{t("Invite a los miembros que deban participar.")}</>,
+            <>{t("Escriba con texto enriquecido (negrita, cursiva, código, enlaces), mencione a compañeros con @ y reaccione a los mensajes con emoji o GIFs.")}</>,
           ]}
         />
-        <P>
-          Puede fijar mensajes importantes y marcar otros como favoritos —cada uno con su propio panel para
-          encontrarlos rápido—, gestionar los miembros de un canal en cualquier momento, y salir de un canal cuando
-          ya no lo necesite.
-        </P>
-        <Callout tone="green" label="Nota">
-          Un canal vinculado a un expediente es una forma cómoda de que todo el equipo que trabaja en un caso tenga
-          una conversación aparte, sin mezclarla con el chat general del despacho.
-        </Callout>
-        <SubHeading>12.1 Tiempo real</SubHeading>
-        <P>
-          Los mensajes llegan al instante y, al enviar, el suyo aparece en la conversación en el momento: no hace
-          falta esperar. Si tarda de verdad (una imagen grande con mala conexión) verá «Enviando…», y si falla,
-          «No se ha podido enviar» con los botones Reintentar y Descartar. Las ediciones, los borrados y las
-          reacciones de los compañeros también se ven al momento.
-        </P>
-        <SubHeading>12.2 Estados</SubHeading>
-        <P>
-          Pulse su nombre, abajo a la izquierda del chat, para elegir un estado: Ocupado, No molestar, En juicio, En
-          reunión o Ausente, o escribir uno personalizado con emoji y color («⚖️ En sala 3»). Puede hacer que se
-          quite solo pasados 30 minutos, 1 hora, 4 horas o al acabar el día. Todos los compañeros ven su estado. Con
-          «No molestar», «En juicio» o «En reunión» no recibirá avisos push del chat.
-        </P>
-        <SubHeading>12.3 Foto de cada grupo</SubHeading>
-        <P>
-          Cualquier miembro de un grupo puede ponerle foto: pulse el icono del grupo en la cabecera de la
-          conversación y elija una imagen. Desde el mismo botón puede cambiarla o quitarla.
-        </P>
+        <P>{t("Puede fijar mensajes importantes y marcar otros como favoritos —cada uno con su propio panel para encontrarlos rápido—, gestionar los miembros de un canal en cualquier momento, y salir de un canal cuando ya no lo necesite.")}</P>
+        <Callout tone="green" label={t("Nota")}>{t("Un canal vinculado a un expediente es una forma cómoda de que todo el equipo que trabaja en un caso tenga una conversación aparte, sin mezclarla con el chat general del despacho.")}</Callout>
+        <SubHeading>{t("12.1 Tiempo real")}</SubHeading>
+        <P>{t("Los mensajes llegan al instante y, al enviar, el suyo aparece en la conversación en el momento: no hace falta esperar. Si tarda de verdad (una imagen grande con mala conexión) verá «Enviando…», y si falla, «No se ha podido enviar» con los botones Reintentar y Descartar. Las ediciones, los borrados y las reacciones de los compañeros también se ven al momento.")}</P>
+        <SubHeading>{t("12.2 Estados")}</SubHeading>
+        <P>{t("Pulse su nombre, abajo a la izquierda del chat, para elegir un estado: Ocupado, No molestar, En juicio, En reunión o Ausente, o escribir uno personalizado con emoji y color («⚖️ En sala 3»). Puede hacer que se quite solo pasados 30 minutos, 1 hora, 4 horas o al acabar el día. Todos los compañeros ven su estado. Con «No molestar», «En juicio» o «En reunión» no recibirá avisos push del chat.")}</P>
+        <SubHeading>{t("12.3 Foto de cada grupo")}</SubHeading>
+        <P>{t("Cualquier miembro de un grupo puede ponerle foto: pulse el icono del grupo en la cabecera de la conversación y elija una imagen. Desde el mismo botón puede cambiarla o quitarla.")}</P>
       </Chapter>
 
       {/* ── 13 Vantia ── */}
-      <Chapter n="13" title="Vantia — el asistente de inteligencia artificial">
-        <P>
-          Vantia es el asistente de IA que acompaña toda la aplicación: aparece como un widget flotante en cualquier
-          pantalla y también como un módulo de página completa, Chat IA, con historial de conversaciones.
-        </P>
-        <SubHeading>13.1 Qué puede pedirle</SubHeading>
-        <P>
-          Vantia responde siempre en español y combina conocimiento jurídico (derecho español e internacional,
-          jurisprudencia, doctrina) con la capacidad de redactar directamente contratos, escritos, demandas, correos
-          y cartas. Algunos ejemplos de lo que puede pedirle, tal y como sugiere la propia aplicación al abrir una
-          conversación nueva:
-        </P>
+      <Chapter n="13" title={t("Vantia — el asistente de inteligencia artificial")}>
+        <P>{t("Vantia es el asistente de IA que acompaña toda la aplicación: aparece como un widget flotante en cualquier pantalla y también como un módulo de página completa, Chat IA, con historial de conversaciones.")}</P>
+        <SubHeading>{t("13.1 Qué puede pedirle")}</SubHeading>
+        <P>{t("Vantia responde siempre en español y combina conocimiento jurídico (derecho español e internacional, jurisprudencia, doctrina) con la capacidad de redactar directamente contratos, escritos, demandas, correos y cartas. Algunos ejemplos de lo que puede pedirle, tal y como sugiere la propia aplicación al abrir una conversación nueva:")}</P>
         <Bullets
           items={[
             "«Resume el expediente más reciente del despacho.»",
@@ -777,42 +520,19 @@ export default function ManualPanel() {
             "«Busca jurisprudencia del TS sobre cláusulas abusivas.»",
           ]}
         />
-        <SubHeading>13.2 Un asistente que conoce los datos reales del despacho</SubHeading>
-        <Callout tone="pink" label="Con inteligencia artificial">
-          A diferencia de un chat genérico, Vantia puede consultar en tiempo real la información del despacho:
-          estadísticas generales, buscar y listar clientes, ver los expedientes de un cliente, listar expedientes,
-          tareas del usuario (incluidas las vencidas), facturas, gastos y presupuestos, próximos eventos de agenda y
-          notas internas. No inventa datos: siempre consulta la base real antes de responder.
-        </Callout>
-        <P>
-          Si está viendo la ficha de un cliente o de un expediente concreto cuando abre Vantia, el asistente ya
-          conoce esos datos y no necesita que se los repita.
-        </P>
-        <SubHeading>13.3 Especialidad según el módulo</SubHeading>
-        <P>
-          El widget flotante cambia su mensaje de bienvenida y su enfoque según dónde se encuentre: especialista en
-          Clientes, en Expedientes, en Agenda, asistente de Correo, de WhatsApp, de Documental, de Facturación, etc.
-          El historial de conversación se guarda por módulo, de modo que puede retomar cada conversación donde la
-          dejó.
-        </P>
-        <SubHeading>13.4 Chat IA (página completa)</SubHeading>
-        <P>
-          El módulo Chat IA ofrece una barra lateral con las conversaciones guardadas, agrupadas por fecha (hoy,
-          ayer, anteriores). Puede iniciar una conversación nueva, eliminarla o dejar que se renombre
-          automáticamente a partir del primer mensaje. Las respuestas admiten formato enriquecido (títulos, listas,
-          citas, bloques de código) y ofrecen acciones de copiar, valorar con «me gusta» o «no me gusta», y
-          regenerar la respuesta o reintentar si algo falla.
-        </P>
-        <Callout tone="amber" label="Importante">
-          Vantia lo indica de forma permanente en su interfaz: «La IA puede cometer errores. Verifica la
-          información.» Trate cualquier redacción o dato generado por el asistente como un primer borrador que debe
-          revisar antes de utilizarlo formalmente.
-        </Callout>
+        <SubHeading>{t("13.2 Un asistente que conoce los datos reales del despacho")}</SubHeading>
+        <Callout tone="pink" label={t("Con inteligencia artificial")}>{t("A diferencia de un chat genérico, Vantia puede consultar en tiempo real la información del despacho: estadísticas generales, buscar y listar clientes, ver los expedientes de un cliente, listar expedientes, tareas del usuario (incluidas las vencidas), facturas, gastos y presupuestos, próximos eventos de agenda y notas internas. No inventa datos: siempre consulta la base real antes de responder.")}</Callout>
+        <P>{t("Si está viendo la ficha de un cliente o de un expediente concreto cuando abre Vantia, el asistente ya conoce esos datos y no necesita que se los repita.")}</P>
+        <SubHeading>{t("13.3 Especialidad según el módulo")}</SubHeading>
+        <P>{t("El widget flotante cambia su mensaje de bienvenida y su enfoque según dónde se encuentre: especialista en Clientes, en Expedientes, en Agenda, asistente de Correo, de WhatsApp, de Documental, de Facturación, etc. El historial de conversación se guarda por módulo, de modo que puede retomar cada conversación donde la dejó.")}</P>
+        <SubHeading>{t("13.4 Chat IA (página completa)")}</SubHeading>
+        <P>{t("El módulo Chat IA ofrece una barra lateral con las conversaciones guardadas, agrupadas por fecha (hoy, ayer, anteriores). Puede iniciar una conversación nueva, eliminarla o dejar que se renombre automáticamente a partir del primer mensaje. Las respuestas admiten formato enriquecido (títulos, listas, citas, bloques de código) y ofrecen acciones de copiar, valorar con «me gusta» o «no me gusta», y regenerar la respuesta o reintentar si algo falla.")}</P>
+        <Callout tone="amber" label={t("Importante")}>{t("Vantia lo indica de forma permanente en su interfaz: «La IA puede cometer errores. Verifica la información.» Trate cualquier redacción o dato generado por el asistente como un primer borrador que debe revisar antes de utilizarlo formalmente.")}</Callout>
       </Chapter>
 
       {/* ── 14 Configuración ── */}
-      <Chapter n="14" title="Configuración (Ajustes)">
-        <P>Ajustes se divide en dos grupos: lo suyo (Mi cuenta) y lo de la organización (Despacho).</P>
+      <Chapter n="14" title={t("Configuración (Ajustes)")}>
+        <P>{t("Ajustes se divide en dos grupos: lo suyo (Mi cuenta) y lo de la organización (Despacho).")}</P>
         <InfoTable
           headers={["Sección", "Para qué sirve"]}
           rows={[
@@ -832,25 +552,12 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 15 Trazabilidad ── */}
-      <Chapter n="15" title="Trazabilidad">
-        <P>El panel de auditoría del despacho: quién ha hecho qué, cuándo y desde dónde.</P>
-        <P>
-          La pantalla se divide en dos: a la izquierda, la lista de usuarios del despacho, con el número total de
-          acciones registradas, sus inicios y cierres de sesión, la última IP utilizada y un indicador de «Activo
-          ahora»; a la derecha, la línea de tiempo detallada del usuario seleccionado.
-        </P>
-        <P>
-          Cada evento de la línea de tiempo indica su tipo —inicio o cierre de sesión, error de acceso, creación,
-          edición o borrado de un cliente o expediente, exportación, subida o descarga de un archivo, consulta…—,
-          junto con la IP, el navegador y el sistema operativo detectados, y un enlace directo a la entidad
-          afectada. Puede filtrar por tipo de evento y por módulo, buscar por usuario o IP, y cargar registros
-          anteriores de forma incremental.
-        </P>
-        <Callout tone="green" label="Para qué sirve">
-          Además de la seguridad, Trazabilidad es útil para reconstruir qué ocurrió con un expediente o un cliente
-          concreto: quién lo modificó por última vez, quién exportó un listado o quién descargó un documento.
-        </Callout>
-        <SubHeading>15.1 Quién ve qué</SubHeading>
+      <Chapter n="15" title={t("Trazabilidad")}>
+        <P>{t("El panel de auditoría del despacho: quién ha hecho qué, cuándo y desde dónde.")}</P>
+        <P>{t("La pantalla se divide en dos: a la izquierda, la lista de usuarios del despacho, con el número total de acciones registradas, sus inicios y cierres de sesión, la última IP utilizada y un indicador de «Activo ahora»; a la derecha, la línea de tiempo detallada del usuario seleccionado.")}</P>
+        <P>{t("Cada evento de la línea de tiempo indica su tipo —inicio o cierre de sesión, error de acceso, creación, edición o borrado de un cliente o expediente, exportación, subida o descarga de un archivo, consulta…—, junto con la IP, el navegador y el sistema operativo detectados, y un enlace directo a la entidad afectada. Puede filtrar por tipo de evento y por módulo, buscar por usuario o IP, y cargar registros anteriores de forma incremental.")}</P>
+        <Callout tone="green" label={t("Para qué sirve")}>{t("Además de la seguridad, Trazabilidad es útil para reconstruir qué ocurrió con un expediente o un cliente concreto: quién lo modificó por última vez, quién exportó un listado o quién descargó un documento.")}</Callout>
+        <SubHeading>{t("15.1 Quién ve qué")}</SubHeading>
         <InfoTable
           headers={["Quién", "Qué ve"]}
           rows={[
@@ -859,70 +566,44 @@ export default function ManualPanel() {
             ["Resto de miembros", "Solo su propia actividad («Mi actividad»)."],
           ]}
         />
-        <P>
-          Está en Ajustes → Despacho → Trazabilidad. Cuánto tiempo se guarda se decide en Ajustes → Datos y
-          privacidad (lo habitual, 12 meses).
-        </P>
+        <P>{t("Está en Ajustes → Despacho → Trazabilidad. Cuánto tiempo se guarda se decide en Ajustes → Datos y privacidad (lo habitual, 12 meses).")}</P>
       </Chapter>
 
       {/* ── 16 Vistas ── */}
-      <Chapter n="16" title="Vistas recibidas por correo">
-        <P>
-          Si su despacho la tiene activada (Ajustes → Automatizaciones), Vantia revisa el correo elegido y detecta
-          los señalamientos de vista: lee fecha, hora, juzgado, autos y NIG, y comprueba si chocan con su agenda.
-        </P>
+      <Chapter n="16" title={t("Vistas recibidas por correo")}>
+        <P>{t("Si su despacho la tiene activada (Ajustes → Automatizaciones), Vantia revisa el correo elegido y detecta los señalamientos de vista: lee fecha, hora, juzgado, autos y NIG, y comprueba si chocan con su agenda.")}</P>
         <Steps
           items={[
-            <>Le llega un aviso (campana y push) con la vista por confirmar.</>,
-            <>Revise los datos en Vistas y pulse Aceptar o Rechazar. Siempre decide una persona.</>,
-            <>Al aceptar, se responde al remitente, se crea o vincula el expediente, se guardan los adjuntos, se añade a la agenda y se programa un recordatorio para prepararla.</>,
+            <>{t("Le llega un aviso (campana y push) con la vista por confirmar.")}</>,
+            <>{t("Revise los datos en Vistas y pulse Aceptar o Rechazar. Siempre decide una persona.")}</>,
+            <>{t("Al aceptar, se responde al remitente, se crea o vincula el expediente, se guardan los adjuntos, se añade a la agenda y se programa un recordatorio para prepararla.")}</>,
           ]}
         />
-        <P>
-          Los cambios de fecha y las cancelaciones también se detectan y, al confirmarlos, se reflejan en la agenda y
-          en el expediente. Cada correo solo puede revisarse en una organización, para no duplicar vistas.
-        </P>
-        <Callout tone="amber" label="Privacidad">
-          Las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón revisado y el abogado responsable.
-        </Callout>
+        <P>{t("Los cambios de fecha y las cancelaciones también se detectan y, al confirmarlos, se reflejan en la agenda y en el expediente. Cada correo solo puede revisarse en una organización, para no duplicar vistas.")}</P>
+        <Callout tone="amber" label={t("Privacidad")}>{t("Las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón revisado y el abogado responsable.")}</Callout>
       </Chapter>
 
       {/* ── 17 Avisos ── */}
-      <Chapter n="17" title="Avisos y notificaciones">
-        <P>
-          La campana de arriba reúne lo pendiente: mensajes, correos sin leer, plazos, vistas y respuestas de
-          soporte. Lo que descarte allí queda descartado en todos sus dispositivos.
-        </P>
-        <P>
-          Los avisos push le llegan aunque tenga Vantia cerrado. Actívelos en Ajustes → Notificaciones en cada
-          dispositivo y elija qué tipos quiere. Por defecto hay horario de silencio (de 21:00 a 08:00 y fines de
-          semana); los mensajes directos y las vistas llegan siempre. Si ya está mirando esa sección de Vantia, no
-          le llega el aviso del sistema.
-        </P>
+      <Chapter n="17" title={t("Avisos y notificaciones")}>
+        <P>{t("La campana de arriba reúne lo pendiente: mensajes, correos sin leer, plazos, vistas y respuestas de soporte. Lo que descarte allí queda descartado en todos sus dispositivos.")}</P>
+        <P>{t("Los avisos push le llegan aunque tenga Vantia cerrado. Actívelos en Ajustes → Notificaciones en cada dispositivo y elija qué tipos quiere. Por defecto hay horario de silencio (de 21:00 a 08:00 y fines de semana); los mensajes directos y las vistas llegan siempre. Si ya está mirando esa sección de Vantia, no le llega el aviso del sistema.")}</P>
         <Bullets
           items={[
-            <><strong>Plazos:</strong> a 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios, uno por semana.</>,
-            <><strong>Correo nuevo:</strong> de lo que llegue a su bandeja de entrada (se revisa cada pocos minutos).</>,
-            <><strong>Al cerrar sesión</strong>, ese navegador deja de recibir sus avisos; al volver a entrar se reactivan solos.</>,
+            <><strong>{t("Plazos:")}</strong>{" "}{t("a 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios, uno por semana.")}</>,
+            <><strong>{t("Correo nuevo:")}</strong>{" "}{t("de lo que llegue a su bandeja de entrada (se revisa cada pocos minutos).")}</>,
+            <><strong>{t("Al cerrar sesión")}</strong>{t(", ese navegador deja de recibir sus avisos; al volver a entrar se reactivan solos.")}</>,
           ]}
         />
       </Chapter>
 
       {/* ── 18 Herramienta PDF ── */}
-      <Chapter n="18" title="Herramienta PDF y adjuntos">
-        <P>
-          Desde los adjuntos de clientes y expedientes puede unir varios documentos en un solo PDF (también Word e
-          imágenes), cambiar el orden de las páginas, girarlas o quitar las que sobren, y guardar el resultado como
-          documento nuevo.
-        </P>
-        <P>
-          Los adjuntos se previsualizan en el propio Vantia (PDF, imágenes, Word, Excel, texto y páginas HTML) sin
-          tener que descargarlos.
-        </P>
+      <Chapter n="18" title={t("Herramienta PDF y adjuntos")}>
+        <P>{t("Desde los adjuntos de clientes y expedientes puede unir varios documentos en un solo PDF (también Word e imágenes), cambiar el orden de las páginas, girarlas o quitar las que sobren, y guardar el resultado como documento nuevo.")}</P>
+        <P>{t("Los adjuntos se previsualizan en el propio Vantia (PDF, imágenes, Word, Excel, texto y páginas HTML) sin tener que descargarlos.")}</P>
       </Chapter>
 
       {/* ── 19 Atajos y preferencias ── */}
-      <Chapter n="19" title="Atajos de teclado y preferencias">
+      <Chapter n="19" title={t("Atajos de teclado y preferencias")}>
         <InfoTable
           headers={["Atajo", "Qué hace"]}
           rows={[
@@ -931,14 +612,11 @@ export default function ManualPanel() {
             ["G y luego D, E, L, A, T, V, C, M, O o S", "Va a Dashboard, Expedientes, Clientes, Agenda, Tareas, Vistas, Chat, Correo, Documental o Ajustes."],
           ]}
         />
-        <P>
-          Los atajos no actúan mientras escribe en un campo y se pueden desactivar en Ajustes → Preferencias de
-          trabajo, donde también elige la página de inicio y el primer día de la semana de la Agenda.
-        </P>
+        <P>{t("Los atajos no actúan mientras escribe en un campo y se pueden desactivar en Ajustes → Preferencias de trabajo, donde también elige la página de inicio y el primer día de la semana de la Agenda.")}</P>
       </Chapter>
 
       {/* ── 16 Preguntas frecuentes ── */}
-      <Chapter n="20" title="Preguntas frecuentes">
+      <Chapter n="20" title={t("Preguntas frecuentes")}>
         {[
           {
             q: "¿Puedo deshacer una eliminación por error?",
@@ -973,7 +651,7 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 17 Glosario ── */}
-      <Chapter n="21" title="Glosario">
+      <Chapter n="21" title={t("Glosario")}>
         <InfoTable
           headers={["Término", "Significado en Vantia"]}
           rows={[
@@ -989,10 +667,7 @@ export default function ManualPanel() {
             ["NIG", "Número de Identificación General de un procedimiento judicial."],
           ]}
         />
-        <p className="!mt-8 border-t border-slate-100 pt-4 text-xs italic text-slate-400">
-          Manual de usuario de Vantia Legis — documento de referencia para el equipo del despacho. Los nombres de
-          botones y pantallas pueden variar ligeramente a medida que la aplicación evoluciona.
-        </p>
+        <p className="!mt-8 border-t border-slate-100 pt-4 text-xs italic text-slate-400">{t("Manual de usuario de Vantia Legis — documento de referencia para el equipo del despacho. Los nombres de botones y pantallas pueden variar ligeramente a medida que la aplicación evoluciona.")}</p>
       </Chapter>
     </div>
   );

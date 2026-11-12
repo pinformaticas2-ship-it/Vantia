@@ -79,6 +79,8 @@ function llamadaT(nodo, fuente) {
     if (!LETRAS.test(nodo.text)) return null;
     // Clases de Tailwind ("text-red-600 peligro") no son texto.
     if (/^[a-z0-9:\-\/\[\]\.#!% ]+$/.test(nodo.text) && nodo.text.includes('-')) return null;
+    // Códigos internos (GCAL_AUTH_EXPIRED) tampoco.
+    if (/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(nodo.text)) return null;
     return `${fn()}(${JSON.stringify(nodo.text)})`;
   }
   if (ts.isTemplateExpression(nodo)) {

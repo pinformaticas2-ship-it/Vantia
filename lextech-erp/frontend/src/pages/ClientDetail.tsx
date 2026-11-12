@@ -24,6 +24,7 @@ import BackButton from "../components/BackButton";
 import { Spinner } from "../components/Spinner";
 import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
+import { t, t as tr } from '../lib/i18n';
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -110,71 +111,71 @@ const TABS = [
 function TabPerfil({ client, formatDate, age }: any) {
   return (
     <div className="space-y-4">
-      <Section title="Identificación" icon={User}>
-        <Field label="Tipo documento"      value={client.document_type} />
-        <Field label="NIF / CIF"           value={client.nif_cif} mono />
-        <Field label="Naturaleza jurídica" value={client.legal_nature} />
-        <Field label="Sexo"                value={client.gender === "M" ? "Masculino" : client.gender === "F" ? "Femenino" : client.gender} />
-        <Field label="Fecha nacimiento"    value={formatDate(client.birth_date)} />
-        <Field label="Edad"                value={age !== null ? `${age} años` : null} />
-        <Field label="Nacionalidad"        value={client.nationality} />
-        <Field label="País expedición"     value={client.expedition_country} />
+      <Section title={t("Identificación")} icon={User}>
+        <Field label={t("Tipo documento")}      value={client.document_type} />
+        <Field label={t("NIF / CIF")}           value={client.nif_cif} mono />
+        <Field label={t("Naturaleza jurídica")} value={client.legal_nature} />
+        <Field label={t("Sexo")}                value={client.gender === "M" ? "Masculino" : client.gender === "F" ? "Femenino" : client.gender} />
+        <Field label={t("Fecha nacimiento")}    value={formatDate(client.birth_date)} />
+        <Field label={t("Edad")}                value={age !== null ? t("{n} años", { n: age }) : null} />
+        <Field label={t("Nacionalidad")}        value={client.nationality} />
+        <Field label={t("País expedición")}     value={client.expedition_country} />
         {client.dni_image_url && (
           <div className="col-span-2 md:col-span-3">
-            <p className="text-xs font-medium text-slate-500 mb-1.5">Foto del documento</p>
+            <p className="text-xs font-medium text-slate-500 mb-1.5">{t("Foto del documento")}</p>
             <a
               href={resolveUploadUrl(client.dni_image_url) || undefined}
               target="_blank"
               rel="noreferrer"
-              title="Ver a tamaño completo"
+              title={t("Ver a tamaño completo")}
               className="inline-block rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
             >
-              <img src={resolveUploadUrl(client.dni_image_url) || undefined} alt="Documento de identidad" className="h-28 w-auto object-cover" />
+              <img src={resolveUploadUrl(client.dni_image_url) || undefined} alt={t("Documento de identidad")} className="h-28 w-auto object-cover" />
             </a>
           </div>
         )}
       </Section>
 
-      <Section title="Dirección" icon={MapPin}>
+      <Section title={t("Dirección")} icon={MapPin}>
         <div className="col-span-2 md:col-span-3">
-          <Field label="Dirección" value={client.address_street} />
+          <Field label={t("Dirección")} value={client.address_street} />
         </div>
-        <Field label="Población"     value={client.address_town} />
-        <Field label="Código postal" value={client.address_cp} />
-        <Field label="Provincia"     value={client.address_province} />
-        <Field label="País"          value={client.address_country} />
+        <Field label={t("Población")}     value={client.address_town} />
+        <Field label={t("Código postal")} value={client.address_cp} />
+        <Field label={t("Provincia")}     value={client.address_province} />
+        <Field label={t("País")}          value={client.address_country} />
       </Section>
 
-      <Section title="Contacto" icon={Phone}>
+      <Section title={t("Contacto")} icon={Phone}>
         <div className="col-span-2 md:col-span-3">
-          <Field label="Correo electrónico" value={client.email} />
+          <Field label={t("Correo electrónico")} value={client.email} />
         </div>
-        <Field label="Teléfono"   value={client.phone_1} />
-        <Field label="Móvil"      value={client.phone_mobile} />
-        <Field label="Teléfono 2" value={client.phone_2} />
-        <Field label="Teléfono 3" value={client.phone_3} />
-        <Field label="Fax"        value={client.phone_fax} />
-        <Field label="Web"        value={client.website} />
+        <Field label={t("Teléfono")}   value={client.phone_1} />
+        <Field label={t("Móvil")}      value={client.phone_mobile} />
+        <Field label={t("Teléfono 2")} value={client.phone_2} />
+        <Field label={t("Teléfono 3")} value={client.phone_3} />
+        <Field label={t("Fax")}        value={client.phone_fax} />
+        <Field label={t("Web")}        value={client.website} />
       </Section>
 
-      <Section title="Datos bancarios y referencia" icon={Landmark}>
-        <Field label="IBAN"                       value={client.iban} />
-        <Field label="BIC / SWIFT"                value={client.bic} />
-        <Field label="Nº mandato SEPA"            value={client.mandato_numero} />
-        <Field label="Fecha mandato"              value={formatDate(client.mandato_fecha)} />
-        <Field label="Referencia del cliente"     value={client.referencia_cliente} />
+      <Section title={t("Datos bancarios y referencia")} icon={Landmark}>
+        <Field label={t("IBAN")}                       value={client.iban} />
+        <Field label={t("BIC / SWIFT")}                value={client.bic} />
+        <Field label={t("Nº mandato SEPA")}            value={client.mandato_numero} />
+        <Field label={t("Fecha mandato")}              value={formatDate(client.mandato_fecha)} />
+        <Field label={t("Referencia del cliente")}     value={client.referencia_cliente} />
       </Section>
 
-      <Section title="Administración" icon={Shield}>
-        <Field label="Estado"                     value={client.client_status} />
-        <Field label="Fecha alta"                 value={formatDate(client.date_alta)} />
-        <Field label="Fecha baja"                 value={formatDate(client.date_baja)} />
-        <Field label="LOPD"                       value={client.lopd} />
-        <Field label="Comunicaciones comerciales" value={client.commercial_communications} />
-        <Field label="Idioma de comunicación"     value={nombreIdioma(client.idioma)} />
-        <Field label="Centro"                     value={client.center} />
-        <Field label="Alta por"                   value={client.created_by} />
-        <Field label="Fecha registro"             value={formatDate(client.created_at)} />
+      <Section title={t("Administración")} icon={Shield}>
+        <Field label={t("Estado")}                     value={client.client_status} />
+        <Field label={t("Fecha alta")}                 value={formatDate(client.date_alta)} />
+        <Field label={t("Fecha baja")}                 value={formatDate(client.date_baja)} />
+        <Field label={t("LOPD")}                       value={client.lopd} />
+        <Field label={t("Comunicaciones comerciales")} value={client.commercial_communications} />
+        <Field label={t("Idioma de comunicación")}     value={nombreIdioma(client.idioma)} />
+        <Field label={t("Centro")}                     value={client.center} />
+        <Field label={t("Alta por")}                   value={client.created_by} />
+        <Field label={t("Fecha registro")}             value={formatDate(client.created_at)} />
       </Section>
     </div>
   );
@@ -215,11 +216,11 @@ function TabExpedientes({ clientId, clientName }: { clientId: string; clientName
       const res = await fetch(`/api/expedientes?clienteId=${clientId}&limit=200`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
+      if (!res.ok) throw new Error(t("Error {status}", { status: res.status }));
       const data = await res.json();
       setExpedientes(data.data || []);
     } catch (e: any) {
-      if (!silent) setError(e?.message || "Error al cargar expedientes");
+      if (!silent) setError(e?.message || t("Error al cargar expedientes"));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -241,7 +242,7 @@ function TabExpedientes({ clientId, clientName }: { clientId: string; clientName
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="text-sm text-slate-500">
-          {expedientes.length} expediente{expedientes.length !== 1 ? "s" : ""} vinculado{expedientes.length !== 1 ? "s" : ""}
+          {expedientes.length}{" "}{t("expediente")}{expedientes.length !== 1 ? "s" : ""}{" "}{t("vinculado")}{expedientes.length !== 1 ? "s" : ""}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -249,34 +250,32 @@ function TabExpedientes({ clientId, clientName }: { clientId: string; clientName
             onClick={() => setShowLinkModal(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Link2 size={15} /> Vincular expediente
-          </button>
+            <Link2 size={15} />{" "}{t("Vincular expediente")}</button>
           <Link
             to="/dashboard/expedientes?nuevo=1"
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Plus size={15} /> Nuevo expediente
-          </Link>
+            <Plus size={15} />{" "}{t("Nuevo expediente")}</Link>
         </div>
       </div>
 
       {expedientes.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-16 flex flex-col items-center gap-3 text-slate-400">
           <Gavel size={40} className="opacity-20" />
-          <p className="font-medium text-sm">No hay expedientes vinculados</p>
-          <p className="text-xs text-slate-300">Crea un expediente nuevo o vincula uno ya existente</p>
+          <p className="font-medium text-sm">{t("No hay expedientes vinculados")}</p>
+          <p className="text-xs text-slate-300">{t("Crea un expediente nuevo o vincula uno ya existente")}</p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Referencia</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asunto</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Contrario</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Apertura</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Referencia")}</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Asunto")}</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tipo")}</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Estado")}</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t("Contrario")}</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t("Apertura")}</th>
                 <th className="px-4 py-3 w-8"></th>
               </tr>
             </thead>
@@ -367,11 +366,11 @@ function LinkExpedienteModal({
         : `/api/expedientes?limit=100`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron buscar expedientes"));
       setSearchResults((data.data || []).filter((item: any) => !linkedIds.has(item.id)));
     } catch (e: any) {
       setSearchResults([]);
-      setSearchError(e?.message || "No se pudieron buscar expedientes");
+      setSearchError(e?.message || t("No se pudieron buscar expedientes"));
     } finally {
       setSearching(false);
     }
@@ -410,10 +409,10 @@ function LinkExpedienteModal({
         body: JSON.stringify({ cliente_id: clientId }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo vincular el expediente");
+      if (!res.ok) throw new Error(data.error || t("No se pudo vincular el expediente"));
       onLinked();
     } catch (e: any) {
-      setLinkError(e?.message || "No se pudo vincular el expediente");
+      setLinkError(e?.message || t("No se pudo vincular el expediente"));
     } finally {
       setSavingId(null);
     }
@@ -424,8 +423,8 @@ function LinkExpedienteModal({
       <div className="w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
           <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Vincular expediente</p>
-            <h3 className="text-lg font-bold text-slate-900">Asociar un expediente a {clientName || "este cliente"}</h3>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t("Vincular expediente")}</p>
+            <h3 className="text-lg font-bold text-slate-900">{t("Asociar un expediente a")}{" "}{clientName || t("este cliente")}</h3>
           </div>
           <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors">
             <X size={16} />
@@ -438,7 +437,7 @@ function LinkExpedienteModal({
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Buscar por referencia, descripción, NIG, juzgado..."
+              placeholder={t("Buscar por referencia, descripción, NIG, juzgado...")}
               autoFocus
               spellCheck={false}
               autoComplete="off"
@@ -456,7 +455,7 @@ function LinkExpedienteModal({
           <div className="rounded-2xl border border-slate-200 overflow-hidden">
             {!hasSearched || searching ? (
               <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
-                <Spinner size="sm" muted label="Buscando expedientes..." />
+                <Spinner size="sm" muted label={t("Buscando expedientes...")} />
               </div>
             ) : searchResults.length === 0 ? (
               <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
@@ -464,15 +463,15 @@ function LinkExpedienteModal({
                   <AlertCircle size={20} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
-                  <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están vinculados.</p>
+                  <p className="text-sm font-semibold text-slate-600">{t("Sin resultados")}</p>
+                  <p className="mt-0.5 text-xs text-slate-400">{t("Prueba con otra búsqueda o revisa si ya están vinculados.")}</p>
                 </div>
               </div>
             ) : (
               <>
                 <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                    {searchResults.length} {searchResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                    {searchResults.length} {searchResults.length === 1 ? t("expediente encontrado") : t("expedientes encontrados")}
                   </span>
                 </div>
                 <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
@@ -489,7 +488,7 @@ function LinkExpedienteModal({
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">{ref}</span>
                             <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${ESTADO_COLOR[item.estado] || "bg-slate-100 text-slate-500"}`}>
-                              {item.estado || "abierto"}
+                              {item.estado || t("abierto")}
                             </span>
                           </div>
                           {item.descripcion && (
@@ -498,8 +497,7 @@ function LinkExpedienteModal({
                           {meta && <p className="mt-0.5 text-[11px] text-slate-400 truncate">{meta}</p>}
                           {hasOtherClient && (
                             <p className="mt-1 text-[11px] font-semibold text-amber-600 flex items-center gap-1">
-                              <AlertTriangle size={10} /> Ya vinculado a {item.cliente_nombre || "otro cliente"} — se reasignará
-                            </p>
+                              <AlertTriangle size={10} />{" "}{t("Ya vinculado a")}{" "}{item.cliente_nombre || t("otro cliente")}{" "}{t("— se reasignará")}</p>
                           )}
                         </div>
                         <button
@@ -508,9 +506,7 @@ function LinkExpedienteModal({
                           disabled={savingId === item.id}
                           className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
                         >
-                          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                          Vincular
-                        </button>
+                          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}{t("Vincular")}</button>
                       </div>
                     );
                   })}
@@ -597,10 +593,10 @@ function TabHistorial({ clientId }: { clientId: string }) {
         setActividades(data.data);
         lastFetchRef.current = Date.now();
       } else {
-        setError(data.error || "Error al cargar el historial");
+        setError(data.error || t("Error al cargar el historial"));
       }
     } catch (e: any) {
-      setError(e.message || "Error de red");
+      setError(e.message || t("Error de red"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -637,15 +633,14 @@ function TabHistorial({ clientId }: { clientId: string }) {
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">
-          {loading ? "Cargando…" : `${actividades.length} movimiento${actividades.length !== 1 ? "s" : ""} registrado${actividades.length !== 1 ? "s" : ""}`}
+          {loading ? t("Cargando…") : t("{length} movimiento{v} registrado{v2}", { length: actividades.length, v: actividades.length !== 1 ? "s" : "", v2: actividades.length !== 1 ? "s" : "" })}
         </p>
         <button
           onClick={() => fetchActividades(false)}
           disabled={loading || refreshing}
           className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors disabled:opacity-50"
         >
-          <Loader2 size={12} className={(loading || refreshing) ? "animate-spin" : ""} /> Actualizar
-        </button>
+          <Loader2 size={12} className={(loading || refreshing) ? "animate-spin" : ""} />{" "}{t("Actualizar")}</button>
       </div>
 
       {/* Línea de tiempo */}
@@ -653,19 +648,19 @@ function TabHistorial({ clientId }: { clientId: string }) {
         {loading ? (
           <div className="p-14 flex flex-col items-center gap-3 text-slate-400">
             <Spinner size="lg" muted />
-            <p className="text-sm">Cargando historial…</p>
+            <p className="text-sm">{t("Cargando historial…")}</p>
           </div>
         ) : error ? (
           <div className="p-10 flex flex-col items-center gap-2 text-red-400">
             <AlertCircle size={26} className="opacity-60" />
             <p className="text-sm font-medium">{error}</p>
-            <button onClick={() => fetchActividades(true)} className="peligro text-xs text-red-500 underline mt-1">Reintentar</button>
+            <button onClick={() => fetchActividades(true)} className="peligro text-xs text-red-500 underline mt-1">{t("Reintentar")}</button>
           </div>
         ) : actividades.length === 0 ? (
           <div className="p-14 flex flex-col items-center gap-3 text-slate-300">
             <Clock size={36} className="opacity-60" />
-            <p className="text-sm font-medium text-slate-400">Sin movimientos registrados</p>
-            <p className="text-xs text-slate-400">Los movimientos aparecerán aquí automáticamente</p>
+            <p className="text-sm font-medium text-slate-400">{t("Sin movimientos registrados")}</p>
+            <p className="text-xs text-slate-400">{t("Los movimientos aparecerán aquí automáticamente")}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-50">
@@ -897,11 +892,11 @@ function TabNotas({ clientId }: { clientId: string }) {
     <div className="space-y-4">
       {/* Nueva nota */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Nueva nota</p>
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Nueva nota")}</p>
         <textarea
           value={nueva}
           onChange={e => setNueva(e.target.value)}
-          placeholder="Escribe una nota sobre este cliente…"
+          placeholder={t("Escribe una nota sobre este cliente…")}
           rows={3}
           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
         />
@@ -910,7 +905,7 @@ function TabNotas({ clientId }: { clientId: string }) {
         <div className="grid grid-cols-3 gap-3">
           {/* Categoría */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Categoría</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Categoría")}</label>
             <select
               value={categoria}
               onChange={e => setCategoria(e.target.value)}
@@ -922,7 +917,7 @@ function TabNotas({ clientId }: { clientId: string }) {
 
           {/* Prioridad */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Prioridad</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Prioridad")}</label>
             <select
               value={prioridad}
               onChange={e => setPrioridad(e.target.value)}
@@ -934,7 +929,7 @@ function TabNotas({ clientId }: { clientId: string }) {
 
           {/* Color */}
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Color</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Color")}</label>
             <div className="flex gap-1">
               {colores.map(c => (
                 <button
@@ -955,9 +950,7 @@ function TabNotas({ clientId }: { clientId: string }) {
             disabled={saving || !nueva.trim()}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl active:scale-95 transition-all"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Guardar nota
-          </button>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}{t("Guardar nota")}</button>
         </div>
       </div>
 
@@ -965,7 +958,7 @@ function TabNotas({ clientId }: { clientId: string }) {
       {notas.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-3 text-slate-400">
           <StickyNote size={36} className="opacity-20" />
-          <p className="text-sm font-medium">No hay notas todavía</p>
+          <p className="text-sm font-medium">{t("No hay notas todavía")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -1001,7 +994,7 @@ function TabNotas({ clientId }: { clientId: string }) {
 
                 {/* Meta */}
                 <p className="text-[10px] text-slate-400">
-                  {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : 'Usuario'} · {new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : t("Usuario")} · {new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                 </p>
 
                 {/* Acciones */}
@@ -1011,15 +1004,11 @@ function TabNotas({ clientId }: { clientId: string }) {
                       <button
                         onClick={() => saveEdit(n.id)}
                         className="px-3 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg transition-all"
-                      >
-                        Guardar
-                      </button>
+                      >{t("Guardar")}</button>
                       <button
                         onClick={() => setEditingId(null)}
                         className="px-3 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
-                      >
-                        Cancelar
-                      </button>
+                      >{t("Cancelar")}</button>
                     </>
                   ) : (
                     <>
@@ -1060,23 +1049,19 @@ function TabNotas({ clientId }: { clientId: string }) {
                   <Trash2 size={18} className="peligro text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Eliminar nota</h3>
-                  <p className="text-sm text-slate-500 mt-0.5">Esta acción no se puede deshacer.</p>
+                  <h3 className="font-bold text-slate-900">{t("Eliminar nota")}</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">{t("Esta acción no se puede deshacer.")}</p>
                 </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => setConfirmDeleteId(null)}
                   className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  Cancelar
-                </button>
+                >{t("Cancelar")}</button>
                 <button
                   onClick={confirmDeleteNota}
                   className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Eliminar
-                </button>
+                >{t("Eliminar")}</button>
               </div>
             </div>
           </div>
@@ -1160,9 +1145,9 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
       const res = await fetch(`/api/tasks/client/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) setTareas(data.data || []);
-      else setFetchError(data.error || "Error al cargar tareas");
+      else setFetchError(data.error || t("Error al cargar tareas"));
     } catch (e: any) {
-      setFetchError(e.message || "Error de conexión con el servidor");
+      setFetchError(e.message || t("Error de conexión con el servidor"));
     } finally { setLoading(false); }
   }, [clientId, getToken]);
 
@@ -1291,13 +1276,11 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
     <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center gap-3 text-center">
       <AlertCircle size={28} className="text-red-400" />
       <div>
-        <p className="text-sm font-semibold text-red-700">No se pudieron cargar las tareas</p>
+        <p className="text-sm font-semibold text-red-700">{t("No se pudieron cargar las tareas")}</p>
         <p className="text-xs text-red-500 mt-1">{fetchError}</p>
       </div>
       <button onClick={fetchTareas}
-        className="mt-1 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
-        Reintentar
-      </button>
+        className="mt-1 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">{t("Reintentar")}</button>
     </div>
   );
 
@@ -1311,17 +1294,16 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
             {(["todas","pendiente","urgente","completada"] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-colors ${filter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                {f === "todas"      ? `Todas (${tareas.length})` :
-                 f === "pendiente"  ? `Pendientes (${tareas.filter(x => x.estado === "pendiente").length})` :
-                 f === "urgente"    ? `Urgentes (${tareas.filter(x => x.estado === "urgente").length})` :
-                                     `Completadas (${tareas.filter(x => x.estado === "completada").length})`}
+                {f === "todas"      ? t("Todas ({length})", { length: tareas.length }) :
+                 f === "pendiente"  ? t("Pendientes ({length})", { length: tareas.filter(x => x.estado === "pendiente").length }) :
+                 f === "urgente"    ? t("Urgentes ({length})", { length: tareas.filter(x => x.estado === "urgente").length }) :
+                                     t("Completadas ({length})", { length: tareas.filter(x => x.estado === "completada").length })}
               </button>
             ))}
           </div>
           <button onClick={() => { setShowForm(v => !v); setForm(TAREA_EMPTY); }}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm active:scale-95 transition-all">
-            <Plus size={15} /> Nueva tarea
-          </button>
+            <Plus size={15} />{" "}{t("Nueva tarea")}</button>
         </div>
 
         {/* Fila 2: búsqueda + tipo + prioridad + vencidas */}
@@ -1331,7 +1313,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar tarea…"
+              placeholder={t("Buscar tarea…")}
               className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-red-400 bg-white"
             />
             {search && (
@@ -1344,7 +1326,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
           {/* Tipo */}
           <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
             className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 bg-white text-slate-600">
-            <option value="">Todos los tipos</option>
+            <option value="">{t("Todos los tipos")}</option>
             {Object.entries(TIPO_CONFIG).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
@@ -1372,15 +1354,13 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
               filterVencidas ? "bg-red-100 text-red-700 border border-red-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
             }`}>
-            <AlertTriangle size={11} /> Vencidas
-          </button>
+            <AlertTriangle size={11} />{" "}{t("Vencidas")}</button>
 
           {/* Limpiar filtros */}
           {(filterTipo || filterPrio || filterVencidas || search) && (
             <button onClick={() => { setFilterTipo(""); setFilterPrio(""); setFilterVencidas(false); setSearch(""); }}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-              <X size={11} /> Limpiar
-            </button>
+              <X size={11} />{" "}{t("Limpiar")}</button>
           )}
         </div>
       </div>
@@ -1388,22 +1368,22 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
       {/* Formulario nueva tarea */}
       {showForm && (
         <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4 shadow-sm">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nueva tarea / plazo</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Nueva tarea / plazo")}</p>
 
           {/* Título */}
           <input value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))}
-            placeholder="Título de la tarea *" autoFocus
+            placeholder={t("Título de la tarea *")} autoFocus
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
 
           {/* Descripción */}
           <textarea value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
-            placeholder="Descripción / instrucciones (opcional)" rows={2}
+            placeholder={t("Descripción / instrucciones (opcional)")} rows={2}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
 
           {/* Fila 1: Tipo + Fecha límite + Estado + Prioridad */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de tarea</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo de tarea")}</label>
               <select value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
                 {Object.entries(TIPO_CONFIG).map(([k, v]) => (
@@ -1412,27 +1392,27 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha límite</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha límite")}</label>
               <input type="date" value={form.plazo} onChange={e => setForm(p => ({ ...p, plazo: e.target.value }))}
                 min={new Date().toISOString().split('T')[0]}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</label>
               <select value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
-                <option value="pendiente">Pendiente</option>
-                <option value="urgente">Urgente</option>
-                <option value="completada">Completada</option>
+                <option value="pendiente">{t("Pendiente")}</option>
+                <option value="urgente">{t("Urgente")}</option>
+                <option value="completada">{t("Completada")}</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridad</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Prioridad")}</label>
               <select value={form.prioridad} onChange={e => setForm(p => ({ ...p, prioridad: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
+                <option value="alta">{t("Alta@@prioridad")}</option>
+                <option value="media">{t("Media@@prioridad")}</option>
+                <option value="baja">{t("Baja@@prioridad")}</option>
               </select>
             </div>
           </div>
@@ -1440,19 +1420,19 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
           {/* Fila 2: Expediente + Juzgado/Tribunal + Nº Procedimiento */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Expediente")}</label>
               <input value={form.expediente} onChange={e => setForm(p => ({ ...p, expediente: e.target.value }))}
-                placeholder="EXP-2024-001"
+                placeholder={t("EXP-2024-001")}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Juzgado / Tribunal</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Juzgado / Tribunal")}</label>
               <input value={form.juzgado} onChange={e => setForm(p => ({ ...p, juzgado: e.target.value }))}
-                placeholder="Juzgado de 1ª Instancia nº 3"
+                placeholder={t("Juzgado de 1ª Instancia nº 3")}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nº Procedimiento</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Nº Procedimiento")}</label>
               <input value={form.num_proc} onChange={e => setForm(p => ({ ...p, num_proc: e.target.value }))}
                 placeholder="123/2024"
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
@@ -1462,44 +1442,41 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
           {/* Fila 3: Fecha aviso + Importe */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔔 Fecha de aviso</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("🔔 Fecha de aviso")}</label>
               <input type="date" value={form.fecha_aviso} onChange={e => setForm(p => ({ ...p, fecha_aviso: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
-              <p className="text-[10px] text-slate-400 mt-0.5">Recordatorio antes del plazo límite</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{t("Recordatorio antes del plazo límite")}</p>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">💶 Importe (€)</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("💶 Importe (€)")}</label>
               <input type="number" step="0.01" min="0" value={form.importe}
                 onChange={e => setForm(p => ({ ...p, importe: e.target.value }))}
                 placeholder="0,00"
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
-              <p className="text-[10px] text-slate-400 mt-0.5">Para pagos, honorarios, tasas...</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">{t("Para pagos, honorarios, tasas...")}</p>
             </div>
           </div>
 
           {/* Fila 4: Etapa + Notas internas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🏷️ Etapa</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("🏷️ Etapa")}</label>
               <EtapaSelect value={form.etapa} onChange={v => setForm(p => ({ ...p, etapa: v }))} getToken={getToken} />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📝 Notas internas</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("📝 Notas internas")}</label>
               <textarea value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}
-                rows={2} placeholder="Observaciones internas, apuntes del letrado..."
+                rows={2} placeholder={t("Observaciones internas, apuntes del letrado...")}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 mt-0.5" />
             </div>
           </div>
 
           <div className="flex gap-2 justify-end pt-1">
             <button onClick={() => setShowForm(false)}
-              className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">
-              Cancelar
-            </button>
+              className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">{t("Cancelar")}</button>
             <button onClick={handleCreate} disabled={saving || !form.titulo.trim()}
               className="flex items-center gap-2 px-5 py-1.5 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95 transition-all">
-              {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Guardar tarea
-            </button>
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}{" "}{t("Guardar tarea")}</button>
           </div>
         </div>
       )}
@@ -1509,7 +1486,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
         <div className="bg-white border border-slate-200 rounded-xl p-14 flex flex-col items-center gap-3 text-slate-400">
           <CheckCircle2 size={36} className="opacity-20" />
           <p className="font-medium text-sm">
-            {(search || filterTipo || filterPrio || filterVencidas) ? "No hay tareas con esos filtros" : filter !== "todas" ? `Sin tareas en estado "${filter}"` : "Sin tareas"}
+            {(search || filterTipo || filterPrio || filterVencidas) ? t("No hay tareas con esos filtros") : filter !== "todas" ? t("Sin tareas en estado \"{filter}\"", { filter: filter }) : t("Sin tareas")}
           </p>
         </div>
       ) : (
@@ -1534,16 +1511,16 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                 <div className="flex-1 space-y-3">
                   {/* Título */}
                   <input value={editForm.titulo} onChange={e => setEditForm(p => ({ ...p, titulo: e.target.value }))}
-                    placeholder="Título *"
+                    placeholder={tr("Título *")}
                     className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-red-400" />
                   {/* Descripción */}
                   <textarea value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))}
-                    rows={2} placeholder="Descripción"
+                    rows={2} placeholder={tr("Descripción")}
                     className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-400" />
                   {/* Fila 1 */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Tipo</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Tipo")}</p>
                       <select value={editForm.tipo} onChange={e => setEditForm(p => ({ ...p, tipo: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
                         {Object.entries(TIPO_CONFIG).map(([k, v]) => (
@@ -1552,46 +1529,46 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                       </select>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Fecha límite</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Fecha límite")}</p>
                       <input type="date" value={editForm.plazo} onChange={e => setEditForm(p => ({ ...p, plazo: e.target.value }))}
                         min={new Date().toISOString().split('T')[0]}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Estado</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Estado")}</p>
                       <select value={editForm.estado} onChange={e => setEditForm(p => ({ ...p, estado: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
-                        <option value="pendiente">Pendiente</option>
-                        <option value="urgente">Urgente</option>
-                        <option value="completada">Completada</option>
+                        <option value="pendiente">{tr("Pendiente")}</option>
+                        <option value="urgente">{tr("Urgente")}</option>
+                        <option value="completada">{tr("Completada")}</option>
                       </select>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Prioridad</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Prioridad")}</p>
                       <select value={editForm.prioridad} onChange={e => setEditForm(p => ({ ...p, prioridad: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
-                        <option value="alta">Alta</option>
-                        <option value="media">Media</option>
-                        <option value="baja">Baja</option>
+                        <option value="alta">{tr("Alta@@prioridad")}</option>
+                        <option value="media">{tr("Media@@prioridad")}</option>
+                        <option value="baja">{tr("Baja@@prioridad")}</option>
                       </select>
                     </div>
                   </div>
                   {/* Fila 2 */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Expediente</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Expediente")}</p>
                       <input value={editForm.expediente} onChange={e => setEditForm(p => ({ ...p, expediente: e.target.value }))}
-                        placeholder="EXP-2024-001"
+                        placeholder={tr("EXP-2024-001")}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Juzgado / Tribunal</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Juzgado / Tribunal")}</p>
                       <input value={editForm.juzgado} onChange={e => setEditForm(p => ({ ...p, juzgado: e.target.value }))}
-                        placeholder="Juzgado de 1ª Instancia nº 3"
+                        placeholder={tr("Juzgado de 1ª Instancia nº 3")}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Nº Procedimiento</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Nº Procedimiento")}</p>
                       <input value={editForm.num_proc} onChange={e => setEditForm(p => ({ ...p, num_proc: e.target.value }))}
                         placeholder="123/2024"
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
@@ -1600,12 +1577,12 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                   {/* Fila 3: Aviso + Importe */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">🔔 Fecha de aviso</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("🔔 Fecha de aviso")}</p>
                       <input type="date" value={editForm.fecha_aviso} onChange={e => setEditForm(p => ({ ...p, fecha_aviso: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">💶 Importe (€)</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("💶 Importe (€)")}</p>
                       <input type="number" step="0.01" min="0" value={editForm.importe}
                         onChange={e => setEditForm(p => ({ ...p, importe: e.target.value }))}
                         placeholder="0,00"
@@ -1615,21 +1592,21 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                   {/* Etapa + Notas internas */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">🏷️ Etapa</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("🏷️ Etapa")}</p>
                       <EtapaSelect value={editForm.etapa} onChange={v => setEditForm(p => ({ ...p, etapa: v }))} getToken={getToken} />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">📝 Notas internas</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("📝 Notas internas")}</p>
                       <textarea value={editForm.notas} onChange={e => setEditForm(p => ({ ...p, notas: e.target.value }))}
-                        rows={2} placeholder="Observaciones internas..."
+                        rows={2} placeholder={tr("Observaciones internas...")}
                         className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-red-400" />
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <button onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
+                    <button onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">{tr("Cancelar")}</button>
                     <button onClick={saveEdit} disabled={saving}
                       className="px-4 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg disabled:opacity-50">
-                      {saving ? "Guardando…" : "Guardar"}
+                      {saving ? tr("Guardando…") : tr("Guardar")}
                     </button>
                   </div>
                 </div>
@@ -1650,7 +1627,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
                       TIPO_CONFIG[t.tipo]?.color || "bg-slate-100 text-slate-500 border-slate-200"
                     }`}>
-                      {TIPO_CONFIG[t.tipo]?.label || "Otro"}
+                      {TIPO_CONFIG[t.tipo]?.label || tr("Otro")}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoStyle[t.estado]}`}>
                       {estadoLabel[t.estado]}
@@ -1670,12 +1647,12 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                     <span className={`flex items-center gap-1 font-medium ${isVencida(t) ? "text-red-600" : t.plazo ? "text-slate-400" : "text-slate-300"}`}>
                       <Calendar size={10} />
                       {t.plazo ? (
-                        <>{fmtPlazo(t.plazo)}{isVencida(t) && <span className="font-bold text-red-600 ml-1">VENCIDA</span>}</>
-                      ) : "Sin fecha límite"}
+                        <>{fmtPlazo(t.plazo)}{isVencida(t) && <span className="font-bold text-red-600 ml-1">{tr("VENCIDA")}</span>}</>
+                      ) : tr("Sin fecha límite")}
                     </span>
                     {/* Fecha de creación */}
                     <span className="flex items-center gap-1 text-slate-300">
-                      <Clock size={10} /> Creada {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                      <Clock size={10} />{" "}{tr("Creada")}{" "}{new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
                     </span>
                     {t.expediente && (
                       <span className="flex items-center gap-1 text-slate-400">
@@ -1693,8 +1670,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                       </span>
                     )}
                     {t.fecha_aviso && (
-                      <span className={`flex items-center gap-1 font-medium ${new Date(t.fecha_aviso) < new Date() && t.estado !== 'completada' ? 'text-amber-600' : 'text-slate-400'}`}>
-                        🔔 Aviso: {fmtPlazo(t.fecha_aviso)}
+                      <span className={`flex items-center gap-1 font-medium ${new Date(t.fecha_aviso) < new Date() && t.estado !== 'completada' ? 'text-amber-600' : 'text-slate-400'}`}>{tr("🔔 Aviso:")}{" "}{fmtPlazo(t.fecha_aviso)}
                       </span>
                     )}
                     {t.importe != null && Number(t.importe) > 0 && (
@@ -1709,14 +1685,14 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                     )}
                     {t.created_by && (
                       <span className="flex items-center gap-1 text-slate-400">
-                        <User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? 'Usuario' : t.created_by}
+                        <User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? tr("Usuario") : t.created_by}
                       </span>
                     )}
                   </div>
                   {/* Notas internas */}
                   {t.notas && (
                     <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed">
-                      <span className="font-bold">📝 Nota: </span>{t.notas}
+                      <span className="font-bold">{tr("📝 Nota:")}{" "}</span>{t.notas}
                     </div>
                   )}
                 </div>
@@ -1727,12 +1703,10 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                 <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
                   <button onClick={() => startEdit(t)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-                    <Edit3 size={12} /> Editar
-                  </button>
+                    <Edit3 size={12} />{" "}{tr("Editar")}</button>
                   <button onClick={() => handleDelete(t.id)}
                     className="peligro flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                    <Trash2 size={12} /> Borrar
-                  </button>
+                    <Trash2 size={12} />{" "}{tr("Borrar")}</button>
                 </div>
               )}
             </div>
@@ -1752,20 +1726,16 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                   <Trash2 size={18} className="peligro text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Eliminar tarea</h3>
-                  <p className="text-sm text-slate-500">Esta acción no se puede deshacer.</p>
+                  <h3 className="font-bold text-slate-900">{t("Eliminar tarea")}</h3>
+                  <p className="text-sm text-slate-500">{t("Esta acción no se puede deshacer.")}</p>
                 </div>
               </div>
             </div>
             <div className="flex gap-2 px-6 pb-6">
               <button onClick={() => setConfirmDeleteTareaId(null)}
-                className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                Cancelar
-              </button>
+                className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">{t("Cancelar")}</button>
               <button onClick={confirmDeleteTarea}
-                className="peligro flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
-                Eliminar
-              </button>
+                className="peligro flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -2233,7 +2203,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        aviso(`Error al descargar: ${err.error || res.status}`);
+        aviso(t("Error al descargar: {v}", { v: err.error || res.status }));
         return;
       }
       const blob = await res.blob();
@@ -2246,7 +2216,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      aviso('Error al descargar el archivo');
+      aviso(t("Error al descargar el archivo"));
     }
   }, [clientId, getToken]);
 
@@ -2261,7 +2231,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
     });
     const data = await safeJson(res);
     if (!res.ok || !data?.token) {
-      throw new Error(data?.error || 'No se pudo generar el acceso temporal.');
+      throw new Error(data?.error || t("No se pudo generar el acceso temporal."));
     }
 
     const resolved = resolveApiUrl(`/api/files/dl/${data.token}`);
@@ -2279,7 +2249,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        aviso(`Error al abrir PDF: ${err.error || res.status}`);
+        aviso(t("Error al abrir PDF: {v}", { v: err.error || res.status }));
         return;
       }
       const blob = await res.blob();
@@ -2288,7 +2258,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_e) {
       setOpeningMessage(null);
-      aviso('No se pudo abrir el PDF en el navegador.');
+      aviso(t("No se pudo abrir el PDF en el navegador."));
     }
   }, [clientId, getToken, showOpeningMessage]);
 
@@ -2305,7 +2275,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
       setOpeningMessage(null);
-      aviso(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
+      aviso(error?.message || t("No se pudo abrir el PDF en PDF Studio."));
     }
   }, [getTempOpenUrl, showOpeningMessage]);
 
@@ -2555,7 +2525,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
           attachment_type: editAttachmentType,
         }),
       });
-      if (!res.ok) throw new Error(`Error: ${res.status}`);
+      if (!res.ok) throw new Error(t("Error: {status}", { status: res.status }));
       const data = await res.json();
       if (data.success && data.data) {
         setEditingFile(null);
@@ -2615,7 +2585,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       setTplPreviewMime('text/html');
     } catch (e: any) {
       if (e.name === 'AbortError') return;
-      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
+      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>${t("Error al cargar vista previa")}</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
       setTplPreviewMime('text/html');
     } finally {
       if (!abort.signal.aborted) setTplPreviewLoading(false);
@@ -2641,20 +2611,20 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch('/api/files/templates', { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+      if (!res.ok) throw new Error(t("Error {status}: {statusText}", { status: res.status, statusText: res.statusText }));
       const data = await res.json();
       if (data.success) {
         setDocPlantFolders(data.data || []);
         if (data.data && data.data.length > 0) {
           setExpandedFolders(new Set([data.data[0].name]));
         } else {
-          setDocPlantError(data.warning || 'No se encontraron plantillas en la carpeta DocPlant.');
+          setDocPlantError(data.warning || t("No se encontraron plantillas en la carpeta DocPlant."));
         }
       } else {
-        setDocPlantError(data.error || 'Error al cargar plantillas.');
+        setDocPlantError(data.error || t("Error al cargar plantillas."));
       }
     } catch (e: any) {
-      setDocPlantError(e.message || 'Error de conexión al cargar plantillas.');
+      setDocPlantError(e.message || t("Error de conexión al cargar plantillas."));
     } finally {
       setDocPlantLoading(false);
     }
@@ -2775,7 +2745,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       {/* Barra de acciones */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <p className="text-sm text-slate-500">
-          {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+          {loadingFiles ? t("Cargando…") : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
         </p>
         <div className="flex flex-wrap gap-2">
           {/* Importar carpeta */}
@@ -2783,29 +2753,25 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
             onClick={() => folderInputRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
           >
-            <FolderOpen size={13} /> Importar carpeta
-          </button>
+            <FolderOpen size={13} />{" "}{t("Importar carpeta")}</button>
           {/* Subir archivos */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
           >
-            <Upload size={13} /> Subir archivo
-          </button>
+            <Upload size={13} />{" "}{t("Subir archivo")}</button>
           {/* Nuevo documento en blanco */}
           <button
             onClick={showCreateBlankModal}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
           >
-            <FilePlus2 size={13} /> Nuevo
-          </button>
+            <FilePlus2 size={13} />{" "}{t("Nuevo")}</button>
           {/* Crear desde plantilla */}
           <button
             onClick={() => openTemplatesModal()}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Sparkles size={13} /> Usar plantilla
-          </button>
+            <Sparkles size={13} />{" "}{t("Usar plantilla")}</button>
         </div>
       </div>
 
@@ -2830,10 +2796,10 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
           ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}
       >
         {uploading
-          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
+          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">{t("Subiendo archivos…")}</p></>
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
-              <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
-              <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p></>
+              <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>{t("Arrastra archivos o carpetas aquí")}</p>
+              <p className="text-xs text-slate-400">{t("PDF, Word, Excel, imágenes — máx. 50 MB por archivo")}</p></>
         }
       </div>
 
@@ -2848,20 +2814,20 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
           ) : files.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-2 text-slate-400">
               <FileText size={36} className="opacity-20" />
-              <p className="text-sm font-medium">No hay documentos adjuntos</p>
-              <p className="text-xs text-slate-300">Sube archivos o crea documentos con las plantillas</p>
+              <p className="text-sm font-medium">{t("No hay documentos adjuntos")}</p>
+              <p className="text-xs text-slate-300">{t("Sube archivos o crea documentos con las plantillas")}</p>
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Documento</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Modificado</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Archivo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t("Documento")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tipo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tamaño")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Fecha")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">{t("Modificado")}</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -2909,7 +2875,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                               <button
                                 onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${(canPreview || canWord || canExcel) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : f.original_name}
+                                title={canWord ? t("Abrir en Word") : canExcel ? t("Abrir en Excel") : isPdf ? t("Abrir PDF") : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -2919,12 +2885,12 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || "Sin nombre"}>
-                          {f.document_name || <span className="text-slate-400 italic">Sin nombre</span>}
+                        <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || t("Sin nombre")}>
+                          {f.document_name || <span className="text-slate-400 italic">{t("Sin nombre")}</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">
                           <span className={`px-2 py-1 rounded text-[10px] font-medium ${fi.color}`}>
-                            {f.attachment_type || 'Sin clasificar'}
+                            {f.attachment_type || t("Sin clasificar")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
@@ -2940,14 +2906,14 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                           <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                             {/* Vista previa — no se toca */}
                             {(canPreview || canWord || canExcel) && (
-                              <button onClick={() => openPreview(f)} title="Vista previa"
+                              <button onClick={() => openPreview(f)} title={t("Vista previa")}
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
                                 <Eye size={14} />
                               </button>
                             )}
                             {/* Editar metadatos */}
                             <button
-                              title="Editar"
+                              title={t("Editar")}
                               className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                               onClick={() => {
                                 setEditingFile({ id: f.id, document_name: f.document_name || '', attachment_type: f.attachment_type || 'Sin clasificar' });
@@ -2959,13 +2925,13 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                             </button>
                             {/* Abrir / descargar */}
                             <button
-                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : "Descargar"}
+                              title={canWord ? t("Abrir en Word") : canExcel ? t("Abrir en Excel") : isPdf ? t("Abrir PDF") : t("Descargar")}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : () => openWithApp(f)}
                             >
                               <ExternalLink size={14} />
                             </button>
-                            <button onClick={() => handleDelete(f.id)} title="Eliminar"
+                            <button onClick={() => handleDelete(f.id)} title={t("Eliminar")}
                               className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
@@ -3014,7 +2980,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                     }}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <ExternalLink size={11} /> Abrir {(() => {
+                    <ExternalLink size={11} />{" "}{t("Abrir")}{" "}{(() => {
                       const sourceFile = files.find((item) => item.id === preview.fileId);
                       return sourceFile && isPdfFile(sourceFile.mimetype || "", sourceFile.original_name || "") ? <ChevronDown size={11} /> : null;
                     })()}
@@ -3026,7 +2992,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Abrir en nueva pestaña"
+                  title={t("Abrir en nueva pestaña")}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </a>
@@ -3036,7 +3002,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                     setPreview(null);
                   }}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Cerrar vista previa"
+                  title={t("Cerrar vista previa")}
                 >
                   <X size={14} />
                 </button>
@@ -3094,17 +3060,15 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                 <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 p-8">
                   <span className="text-5xl">📎</span>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-600 mb-1">Vista previa no disponible</p>
-                    <p className="text-xs text-slate-400">Este formato no se puede mostrar directamente.</p>
+                    <p className="text-sm font-semibold text-slate-600 mb-1">{t("Vista previa no disponible")}</p>
+                    <p className="text-xs text-slate-400">{t("Este formato no se puede mostrar directamente.")}</p>
                   </div>
                   {preview.fileId && (
                     <button
                       onClick={() => downloadWithAuth(preview.fileId!, preview.name)}
                       className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      <Download size={14} />
-                      Descargar archivo
-                    </button>
+                      <Download size={14} />{t("Descargar archivo")}</button>
                   )}
                 </div>
               )}
@@ -3131,8 +3095,8 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
               <div className="flex items-center gap-3">
                 <Sparkles size={16} className="text-red-600" />
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Plantillas del despacho</h2>
-                  <p className="text-[11px] text-slate-400">Selecciona una plantilla para previsualizarla</p>
+                  <h2 className="text-sm font-bold text-slate-900">{t("Plantillas del despacho")}</h2>
+                  <p className="text-[11px] text-slate-400">{t("Selecciona una plantilla para previsualizarla")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -3140,15 +3104,11 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                 <button
                   onClick={() => setTemplateTab('docplant')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'docplant' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                  📁 Plantillas
-                </button>
+                >{t("📁 Plantillas")}</button>
                 <button
                   onClick={() => setTemplateTab('generated')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'generated' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                  ✨ Generar
-                </button>
+                >{t("✨ Generar")}</button>
                 <div className="w-px h-5 bg-slate-200 mx-1" />
                 <button onClick={() => {
                   if (tplPreviewBlobUrl.current) {
@@ -3177,7 +3137,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                       <input
                         value={templateSearch}
                         onChange={e => setTemplateSearch(e.target.value)}
-                        placeholder="Buscar plantilla…"
+                        placeholder={t("Buscar plantilla…")}
                         className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
                       />
                     </div>
@@ -3188,23 +3148,22 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                     {docPlantLoading ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
                         <Spinner size="md" />
-                        <p className="text-xs">Cargando plantillas…</p>
+                        <p className="text-xs">{t("Cargando plantillas…")}</p>
                       </div>
                     ) : docPlantError ? (
                       <div className="p-3">
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
-                          <p className="text-xs font-bold text-amber-700 mb-1">Error al cargar</p>
+                          <p className="text-xs font-bold text-amber-700 mb-1">{t("Error al cargar")}</p>
                           <p className="text-[11px] text-amber-600">{docPlantError}</p>
                         </div>
                         <button
                           onClick={() => openTemplatesModal(true)}
                           className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all"
                         >
-                          <Loader2 size={11} /> Reintentar
-                        </button>
+                          <Loader2 size={11} />{" "}{t("Reintentar")}</button>
                       </div>
                     ) : docPlantFolders.length === 0 ? (
-                      <p className="text-center text-xs text-slate-400 py-8">No se encontraron plantillas</p>
+                      <p className="text-center text-xs text-slate-400 py-8">{t("No se encontraron plantillas")}</p>
                     ) : (() => {
                       const q = templateSearch.toLowerCase().trim();
                       const filteredFolders = docPlantFolders.map(folder => ({
@@ -3212,7 +3171,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                         files: q ? folder.files.filter(f => f.name.toLowerCase().includes(q)) : folder.files,
                       })).filter(f => f.files.length > 0);
 
-                      if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">Sin resultados</p>;
+                      if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">{t("Sin resultados")}</p>;
 
                       return filteredFolders.map(folder => {
                         const isOpen = q ? true : expandedFolders.has(folder.name);
@@ -3267,7 +3226,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                   {!selectedTpl ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
                       <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-30"><rect x="8" y="4" width="32" height="40" rx="3" fill="#94a3b8"/><rect x="13" y="14" width="22" height="2" rx="1" fill="white"/><rect x="13" y="20" width="22" height="2" rx="1" fill="white"/><rect x="13" y="26" width="14" height="2" rx="1" fill="white"/></svg>
-                      <p className="text-sm">Selecciona una plantilla para previsualizar</p>
+                      <p className="text-sm">{t("Selecciona una plantilla para previsualizar")}</p>
                     </div>
                   ) : (
                     <>
@@ -3282,29 +3241,28 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                           onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
                           className="shrink-0 ml-3 flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg active:scale-95 transition-all"
                         >
-                          <Download size={12} /> Seleccionar
-                        </button>
+                          <Download size={12} />{" "}{t("Seleccionar")}</button>
                       </div>
                       {/* Preview content */}
                       <div className="flex-1 overflow-hidden relative">
                         {tplPreviewLoading ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
                             <Spinner size="lg" />
-                            <p className="text-sm">Cargando vista previa…</p>
+                            <p className="text-sm">{t("Cargando vista previa…")}</p>
                           </div>
                         ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
                           <iframe
                             key={tplPreviewUrl}
                             src={`${tplPreviewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
                             className="w-full h-full border-0"
-                            title="Vista previa de plantilla"
+                            title={t("Vista previa de plantilla")}
                           />
                         ) : tplPreviewHtml ? (
                           <iframe
                             key={selectedTpl?.path}
                             srcDoc={tplPreviewHtml}
                             className="w-full h-full border-0"
-                            title="Vista previa de plantilla"
+                            title={t("Vista previa de plantilla")}
                             sandbox="allow-same-origin"
                           />
                         ) : null}
@@ -3340,9 +3298,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                     );
                   })}
                 </div>
-                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-400">
-                  Documentos pre-rellenados con datos de <strong>{client.first_name} {client.last_name || ""}</strong> · Se generan como HTML apto para Word
-                </div>
+                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-400">{t("Documentos pre-rellenados con datos de")}{" "}<strong>{client.first_name} {client.last_name || ""}</strong>{" "}{t("· Se generan como HTML apto para Word")}</div>
               </div>
             )}
 
@@ -3369,18 +3325,14 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir en navegador
-          </button>
+          >{t("Abrir en navegador")}</button>
           <button
             onClick={() => {
               void openPdfWithPdfStudio(pdfOpenMenu.file);
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir con PDF Studio
-          </button>
+          >{t("Abrir con PDF Studio")}</button>
         </div>,
         document.body
       )}
@@ -3393,7 +3345,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-neutral-700" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Vista previa</p>
+                  <p className="text-sm font-bold text-slate-900">{t("Vista previa")}</p>
                   <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{wordPreview.name}</p>
                 </div>
               </div>
@@ -3402,9 +3354,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-600">
-                Este es un documento Word. Vamos a intentar abrirlo directamente en Microsoft Word.
-              </p>
+              <p className="text-sm text-slate-600">{t("Este es un documento Word. Vamos a intentar abrirlo directamente en Microsoft Word.")}</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -3413,15 +3363,11 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <ExternalLink size={14} />
-                  Abrir en Word
-                </button>
+                  <ExternalLink size={14} />{t("Abrir en Word")}</button>
                 <button
                   onClick={() => setWordPreview(null)}
                   className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Cerrar
-                </button>
+                >{t("Cerrar")}</button>
               </div>
             </div>
           </div>
@@ -3439,16 +3385,15 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
               <div>
                 <h2 className="text-base font-bold text-slate-900">
                   {editingFile.id === 'NEW_BLANK'
-                    ? 'Nuevo documento'
+                    ? t("Nuevo documento")
                     : editingFile.id === 'PENDING_TEMPLATE'
-                    ? 'Usar plantilla'
+                    ? t("Usar plantilla")
                     : editingFile.id === 'PENDING_UPLOAD'
-                    ? 'Adjuntar archivo'
-                    : 'Editar documento'}
+                    ? t("Adjuntar archivo")
+                    : t("Editar documento")}
                 </h2>
                 {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 && (
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Archivo {uploadQueueTotal - uploadQueue.length} de {uploadQueueTotal}
+                  <p className="text-[11px] text-slate-400 mt-0.5">{t("Archivo")}{" "}{uploadQueueTotal - uploadQueue.length}{" "}{t("de")}{" "}{uploadQueueTotal}
                   </p>
                 )}
               </div>
@@ -3469,36 +3414,35 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
             <div className="p-6 space-y-4">
               {/* Nombre del documento */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre del documento</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Nombre del documento")}</label>
                 <input
                   type="text"
                   value={editDocName}
                   onChange={(e) => setEditDocName(e.target.value)}
-                  placeholder="Ej: 1. - Consentimiento"
+                  placeholder={t("Ej: 1. - Consentimiento")}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   autoFocus
                 />
                 {editingFile.id === 'PENDING_UPLOAD' && pendingUploadFile.current && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Archivo: <span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
+                  <p className="text-[11px] text-slate-400 mt-1">{t("Archivo:")}{" "}<span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
                   </p>
                 )}
               </div>
 
               {/* Tipo de adjunto */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Tipo de adjunto</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Tipo de adjunto")}</label>
                 <select
                   value={editAttachmentType}
                   onChange={(e) => setEditAttachmentType(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 >
-                  <option value="Sin clasificar">Sin clasificar</option>
-                  <option value="AUTO">AUTO</option>
-                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
-                  <option value="FACTURAS">FACTURAS</option>
-                  <option value="PODER">PODER</option>
-                  <option value="EVIDENCIA">EVIDENCIA</option>
+                  <option value="Sin clasificar">{t("Sin clasificar")}</option>
+                  <option value="AUTO">{t("AUTO")}</option>
+                  <option value="ESCRITO PROCESAL">{t("ESCRITO PROCESAL")}</option>
+                  <option value="FACTURAS">{t("FACTURAS")}</option>
+                  <option value="PODER">{t("PODER")}</option>
+                  <option value="EVIDENCIA">{t("EVIDENCIA")}</option>
                 </select>
               </div>
             </div>
@@ -3514,7 +3458,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                 }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? 'Cancelar todo' : 'Cancelar'}
+                {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? t("Cancelar todo") : t("Cancelar")}
               </button>
               <button
                 onClick={() => {
@@ -3527,14 +3471,14 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                 className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {savingMetadata
-                  ? 'Subiendo...'
+                  ? t("Subiendo...")
                   : editingFile.id === 'NEW_BLANK'
-                  ? 'Crear'
+                  ? t("Crear")
                   : editingFile.id === 'PENDING_TEMPLATE'
-                  ? 'Usar'
+                  ? t("Usar")
                   : editingFile.id === 'PENDING_UPLOAD'
-                  ? (uploadQueue.length > 0 ? `Adjuntar (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : 'Adjuntar')
-                  : 'Guardar'}
+                  ? (uploadQueue.length > 0 ? t("Adjuntar ({v}/{uploadQueueTotal})", { v: uploadQueueTotal - uploadQueue.length, uploadQueueTotal: uploadQueueTotal }) : t("Adjuntar"))
+                  : t("Guardar")}
               </button>
             </div>
           </div>
@@ -3559,9 +3503,9 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
       const res = await fetch(`/api/tasks/indicators/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) setInd(data.data);
-      else setIndError(data.error || "Error al cargar indicadores");
+      else setIndError(data.error || t("Error al cargar indicadores"));
     } catch (e: any) {
-      setIndError(e.message || "Error de conexión");
+      setIndError(e.message || t("Error de conexión"));
     } finally { setLoading(false); }
   }, [clientId, getToken]);
 
@@ -3582,7 +3526,7 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
     <aside className="w-full shrink-0 flex flex-col min-h-0">
       <div className="bg-white border border-slate-200 rounded-xl overflow-y-auto flex-1 min-h-0">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Indicadores")}</h3>
           {loading && <Spinner size="sm" muted />}
         </div>
 
@@ -3590,39 +3534,39 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
           {indError && (
             <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-[10px] text-red-600 leading-snug">
               {indError}
-              <button onClick={fetchIndicators} className="block mt-1 font-bold underline">Reintentar</button>
+              <button onClick={fetchIndicators} className="block mt-1 font-bold underline">{t("Reintentar")}</button>
             </div>
           )}
           {/* Tareas */}
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tareas</p>
-          <Indicador label="Total tareas"      value={fmt(ind?.total_tareas)} />
-          <Indicador label="Pendientes"        value={fmt(ind?.tareas_pendientes)}
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{t("Tareas")}</p>
+          <Indicador label={t("Total tareas")}      value={fmt(ind?.total_tareas)} />
+          <Indicador label={t("Pendientes")}        value={fmt(ind?.tareas_pendientes)}
             color={ind?.tareas_pendientes > 0 ? "text-amber-600" : "text-slate-700"} />
-          <Indicador label="Urgentes"          value={fmt(ind?.tareas_urgentes)}
+          <Indicador label={t("Urgentes")}          value={fmt(ind?.tareas_urgentes)}
             color={ind?.tareas_urgentes > 0 ? "text-rose-600" : "text-slate-700"} />
-          <Indicador label="Vencidas"          value={fmt(ind?.tareas_vencidas)}
+          <Indicador label={t("Vencidas")}          value={fmt(ind?.tareas_vencidas)}
             color={ind?.tareas_vencidas > 0 ? "text-rose-700 font-bold" : "text-slate-700"} />
-          <Indicador label="Completadas"       value={fmt(ind?.tareas_completadas)}
+          <Indicador label={t("Completadas")}       value={fmt(ind?.tareas_completadas)}
             color={ind?.tareas_completadas > 0 ? "text-emerald-600" : "text-slate-700"} />
 
           {/* Documentación */}
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">Documentación</p>
-          <Indicador label="Archivos"          value={fmt(ind?.total_archivos)} />
-          <Indicador label="Notas"             value={fmt(ind?.total_notas)} />
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">{t("Documentación")}</p>
+          <Indicador label={t("Archivos")}          value={fmt(ind?.total_archivos)} />
+          <Indicador label={t("Notas")}             value={fmt(ind?.total_notas)} />
 
           {/* Actividad */}
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">Actividad</p>
-          <Indicador label="Actuaciones"        value={fmt(ind?.total_actuaciones)}
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">{t("Actividad")}</p>
+          <Indicador label={t("Actuaciones")}        value={fmt(ind?.total_actuaciones)}
             color={ind?.total_actuaciones > 0 ? "text-blue-600" : "text-slate-700"} />
-          <Indicador label="Expedientes"        value={fmt(ind?.total_expedientes)}
+          <Indicador label={t("Expedientes")}        value={fmt(ind?.total_expedientes)}
             color={ind?.total_expedientes > 0 ? "text-indigo-600" : "text-slate-700"} />
-          <Indicador label="Días sin actuac."  value={fmt(ind?.dias_sin_actuacion, " días")}
+          <Indicador label={t("Días sin actuac.")}  value={fmt(ind?.dias_sin_actuacion, " días")}
             color={ind?.dias_sin_actuacion > 30 ? "text-amber-600" : "text-slate-700"} />
-          <Indicador label="Días desde alta"   value={fmt(ind?.dias_desde_alta, " días")} />
-          <Indicador label="Estado"            value={ind?.client_status || "—"}
+          <Indicador label={t("Días desde alta")}   value={fmt(ind?.dias_desde_alta, " días")} />
+          <Indicador label={t("Estado")}            value={ind?.client_status || "—"}
             color={ind?.client_status === "Alta" ? "text-emerald-600" :
                    ind?.client_status === "Baja" ? "text-red-600" : "text-slate-700"} />
-          <Indicador label="Domicilio"
+          <Indicador label={t("Domicilio")}
             value={ind?.tiene_domicilio ? "Sí" : "No"}
             color={ind?.tiene_domicilio ? "text-emerald-600" : "text-red-500"} />
         </div>
@@ -3679,26 +3623,26 @@ function TabEconomico({ clientId }: { clientId: string }) {
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-2 mb-3">
             <BadgeEuro size={15} className="text-slate-400" />
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Facturado")}</p>
           </div>
           <p className="text-2xl font-bold text-slate-800">{fmtMoney(totalFacturado)}</p>
-          <p className="text-xs text-slate-400 mt-1">{clientFacturas.length} factura{clientFacturas.length !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-slate-400 mt-1">{clientFacturas.length}{" "}{t("factura")}{clientFacturas.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={15} className="text-emerald-500" />
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Cobrado")}</p>
           </div>
           <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalCobrado)}</p>
-          <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
+          <p className="text-xs text-slate-400 mt-1">{t("facturas cobradas")}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-2 mb-3">
             <TrendingDown size={15} className="text-amber-500" />
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Pendiente")}</p>
           </div>
           <p className="text-2xl font-bold text-amber-600">{fmtMoney(totalPendiente)}</p>
-          <p className="text-xs text-slate-400 mt-1">por cobrar</p>
+          <p className="text-xs text-slate-400 mt-1">{t("por cobrar")}</p>
         </div>
       </div>
 
@@ -3706,10 +3650,9 @@ function TabEconomico({ clientId }: { clientId: string }) {
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Banknote size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas del cliente</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Facturas del cliente")}</h3>
           </div>
-          <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
-            Ir a facturación <ChevronRight size={11} />
+          <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">{t("Ir a facturación")}{" "}<ChevronRight size={11} />
           </Link>
         </div>
         {loading ? (
@@ -3719,19 +3662,19 @@ function TabEconomico({ clientId }: { clientId: string }) {
         ) : clientFacturas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
             <Banknote size={28} className="opacity-30" />
-            <p className="text-sm font-medium">Sin facturas vinculadas a este cliente</p>
-            <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear factura</Link>
+            <p className="text-sm font-medium">{t("Sin facturas vinculadas a este cliente")}</p>
+            <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("Crear factura")}</Link>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
-                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Expediente</th>
-                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
-                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
-                <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
-                <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Núm.")}</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Expediente")}</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha")}</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Vencimiento")}</th>
+                <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Total")}</th>
+                <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -3802,10 +3745,9 @@ function TabAgenda({ clientId }: { clientId: string }) {
       <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Calendar size={14} className="text-slate-400" />
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Eventos de agenda")}</h3>
         </div>
-        <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
-          Ir a agenda <ChevronRight size={11} />
+        <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">{t("Ir a agenda")}{" "}<ChevronRight size={11} />
         </Link>
       </div>
       {loading ? (
@@ -3815,18 +3757,18 @@ function TabAgenda({ clientId }: { clientId: string }) {
       ) : clientEvents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
           <Calendar size={28} className="opacity-30" />
-          <p className="text-sm font-medium">Sin eventos vinculados a este cliente</p>
-          <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear evento</Link>
+          <p className="text-sm font-medium">{t("Sin eventos vinculados a este cliente")}</p>
+          <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("Crear evento")}</Link>
         </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100">
-              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
-              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
-              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
-              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
-              <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Título")}</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo")}</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha inicio")}</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha fin")}</th>
+              <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -3905,7 +3847,7 @@ export default function ClientDetail() {
       });
       const result = await safeJson(res);
       if (res.ok) setClient(result.data);
-      else if (!silent) throw new Error(result.error || "Cliente no encontrado");
+      else if (!silent) throw new Error(result.error || t("Cliente no encontrado"));
     } catch (err: any) {
       if (!silent) setError(err.message);
     } finally {
@@ -3969,7 +3911,7 @@ export default function ClientDetail() {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Spinner size="xl" label="Cargando ficha..." />
+      <Spinner size="xl" label={t("Cargando ficha...")} />
     </div>
   );
 
@@ -3980,7 +3922,7 @@ export default function ClientDetail() {
       </Link>
       <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertCircle size={20} className="shrink-0" />
-        <span className="text-sm">{error || "Cliente no encontrado"}</span>
+        <span className="text-sm">{error || t("Cliente no encontrado")}</span>
       </div>
     </div>
   );
@@ -4054,14 +3996,14 @@ export default function ClientDetail() {
         // sobreescribir en silencio -- se ofrece recargar en vez de un simple
         // "error al guardar" que no explica qué pasó.
         if (res.status === 409 && d.conflict) {
-          if (await confirmar({ titulo: "Alguien ha cambiado este cliente mientras lo editabas", mensaje: `${d.error}\n\n¿Recargar el cliente ahora? Perderás los cambios que no hayas guardado.`, confirmar: "Recargar" })) {
+          if (await confirmar({ titulo: t("Alguien ha cambiado este cliente mientras lo editabas"), mensaje: t("{error}\n\n¿Recargar el cliente ahora? Perderás los cambios que no hayas guardado.", { error: d.error }), confirmar: t("Recargar") })) {
             setEditing(false);
             setEditForm(null);
             await fetchClient();
           }
           return;
         }
-        aviso(d.error || "Error al guardar");
+        aviso(d.error || t("Error al guardar"));
         return;
       }
       setEditing(false);
@@ -4085,9 +4027,9 @@ export default function ClientDetail() {
               <button
                 onClick={() => setPhotoZoom(true)}
                 className="shrink-0 rounded-xl overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in"
-                title="Ver foto ampliada"
+                title={t("Ver foto ampliada")}
               >
-                <img src={client.photo_url} alt="Foto" className="h-12 w-12 object-cover hover:scale-105 transition-transform duration-200" />
+                <img src={client.photo_url} alt={t("Foto")} className="h-12 w-12 object-cover hover:scale-105 transition-transform duration-200" />
               </button>
             )
             : (
@@ -4106,7 +4048,7 @@ export default function ClientDetail() {
               <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
                 <img
                   src={client.photo_url}
-                  alt="Foto ampliada"
+                  alt={t("Foto ampliada")}
                   className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]"
                 />
                 <button
@@ -4128,10 +4070,10 @@ export default function ClientDetail() {
                 {client.first_name} {client.last_name}
               </h1>
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
-                {client.client_status || "Alta"}
+                {client.client_status || t("Alta")}
               </span>
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>
-                {client.type || "Cliente"}
+                {client.type || t("Cliente")}
               </span>
             </div>
             <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500 flex-wrap">
@@ -4143,7 +4085,7 @@ export default function ClientDetail() {
                 <span className="flex items-center gap-1.5">Nº {client.internal_number}</span>
               )}
               {client.date_alta && (
-                <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" /> Alta: {formatDate(client.date_alta)}</span>
+                <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" />{" "}{t("Alta:")}{" "}{formatDate(client.date_alta)}</span>
               )}
             </div>
           </div>
@@ -4151,25 +4093,21 @@ export default function ClientDetail() {
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={() => navigate(`/dashboard/calculadora?cliente=${client.id}`)}
-            title="Tasación de costas y jura de cuentas con los datos de este cliente y sus expedientes"
+            title={t("Tasación de costas y jura de cuentas con los datos de este cliente y sus expedientes")}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Calculator size={14} className="text-slate-400" /> Costas
-          </button>
+            <Calculator size={14} className="text-slate-400" />{" "}{t("Costas")}</button>
           <BackButton onClick={() => navigate("/dashboard/clientes")} />
           {editing ? (
             <>
               <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all">
-                <X size={14} /> Cancelar
-              </button>
+                <X size={14} />{" "}{t("Cancelar")}</button>
               <button onClick={handleSaveClient} disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
-              </button>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{" "}{t("Guardar cambios")}</button>
             </>
           ) : (
             <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
-              <Edit3 size={14} /> Editar
-            </button>
+              <Edit3 size={14} />{" "}{t("Editar")}</button>
           )}
         </div>
       </div>
@@ -4180,7 +4118,7 @@ export default function ClientDetail() {
 
           {/* Columna 1: Nav vertical */}
           <div className="anim-fade-up w-full flex-shrink-0 lg:w-56 lg:sticky lg:top-6" style={{ animationDelay: '60ms' }}>
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Cliente</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">{t("Secciones del Cliente")}</h3>
             <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
               {TABS.map(tabItem => {
                 const Icon = tabItem.icon;
@@ -4208,18 +4146,18 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <User size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Datos principales</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Datos principales")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <EF label="Nombre"><input value={editForm.first_name} onChange={e => setEF("first_name", e.target.value)} className={EI} placeholder="Nombre" /></EF>
-                      <EF label="Apellidos"><input value={editForm.last_name} onChange={e => setEF("last_name", e.target.value)} className={EI} placeholder="Apellidos" /></EF>
-                      <EF label="Nombre comercial"><input value={editForm.commercial_name} onChange={e => setEF("commercial_name", e.target.value)} className={EI} placeholder="Nombre comercial / empresa" /></EF>
-                      <EF label="Tipo">
+                      <EF label={t("Nombre")}><input value={editForm.first_name} onChange={e => setEF("first_name", e.target.value)} className={EI} placeholder={t("Nombre")} /></EF>
+                      <EF label={t("Apellidos")}><input value={editForm.last_name} onChange={e => setEF("last_name", e.target.value)} className={EI} placeholder={t("Apellidos")} /></EF>
+                      <EF label={t("Nombre comercial")}><input value={editForm.commercial_name} onChange={e => setEF("commercial_name", e.target.value)} className={EI} placeholder={t("Nombre comercial / empresa")} /></EF>
+                      <EF label={t("Tipo")}>
                         <select value={editForm.type} onChange={e => setEF("type", e.target.value)} className={EI}>
                           {["CLIENTE","CONTRARIO","JUZGADO","PERITO","PROVEEDOR"].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </EF>
-                      <EF label="Estado">
+                      <EF label={t("Estado")}>
                         <select value={editForm.client_status} onChange={e => setEF("client_status", e.target.value)} className={EI}>
                           {["Alta","Baja","Suspendido","Potencial"].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -4231,27 +4169,27 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <FileText size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Identificación")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <EF label="Tipo documento">
+                      <EF label={t("Tipo documento")}>
                         <select value={editForm.document_type} onChange={e => setEF("document_type", e.target.value)} className={EI}>
                           {["DNI","NIE","NIF","CIF","Pasaporte","Otro"].map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
                       </EF>
-                      <EF label="NIF / CIF"><input value={editForm.nif_cif} onChange={e => setEF("nif_cif", e.target.value)} className={EI + " font-mono"} placeholder="00000000A" /></EF>
-                      <EF label="Naturaleza jurídica"><input value={editForm.legal_nature} onChange={e => setEF("legal_nature", e.target.value)} className={EI} /></EF>
-                      <EF label="Sexo">
+                      <EF label={t("NIF / CIF")}><input value={editForm.nif_cif} onChange={e => setEF("nif_cif", e.target.value)} className={EI + " font-mono"} placeholder="00000000A" /></EF>
+                      <EF label={t("Naturaleza jurídica")}><input value={editForm.legal_nature} onChange={e => setEF("legal_nature", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Sexo")}>
                         <select value={editForm.gender} onChange={e => setEF("gender", e.target.value)} className={EI}>
                           <option value="">—</option>
-                          <option value="M">Masculino</option>
-                          <option value="F">Femenino</option>
-                          <option value="Otro">Otro</option>
+                          <option value="M">{t("Masculino")}</option>
+                          <option value="F">{t("Femenino")}</option>
+                          <option value="Otro">{t("Otro")}</option>
                         </select>
                       </EF>
-                      <EF label="Fecha nacimiento"><input type="date" value={editForm.birth_date} onChange={e => setEF("birth_date", e.target.value)} className={EI} /></EF>
-                      <EF label="Nacionalidad"><input value={editForm.nationality} onChange={e => setEF("nationality", e.target.value)} className={EI} /></EF>
-                      <EF label="País expedición"><input value={editForm.expedition_country} onChange={e => setEF("expedition_country", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Fecha nacimiento")}><input type="date" value={editForm.birth_date} onChange={e => setEF("birth_date", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Nacionalidad")}><input value={editForm.nationality} onChange={e => setEF("nationality", e.target.value)} className={EI} /></EF>
+                      <EF label={t("País expedición")}><input value={editForm.expedition_country} onChange={e => setEF("expedition_country", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>
 
@@ -4259,16 +4197,16 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <MapPin size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Dirección</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Dirección")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="col-span-2 md:col-span-3">
-                        <EF label="Dirección"><input value={editForm.address_street} onChange={e => setEF("address_street", e.target.value)} className={EI} placeholder="Calle, número, piso…" /></EF>
+                        <EF label={t("Dirección")}><input value={editForm.address_street} onChange={e => setEF("address_street", e.target.value)} className={EI} placeholder={t("Calle, número, piso…")} /></EF>
                       </div>
-                      <EF label="Población"><input value={editForm.address_town} onChange={e => setEF("address_town", e.target.value)} className={EI} /></EF>
-                      <EF label="Código postal"><input value={editForm.address_cp} onChange={e => setEF("address_cp", e.target.value)} className={EI} /></EF>
-                      <EF label="Provincia"><input value={editForm.address_province} onChange={e => setEF("address_province", e.target.value)} className={EI} /></EF>
-                      <EF label="País"><input value={editForm.address_country} onChange={e => setEF("address_country", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Población")}><input value={editForm.address_town} onChange={e => setEF("address_town", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Código postal")}><input value={editForm.address_cp} onChange={e => setEF("address_cp", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Provincia")}><input value={editForm.address_province} onChange={e => setEF("address_province", e.target.value)} className={EI} /></EF>
+                      <EF label={t("País")}><input value={editForm.address_country} onChange={e => setEF("address_country", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>
 
@@ -4276,18 +4214,18 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <Phone size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Contacto</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Contacto")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="col-span-2 md:col-span-3">
-                        <EF label="Correo electrónico"><input type="email" value={editForm.email} onChange={e => setEF("email", e.target.value)} className={EI} placeholder="correo@ejemplo.com" /></EF>
+                        <EF label={t("Correo electrónico")}><input type="email" value={editForm.email} onChange={e => setEF("email", e.target.value)} className={EI} placeholder={t("correo@ejemplo.com")} /></EF>
                       </div>
-                      <EF label="Teléfono"><input value={editForm.phone_1} onChange={e => setEF("phone_1", e.target.value)} className={EI} /></EF>
-                      <EF label="Móvil"><input value={editForm.phone_mobile} onChange={e => setEF("phone_mobile", e.target.value)} className={EI} /></EF>
-                      <EF label="Teléfono 2"><input value={editForm.phone_2} onChange={e => setEF("phone_2", e.target.value)} className={EI} /></EF>
-                      <EF label="Teléfono 3"><input value={editForm.phone_3} onChange={e => setEF("phone_3", e.target.value)} className={EI} /></EF>
-                      <EF label="Fax"><input value={editForm.phone_fax} onChange={e => setEF("phone_fax", e.target.value)} className={EI} /></EF>
-                      <EF label="Web"><input value={editForm.website} onChange={e => setEF("website", e.target.value)} className={EI} placeholder="https://…" /></EF>
+                      <EF label={t("Teléfono")}><input value={editForm.phone_1} onChange={e => setEF("phone_1", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Móvil")}><input value={editForm.phone_mobile} onChange={e => setEF("phone_mobile", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Teléfono 2")}><input value={editForm.phone_2} onChange={e => setEF("phone_2", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Teléfono 3")}><input value={editForm.phone_3} onChange={e => setEF("phone_3", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Fax")}><input value={editForm.phone_fax} onChange={e => setEF("phone_fax", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Web")}><input value={editForm.website} onChange={e => setEF("website", e.target.value)} className={EI} placeholder={t("https://…")} /></EF>
                     </div>
                   </div>
 
@@ -4295,14 +4233,14 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <Landmark size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Datos bancarios y referencia</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Datos bancarios y referencia")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <EF label="IBAN"><input value={editForm.iban} onChange={e => setEF("iban", e.target.value)} placeholder="ES00 0000 0000 0000 0000 0000" className={EI} /></EF>
-                      <EF label="BIC / SWIFT"><input value={editForm.bic} onChange={e => setEF("bic", e.target.value)} className={EI} /></EF>
-                      <EF label="Referencia del cliente"><input value={editForm.referencia_cliente} onChange={e => setEF("referencia_cliente", e.target.value)} className={EI} /></EF>
-                      <EF label="Nº mandato SEPA"><input value={editForm.mandato_numero} onChange={e => setEF("mandato_numero", e.target.value)} className={EI} /></EF>
-                      <EF label="Fecha mandato"><input type="date" value={editForm.mandato_fecha} onChange={e => setEF("mandato_fecha", e.target.value)} className={EI} /></EF>
+                      <EF label={t("IBAN")}><input value={editForm.iban} onChange={e => setEF("iban", e.target.value)} placeholder={t("ES00 0000 0000 0000 0000 0000")} className={EI} /></EF>
+                      <EF label={t("BIC / SWIFT")}><input value={editForm.bic} onChange={e => setEF("bic", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Referencia del cliente")}><input value={editForm.referencia_cliente} onChange={e => setEF("referencia_cliente", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Nº mandato SEPA")}><input value={editForm.mandato_numero} onChange={e => setEF("mandato_numero", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Fecha mandato")}><input type="date" value={editForm.mandato_fecha} onChange={e => setEF("mandato_fecha", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>
 
@@ -4310,19 +4248,19 @@ export default function ClientDetail() {
                   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                       <Shield size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Administración</h3>
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Administración")}</h3>
                     </div>
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <EF label="Fecha alta"><input type="date" value={editForm.date_alta} onChange={e => setEF("date_alta", e.target.value)} className={EI} /></EF>
-                      <EF label="Fecha baja"><input type="date" value={editForm.date_baja} onChange={e => setEF("date_baja", e.target.value)} className={EI} /></EF>
-                      <EF label="LOPD"><input value={editForm.lopd} onChange={e => setEF("lopd", e.target.value)} className={EI} /></EF>
-                      <EF label="Comunicaciones comerciales"><input value={editForm.commercial_communications} onChange={e => setEF("commercial_communications", e.target.value)} className={EI} /></EF>
-                      <EF label="Idioma de comunicación">
+                      <EF label={t("Fecha alta")}><input type="date" value={editForm.date_alta} onChange={e => setEF("date_alta", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Fecha baja")}><input type="date" value={editForm.date_baja} onChange={e => setEF("date_baja", e.target.value)} className={EI} /></EF>
+                      <EF label={t("LOPD")}><input value={editForm.lopd} onChange={e => setEF("lopd", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Comunicaciones comerciales")}><input value={editForm.commercial_communications} onChange={e => setEF("commercial_communications", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Idioma de comunicación")}>
                         <select value={editForm.idioma} onChange={e => setEF("idioma", e.target.value)} className={EI}>
                           {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
                         </select>
                       </EF>
-                      <EF label="Centro"><input value={editForm.center} onChange={e => setEF("center", e.target.value)} className={EI} /></EF>
+                      <EF label={t("Centro")}><input value={editForm.center} onChange={e => setEF("center", e.target.value)} className={EI} /></EF>
                     </div>
                   </div>
                 </div>

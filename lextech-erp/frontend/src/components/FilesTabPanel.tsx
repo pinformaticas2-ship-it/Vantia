@@ -19,6 +19,7 @@ import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 import { aviso } from "../lib/avisos";
 import RellenarPlantilla from './RellenarPlantilla';
 import OnlyOfficeEditor, { isOnlyOfficeCompatible, useOnlyOfficeEnabled } from './OnlyOfficeEditor';
+import { t } from '../lib/i18n';
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -266,7 +267,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        aviso(`Error al descargar: ${err.error || res.status}`);
+        aviso(t("Error al descargar: {v}", { v: err.error || res.status }));
         return;
       }
       const blob = await res.blob();
@@ -279,7 +280,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      aviso('Error al descargar el archivo');
+      aviso(t("Error al descargar el archivo"));
     }
   }, [entityId, getToken]);
 
@@ -294,7 +295,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
     });
     const data = await safeJson(res);
     if (!res.ok || !data?.token) {
-      throw new Error(data?.error || 'No se pudo generar el acceso temporal.');
+      throw new Error(data?.error || t("No se pudo generar el acceso temporal."));
     }
 
     const resolved = resolveApiUrl(`/api/files/dl/${data.token}`);
@@ -315,7 +316,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       const url = await getTempOpenUrl(file.id);
       setRichPreview({ file, url });
     } catch (e: any) {
-      aviso(e?.message || 'No se pudo generar la vista previa.');
+      aviso(e?.message || t("No se pudo generar la vista previa."));
     } finally {
       setRichPreviewLoading(null);
     }
@@ -330,7 +331,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        aviso(`Error al abrir PDF: ${err.error || res.status}`);
+        aviso(t("Error al abrir PDF: {v}", { v: err.error || res.status }));
         return;
       }
       const blob = await res.blob();
@@ -339,7 +340,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_e) {
       setOpeningMessage(null);
-      aviso('No se pudo abrir el PDF en el navegador.');
+      aviso(t("No se pudo abrir el PDF en el navegador."));
     }
   }, [entityId, getToken, showOpeningMessage]);
 
@@ -356,7 +357,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
       setOpeningMessage(null);
-      aviso(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
+      aviso(error?.message || t("No se pudo abrir el PDF en PDF Studio."));
     }
   }, [getTempOpenUrl, showOpeningMessage]);
 
@@ -663,7 +664,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           ...(askWhereToUpload ? { provider: uploadProvider } : {}),
         }),
       });
-      if (!res.ok) throw new Error(`Error: ${res.status}`);
+      if (!res.ok) throw new Error(t("Error: {status}", { status: res.status }));
       const data = await res.json();
       if (data.success && data.data) {
         setEditingFile(null);
@@ -723,7 +724,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       setTplPreviewMime('text/html');
     } catch (e: any) {
       if (e.name === 'AbortError') return;
-      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
+      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>${t("Error al cargar vista previa")}</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
       setTplPreviewMime('text/html');
     } finally {
       if (!abort.signal.aborted) setTplPreviewLoading(false);
@@ -749,20 +750,20 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch('/api/files/templates', { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+      if (!res.ok) throw new Error(t("Error {status}: {statusText}", { status: res.status, statusText: res.statusText }));
       const data = await res.json();
       if (data.success) {
         setDocPlantFolders(data.data || []);
         if (data.data && data.data.length > 0) {
           setExpandedFolders(new Set([data.data[0].name]));
         } else {
-          setDocPlantError(data.warning || 'No se encontraron plantillas en la carpeta DocPlant.');
+          setDocPlantError(data.warning || t("No se encontraron plantillas en la carpeta DocPlant."));
         }
       } else {
-        setDocPlantError(data.error || 'Error al cargar plantillas.');
+        setDocPlantError(data.error || t("Error al cargar plantillas."));
       }
     } catch (e: any) {
-      setDocPlantError(e.message || 'Error de conexión al cargar plantillas.');
+      setDocPlantError(e.message || t("Error de conexión al cargar plantillas."));
     } finally {
       setDocPlantLoading(false);
     }
@@ -784,7 +785,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
     const fd = new FormData();
     fd.append('files', archivo);
     const res = await fetch(`/api/files/${entityId}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-    if (!res.ok) throw new Error('No se pudo adjuntar el documento.');
+    if (!res.ok) throw new Error(t("No se pudo adjuntar el documento."));
     const data = await res.json().catch(() => null);
     const fileId = data?.data?.[0]?.id;
     if (fileId) {
@@ -911,21 +912,20 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <div className="flex items-center gap-3">
           <p className="text-sm text-slate-500">
-            {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+            {loadingFiles ? t("Cargando…") : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
           </p>
           {/* Indicador de portapapeles ERP — visible mientras haya algo copiado */}
           {erpClip && !locked && (
             <button
               onClick={pasteFromErpClipboard}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-all animate-in fade-in duration-200"
-              title={`Pegar "${erpClip.name}" aquí`}
+              title={t("Pegar \"{name}\" aquí", { name: erpClip.name })}
             >
-              <Clipboard size={12} />
-              Pegar "{erpClip.name.length > 24 ? erpClip.name.slice(0, 22) + '…' : erpClip.name}"
+              <Clipboard size={12} />{t("Pegar \"")}{erpClip.name.length > 24 ? erpClip.name.slice(0, 22) + '…' : erpClip.name}"
               <button
                 onClick={(e) => { e.stopPropagation(); clearErpClipboard(); }}
                 className="ml-1 text-blue-400 hover:text-blue-700 rounded"
-                title="Limpiar portapapeles"
+                title={t("Limpiar portapapeles")}
               >
                 <X size={11} />
               </button>
@@ -937,43 +937,38 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           <button
             onClick={() => !locked && setPdfTool([])}
             disabled={locked}
-            title="Unir varios documentos en un PDF o quitar, ordenar y girar páginas"
+            title={t("Unir varios documentos en un PDF o quitar, ordenar y girar páginas")}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Combine size={13} /> Fusionar PDF
-          </button>
+            <Combine size={13} />{" "}{t("Fusionar PDF")}</button>
           {/* Importar carpeta */}
           <button
             onClick={() => !locked && folderInputRef.current?.click()}
             disabled={locked}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <FolderOpen size={13} /> Importar carpeta
-          </button>
+            <FolderOpen size={13} />{" "}{t("Importar carpeta")}</button>
           {/* Subir archivos */}
           <button
             onClick={() => !locked && fileInputRef.current?.click()}
             disabled={locked}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Upload size={13} /> Subir archivo
-          </button>
+            <Upload size={13} />{" "}{t("Subir archivo")}</button>
           {/* Nuevo documento en blanco */}
           <button
             onClick={!locked ? showCreateBlankModal : undefined}
             disabled={locked}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <FilePlus2 size={13} /> Nuevo
-          </button>
+            <FilePlus2 size={13} />{" "}{t("Nuevo")}</button>
           {/* Crear desde plantilla */}
           <button
             onClick={!locked ? () => openTemplatesModal() : undefined}
             disabled={locked}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Sparkles size={13} /> Usar plantilla
-          </button>
+            <Sparkles size={13} />{" "}{t("Usar plantilla")}</button>
         </div>
       </div>
 
@@ -998,16 +993,16 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           ${locked ? "border-slate-100 bg-slate-50/50 cursor-not-allowed opacity-50" : `cursor-pointer ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}`}
       >
         {uploading
-          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
+          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">{t("Subiendo archivos…")}</p></>
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
-              <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
-              <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
+              <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>{t("Arrastra archivos o carpetas aquí")}</p>
+              <p className="text-xs text-slate-400">{t("PDF, Word, Excel, imágenes — máx. 50 MB por archivo")}</p>
               {!locked && (
                 <p className="text-[10px] text-slate-300 flex items-center gap-1">
                   <Clipboard size={10} />
                   {erpClip
-                    ? <><span className="text-blue-400 font-semibold">Ctrl+V</span> para pegar "{erpClip.name.length > 30 ? erpClip.name.slice(0, 28) + '…' : erpClip.name}"</>
-                    : 'Ctrl+V para pegar — usa el botón copiar en cualquier archivo'
+                    ? <><span className="text-blue-400 font-semibold">{t("Ctrl+V")}</span>{" "}{t("para pegar \"")}{erpClip.name.length > 30 ? erpClip.name.slice(0, 28) + '…' : erpClip.name}"</>
+                    : t("Ctrl+V para pegar — usa el botón copiar en cualquier archivo")
                   }
                 </p>
               )}</>
@@ -1025,20 +1020,20 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           ) : files.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-2 text-slate-400">
               <FileText size={36} className="opacity-20" />
-              <p className="text-sm font-medium">No hay documentos adjuntos</p>
-              <p className="text-xs text-slate-300">Sube archivos o crea documentos con las plantillas</p>
+              <p className="text-sm font-medium">{t("No hay documentos adjuntos")}</p>
+              <p className="text-xs text-slate-300">{t("Sube archivos o crea documentos con las plantillas")}</p>
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Documento</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Modificado</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Archivo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t("Documento")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tipo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tamaño")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Fecha")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">{t("Modificado")}</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -1087,7 +1082,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                               <button
                                 onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${canOpenPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : f.original_name}
+                                title={canWord ? t("Abrir en Word") : canExcel ? t("Abrir en Excel") : isPdf ? t("Abrir PDF") : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -1097,12 +1092,12 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || "Sin nombre"}>
-                          {f.document_name || <span className="text-slate-400 italic">Sin nombre</span>}
+                        <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || t("Sin nombre")}>
+                          {f.document_name || <span className="text-slate-400 italic">{t("Sin nombre")}</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">
                           <span className={`px-2 py-1 rounded text-[10px] font-medium ${fi.color}`}>
-                            {f.attachment_type || 'Sin clasificar'}
+                            {f.attachment_type || t("Sin clasificar")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
@@ -1120,34 +1115,34 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                 el ratón por encima de la fila, y era fácil no darse cuenta
                                 de que existía). */}
                             {canOpenPreview && (
-                              <button onClick={() => openRichPreview(f)} title="Vista previa" disabled={richPreviewLoading === f.id}
+                              <button onClick={() => openRichPreview(f)} title={t("Vista previa")} disabled={richPreviewLoading === f.id}
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60">
                                 {richPreviewLoading === f.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
                               </button>
                             )}
                             {onlyofficeEnabled && isOnlyOfficeCompatible(f) && (
                               <button onClick={(e) => { e.stopPropagation(); setEditorFile({ id: f.id, original_name: f.original_name }); }}
-                                title={locked ? "Ver en el navegador" : "Editar en el navegador"}
+                                title={locked ? t("Ver en el navegador") : t("Editar en el navegador")}
                                 className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
                                 <PenLine size={14} />
                               </button>
                             )}
                             {!locked && isPdfToolCompatible(f) && (
-                              <button onClick={(e) => { e.stopPropagation(); setPdfTool([f.id]); }} title="Editar páginas / fusionar con otros"
+                              <button onClick={(e) => { e.stopPropagation(); setPdfTool([f.id]); }} title={t("Editar páginas / fusionar con otros")}
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
                                 <Combine size={14} />
                               </button>
                             )}
                             {!locked && traducible(f.original_name, f.mimetype) && (
                               <button onClick={(e) => { e.stopPropagation(); setTraducir({ id: f.id, nombre: f.document_name || f.original_name }); }}
-                                title="Traducir a otro idioma (se guarda junto al original)"
+                                title={t("Traducir a otro idioma (se guarda junto al original)")}
                                 className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors">
                                 <Languages size={14} />
                               </button>
                             )}
                             {/* Copiar al portapapeles del ERP — siempre visible */}
                             <button
-                              title="Copiar archivo (Ctrl+V para pegar en cualquier zona de adjuntos)"
+                              title={t("Copiar archivo (Ctrl+V para pegar en cualquier zona de adjuntos)")}
                               className={`p-1.5 rounded-lg transition-colors ${
                                 erpClip?.name === f.original_name
                                   ? 'text-blue-600 bg-blue-50'
@@ -1160,7 +1155,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                             {/* Editar metadatos */}
                             {!locked && (
                             <button
-                              title="Editar"
+                              title={t("Editar")}
                               className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                               onClick={() => {
                                 setEditingFile({ id: f.id, document_name: f.document_name || '', attachment_type: f.attachment_type || 'Sin clasificar' });
@@ -1173,14 +1168,14 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                             )}
                             {/* Abrir / descargar */}
                             <button
-                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : "Descargar"}
+                              title={canWord ? t("Abrir en Word") : canExcel ? t("Abrir en Excel") : isPdf ? t("Abrir PDF") : t("Descargar")}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : () => openWithApp(f)}
                             >
                               <ExternalLink size={14} />
                             </button>
                             {!locked && (
-                            <button onClick={() => handleDelete(f.id)} title="Eliminar"
+                            <button onClick={() => handleDelete(f.id)} title={t("Eliminar")}
                               className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
@@ -1230,7 +1225,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                     }}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <ExternalLink size={11} /> Abrir {(() => {
+                    <ExternalLink size={11} />{" "}{t("Abrir")}{" "}{(() => {
                       const sourceFile = files.find((item) => item.id === preview.fileId);
                       return sourceFile && isPdfFile(sourceFile.mimetype || "", sourceFile.original_name || "") ? <ChevronDown size={11} /> : null;
                     })()}
@@ -1242,7 +1237,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                  title="Abrir en nueva pestaña"
+                  title={t("Abrir en nueva pestaña")}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </a>
@@ -1252,7 +1247,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                     setPreview(null);
                   }}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Cerrar vista previa"
+                  title={t("Cerrar vista previa")}
                 >
                   <X size={14} />
                 </button>
@@ -1310,17 +1305,15 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                 <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 p-8">
                   <span className="text-5xl">📎</span>
                   <div className="text-center">
-                    <p className="text-sm font-semibold text-slate-600 mb-1">Vista previa no disponible</p>
-                    <p className="text-xs text-slate-400">Este formato no se puede mostrar directamente.</p>
+                    <p className="text-sm font-semibold text-slate-600 mb-1">{t("Vista previa no disponible")}</p>
+                    <p className="text-xs text-slate-400">{t("Este formato no se puede mostrar directamente.")}</p>
                   </div>
                   {preview.fileId && (
                     <button
                       onClick={() => downloadWithAuth(preview.fileId!, preview.name)}
                       className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      <Download size={14} />
-                      Descargar archivo
-                    </button>
+                      <Download size={14} />{t("Descargar archivo")}</button>
                   )}
                 </div>
               )}
@@ -1347,8 +1340,8 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
               <div className="flex items-center gap-3">
                 <Sparkles size={16} className="text-red-600" />
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Plantillas del despacho</h2>
-                  <p className="text-[11px] text-slate-400">Selecciona una plantilla para previsualizarla</p>
+                  <h2 className="text-sm font-bold text-slate-900">{t("Plantillas del despacho")}</h2>
+                  <p className="text-[11px] text-slate-400">{t("Selecciona una plantilla para previsualizarla")}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1356,15 +1349,11 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                 <button
                   onClick={() => setTemplateTab('docplant')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'docplant' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                  📁 Plantillas
-                </button>
+                >{t("📁 Plantillas")}</button>
                 <button
                   onClick={() => setTemplateTab('generated')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'generated' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                >
-                  ✨ Generar
-                </button>
+                >{t("✨ Generar")}</button>
                 <div className="w-px h-5 bg-slate-200 mx-1" />
                 <button onClick={() => {
                   if (tplPreviewBlobUrl.current) {
@@ -1393,7 +1382,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                       <input
                         value={templateSearch}
                         onChange={e => setTemplateSearch(e.target.value)}
-                        placeholder="Buscar plantilla…"
+                        placeholder={t("Buscar plantilla…")}
                         className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
                       />
                     </div>
@@ -1403,23 +1392,22 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {docPlantLoading ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                        <Spinner size="md" label="Cargando plantillas…" />
+                        <Spinner size="md" label={t("Cargando plantillas…")} />
                       </div>
                     ) : docPlantError ? (
                       <div className="p-3">
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
-                          <p className="text-xs font-bold text-amber-700 mb-1">Error al cargar</p>
+                          <p className="text-xs font-bold text-amber-700 mb-1">{t("Error al cargar")}</p>
                           <p className="text-[11px] text-amber-600">{docPlantError}</p>
                         </div>
                         <button
                           onClick={() => openTemplatesModal(true)}
                           className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all"
                         >
-                          <Loader2 size={11} /> Reintentar
-                        </button>
+                          <Loader2 size={11} />{" "}{t("Reintentar")}</button>
                       </div>
                     ) : docPlantFolders.length === 0 ? (
-                      <p className="text-center text-xs text-slate-400 py-8">No se encontraron plantillas</p>
+                      <p className="text-center text-xs text-slate-400 py-8">{t("No se encontraron plantillas")}</p>
                     ) : (() => {
                       const q = templateSearch.toLowerCase().trim();
                       const filteredFolders = docPlantFolders.map(folder => ({
@@ -1427,7 +1415,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                         files: q ? folder.files.filter(f => `${f.name} ${f.sub || ""}`.toLowerCase().includes(q)) : folder.files,
                       })).filter(f => f.files.length > 0);
 
-                      if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">Sin resultados</p>;
+                      if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">{t("Sin resultados")}</p>;
 
                       return filteredFolders.map(folder => {
                         const isOpen = q ? true : expandedFolders.has(folder.name);
@@ -1466,7 +1454,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                                       <span className="shrink-0 text-xs">{f.ext === '.docx' ? '📝' : '📄'}</span>
                                       <span className="flex-1 min-w-0" title={f.sub ? `${f.sub} / ${f.name}` : f.name}>
                                         <span className="block text-xs truncate">{f.name.replace(/\.[^.]+$/, '')}</span>
-                                        {f.sub && <span className="block text-[10px] text-slate-400 truncate">en {f.sub}</span>}
+                                        {f.sub && <span className="block text-[10px] text-slate-400 truncate">{t("en")}{" "}{f.sub}</span>}
                                       </span>
                                     </button>
                                   );
@@ -1485,7 +1473,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   {!selectedTpl ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
                       <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-30"><rect x="8" y="4" width="32" height="40" rx="3" fill="#94a3b8"/><rect x="13" y="14" width="22" height="2" rx="1" fill="white"/><rect x="13" y="20" width="22" height="2" rx="1" fill="white"/><rect x="13" y="26" width="14" height="2" rx="1" fill="white"/></svg>
-                      <p className="text-sm">Selecciona una plantilla para previsualizar</p>
+                      <p className="text-sm">{t("Selecciona una plantilla para previsualizar")}</p>
                     </div>
                   ) : (
                     <>
@@ -1499,19 +1487,17 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                         <div className="shrink-0 ml-3 flex items-center gap-2">
                           <button
                             onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
-                            title="Adjuntarla tal cual, sin rellenar"
+                            title={t("Adjuntarla tal cual, sin rellenar")}
                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg active:scale-95 transition-all"
                           >
-                            <Download size={12} /> Usar tal cual
-                          </button>
+                            <Download size={12} />{" "}{t("Usar tal cual")}</button>
                           {/\.docx?$/i.test(selectedTpl.name) && (
                             <button
                               onClick={() => setRellenando(true)}
-                              title={entityType === 'expediente' ? 'Rellenarla con los datos de este expediente' : 'Rellenarla con los datos de este cliente'}
+                              title={entityType === 'expediente' ? t("Rellenarla con los datos de este expediente") : t("Rellenarla con los datos de este cliente")}
                               className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95 transition-all"
                             >
-                              <Sparkles size={12} /> Usar y autorrellenar
-                            </button>
+                              <Sparkles size={12} />{" "}{t("Usar y autorrellenar")}</button>
                           )}
                         </div>
                       </div>
@@ -1532,21 +1518,21 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                       <div className="flex-1 overflow-hidden relative">
                         {tplPreviewLoading ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                            <Spinner size="lg" label="Cargando vista previa…" />
+                            <Spinner size="lg" label={t("Cargando vista previa…")} />
                           </div>
                         ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
                           <iframe
                             key={tplPreviewUrl}
                             src={`${tplPreviewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
                             className="w-full h-full border-0"
-                            title="Vista previa de plantilla"
+                            title={t("Vista previa de plantilla")}
                           />
                         ) : tplPreviewHtml ? (
                           <iframe
                             key={selectedTpl?.path}
                             srcDoc={tplPreviewHtml}
                             className="w-full h-full border-0"
-                            title="Vista previa de plantilla"
+                            title={t("Vista previa de plantilla")}
                             sandbox="allow-same-origin"
                           />
                         ) : null}
@@ -1583,9 +1569,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                     );
                   })}
                 </div>
-                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-400">
-                  Documentos pre-rellenados con datos de <strong>{entity?.first_name ?? ""} {entity?.last_name ?? ""}</strong> · Se generan como HTML apto para Word
-                </div>
+                <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-400">{t("Documentos pre-rellenados con datos de")}{" "}<strong>{entity?.first_name ?? ""} {entity?.last_name ?? ""}</strong>{" "}{t("· Se generan como HTML apto para Word")}</div>
               </div>
             )}
 
@@ -1623,18 +1607,14 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir en navegador
-          </button>
+          >{t("Abrir en navegador")}</button>
           <button
             onClick={() => {
               void openPdfWithPdfStudio(pdfOpenMenu.file);
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir con PDF Studio
-          </button>
+          >{t("Abrir con PDF Studio")}</button>
         </div>,
         document.body
       )}
@@ -1647,7 +1627,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
               <div className="flex items-center gap-3">
                 <FileText size={20} className="text-neutral-700" />
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Vista previa</p>
+                  <p className="text-sm font-bold text-slate-900">{t("Vista previa")}</p>
                   <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{wordPreview.name}</p>
                 </div>
               </div>
@@ -1656,9 +1636,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-600">
-                Este es un documento Word. Vamos a intentar abrirlo directamente en Microsoft Word.
-              </p>
+              <p className="text-sm text-slate-600">{t("Este es un documento Word. Vamos a intentar abrirlo directamente en Microsoft Word.")}</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => {
@@ -1667,15 +1645,11 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <ExternalLink size={14} />
-                  Abrir en Word
-                </button>
+                  <ExternalLink size={14} />{t("Abrir en Word")}</button>
                 <button
                   onClick={() => setWordPreview(null)}
                   className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-200 transition-colors"
-                >
-                  Cerrar
-                </button>
+                >{t("Cerrar")}</button>
               </div>
             </div>
           </div>
@@ -1693,16 +1667,15 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
               <div>
                 <h2 className="text-base font-bold text-slate-900">
                   {editingFile.id === 'NEW_BLANK'
-                    ? 'Nuevo documento'
+                    ? t("Nuevo documento")
                     : editingFile.id === 'PENDING_TEMPLATE'
-                    ? 'Usar plantilla'
+                    ? t("Usar plantilla")
                     : editingFile.id === 'PENDING_UPLOAD'
-                    ? 'Adjuntar archivo'
-                    : 'Editar documento'}
+                    ? t("Adjuntar archivo")
+                    : t("Editar documento")}
                 </h2>
                 {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 && (
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Archivo {uploadQueueTotal - uploadQueue.length} de {uploadQueueTotal}
+                  <p className="text-[11px] text-slate-400 mt-0.5">{t("Archivo")}{" "}{uploadQueueTotal - uploadQueue.length}{" "}{t("de")}{" "}{uploadQueueTotal}
                   </p>
                 )}
               </div>
@@ -1723,68 +1696,64 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
             <div className="p-6 space-y-4">
               {/* Nombre del documento */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre del documento</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Nombre del documento")}</label>
                 <input
                   type="text"
                   value={editDocName}
                   onChange={(e) => setEditDocName(e.target.value)}
-                  placeholder="Ej: 1. - Consentimiento"
+                  placeholder={t("Ej: 1. - Consentimiento")}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   autoFocus
                 />
                 {editingFile.id === 'PENDING_UPLOAD' && pendingUploadFile.current && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Archivo: <span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
+                  <p className="text-[11px] text-slate-400 mt-1">{t("Archivo:")}{" "}<span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
                   </p>
                 )}
               </div>
 
               {/* Tipo de adjunto */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Tipo de adjunto</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Tipo de adjunto")}</label>
                 <select
                   value={editAttachmentType}
                   onChange={(e) => setEditAttachmentType(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 >
-                  <option value="Sin clasificar">Sin clasificar</option>
-                  <option value="AUTO">AUTO</option>
-                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
-                  <option value="FACTURAS">FACTURAS</option>
-                  <option value="PODER">PODER</option>
-                  <option value="EVIDENCIA">EVIDENCIA</option>
+                  <option value="Sin clasificar">{t("Sin clasificar")}</option>
+                  <option value="AUTO">{t("AUTO")}</option>
+                  <option value="ESCRITO PROCESAL">{t("ESCRITO PROCESAL")}</option>
+                  <option value="FACTURAS">{t("FACTURAS")}</option>
+                  <option value="PODER">{t("PODER")}</option>
+                  <option value="EVIDENCIA">{t("EVIDENCIA")}</option>
                 </select>
               </div>
 
               {/* Dónde guardarlo -- solo si el despacho tiene "preguntar cada vez" activado (Integraciones) */}
               {askWhereToUpload && (editingFile.id === 'NEW_BLANK' || editingFile.id === 'PENDING_UPLOAD') && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">¿Dónde lo guardamos?</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("¿Dónde lo guardamos?")}</label>
                   <div className="grid grid-cols-3 gap-2">
                     <button type="button" onClick={() => setUploadProvider('drive')}
                       className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-semibold transition-colors ${
                         uploadProvider === 'drive' ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}>
-                      <DriveLogo size={18} /> Drive
-                      {uploadProvider === 'drive' && <Check size={11} className="text-red-600" />}
+                      <DriveLogo size={18} />{" "}{t("Drive")}{uploadProvider === 'drive' && <Check size={11} className="text-red-600" />}
                     </button>
                     <button type="button" onClick={() => setUploadProvider('dropbox')}
                       className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-semibold transition-colors ${
                         uploadProvider === 'dropbox' ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}>
-                      <DropboxLogo size={18} /> Dropbox
-                      {uploadProvider === 'dropbox' && <Check size={11} className="text-red-600" />}
+                      <DropboxLogo size={18} />{" "}{t("Dropbox")}{uploadProvider === 'dropbox' && <Check size={11} className="text-red-600" />}
                     </button>
-                    <button type="button" disabled title="Próximamente"
+                    <button type="button" disabled title={t("Próximamente")}
                       className="flex cursor-not-allowed flex-col items-center gap-1 rounded-lg border border-slate-100 px-2 py-2.5 text-[11px] font-semibold text-slate-300">
-                      <Cloud size={18} className="text-[#0364B8] opacity-40" fill="currentColor" /> OneDrive
-                    </button>
+                      <Cloud size={18} className="text-[#0364B8] opacity-40" fill="currentColor" />{" "}{t("OneDrive")}</button>
                   </div>
                   {uploadProvider === 'drive' && !organizacion?.googleDriveConnected && (
-                    <p className="mt-1.5 text-[11px] text-amber-600">Google Drive no está vinculado -- se guardará solo en el servidor.</p>
+                    <p className="mt-1.5 text-[11px] text-amber-600">{t("Google Drive no está vinculado -- se guardará solo en el servidor.")}</p>
                   )}
                   {uploadProvider === 'dropbox' && !organizacion?.dropboxConnected && (
-                    <p className="mt-1.5 text-[11px] text-amber-600">Dropbox no está vinculado -- se guardará solo en el servidor.</p>
+                    <p className="mt-1.5 text-[11px] text-amber-600">{t("Dropbox no está vinculado -- se guardará solo en el servidor.")}</p>
                   )}
                 </div>
               )}
@@ -1799,8 +1768,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   disabled={savingMetadata}
                   className="w-full px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
-                  {savingMetadata ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                  Adjuntar todos ({uploadQueue.length + 1} archivos) — tipo: {editAttachmentType}
+                  {savingMetadata ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}{t("Adjuntar todos (")}{uploadQueue.length + 1}{" "}{t("archivos) — tipo:")}{" "}{editAttachmentType}
                 </button>
               )}
               <div className="flex gap-2">
@@ -1813,7 +1781,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   }}
                   className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
                 >
-                  {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? 'Cancelar todo' : 'Cancelar'}
+                  {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? t("Cancelar todo") : t("Cancelar")}
                 </button>
                 <button
                   onClick={() => {
@@ -1826,14 +1794,14 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                 >
                   {savingMetadata
-                    ? 'Subiendo...'
+                    ? t("Subiendo...")
                     : editingFile.id === 'NEW_BLANK'
-                    ? 'Crear'
+                    ? t("Crear")
                     : editingFile.id === 'PENDING_TEMPLATE'
-                    ? 'Usar'
+                    ? t("Usar")
                     : editingFile.id === 'PENDING_UPLOAD'
-                    ? (uploadQueue.length > 0 ? `Solo este (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : 'Adjuntar')
-                    : 'Guardar'}
+                    ? (uploadQueue.length > 0 ? t("Solo este ({v}/{uploadQueueTotal})", { v: uploadQueueTotal - uploadQueue.length, uploadQueueTotal: uploadQueueTotal }) : t("Adjuntar"))
+                    : t("Guardar")}
                 </button>
               </div>
             </div>
@@ -1845,7 +1813,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
         <TraducirDocumento nombre={traducir.nombre} url={`/api/files/${entityId}/${traducir.id}/traducir`}
           idiomaSugerido={entity?.idioma}
           onClose={() => setTraducir(null)}
-          onHecho={(r) => { void loadFiles(true); aviso.ok(`Traducción guardada: ${r.tipo === "archivo" ? r.nombre : r.titulo}`); }} />
+          onHecho={(r) => { void loadFiles(true); aviso.ok(t("Traducción guardada: {v}", { v: r.tipo === "archivo" ? r.nombre : r.titulo })); }} />
       )}
       {pdfTool && (
         <PdfToolModal entityId={entityId} files={files} initialFileIds={pdfTool}

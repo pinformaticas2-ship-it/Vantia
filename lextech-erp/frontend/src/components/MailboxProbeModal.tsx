@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { AlertTriangle, CheckCircle2, Folder, FolderTree, Loader2, Stethoscope, Wrench, X, XCircle } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { t } from '../lib/i18n';
 
 // "Diagnosticar buzón": sondeo completo de una cuenta IMAP (estructura de
 // carpetas del servidor + estado de cada una frente a lo guardado en Vantia),
@@ -67,7 +68,7 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
       setReport(res.data); setProbeAt(new Date().toISOString());
       onRepaired?.();
     } catch (e: any) {
-      setError(e.message || 'No se pudo diagnosticar el buzón');
+      setError(e.message || t("No se pudo diagnosticar el buzón"));
     } finally {
       setRunning(false);
     }
@@ -95,11 +96,11 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
             <Stethoscope size={22} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-slate-900">Diagnóstico del buzón</h3>
+            <h3 className="text-lg font-semibold text-slate-900">{t("Diagnóstico del buzón")}</h3>
             <p className="truncate text-sm text-slate-500">{accountEmail}{report ? ` · ${report.server}` : ''}</p>
-            {probeAt && <p className="mt-0.5 text-xs text-slate-400">Último diagnóstico: {fmt(probeAt)}{report?.ms ? ` · ${(report.ms / 1000).toFixed(1)} s` : ''}</p>}
+            {probeAt && <p className="mt-0.5 text-xs text-slate-400">{t("Último diagnóstico:")}{" "}{fmt(probeAt)}{report?.ms ? ` · ${(report.ms / 1000).toFixed(1)} s` : ''}</p>}
           </div>
-          <button type="button" onClick={onClose} aria-label="Cerrar"
+          <button type="button" onClick={onClose} aria-label={t("Cerrar")}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50">
             <X size={16} />
           </button>
@@ -108,14 +109,12 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {(loading || (running && !report)) && (
             <div className="flex flex-col items-center gap-2 py-12 text-sm text-slate-500">
-              <Loader2 className="animate-spin text-slate-400" />
-              Revisando todas las carpetas del servidor…
-            </div>
+              <Loader2 className="animate-spin text-slate-400" />{t("Revisando todas las carpetas del servidor…")}</div>
           )}
           {error && <p className="peligro mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           {report?.error && (
             <p className="peligro mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              <XCircle size={15} className="mt-0.5 shrink-0" /> No se pudo conectar con el servidor: {report.error}
+              <XCircle size={15} className="mt-0.5 shrink-0" />{" "}{t("No se pudo conectar con el servidor:")}{" "}{report.error}
             </p>
           )}
           {report && !report.error && (
@@ -123,17 +122,17 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
               <div className={`mb-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${problemas.length ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
                 {problemas.length ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}
                 {problemas.length
-                  ? `${problemas.length} carpeta${problemas.length === 1 ? '' : 's'} con problemas. Pulsa "Diagnosticar y reparar".`
-                  : `Todo correcto: ${report.folders.length} carpetas revisadas.`}
+                  ? t("{length} carpeta{v} con problemas. Pulsa \"Diagnosticar y reparar\".", { length: problemas.length, v: problemas.length === 1 ? '' : 's' })
+                  : t("Todo correcto: {length} carpetas revisadas.", { length: report.folders.length })}
               </div>
               <table className="w-full text-left text-xs">
                 <thead className="text-[10px] uppercase tracking-wider text-slate-400">
                   <tr>
-                    <th className="py-1.5 pr-2 font-semibold">Carpeta</th>
-                    <th className="py-1.5 pr-2 font-semibold text-right">Servidor</th>
-                    <th className="py-1.5 pr-2 font-semibold text-right">Vantia</th>
-                    <th className="py-1.5 pr-2 font-semibold">Último mensaje</th>
-                    <th className="py-1.5 font-semibold">Estado</th>
+                    <th className="py-1.5 pr-2 font-semibold">{t("Carpeta")}</th>
+                    <th className="py-1.5 pr-2 font-semibold text-right">{t("Servidor")}</th>
+                    <th className="py-1.5 pr-2 font-semibold text-right">{t("Vantia")}</th>
+                    <th className="py-1.5 pr-2 font-semibold">{t("Último mensaje")}</th>
+                    <th className="py-1.5 font-semibold">{t("Estado")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -159,20 +158,17 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
                   })}
                 </tbody>
               </table>
-              <p className="mt-3 text-[11px] text-slate-400">
-                "No suscrita": la carpeta existe en el servidor pero tu programa de correo la oculta; Vantia hace lo mismo. "Agrupa": solo contiene otras carpetas.
-                "Cargando historial": lo nuevo ya está; los mensajes antiguos se van descargando por tandas cada pocos minutos hasta igualar al servidor.
-              </p>
+              <p className="mt-3 text-[11px] text-slate-400">{t("\"No suscrita\": la carpeta existe en el servidor pero tu programa de correo la oculta; Vantia hace lo mismo. \"Agrupa\": solo contiene otras carpetas. \"Cargando historial\": lo nuevo ya está; los mensajes antiguos se van descargando por tandas cada pocos minutos hasta igualar al servidor.")}</p>
             </>
           )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
-          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+          <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cerrar")}</button>
           <button type="button" onClick={() => void run()} disabled={running}
             className="inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2 text-sm font-bold text-white hover:bg-[#8f0329] disabled:opacity-60">
             {running ? <Loader2 size={15} className="animate-spin" /> : <Wrench size={15} />}
-            {running ? 'Diagnosticando…' : 'Diagnosticar y reparar'}
+            {running ? t("Diagnosticando…") : t("Diagnosticar y reparar")}
           </button>
         </div>
       </div>

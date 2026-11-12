@@ -9,6 +9,7 @@ import { apiFetch } from "../lib/api";
 import { Spinner } from "../components/Spinner";
 import { Modal } from "../components/Modal";
 import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
+import { t, t as tr } from '../lib/i18n';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Categoria = "incidencia" | "consulta" | "peticion" | "otro";
@@ -74,9 +75,9 @@ const CATEGORIAS: { id: Categoria; label: string }[] = [
   { id: "otro", label: "Otro" },
 ];
 const PRIORIDADES: { id: Prioridad; label: string; cls: string }[] = [
-  { id: "baja", label: "Baja", cls: "bg-slate-100 text-slate-600 border-slate-200" },
-  { id: "media", label: "Media", cls: "bg-sky-50 text-sky-700 border-sky-200" },
-  { id: "alta", label: "Alta", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  { id: "baja", label: "Baja@@prioridad", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  { id: "media", label: "Media@@prioridad", cls: "bg-sky-50 text-sky-700 border-sky-200" },
+  { id: "alta", label: "Alta@@prioridad", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   { id: "urgente", label: "Urgente", cls: "bg-red-50 text-red-700 border-red-200" },
 ];
 const ESTADOS: { id: Estado; label: string; cls: string }[] = [
@@ -126,7 +127,7 @@ function fmtHoras(h: number | null): string {
   if (h == null) return "—";
   if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
   if (h < 48) return `${h.toFixed(1).replace(".", ",")} h`;
-  return `${(h / 24).toFixed(1).replace(".", ",")} días`;
+  return t("{n} días", { n: (h / 24).toLocaleString("es-ES", { maximumFractionDigits: 1 }) });
 }
 
 // Descarga un CSV del backend (autenticado) y lo guarda con el nombre que
@@ -136,7 +137,7 @@ async function downloadCsv(getToken: () => Promise<string | null>, tipo: "pendie
   const res = await fetch(`/api/soporte/export?tipo=${tipo}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const d = await res.json().catch(() => null);
-    throw new Error(d?.error || `Error ${res.status} al descargar el CSV`);
+    throw new Error(d?.error || t("Error {status} al descargar el CSV", { status: res.status }));
   }
   const nombre = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "")?.[1] || `soporte-${tipo}.csv`;
   const url = URL.createObjectURL(await res.blob());
@@ -152,7 +153,7 @@ async function downloadCsv(getToken: () => Promise<string | null>, tipo: "pendie
 function Badge({ list, id }: { list: { id: string; label: string; cls: string }[]; id: string }) {
   const item = list.find((x) => x.id === id);
   if (!item) return null;
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap ${item.cls}`}>{item.label}</span>;
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap ${item.cls}`}>{tr(item.label)}</span>;
 }
 
 const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100";
@@ -193,13 +194,13 @@ export default function Soporte() {
     setError("");
     try {
       const d = await apiFetch("/api/soporte/tickets", { getToken });
-      if (!d?.success) throw new Error(d?.error || "Error al cargar los tickets");
+      if (!d?.success) throw new Error(d?.error || t("Error al cargar los tickets"));
       setTickets(d.data.tickets || []);
       setEsGestor(Boolean(d.data.esGestor));
       setSoporteEmail(d.data.soporteEmail || null);
       setRetencion(d.data.retencion || null);
     } catch (e: any) {
-      setError(e.message || "Error al cargar los tickets");
+      setError(e.message || t("Error al cargar los tickets"));
     } finally {
       setLoading(false);
       setRefreshSpin(false);
@@ -234,13 +235,13 @@ export default function Soporte() {
 
   if (loading) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <Spinner size="xl" label="Cargando centro de soporte..." />
+      <Spinner size="xl" label={t("Cargando centro de soporte...")} />
     </div>
   );
 
   if (error) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
-      <ConnectionErrorBanner error={error} onRetry={() => load()} title="No se ha podido cargar el centro de soporte" />
+      <ConnectionErrorBanner error={error} onRetry={() => load()} title={t("No se ha podido cargar el centro de soporte")} />
     </div>
   );
 
@@ -256,16 +257,16 @@ export default function Soporte() {
               <LifeBuoy size={18} className="text-red-600" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Centro de soporte</h1>
+              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">{t("Centro de soporte")}</h1>
               <p className="text-xs text-slate-500 mt-0.5 truncate">
-                <span className="font-semibold text-slate-700">{abiertos}</span> {abiertos === 1 ? "ticket activo" : "tickets activos"}
+                <span className="font-semibold text-slate-700">{abiertos}</span> {abiertos === 1 ? t("ticket activo") : t("tickets activos")}
                 {esGestor
-                  ? <> · Los tickets llegan a <span className="font-semibold text-slate-700">{soporteEmail || "— sin correo configurado —"}</span></>
-                  : <> · Solo ves los tickets que has abierto tú</>}
+                  ? <>{" "}{t("· Los tickets llegan a")}{" "}<span className="font-semibold text-slate-700">{soporteEmail || t("— sin correo configurado —")}</span></>
+                  : <>{" "}{t("· Solo ves los tickets que has abierto tú")}</>}
               </p>
             </div>
           </div>
-          <button onClick={() => load(true)} title="Refrescar datos"
+          <button onClick={() => load(true)} title={t("Refrescar datos")}
             className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
             <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
           </button>
@@ -291,15 +292,14 @@ export default function Soporte() {
           ) : (
             <button onClick={() => setShowNew(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors">
-              <Plus size={13} /> Nuevo ticket
-            </button>
+              <Plus size={13} />{" "}{t("Nuevo ticket")}</button>
           )}
         </div>
         {tab === "tickets" && (
           <div className="flex min-w-0 w-full sm:w-auto items-center gap-2">
             <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..."
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Buscar...")}
                 className="w-full sm:w-48 pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300" />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={11} /></button>
@@ -307,8 +307,8 @@ export default function Soporte() {
             </div>
             <select value={filtro} onChange={(e) => setFiltro(e.target.value as any)}
               className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400">
-              <option value="activos">Activos</option>
-              <option value="todos">Todos</option>
+              <option value="activos">{t("Activos")}</option>
+              <option value="todos">{t("Todos")}</option>
               {ESTADOS.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
             </select>
           </div>
@@ -320,15 +320,13 @@ export default function Soporte() {
         <div className="px-6 py-2 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-amber-900 shrink-0">
           <Clock size={14} className="shrink-0 text-amber-600" />
           <span className="flex-1 min-w-[200px]">
-            <b>{retencion.pendientesBorrado} {retencion.pendientesBorrado === 1 ? "ticket cerrado se borrará" : "tickets cerrados se borrarán"}</b>
-            {retencion.proximoBorrado && <> a partir del <b>{fmtDia(retencion.proximoBorrado)}</b></>}
-            {" "}({retencion.dias} días tras el cierre). Descarga el CSV si quieres conservarlos.
-          </span>
+            <b>{retencion.pendientesBorrado} {retencion.pendientesBorrado === 1 ? t("ticket cerrado se borrará") : t("tickets cerrados se borrarán")}</b>
+            {retencion.proximoBorrado && <>{" "}{t("a partir del")}{" "}<b>{fmtDia(retencion.proximoBorrado)}</b></>}
+            {" "}({retencion.dias}{" "}{t("días tras el cierre). Descarga el CSV si quieres conservarlos.")}</span>
           {downloadError && <span className="text-red-600 font-semibold">{downloadError}</span>}
           <button onClick={descargarPendientes} disabled={downloading}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700 disabled:opacity-50">
-            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Descargar CSV
-          </button>
+            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}{" "}{t("Descargar CSV")}</button>
         </div>
       )}
 
@@ -344,9 +342,9 @@ export default function Soporte() {
               {filtered.length === 0 ? (
                 <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
                   <LifeBuoy size={36} className="opacity-15" />
-                  <p className="font-medium text-sm">{tickets.length ? "No hay tickets con este filtro" : "Todavía no hay tickets"}</p>
+                  <p className="font-medium text-sm">{tickets.length ? t("No hay tickets con este filtro") : t("Todavía no hay tickets")}</p>
                   {!tickets.length && !esGestor && (
-                    <button onClick={() => setShowNew(true)} className="text-red-600 text-xs font-bold hover:underline">+ Abrir el primer ticket</button>
+                    <button onClick={() => setShowNew(true)} className="text-red-600 text-xs font-bold hover:underline">{t("+ Abrir el primer ticket")}</button>
                   )}
                 </div>
               ) : filtered.map((t) => (
@@ -357,7 +355,7 @@ export default function Soporte() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-mono font-bold text-slate-400">{ref(t.numero)}</span>
                     <div className="flex items-center gap-1">
-                      {esGestor && t.emailError && <span title={`Correo no enviado: ${t.emailError}`}><AlertTriangle size={12} className="text-amber-500" /></span>}
+                      {esGestor && t.emailError && <span title={tr("Correo no enviado: {emailError}", { emailError: t.emailError })}><AlertTriangle size={12} className="text-amber-500" /></span>}
                       <Badge list={PRIORIDADES} id={t.prioridad} />
                       <Badge list={ESTADOS} id={t.estado} />
                     </div>
@@ -372,7 +370,7 @@ export default function Soporte() {
                   </div>
                   {t.fechaBorrado && (
                     <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
-                      <Trash2 size={10} /> Se borrará el {fmtDia(t.fechaBorrado)}
+                      <Trash2 size={10} />{" "}{tr("Se borrará el")}{" "}{fmtDia(t.fechaBorrado)}
                     </p>
                   )}
                 </button>
@@ -387,7 +385,7 @@ export default function Soporte() {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400">
                 <MessageSquare size={36} className="opacity-15" />
-                <p className="text-sm font-medium">Selecciona un ticket para ver la conversación</p>
+                <p className="text-sm font-medium">{t("Selecciona un ticket para ver la conversación")}</p>
               </div>
             )}
           </div>
@@ -422,10 +420,10 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
   }, [open]);
 
   const submit = async () => {
-    if (!asunto.trim() || !descripcion.trim()) { setError("El asunto y la descripción son obligatorios."); return; }
+    if (!asunto.trim() || !descripcion.trim()) { setError(t("El asunto y la descripción son obligatorios.")); return; }
     const fecha = fechaIncidencia ? new Date(fechaIncidencia) : new Date();
     if (isNaN(fecha.getTime()) || fecha.getTime() > Date.now() + 5 * 60 * 1000) {
-      setError("La fecha y hora de la incidencia no puede estar en el futuro.");
+      setError(t("La fecha y hora de la incidencia no puede estar en el futuro."));
       return;
     }
     setSaving(true);
@@ -435,7 +433,7 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
         getToken, method: "POST",
         body: JSON.stringify({ asunto, descripcion, categoria, prioridad, modulo: modulo || null, fechaIncidencia: fecha.toISOString() }),
       });
-      if (!d?.success) throw new Error(d?.error || "No se pudo crear el ticket");
+      if (!d?.success) throw new Error(d?.error || t("No se pudo crear el ticket"));
       onCreated(d.data);
       onClose();
     } catch (e: any) {
@@ -446,52 +444,51 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Nuevo ticket de soporte" subtitle="Se enviará al equipo de soporte de tu organización"
+    <Modal open={open} onClose={onClose} title={t("Nuevo ticket de soporte")} subtitle={t("Se enviará al equipo de soporte de tu organización")}
       icon={<LifeBuoy size={18} />} maxWidth="max-w-xl"
       footer={<>
-        <button onClick={onClose} className={btnSecondary}>Cancelar</button>
+        <button onClick={onClose} className={btnSecondary}>{t("Cancelar")}</button>
         <button onClick={submit} disabled={saving} className={btnPrimary}>
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Enviar ticket
-        </button>
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}{" "}{t("Enviar ticket")}</button>
       </>}>
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">Asunto</label>
+          <label className="block text-xs font-bold text-slate-600 mb-1">{t("Asunto")}</label>
           <input value={asunto} onChange={(e) => setAsunto(e.target.value)} maxLength={200} autoFocus
-            placeholder="Ej.: No puedo abrir los documentos de un expediente" className={inputCls} />
+            placeholder={t("Ej.: No puedo abrir los documentos de un expediente")} className={inputCls} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Fecha y hora de la incidencia</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t("Fecha y hora de la incidencia")}</label>
             <input type="datetime-local" value={fechaIncidencia} max={nowLocalInput()}
               onChange={(e) => setFechaIncidencia(e.target.value)} className={inputCls} />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Módulo afectado</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t("Módulo afectado")}</label>
             <select value={modulo} onChange={(e) => setModulo(e.target.value)} className={inputCls}>
-              <option value="">— Selecciona —</option>
+              <option value="">{t("— Selecciona —")}</option>
               {MODULOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
             </select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Categoría</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t("Categoría")}</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value as Categoria)} className={inputCls}>
               {CATEGORIAS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Prioridad</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t("Prioridad")}</label>
             <select value={prioridad} onChange={(e) => setPrioridad(e.target.value as Prioridad)} className={inputCls}>
-              {PRIORIDADES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              {PRIORIDADES.map((p) => <option key={p.id} value={p.id}>{tr(p.label)}</option>)}
             </select>
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">Descripción</label>
+          <label className="block text-xs font-bold text-slate-600 mb-1">{t("Descripción")}</label>
           <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={7}
-            placeholder="Describe qué ocurre, qué estabas haciendo y, si aparece, el mensaje de error." className={`${inputCls} resize-y`} />
+            placeholder={t("Describe qué ocurre, qué estabas haciendo y, si aparece, el mensaje de error.")} className={`${inputCls} resize-y`} />
         </div>
         {error && <p className="peligro text-xs font-semibold text-red-600">{error}</p>}
       </div>
@@ -516,7 +513,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
     setError("");
     try {
       const d = await apiFetch(`/api/soporte/tickets/${id}`, { getToken });
-      if (!d?.success) throw new Error(d?.error || "No se pudo cargar el ticket");
+      if (!d?.success) throw new Error(d?.error || t("No se pudo cargar el ticket"));
       setTicket(d.data.ticket);
       setMensajes(d.data.mensajes || []);
     } catch (e: any) {
@@ -533,7 +530,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
   const patch = async (body: Partial<Pick<Ticket, "estado" | "prioridad">>) => {
     const d = await apiFetch(`/api/soporte/tickets/${id}`, { getToken, method: "PATCH", body: JSON.stringify(body) });
     if (d?.success) applyTicket(d.data);
-    else setError(d?.error || "No se pudo actualizar el ticket");
+    else setError(d?.error || t("No se pudo actualizar el ticket"));
   };
 
   const enviar = async () => {
@@ -541,7 +538,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
     setSending(true);
     try {
       const d = await apiFetch(`/api/soporte/tickets/${id}/mensajes`, { getToken, method: "POST", body: JSON.stringify({ mensaje: respuesta }) });
-      if (!d?.success) throw new Error(d?.error || "No se pudo enviar la respuesta");
+      if (!d?.success) throw new Error(d?.error || t("No se pudo enviar la respuesta"));
       setMensajes((prev) => [...prev, d.data.mensaje]);
       applyTicket({ ...d.data.ticket, mensajesCount: mensajes.length + 1 });
       setRespuesta("");
@@ -563,7 +560,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
   };
 
   if (loading) return <div className="flex-1 flex items-center justify-center"><Spinner size="lg" /></div>;
-  if (!ticket) return <div className="peligro flex-1 flex items-center justify-center text-sm text-red-600">{error || "Ticket no encontrado"}</div>;
+  if (!ticket) return <div className="peligro flex-1 flex items-center justify-center text-sm text-red-600">{error || t("Ticket no encontrado")}</div>;
 
   const cerrado = ticket.estado === "cerrado" || ticket.estado === "resuelto";
 
@@ -575,12 +572,10 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-mono font-bold text-slate-400">{ref(ticket.numero)} · {CATEGORIAS.find((c) => c.id === ticket.categoria)?.label}</p>
             <h2 className="text-base font-extrabold text-slate-900 break-words">{ticket.asunto}</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Abierto por <span className="font-semibold">{ticket.createdByName}</span> el {fmt(ticket.createdAt)}
+            <p className="text-[11px] text-slate-500 mt-0.5">{t("Abierto por")}{" "}<span className="font-semibold">{ticket.createdByName}</span>{" "}{t("el")}{" "}{fmt(ticket.createdAt)}
             </p>
-            <p className="text-[11px] text-slate-500">
-              Incidencia: <span className="font-semibold">{fmt(ticket.fechaIncidencia)}</span>
-              {ticket.modulo && <> · Módulo: <span className="font-semibold">{MODULOS.find((m) => m.id === ticket.modulo)?.label || ticket.modulo}</span></>}
+            <p className="text-[11px] text-slate-500">{t("Incidencia:")}{" "}<span className="font-semibold">{fmt(ticket.fechaIncidencia)}</span>
+              {ticket.modulo && <>{" "}{t("· Módulo:")}{" "}<span className="font-semibold">{MODULOS.find((m) => m.id === ticket.modulo)?.label || ticket.modulo}</span></>}
             </p>
           </div>
         </div>
@@ -593,7 +588,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
               </select>
               <select value={ticket.prioridad} onChange={(e) => patch({ prioridad: e.target.value as Prioridad })}
                 className="px-2 py-1 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400">
-                {PRIORIDADES.map((p) => <option key={p.id} value={p.id}>Prioridad {p.label.toLowerCase()}</option>)}
+                {PRIORIDADES.map((p) => <option key={p.id} value={p.id}>{t("Prioridad")}{" "}{tr(p.label).toLowerCase()}</option>)}
               </select>
             </>
           ) : (
@@ -605,20 +600,20 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
         </div>
         {ticket.fechaBorrado && (
           <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-            <Trash2 size={11} /> Ticket cerrado{ticket.cerradoAt ? ` el ${fmt(ticket.cerradoAt)}` : ""}. Se borrará automáticamente el {fmtDia(ticket.fechaBorrado)}
-            {esGestor ? " (reábrelo si debe conservarse)." : "."}
+            <Trash2 size={11} />{" "}{t("Ticket cerrado")}{ticket.cerradoAt ? t(" el {v}", { v: fmt(ticket.cerradoAt) }) : ""}{t(". Se borrará automáticamente el")}{" "}{fmtDia(ticket.fechaBorrado)}
+            {esGestor ? t(" (reábrelo si debe conservarse).") : "."}
           </p>
         )}
         {!esGestor ? null : ticket.emailError ? (
           <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-            <span className="flex-1">No se pudo enviar por correo al soporte: {ticket.emailError}</span>
+            <span className="flex-1">{t("No se pudo enviar por correo al soporte:")}{" "}{ticket.emailError}</span>
             <button onClick={reenviar} disabled={resending} className="shrink-0 font-bold underline disabled:opacity-50">
-              {resending ? "Enviando…" : "Reintentar"}
+              {resending ? t("Enviando…") : t("Reintentar")}
             </button>
           </div>
         ) : ticket.enviadoA ? (
-          <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400"><Mail size={11} /> Enviado a {ticket.enviadoA}</p>
+          <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400"><Mail size={11} />{" "}{t("Enviado a")}{" "}{ticket.enviadoA}</p>
         ) : null}
       </div>
 
@@ -634,7 +629,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
         <div className="flex items-end gap-2">
           <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void enviar(); }}
-            placeholder={cerrado ? "Responder reabrirá el ticket..." : "Escribe una respuesta... (Ctrl+Enter para enviar)"}
+            placeholder={cerrado ? t("Responder reabrirá el ticket...") : t("Escribe una respuesta... (Ctrl+Enter para enviar)")}
             className={`${inputCls} resize-none`} />
           <button onClick={enviar} disabled={sending || !respuesta.trim()} className={btnPrimary}>
             {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -650,7 +645,7 @@ function MessageBubble({ nombre, fecha, texto, soporte }: { nombre: string; fech
     <div className={`flex ${soporte ? "justify-start" : "justify-end"}`}>
       <div className={`max-w-[85%] rounded-2xl px-4 py-3 border ${soporte ? "bg-white border-slate-200" : "bg-red-50 border-red-100"}`}>
         <p className="text-[11px] font-bold text-slate-500 mb-1">
-          {nombre}{soporte && <span className="ml-1.5 text-[9px] uppercase tracking-wider text-sky-600">Soporte</span>}
+          {nombre}{soporte && <span className="ml-1.5 text-[9px] uppercase tracking-wider text-sky-600">{t("Soporte")}</span>}
           <span className="font-normal text-slate-400"> · {fmt(fecha)}</span>
         </p>
         <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{texto}</p>
@@ -687,7 +682,7 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
       const d = await apiFetch(`/api/soporte/config/${orgId}`, {
         getToken, method: "PUT", body: JSON.stringify({ soporteEmail: drafts[orgId] || "" }),
       });
-      if (!d?.success) throw new Error(d?.error || "No se pudo guardar");
+      if (!d?.success) throw new Error(d?.error || t("No se pudo guardar"));
       setOrgs((prev) => prev.map((o) => (o.organizacionId === orgId ? { ...o, soporteEmail: d.data.soporteEmail } : o)));
       setSavedId(orgId);
       setTimeout(() => setSavedId((s) => (s === orgId ? null : s)), 2000);
@@ -705,10 +700,8 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
     <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50">
       <div className="px-6 py-4 space-y-3">
         <div>
-          <h2 className="text-sm font-extrabold text-slate-800">Correo de soporte por organización</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Los tickets que se abran en cada organización se enviarán a este correo. El envío sale desde la cuenta de correo de quien abre el ticket (o, si no tiene, desde la primera de la organización).
-          </p>
+          <h2 className="text-sm font-extrabold text-slate-800">{t("Correo de soporte por organización")}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">{t("Los tickets que se abran en cada organización se enviarán a este correo. El envío sale desde la cuenta de correo de quien abre el ticket (o, si no tiene, desde la primera de la organización).")}</p>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {orgs.map((o) => {
@@ -722,24 +715,23 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="email" value={drafts[o.organizacionId] || ""} placeholder="soporte@tudespacho.com"
+                  <input type="email" value={drafts[o.organizacionId] || ""} placeholder={t("soporte@tudespacho.com")}
                     onChange={(e) => setDrafts((p) => ({ ...p, [o.organizacionId]: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === "Enter" && dirty) void save(o.organizacionId); }}
                     className={`${inputCls} pl-8`} />
                 </div>
                 <button onClick={() => save(o.organizacionId)} disabled={!dirty || savingId === o.organizacionId} className={btnPrimary}>
                   {savingId === o.organizacionId ? <Loader2 size={14} className="animate-spin" /> : savedId === o.organizacionId ? <Check size={14} /> : null}
-                  {savedId === o.organizacionId ? "Guardado" : "Guardar"}
+                  {savedId === o.organizacionId ? t("Guardado") : t("Guardar")}
                 </button>
               </div>
               {errors[o.organizacionId] && <p className="mt-2 text-xs font-semibold text-red-600">{errors[o.organizacionId]}</p>}
               {!o.soporteEmail && !errors[o.organizacionId] && (
-                <p className="mt-2 text-[11px] text-amber-700">Sin correo configurado: los tickets se guardan pero no se envían por correo.</p>
+                <p className="mt-2 text-[11px] text-amber-700">{t("Sin correo configurado: los tickets se guardan pero no se envían por correo.")}</p>
               )}
               {!o.tieneCuentaEnvio && (
                 <p className="mt-2 flex items-center gap-1 text-[11px] text-amber-700">
-                  <AlertTriangle size={11} /> Esta organización no tiene ninguna cuenta de correo activa desde la que enviar (Correo → añadir cuenta).
-                </p>
+                  <AlertTriangle size={11} />{" "}{t("Esta organización no tiene ninguna cuenta de correo activa desde la que enviar (Correo → añadir cuenta).")}</p>
               )}
             </div>
           );
@@ -764,7 +756,7 @@ function SoporteEstadisticas() {
     (async () => {
       try {
         const d = await apiFetch("/api/soporte/estadisticas", { getToken });
-        if (!d?.success) throw new Error(d?.error || "No se pudieron cargar las estadísticas");
+        if (!d?.success) throw new Error(d?.error || t("No se pudieron cargar las estadísticas"));
         setStats(d.data || []);
       } catch (e: any) {
         setError(e.message);
@@ -797,17 +789,14 @@ function SoporteEstadisticas() {
       <div className="px-6 py-4 space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-sm font-extrabold text-slate-800">Tickets cerrados por mes</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 15 días.
-            </p>
+            <h2 className="text-sm font-extrabold text-slate-800">{t("Tickets cerrados por mes")}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{t("Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 15 días.")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {([["mensual", "Resumen mensual"], ["cerrados", "Tickets cerrados"], ["todos", "Todos los tickets"]] as const).map(([tipo, label]) => (
               <button key={tipo} onClick={() => descargar(tipo)} disabled={downloading !== null}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-red-600 disabled:opacity-50">
-                {downloading === tipo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {label} (CSV)
-              </button>
+                {downloading === tipo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {label}{" "}{t("(CSV)")}</button>
             ))}
           </div>
         </div>
@@ -817,16 +806,16 @@ function SoporteEstadisticas() {
           {stats.length === 0 ? (
             <div className="py-14 flex flex-col items-center gap-2 text-slate-400">
               <BarChart3 size={32} className="opacity-20" />
-              <p className="text-sm font-medium">Todavía no hay tickets cerrados</p>
+              <p className="text-sm font-medium">{t("Todavía no hay tickets cerrados")}</p>
             </div>
           ) : (
             <table className="w-full min-w-[640px]">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className={`${th} text-left`}>Mes</th>
-                  <th className={th}>Cerrados</th>
+                  <th className={`${th} text-left`}>{t("Mes")}</th>
+                  <th className={th}>{t("Cerrados")}</th>
                   {CATEGORIAS.map((c) => <th key={c.id} className={th}>{c.label}</th>)}
-                  <th className={th}>Tiempo medio hasta el cierre</th>
+                  <th className={th}>{t("Tiempo medio hasta el cierre")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -841,7 +830,7 @@ function SoporteEstadisticas() {
               </tbody>
               <tfoot className="bg-slate-50 border-t border-slate-200">
                 <tr>
-                  <td className={`${td} text-left font-bold text-slate-800`}>Total</td>
+                  <td className={`${td} text-left font-bold text-slate-800`}>{t("Total")}</td>
                   <td className={`${td} font-extrabold text-slate-900`}>{total}</td>
                   {CATEGORIAS.map((c) => (
                     <td key={c.id} className={`${td} font-semibold`}>{stats.reduce((s, m) => s + (m.porCategoria[c.id] || 0), 0)}</td>

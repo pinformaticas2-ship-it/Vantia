@@ -9,6 +9,7 @@ import {
 import { apiFetch } from "../lib/api";
 import { aviso, confirmar } from "../lib/avisos";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import { t } from '../lib/i18n';
 
 // ── CRM (23/10/2026) ─────────────────────────────────────────────────────────
 // Misma estructura que el CRM de GoHighLevel del despacho: embudos con sus
@@ -97,7 +98,7 @@ export default function Crm() {
 
   const cargarConfig = useCallback(async () => {
     const r = await apiFetch("/api/crm/config", { getToken });
-    if (r?.success === false || !r?.data) { aviso.error(r?.error || "No se pudo cargar el CRM"); return; }
+    if (r?.success === false || !r?.data) { aviso.error(r?.error || t("No se pudo cargar el CRM")); return; }
     setConfig(r.data);
     setEmbudoId((id) => (id && r.data.embudos.some((e: Embudo) => e.id === id) ? id : r.data.embudos[0]?.id || ""));
   }, [getToken]);
@@ -116,7 +117,7 @@ export default function Crm() {
       setLista(l?.data || []);
       setResumen(r?.data || null);
     } catch (e: any) {
-      aviso.error(e?.message || "No se pudo cargar el CRM");
+      aviso.error(e?.message || t("No se pudo cargar el CRM"));
     } finally {
       setCargando(false);
     }
@@ -143,12 +144,12 @@ export default function Crm() {
     const r = await apiFetch(`/api/crm/oportunidades/${o.id}`, { method: "PUT", getToken, body: JSON.stringify({ etapa_id: destino.id }) });
     if (r?.success === false) { aviso.error(r.error); void cargar(); return; }
     if (destino.tipo === "ganada" && !o.cliente_id && await confirmar({
-      titulo: `¿Dar de alta a «${o.nombre}» como cliente?`,
-      mensaje: "Se crea su ficha de cliente con el nombre, el teléfono y el correo de la oportunidad.",
-      confirmar: "Sí, crear el cliente", cancelar: "Ahora no",
+      titulo: t("¿Dar de alta a «{nombre}» como cliente?", { nombre: o.nombre }),
+      mensaje: t("Se crea su ficha de cliente con el nombre, el teléfono y el correo de la oportunidad."),
+      confirmar: t("Sí, crear el cliente"), cancelar: t("Ahora no"),
     })) {
       const c = await apiFetch(`/api/crm/oportunidades/${o.id}/convertir`, { method: "POST", getToken, body: "{}" });
-      if (c?.success === false) aviso.error(c.error); else aviso.ok(`«${o.nombre}» ya es cliente`);
+      if (c?.success === false) aviso.error(c.error); else aviso.ok(t("«{nombre}» ya es cliente", { nombre: o.nombre }));
     }
     void cargar();
   };
@@ -160,7 +161,7 @@ export default function Crm() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white"><HeartHandshake size={19} className="text-red-600" /></div>
-          <h1 className="text-xl font-extrabold text-slate-900">CRM</h1>
+          <h1 className="text-xl font-extrabold text-slate-900">{t("CRM")}</h1>
           <nav className="flex gap-1">
             {[["oportunidades", "Oportunidades"], ...(editable ? [["configuracion", "Embudos y cuestionario"]] : [])].map(([id, label]) => (
               <button key={id} onClick={() => setPestana(id as any)}
@@ -169,7 +170,7 @@ export default function Crm() {
           </nav>
         </div>
         {pestana === "oportunidades" && editable && (
-          <button onClick={() => setNueva(true)} className={botonPri}><Plus size={16} /> Añadir oportunidad</button>
+          <button onClick={() => setNueva(true)} className={botonPri}><Plus size={16} />{" "}{t("Añadir oportunidad")}</button>
         )}
       </div>
 
@@ -178,13 +179,13 @@ export default function Crm() {
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <select id="crm-embudo" value={embudoId} onChange={(e) => setEmbudoId(e.target.value)} className="min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-red-300" aria-label="Embudo">
+            <select id="crm-embudo" value={embudoId} onChange={(e) => setEmbudoId(e.target.value)} className="min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none focus:border-red-300" aria-label={t("Embudo")}>
               {config?.embudos.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
-            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">{lista.length} oportunidades</span>
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">{lista.length}{" "}{t("oportunidades")}</span>
             <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-200">
               {([["tablero", LayoutGrid], ["lista", List]] as const).map(([v, Icon]) => (
-                <button key={v} onClick={() => setVista(v)} aria-label={v === "tablero" ? "Vista de tablero" : "Vista de lista"} aria-pressed={vista === v}
+                <button key={v} onClick={() => setVista(v)} aria-label={v === "tablero" ? t("Vista de tablero") : t("Vista de lista")} aria-pressed={vista === v}
                   className={`px-2.5 py-2 ${vista === v ? "bg-red-50 text-red-600" : "bg-white text-slate-500 hover:bg-slate-50"}`}><Icon size={15} /></button>
               ))}
             </div>
@@ -214,15 +215,15 @@ export default function Crm() {
               ))}
             </div>
             <button onClick={() => setMias((v) => !v)} aria-pressed={mias}
-              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${mias ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>Solo las mías</button>
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold ${mias ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>{t("Solo las mías")}</button>
             <label className="relative ml-auto min-w-[220px] flex-1 sm:max-w-xs">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input id="crm-buscar" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar oportunidades o etiquetas" className={`${campo} pl-9`} />
+              <input id="crm-buscar" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar oportunidades o etiquetas")} className={`${campo} pl-9`} />
             </label>
           </div>
 
           {cargando || !config ? (
-            <div className="flex items-center gap-2 py-16 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Cargando oportunidades…</div>
+            <div className="flex items-center gap-2 py-16 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{" "}{t("Cargando oportunidades…")}</div>
           ) : vista === "lista" ? (
             <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
               <table className="w-full min-w-[880px] text-sm">
@@ -243,7 +244,7 @@ export default function Crm() {
                       </td>
                     </tr>
                   ))}
-                  {!lista.length && <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-400">No hay oportunidades con estos filtros</td></tr>}
+                  {!lista.length && <tr><td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-400">{t("No hay oportunidades con estos filtros")}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -253,7 +254,7 @@ export default function Crm() {
                 {etapas.map((e) => {
                   const items = porEtapa.get(e.id) || [];
                   const total = items.reduce((s, o) => s + Number(o.valor_estimado || 0), 0);
-                  const reglas = [e.aviso_responsable && "aviso al propietario", e.accion_texto && `próxima acción: ${e.accion_texto}`,
+                  const reglas = [e.aviso_responsable && t("aviso al propietario"), e.accion_texto && t("próxima acción: {accion}", { accion: e.accion_texto }),
                     e.mover_horas && e.mover_a_etapa_id && `tras ${e.mover_horas} h → ${nombreEtapa(e.mover_a_etapa_id)}`].filter(Boolean);
                   return (
                     <div key={e.id}
@@ -265,9 +266,9 @@ export default function Crm() {
                         <div className="flex items-center gap-2">
                           <span className={`h-2 w-2 shrink-0 rounded-full ${COLORES[e.color || "slate"] || COLORES.slate}`} />
                           <span className="truncate text-sm font-bold text-slate-800" title={e.nombre}>{e.nombre}</span>
-                          {reglas.length > 0 && <span title={`Reglas: ${reglas.join(" · ")}`} className="ml-auto"><Zap size={13} className="text-amber-500" /></span>}
+                          {reglas.length > 0 && <span title={t("Reglas: {join}", { join: reglas.join(" · ") })} className="ml-auto"><Zap size={13} className="text-amber-500" /></span>}
                         </div>
-                        <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">{items.length} oportunidades · <b className="text-slate-700">{euros(total)}</b></p>
+                        <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">{items.length}{" "}{t("oportunidades ·")}{" "}<b className="text-slate-700">{euros(total)}</b></p>
                       </div>
                       <div className="flex max-h-[calc(100dvh-360px)] min-h-[200px] flex-col gap-2 overflow-y-auto">
                         {items.map((o) => (
@@ -278,11 +279,11 @@ export default function Crm() {
                             className={`grid gap-1.5 rounded-xl border bg-white p-3 text-left shadow-sm hover:border-slate-300 ${arrastrando === o.id ? "opacity-50" : ""} ${vencida(o.proxima_accion_at) && o.estado === "abierta" ? "border-rose-200" : "border-slate-200"}`}>
                             <span className="flex items-start justify-between gap-2">
                               <span className="text-sm font-bold text-slate-800">{o.nombre}</span>
-                              <span title={o.responsable_nombre || "Sin asignar"} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{iniciales(o.responsable_nombre)}</span>
+                              <span title={o.responsable_nombre || t("Sin asignar")} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{iniciales(o.responsable_nombre)}</span>
                             </span>
                             <span className="grid grid-cols-[56px_1fr] gap-y-0.5 text-[12px]">
-                              <span className="text-slate-500">Fuente:</span><span className="text-slate-700">{ORIGENES[o.origen] || o.origen}</span>
-                              <span className="text-slate-500">Valor:</span><span className="tabular-nums text-slate-700">{euros(o.valor_estimado)}</span>
+                              <span className="text-slate-500">{t("Fuente:")}</span><span className="text-slate-700">{ORIGENES[o.origen] || o.origen}</span>
+                              <span className="text-slate-500">{t("Valor:")}</span><span className="tabular-nums text-slate-700">{euros(o.valor_estimado)}</span>
                             </span>
                             {o.estado !== "abierta" && <span className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-bold ${ESTILO_ESTADO[o.estado]}`}>{o.estado}</span>}
                             {o.etiquetas?.length > 0 && (
@@ -300,7 +301,7 @@ export default function Crm() {
                             </span>
                           </button>
                         ))}
-                        {!items.length && <p className="py-6 text-center text-xs text-slate-400">Ninguna</p>}
+                        {!items.length && <p className="py-6 text-center text-xs text-slate-400">{t("Ninguna")}</p>}
                       </div>
                     </div>
                   );
@@ -342,29 +343,29 @@ function Capa({ children, onClose, lateral = false }: { children: React.ReactNod
 function CamposDatos({ v, set, miembros }: { v: any; set: (k: string, val: any) => void; miembros: Miembro[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <label className="sm:col-span-2"><span className={etiqueta}>Nombre de la oportunidad *</span>
-        <input id="crm-nombre" value={v.nombre || ""} onChange={(e) => set("nombre", e.target.value)} placeholder="Persona o empresa" className={campo} /></label>
-      <label><span className={etiqueta}>Teléfono</span><input id="crm-telefono" value={v.telefono || ""} onChange={(e) => set("telefono", e.target.value)} className={campo} /></label>
-      <label><span className={etiqueta}>Correo</span><input id="crm-email" type="email" value={v.email || ""} onChange={(e) => set("email", e.target.value)} className={campo} /></label>
-      <label><span className={etiqueta}>Fuente</span>
+      <label className="sm:col-span-2"><span className={etiqueta}>{t("Nombre de la oportunidad *")}</span>
+        <input id="crm-nombre" value={v.nombre || ""} onChange={(e) => set("nombre", e.target.value)} placeholder={t("Persona o empresa")} className={campo} /></label>
+      <label><span className={etiqueta}>{t("Teléfono")}</span><input id="crm-telefono" value={v.telefono || ""} onChange={(e) => set("telefono", e.target.value)} className={campo} /></label>
+      <label><span className={etiqueta}>{t("Correo")}</span><input id="crm-email" type="email" value={v.email || ""} onChange={(e) => set("email", e.target.value)} className={campo} /></label>
+      <label><span className={etiqueta}>{t("Fuente")}</span>
         <select id="crm-origen" value={v.origen || "otro"} onChange={(e) => set("origen", e.target.value)} className={campo}>
           {Object.entries(ORIGENES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select></label>
-      <label><span className={etiqueta}>Valor (€)</span>
+      <label><span className={etiqueta}>{t("Valor (€)")}</span>
         <input id="crm-valor" inputMode="decimal" value={v.valor_estimado ?? ""} onChange={(e) => set("valor_estimado", e.target.value)} placeholder="0" className={campo} /></label>
-      <label><span className={etiqueta}>Propietario</span>
+      <label><span className={etiqueta}>{t("Propietario")}</span>
         <select id="crm-responsable" value={v.responsable_user_id || ""} onChange={(e) => set("responsable_user_id", e.target.value)} className={campo}>
-          <option value="">Yo</option>
+          <option value="">{t("Yo")}</option>
           {miembros.map((m) => <option key={m.userId} value={m.userId}>{m.nombre}</option>)}
         </select></label>
-      <label><span className={etiqueta}>Área</span><input id="crm-area" value={v.area || ""} onChange={(e) => set("area", e.target.value)} placeholder="Medidas de apoyo…" className={campo} /></label>
-      <label className="sm:col-span-2"><span className={etiqueta}>Qué necesita</span>
+      <label><span className={etiqueta}>{t("Área")}</span><input id="crm-area" value={v.area || ""} onChange={(e) => set("area", e.target.value)} placeholder={t("Medidas de apoyo…")} className={campo} /></label>
+      <label className="sm:col-span-2"><span className={etiqueta}>{t("Qué necesita")}</span>
         <textarea id="crm-asunto" value={v.asunto || ""} onChange={(e) => set("asunto", e.target.value)} rows={2} className={campo} /></label>
-      <label className="sm:col-span-2"><span className={etiqueta}>Etiquetas (separadas por comas)</span>
-        <input id="crm-etiquetas" value={Array.isArray(v.etiquetas) ? v.etiquetas.join(", ") : v.etiquetas || ""} onChange={(e) => set("etiquetas", e.target.value)} placeholder="urgente, curatela…" className={campo} /></label>
-      <label><span className={etiqueta}>Próxima acción</span>
+      <label className="sm:col-span-2"><span className={etiqueta}>{t("Etiquetas (separadas por comas)")}</span>
+        <input id="crm-etiquetas" value={Array.isArray(v.etiquetas) ? v.etiquetas.join(", ") : v.etiquetas || ""} onChange={(e) => set("etiquetas", e.target.value)} placeholder={t("urgente, curatela…")} className={campo} /></label>
+      <label><span className={etiqueta}>{t("Próxima acción")}</span>
         <input id="crm-accion" value={v.proxima_accion || ""} onChange={(e) => set("proxima_accion", e.target.value)} className={campo} /></label>
-      <label><span className={etiqueta}>Cuándo</span>
+      <label><span className={etiqueta}>{t("Cuándo")}</span>
         <input id="crm-accion-fecha" type="datetime-local" value={aInputFecha(v.proxima_accion_at)} onChange={(e) => set("proxima_accion_at", e.target.value ? new Date(e.target.value).toISOString() : null)} className={campo} /></label>
     </div>
   );
@@ -400,38 +401,38 @@ function NuevaOportunidad({ config, embudoId, miembros, onClose, onCreada }: { c
   const [v, setV] = useState<any>({ origen: "telefono", etapa_id: etapas[0]?.id, campos: {} });
   const [guardando, setGuardando] = useState(false);
   const crear = async () => {
-    if (!String(v.nombre || "").trim()) { aviso.error("Escribe el nombre de la persona o empresa"); return; }
+    if (!String(v.nombre || "").trim()) { aviso.error(t("Escribe el nombre de la persona o empresa")); return; }
     setGuardando(true);
     const cuerpo = { ...v };
     if (!cuerpo.responsable_user_id) delete cuerpo.responsable_user_id;
     const r = await apiFetch("/api/crm/oportunidades", { method: "POST", getToken, body: JSON.stringify(cuerpo) });
     setGuardando(false);
-    if (r?.success === false || !r?.data) { aviso.error(r?.error || "No se pudo crear"); return; }
-    aviso.ok("Oportunidad creada");
+    if (r?.success === false || !r?.data) { aviso.error(r?.error || t("No se pudo crear")); return; }
+    aviso.ok(t("Oportunidad creada"));
     onCreada(r.data.id);
   };
   return (
     <Capa onClose={onClose}>
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-        <h2 className="text-base font-extrabold text-slate-900">Añadir oportunidad</h2>
-        <button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+        <h2 className="text-base font-extrabold text-slate-900">{t("Añadir oportunidad")}</h2>
+        <button onClick={onClose} aria-label={t("Cerrar")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        <label className="block"><span className={etiqueta}>Etapa</span>
+        <label className="block"><span className={etiqueta}>{t("Etapa")}</span>
           <select id="crm-nueva-etapa" value={v.etapa_id || ""} onChange={(e) => setV((p: any) => ({ ...p, etapa_id: e.target.value }))} className={campo}>
             {etapas.filter((e) => e.tipo === "abierta").map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
           </select></label>
         <CamposDatos v={v} set={(k, val) => setV((p: any) => ({ ...p, [k]: val }))} miembros={miembros} />
         {config.campos.length > 0 && (
           <details className="rounded-xl border border-slate-200 p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Cuestionario ({config.campos.length} preguntas)</summary>
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">{t("Cuestionario (")}{config.campos.length}{" "}{t("preguntas)")}</summary>
             <div className="mt-3"><Cuestionario campos={config.campos} valores={v.campos} set={(id, val) => setV((p: any) => ({ ...p, campos: { ...p.campos, [id]: val } }))} /></div>
           </details>
         )}
       </div>
       <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-        <button onClick={onClose} className={botonSec}>Cancelar</button>
-        <button onClick={() => void crear()} disabled={guardando} className={botonPri}>{guardando && <Loader2 size={14} className="animate-spin" />} Crear</button>
+        <button onClick={onClose} className={botonSec}>{t("Cancelar")}</button>
+        <button onClick={() => void crear()} disabled={guardando} className={botonPri}>{guardando && <Loader2 size={14} className="animate-spin" />}{" "}{t("Crear")}</button>
       </div>
     </Capa>
   );
@@ -450,7 +451,7 @@ function FichaOportunidad({ id, config, editable, miembros, onClose, onCambio, o
 
   const cargar = useCallback(async () => {
     const r = await apiFetch(`/api/crm/oportunidades/${id}`, { getToken });
-    if (r?.success === false || !r?.data) { aviso.error(r?.error || "No se pudo abrir"); onClose(); return; }
+    if (r?.success === false || !r?.data) { aviso.error(r?.error || t("No se pudo abrir")); onClose(); return; }
     const datos = { ...r.data, valor_estimado: valorEditable(r.data.valor_estimado), campos: r.data.campos || {} };
     setO(datos); setV(datos);
   }, [getToken, id, onClose]);
@@ -482,7 +483,7 @@ function FichaOportunidad({ id, config, editable, miembros, onClose, onCambio, o
     const destino = etapas.find((e) => e.id === etapaId);
     if (!o || !destino) return;
     if (destino.tipo === "perdida") onPerder(o, etapaId);
-    else void enviar({ etapa_id: etapaId }, `Movida a «${destino.nombre}»`);
+    else void enviar({ etapa_id: etapaId }, t("Movida a «{etapa}»", { etapa: destino.nombre }));
   };
   const cambiarEstado = (est: Estado) => {
     if (!o) return;
@@ -490,16 +491,16 @@ function FichaOportunidad({ id, config, editable, miembros, onClose, onCambio, o
     else void enviar({ estado: est }, "Estado cambiado");
   };
   const convertir = async () => {
-    if (!o || !(await confirmar({ titulo: `¿Dar de alta a «${o.nombre}» como cliente?`, mensaje: "Se crea su ficha de cliente y la oportunidad queda ganada.", confirmar: "Sí, es cliente" }))) return;
+    if (!o || !(await confirmar({ titulo: t("¿Dar de alta a «{nombre}» como cliente?", { nombre: o.nombre }), mensaje: t("Se crea su ficha de cliente y la oportunidad queda ganada."), confirmar: t("Sí, es cliente") }))) return;
     const r = await apiFetch(`/api/crm/oportunidades/${id}/convertir`, { method: "POST", getToken, body: "{}" });
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok(`«${o.nombre}» ya es cliente`); await cargar(); onCambio();
+    aviso.ok(t("«{nombre}» ya es cliente", { nombre: o.nombre })); await cargar(); onCambio();
   };
   const borrar = async () => {
-    if (!o || !(await confirmar({ titulo: `¿Eliminar la oportunidad «${o.nombre}»?`, mensaje: "Se borra con todo su historial. Si no salió adelante, mejor márcala como perdida o abandonada.", confirmar: "Eliminar", peligro: true }))) return;
+    if (!o || !(await confirmar({ titulo: t("¿Eliminar la oportunidad «{nombre}»?", { nombre: o.nombre }), mensaje: t("Se borra con todo su historial. Si no salió adelante, mejor márcala como perdida o abandonada."), confirmar: t("Eliminar"), peligro: true }))) return;
     const r = await apiFetch(`/api/crm/oportunidades/${id}`, { method: "DELETE", getToken });
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok("Oportunidad eliminada"); onCambio(); onClose();
+    aviso.ok(t("Oportunidad eliminada")); onCambio(); onClose();
   };
   const anadir = async () => {
     if (!nota.trim()) return;
@@ -515,51 +516,50 @@ function FichaOportunidad({ id, config, editable, miembros, onClose, onCambio, o
           <h2 className="truncate text-base font-extrabold text-slate-900">{o?.nombre || "…"}</h2>
           {o && (
             <div className="flex flex-wrap items-center gap-2">
-              <select id="crm-etapa" value={o.etapa_id || ""} disabled={!editable || guardando} onChange={(e) => cambiarEtapa(e.target.value)} aria-label="Etapa"
+              <select id="crm-etapa" value={o.etapa_id || ""} disabled={!editable || guardando} onChange={(e) => cambiarEtapa(e.target.value)} aria-label={t("Etapa")}
                 className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
                 {etapas.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
               </select>
-              <select id="crm-estado" value={o.estado} disabled={!editable || guardando} onChange={(e) => cambiarEstado(e.target.value as Estado)} aria-label="Estado"
+              <select id="crm-estado" value={o.estado} disabled={!editable || guardando} onChange={(e) => cambiarEstado(e.target.value as Estado)} aria-label={t("Estado")}
                 className={`rounded-lg border-0 px-2.5 py-1.5 text-xs font-bold ${ESTILO_ESTADO[o.estado]}`}>
                 {(["abierta", "ganada", "perdida", "abandonada"] as Estado[]).map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
               </select>
-              {o.cliente_id && <Link to={`/dashboard/clientes/${o.cliente_id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"><ExternalLink size={12} /> Ficha del cliente</Link>}
+              {o.cliente_id && <Link to={`/dashboard/clientes/${o.cliente_id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"><ExternalLink size={12} />{" "}{t("Ficha del cliente")}</Link>}
             </div>
           )}
         </div>
-        <button onClick={onClose} aria-label="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
+        <button onClick={onClose} aria-label={t("Cerrar")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
       </div>
 
       {!o ? (
-        <div className="flex items-center gap-2 p-6 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" /> Cargando…</div>
+        <div className="flex items-center gap-2 p-6 text-sm text-slate-500"><Loader2 size={16} className="animate-spin" />{" "}{t("Cargando…")}</div>
       ) : (
         <div className="flex-1 space-y-5 overflow-y-auto p-5">
           {(o.estado === "perdida" || o.estado === "abandonada") && o.motivo_perdida && (
-            <p className="peligro flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><XCircle size={16} className="mt-0.5 shrink-0" /> {o.estado === "perdida" ? "Perdida" : "Abandonada"}: {o.motivo_perdida}</p>
+            <p className="peligro flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700"><XCircle size={16} className="mt-0.5 shrink-0" /> {o.estado === "perdida" ? t("Perdida") : t("Abandonada")}: {o.motivo_perdida}</p>
           )}
           <fieldset disabled={!editable}>
             <CamposDatos v={v} set={(k, val) => setV((p: any) => ({ ...p, [k]: val }))} miembros={miembros} />
           </fieldset>
           {config.campos.length > 0 && (
             <section className="space-y-3 rounded-xl border border-slate-200 p-4">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cuestionario</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Cuestionario")}</h3>
               <Cuestionario campos={config.campos} valores={v.campos || {}} disabled={!editable} set={(cid, val) => setV((p: any) => ({ ...p, campos: { ...p.campos, [cid]: val } }))} />
             </section>
           )}
           {editable && (
             <div className="flex flex-wrap gap-2">
               <button onClick={() => void guardar()} disabled={!cambiado || guardando} className={botonPri}>
-                {guardando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar
-              </button>
+                {guardando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{" "}{t("Guardar")}</button>
               {!o.cliente_id && (
-                <button onClick={() => void convertir()} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"><UserCheck size={14} /> Convertir en cliente</button>
+                <button onClick={() => void convertir()} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"><UserCheck size={14} />{" "}{t("Convertir en cliente")}</button>
               )}
-              <button onClick={() => void borrar()} className="peligro ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"><Trash2 size={14} /> Eliminar</button>
+              <button onClick={() => void borrar()} className="peligro ml-auto inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"><Trash2 size={14} />{" "}{t("Eliminar")}</button>
             </div>
           )}
 
           <section className="space-y-3 border-t border-slate-200 pt-4">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Historial</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Historial")}</h3>
             {editable && (
               <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex flex-wrap gap-1">
@@ -573,8 +573,8 @@ function FichaOportunidad({ id, config, editable, miembros, onClose, onCambio, o
                     );
                   })}
                 </div>
-                <textarea id="crm-nota" value={nota} onChange={(e) => setNota(e.target.value)} rows={2} placeholder="¿Qué se ha hablado?" className={campo} />
-                <button onClick={() => void anadir()} disabled={!nota.trim()} className={botonSec}>Añadir al historial</button>
+                <textarea id="crm-nota" value={nota} onChange={(e) => setNota(e.target.value)} rows={2} placeholder={t("¿Qué se ha hablado?")} className={campo} />
+                <button onClick={() => void anadir()} disabled={!nota.trim()} className={botonSec}>{t("Añadir al historial")}</button>
               </div>
             )}
             <ol className="space-y-3">
@@ -614,7 +614,7 @@ function MotivoPerdida({ o, etapaId, estado, onClose, onHecho }: { o: Oportunida
     const r = await apiFetch(`/api/crm/oportunidades/${o.id}`, { method: "PUT", getToken, body: JSON.stringify(cuerpo) });
     setGuardando(false);
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok(`«${o.nombre}» marcada como ${abandono ? "abandonada" : "perdida"}`);
+    aviso.ok(t("«{nombre}» marcada como {v}", { nombre: o.nombre, v: abandono ? "abandonada" : "perdida" }));
     onHecho();
   };
   return (
@@ -623,8 +623,8 @@ function MotivoPerdida({ o, etapaId, estado, onClose, onHecho }: { o: Oportunida
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50"><AlertTriangle size={18} className="text-rose-600" /></span>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900">{abandono ? "¿Por qué se abandona" : "¿Por qué se ha perdido"} «{o.nombre}»?</h2>
-            <p className="text-xs text-slate-500">El motivo sirve para ver después por qué no salen adelante.</p>
+            <h2 className="text-base font-extrabold text-slate-900">{abandono ? t("¿Por qué se abandona") : t("¿Por qué se ha perdido")} «{o.nombre}»?</h2>
+            <p className="text-xs text-slate-500">{t("El motivo sirve para ver después por qué no salen adelante.")}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -632,10 +632,10 @@ function MotivoPerdida({ o, etapaId, estado, onClose, onHecho }: { o: Oportunida
             <button key={m} onClick={() => setMotivo(m)} className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${motivo === m ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{m}</button>
           ))}
         </div>
-        <textarea id="crm-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder="Otro motivo…" className={campo} />
+        <textarea id="crm-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder={t("Otro motivo…")} className={campo} />
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className={botonSec}>Cancelar</button>
-          <button onClick={() => void guardar()} disabled={!motivo.trim() || guardando} className={botonPri}>{guardando && <Loader2 size={14} className="animate-spin" />} Confirmar</button>
+          <button onClick={onClose} className={botonSec}>{t("Cancelar")}</button>
+          <button onClick={() => void guardar()} disabled={!motivo.trim() || guardando} className={botonPri}>{guardando && <Loader2 size={14} className="animate-spin" />}{" "}{t("Confirmar")}</button>
         </div>
       </div>
     </Capa>
@@ -660,12 +660,12 @@ function ConfiguracionCrm({ config, embudoId, setEmbudoId, onGuardado }: { confi
     const r = await apiFetch(`/api/crm/embudos/${embudo.id}`, { method: "PUT", getToken, body: JSON.stringify({ nombre, etapas }) });
     setGuardando("");
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok("Embudo guardado"); onGuardado();
+    aviso.ok(t("Embudo guardado")); onGuardado();
   };
   const nuevoEmbudo = async () => {
     const r = await apiFetch("/api/crm/embudos", { method: "POST", getToken, body: JSON.stringify({ nombre: `Embudo ${config.embudos.length + 1}` }) });
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok("Embudo creado: ponle nombre y sus etapas"); setEmbudoId(r.data.id); onGuardado();
+    aviso.ok(t("Embudo creado: ponle nombre y sus etapas")); setEmbudoId(r.data.id); onGuardado();
   };
   const guardarCampos = async () => {
     setGuardando("campos");
@@ -673,7 +673,7 @@ function ConfiguracionCrm({ config, embudoId, setEmbudoId, onGuardado }: { confi
     const r = await apiFetch("/api/crm/campos", { method: "PUT", getToken, body: JSON.stringify({ campos: lista }) });
     setGuardando("");
     if (r?.success === false) { aviso.error(r.error); return; }
-    aviso.ok("Cuestionario guardado"); onGuardado();
+    aviso.ok(t("Cuestionario guardado")); onGuardado();
   };
 
   if (!embudo) return null;
@@ -682,50 +682,47 @@ function ConfiguracionCrm({ config, embudoId, setEmbudoId, onGuardado }: { confi
     <div className="space-y-6">
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-end gap-3">
-          <label><span className={etiqueta}>Embudo</span>
+          <label><span className={etiqueta}>{t("Embudo")}</span>
             <select id="crm-cfg-embudo" value={embudo.id} onChange={(e) => setEmbudoId(e.target.value)} className={`${campo} min-w-[200px]`}>
               {config.embudos.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select></label>
-          <label className="min-w-[220px] flex-1"><span className={etiqueta}>Nombre</span>
+          <label className="min-w-[220px] flex-1"><span className={etiqueta}>{t("Nombre")}</span>
             <input id="crm-cfg-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} className={campo} /></label>
-          <button onClick={() => void nuevoEmbudo()} className={botonSec}><Plus size={14} /> Nuevo embudo</button>
+          <button onClick={() => void nuevoEmbudo()} className={botonSec}><Plus size={14} />{" "}{t("Nuevo embudo")}</button>
         </div>
-        <p className="text-xs text-slate-500">
-          Cada etapa puede tener reglas: <b>avisar al propietario</b> cuando una oportunidad entra, poner una <b>próxima acción</b> automática y, si sigue
-          sin moverse unas horas, <b>pasarla a otra etapa</b> (por ejemplo, «No respondió» → «No respondió (48h)»). Las de tipo Ganada o Perdida cambian el estado.
-        </p>
+        <p className="text-xs text-slate-500">{t("Cada etapa puede tener reglas:")}{" "}<b>{t("avisar al propietario")}</b>{" "}{t("cuando una oportunidad entra, poner una")}{" "}<b>{t("próxima acción")}</b>{" "}{t("automática y, si sigue sin moverse unas horas,")}{" "}<b>{t("pasarla a otra etapa")}</b>{" "}{t("(por ejemplo, «No respondió» → «No respondió (48h)»). Las de tipo Ganada o Perdida cambian el estado.")}</p>
         <div className="space-y-2">
           {etapas.map((e, i) => (
             <div key={e.id || i} className="grid gap-2 rounded-xl border border-slate-200 p-3 lg:grid-cols-[auto_1.4fr_auto_auto_auto]">
               <div className="flex items-center gap-1">
-                <button onClick={() => moverEtapa(i, -1)} disabled={i === 0} aria-label="Subir" className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp size={14} /></button>
-                <button onClick={() => moverEtapa(i, 1)} disabled={i === etapas.length - 1} aria-label="Bajar" className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown size={14} /></button>
+                <button onClick={() => moverEtapa(i, -1)} disabled={i === 0} aria-label={t("Subir")} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp size={14} /></button>
+                <button onClick={() => moverEtapa(i, 1)} disabled={i === etapas.length - 1} aria-label={t("Bajar")} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown size={14} /></button>
                 <span className="w-5 text-center text-xs font-bold text-slate-400">{i + 1}</span>
               </div>
-              <input id={`crm-etapa-${i}`} value={e.nombre} onChange={(ev) => setEtapa(i, "nombre", ev.target.value)} aria-label="Nombre de la etapa" className={campo} />
-              <select value={e.tipo} onChange={(ev) => setEtapa(i, "tipo", ev.target.value)} aria-label="Tipo" className={campo}>
-                <option value="abierta">En curso</option><option value="ganada">Ganada</option><option value="perdida">Perdida</option>
+              <input id={`crm-etapa-${i}`} value={e.nombre} onChange={(ev) => setEtapa(i, "nombre", ev.target.value)} aria-label={t("Nombre de la etapa")} className={campo} />
+              <select value={e.tipo} onChange={(ev) => setEtapa(i, "tipo", ev.target.value)} aria-label={t("Tipo")} className={campo}>
+                <option value="abierta">{t("En curso")}</option><option value="ganada">{t("Ganada")}</option><option value="perdida">{t("Perdida")}</option>
               </select>
-              <select value={e.color || "slate"} onChange={(ev) => setEtapa(i, "color", ev.target.value)} aria-label="Color" className={campo}>
+              <select value={e.color || "slate"} onChange={(ev) => setEtapa(i, "color", ev.target.value)} aria-label={t("Color")} className={campo}>
                 {Object.keys(COLORES).map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <div className="flex items-center justify-end">
-                <button onClick={() => setEtapas((p) => p.filter((_, j) => j !== i))} aria-label="Quitar etapa" className="peligro rounded p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
+                <button onClick={() => setEtapas((p) => p.filter((_, j) => j !== i))} aria-label={t("Quitar etapa")} className="peligro rounded p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 lg:col-span-5">
                 <Zap size={13} className="text-amber-500" />
-                <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={!!e.aviso_responsable} onChange={(ev) => setEtapa(i, "aviso_responsable", ev.target.checked)} className="accent-red-600" /><Bell size={12} /> Avisar al propietario</label>
+                <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={!!e.aviso_responsable} onChange={(ev) => setEtapa(i, "aviso_responsable", ev.target.checked)} className="accent-red-600" /><Bell size={12} />{" "}{t("Avisar al propietario")}</label>
                 <span className="text-slate-300">·</span>
-                <span>Próxima acción</span>
-                <input value={e.accion_texto || ""} onChange={(ev) => setEtapa(i, "accion_texto", ev.target.value)} placeholder="ninguna" className={`${mini} w-52`} aria-label="Próxima acción automática" />
-                <span>en</span>
-                <input type="number" min={0} value={e.accion_horas ?? ""} onChange={(ev) => setEtapa(i, "accion_horas", ev.target.value === "" ? null : Number(ev.target.value))} className={`${mini} w-16`} aria-label="Horas para la próxima acción" />
+                <span>{t("Próxima acción")}</span>
+                <input value={e.accion_texto || ""} onChange={(ev) => setEtapa(i, "accion_texto", ev.target.value)} placeholder={t("ninguna")} className={`${mini} w-52`} aria-label={t("Próxima acción automática")} />
+                <span>{t("en")}</span>
+                <input type="number" min={0} value={e.accion_horas ?? ""} onChange={(ev) => setEtapa(i, "accion_horas", ev.target.value === "" ? null : Number(ev.target.value))} className={`${mini} w-16`} aria-label={t("Horas para la próxima acción")} />
                 <span>h</span>
                 <span className="text-slate-300">·</span>
-                <span>Si sigue</span>
-                <input type="number" min={1} value={e.mover_horas ?? ""} onChange={(ev) => setEtapa(i, "mover_horas", ev.target.value === "" ? null : Number(ev.target.value))} className={`${mini} w-16`} aria-label="Horas sin moverse" />
-                <span>h, pasar a</span>
-                <select value={e.mover_a_etapa_id || ""} onChange={(ev) => setEtapa(i, "mover_a_etapa_id", ev.target.value || null)} className={mini} aria-label="Etapa destino">
+                <span>{t("Si sigue")}</span>
+                <input type="number" min={1} value={e.mover_horas ?? ""} onChange={(ev) => setEtapa(i, "mover_horas", ev.target.value === "" ? null : Number(ev.target.value))} className={`${mini} w-16`} aria-label={t("Horas sin moverse")} />
+                <span>{t("h, pasar a")}</span>
+                <select value={e.mover_a_etapa_id || ""} onChange={(ev) => setEtapa(i, "mover_a_etapa_id", ev.target.value || null)} className={mini} aria-label={t("Etapa destino")}>
                   <option value="">—</option>
                   {etapas.filter((x) => x !== e && x.id).map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
                 </select>
@@ -734,32 +731,32 @@ function ConfiguracionCrm({ config, embudoId, setEmbudoId, onGuardado }: { confi
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setEtapas((p) => [...p, { id: `nueva-${Date.now()}`, nombre: "Nueva etapa", tipo: "abierta", color: "slate" }])} className={botonSec}><Plus size={14} /> Añadir etapa</button>
-          <button onClick={() => void guardarEmbudo()} disabled={guardando === "embudo"} className={`${botonPri} ml-auto`}>{guardando === "embudo" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar embudo</button>
+          <button onClick={() => setEtapas((p) => [...p, { id: `nueva-${Date.now()}`, nombre: "Nueva etapa", tipo: "abierta", color: "slate" }])} className={botonSec}><Plus size={14} />{" "}{t("Añadir etapa")}</button>
+          <button onClick={() => void guardarEmbudo()} disabled={guardando === "embudo"} className={`${botonPri} ml-auto`}>{guardando === "embudo" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{" "}{t("Guardar embudo")}</button>
         </div>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><Settings2 size={15} /> Cuestionario de captación</h2>
-          <p className="mt-1 text-xs text-slate-500">Las preguntas que se rellenan en cada oportunidad. Para las de opción única, una opción por línea.</p>
+          <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900"><Settings2 size={15} />{" "}{t("Cuestionario de captación")}</h2>
+          <p className="mt-1 text-xs text-slate-500">{t("Las preguntas que se rellenan en cada oportunidad. Para las de opción única, una opción por línea.")}</p>
         </div>
         {campos.map((c, i) => (
           <div key={c.id || i} className="grid gap-2 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_auto_auto]">
-            <input value={c.nombre} onChange={(ev) => setCampos((p) => p.map((x, j) => (j === i ? { ...x, nombre: ev.target.value } : x)))} aria-label="Pregunta" className={campo} />
-            <select value={c.tipo} onChange={(ev) => setCampos((p) => p.map((x, j) => (j === i ? { ...x, tipo: ev.target.value } : x)))} aria-label="Tipo de respuesta" className={campo}>
-              <option value="opcion">Opción única</option><option value="texto">Texto</option><option value="fecha">Fecha</option><option value="numero">Número</option>
+            <input value={c.nombre} onChange={(ev) => setCampos((p) => p.map((x, j) => (j === i ? { ...x, nombre: ev.target.value } : x)))} aria-label={t("Pregunta")} className={campo} />
+            <select value={c.tipo} onChange={(ev) => setCampos((p) => p.map((x, j) => (j === i ? { ...x, tipo: ev.target.value } : x)))} aria-label={t("Tipo de respuesta")} className={campo}>
+              <option value="opcion">{t("Opción única")}</option><option value="texto">{t("Texto")}</option><option value="fecha">{t("Fecha")}</option><option value="numero">{t("Número")}</option>
             </select>
-            <button onClick={() => setCampos((p) => p.filter((_, j) => j !== i))} aria-label="Quitar pregunta" className="peligro rounded p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
+            <button onClick={() => setCampos((p) => p.filter((_, j) => j !== i))} aria-label={t("Quitar pregunta")} className="peligro rounded p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={14} /></button>
             {c.tipo === "opcion" && (
               <textarea value={c.opcionesTexto} onChange={(ev) => setCampos((p) => p.map((x, j) => (j === i ? { ...x, opcionesTexto: ev.target.value } : x)))}
-                rows={Math.max(2, String(c.opcionesTexto || "").split("\n").length)} aria-label="Opciones" className={`${campo} sm:col-span-3`} />
+                rows={Math.max(2, String(c.opcionesTexto || "").split("\n").length)} aria-label={t("Opciones")} className={`${campo} sm:col-span-3`} />
             )}
           </div>
         ))}
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setCampos((p) => [...p, { nombre: "Nueva pregunta", tipo: "opcion", opcionesTexto: "Sí\nNo" }])} className={botonSec}><Tag size={14} /> Añadir pregunta</button>
-          <button onClick={() => void guardarCampos()} disabled={guardando === "campos"} className={`${botonPri} ml-auto`}>{guardando === "campos" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cuestionario</button>
+          <button onClick={() => setCampos((p) => [...p, { nombre: "Nueva pregunta", tipo: "opcion", opcionesTexto: "Sí\nNo" }])} className={botonSec}><Tag size={14} />{" "}{t("Añadir pregunta")}</button>
+          <button onClick={() => void guardarCampos()} disabled={guardando === "campos"} className={`${botonPri} ml-auto`}>{guardando === "campos" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{" "}{t("Guardar cuestionario")}</button>
         </div>
       </section>
     </div>

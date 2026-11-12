@@ -26,6 +26,7 @@ import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { aviso, confirmar } from "../lib/avisos";
 import { abrirPaleta } from "../components/PaletaComandos";
+import { t, t as tr } from '../lib/i18n';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -235,18 +236,18 @@ async function recortarFotoCuadrada(file: File, lado = 256): Promise<Blob> {
     const img = await new Promise<HTMLImageElement>((ok, ko) => {
       const i = new Image();
       i.onload = () => ok(i);
-      i.onerror = () => ko(new Error("No se pudo leer la imagen"));
+      i.onerror = () => ko(new Error(t("No se pudo leer la imagen")));
       i.src = url;
     });
     const s = Math.min(img.naturalWidth, img.naturalHeight);
     const canvas = document.createElement("canvas");
     canvas.width = lado; canvas.height = lado;
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("No se pudo procesar la imagen");
+    if (!ctx) throw new Error(t("No se pudo procesar la imagen"));
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, lado, lado);
     ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, lado, lado);
-    return await new Promise<Blob>((ok, ko) => canvas.toBlob((b) => (b ? ok(b) : ko(new Error("No se pudo procesar la imagen"))), "image/jpeg", 0.88));
+    return await new Promise<Blob>((ok, ko) => canvas.toBlob((b) => (b ? ok(b) : ko(new Error(t("No se pudo procesar la imagen")))), "image/jpeg", 0.88));
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -453,10 +454,10 @@ function haceRato(iso: string): string {
   if (min < 60) return `hace ${min} min`;
   const d = new Date(t);
   const hoy = new Date();
-  if (d.toDateString() === hoy.toDateString()) return `hoy a las ${fmtTime(iso)}`;
+  if (d.toDateString() === hoy.toDateString()) return tr("hoy a las {hora}", { hora: fmtTime(iso) });
   const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
-  if (d.toDateString() === ayer.toDateString()) return `ayer a las ${fmtTime(iso)}`;
-  return `el ${d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })}`;
+  if (d.toDateString() === ayer.toDateString()) return tr("ayer a las {hora}", { hora: fmtTime(iso) });
+  return tr("el {fecha}", { fecha: d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) });
 }
 
 /** Reacciones de un clic en la barra de cada mensaje. */
@@ -604,7 +605,7 @@ function ImageLightbox({
   const handleDownload = useCallback(async () => {
     try {
       const response = await fetch(src, { credentials: "same-origin" });
-      if (!response.ok) throw new Error("download");
+      if (!response.ok) throw new Error(t("download"));
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -623,7 +624,7 @@ function ImageLightbox({
   const copyLink = useCallback(async () => {
     try {
       const copied = await copyText(src);
-      if (!copied) throw new Error("copy");
+      if (!copied) throw new Error(t("copy"));
       setFeedback("Enlace copiado");
       setShowOptions(false);
     } catch {
@@ -639,7 +640,7 @@ function ImageLightbox({
         return;
       }
       const copied = await copyText(src);
-      if (!copied) throw new Error("share");
+      if (!copied) throw new Error(t("share"));
       setFeedback("Enlace copiado para compartir");
     } catch {
       openOriginal();
@@ -683,26 +684,20 @@ function ImageLightbox({
             onClick={(e) => { e.stopPropagation(); void handleDownload(); }}
             className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
           >
-            <Download size={16} />
-            Descargar
-          </button>
+            <Download size={16} />{t("Descargar")}</button>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleShare(); }}
             className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
           >
-            <Share2 size={16} />
-            Compartir
-          </button>
+            <Share2 size={16} />{t("Compartir")}</button>
           <div className="relative">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setShowOptions((v) => !v); }}
               className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
             >
-              <MoreHorizontal size={16} />
-              Opciones
-            </button>
+              <MoreHorizontal size={16} />{t("Opciones")}</button>
             {showOptions && (
               <div
                 className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/95 p-1 shadow-2xl"
@@ -713,17 +708,13 @@ function ImageLightbox({
                   onClick={() => { openOriginal(); }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/10"
                 >
-                  <ExternalLink size={15} />
-                  Abrir original
-                </button>
+                  <ExternalLink size={15} />{t("Abrir original")}</button>
                 <button
                   type="button"
                   onClick={() => { void copyLink(); }}
                   className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-white/10"
                 >
-                  <Copy size={15} />
-                  Copiar enlace
-                </button>
+                  <Copy size={15} />{t("Copiar enlace")}</button>
               </div>
             )}
           </div>
@@ -731,7 +722,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); onClose(); }}
             className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
-            aria-label="Cerrar visor"
+            aria-label={t("Cerrar visor")}
           >
             <X size={18} />
           </button>
@@ -772,7 +763,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); zoomOut(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
-            aria-label="Reducir imagen"
+            aria-label={t("Reducir imagen")}
             disabled={zoom <= 0.6}
           >
             <Minus size={16} />
@@ -781,7 +772,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); resetZoom(); }}
             className="rounded-full px-3 py-2 font-semibold text-white transition hover:bg-white/10"
-            aria-label="Restablecer zoom"
+            aria-label={t("Restablecer zoom")}
           >
             {Math.round(zoom * 100)}%
           </button>
@@ -789,7 +780,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); zoomIn(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10 disabled:opacity-40"
-            aria-label="Ampliar imagen"
+            aria-label={t("Ampliar imagen")}
             disabled={zoom >= 4}
           >
             <Plus size={16} />
@@ -798,20 +789,18 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); resetZoom(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-            aria-label="Reiniciar zoom"
+            aria-label={t("Reiniciar zoom")}
           >
             <RotateCcw size={15} />
           </button>
         </div>
-        <div className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
-          Usa `+`, `-`, rueda o `0` para el zoom
-        </div>
+        <div className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">{t("Usa `+`, `-`, rueda o `0` para el zoom")}</div>
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-2 py-2">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleDownload(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-            aria-label="Descargar imagen"
+            aria-label={t("Descargar imagen")}
           >
             <Download size={16} />
           </button>
@@ -819,7 +808,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleShare(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-            aria-label="Compartir imagen"
+            aria-label={t("Compartir imagen")}
           >
             <Share2 size={16} />
           </button>
@@ -827,7 +816,7 @@ function ImageLightbox({
             type="button"
             onClick={(e) => { e.stopPropagation(); openOriginal(); }}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
-            aria-label="Abrir imagen original"
+            aria-label={t("Abrir imagen original")}
           >
             <ExternalLink size={16} />
           </button>
@@ -1022,9 +1011,9 @@ function TextoMensaje({ texto }: { texto: string }) {
 
 function buildTypingLabel(names: string[]) {
   if (!names.length) return "";
-  if (names.length === 1) return `${names[0]} está escribiendo...`;
-  if (names.length === 2) return `${names[0]} y ${names[1]} están escribiendo...`;
-  return `${names[0]}, ${names[1]} y ${names.length - 2} más están escribiendo...`;
+  if (names.length === 1) return t("{a} está escribiendo...", { a: names[0] });
+  if (names.length === 2) return t("{a} y {b} están escribiendo...", { a: names[0], b: names[1] });
+  return t("{a}, {b} y {n} más están escribiendo...", { a: names[0], b: names[1], n: names.length - 2 });
 }
 
 function normalizeEmojiSearch(value: string) {
@@ -1343,13 +1332,13 @@ function EmojiPicker({
 
       try {
         if (!EMOJI_API_ACCESS_KEY) {
-          if (!cancelled) setEmojiApiError("Configura VITE_EMOJI_API_KEY para cargar los emojis.");
+          if (!cancelled) setEmojiApiError(t("Configura VITE_EMOJI_API_KEY para cargar los emojis."));
           return;
         }
         const url = new URL(EMOJI_API_URL);
         url.searchParams.set("access_key", EMOJI_API_ACCESS_KEY);
         const res = await fetch(url.toString());
-        if (!res.ok) throw new Error(`emoji-api ${res.status}`);
+        if (!res.ok) throw new Error(t("emoji-api {status}", { status: res.status }));
         const data = await res.json();
         if (!Array.isArray(data) || cancelled) return;
         try {
@@ -1363,7 +1352,7 @@ function EmojiPicker({
         hydrateFromEntries(data);
       } catch {
         if (!cancelled) {
-          setEmojiApiError("No se pudieron cargar los emojis desde la API.");
+          setEmojiApiError(t("No se pudieron cargar los emojis desde la API."));
         }
       } finally {
         if (!cancelled) setEmojiApiLoading(false);
@@ -1445,7 +1434,7 @@ function EmojiPicker({
 
   const searchGifs = useCallback(async (query: string) => {
     if (!GIPHY_API_KEY) {
-      setGifError("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat.");
+      setGifError(t("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat."));
       setGifs([]);
       setGifLoading(false);
       return;
@@ -1486,7 +1475,7 @@ function EmojiPicker({
     } catch {
       if (requestSeq !== gifSearchSeqRef.current) return;
       setGifs([]);
-      setGifError("No se pudieron cargar los GIFs de GIPHY.");
+      setGifError(t("No se pudieron cargar los GIFs de GIPHY."));
     }
     if (requestSeq !== gifSearchSeqRef.current) return;
     setGifLoading(false);
@@ -1522,21 +1511,15 @@ function EmojiPicker({
             <button
               onClick={() => setMediaTab("emoji")}
               className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${mediaTab === "emoji" ? "bg-white text-red-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              Emojis
-            </button>
+            >{t("Emojis")}</button>
             <button
               onClick={() => setMediaTab("gif")}
               className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${mediaTab === "gif" ? "bg-white text-red-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              GIFs
-            </button>
+            >{t("GIFs")}</button>
           </div>
         ) : (
           <div className="mb-3 border-b border-slate-200 px-1">
-            <div className="inline-flex border-b-2 border-slate-900 px-1 pb-2 text-base font-semibold text-slate-900">
-              Emojis
-            </div>
+            <div className="inline-flex border-b-2 border-slate-900 px-1 pb-2 text-base font-semibold text-slate-900">{t("Emojis")}</div>
           </div>
         )}
         <div className="mb-3 flex items-center gap-2 rounded-2xl border border-blue-200 bg-slate-50 px-3 py-2.5 shadow-sm">
@@ -1544,7 +1527,7 @@ function EmojiPicker({
           <input
             value={mediaTab === "emoji" ? emojiQuery : gifQuery}
             onChange={e=> mediaTab === "emoji" ? setEmojiQuery(e.target.value) : setGifQuery(e.target.value)}
-            placeholder={mediaTab === "emoji" ? "Buscar todos los emojis" : "Buscar GIFs en GIPHY"}
+            placeholder={mediaTab === "emoji" ? t("Buscar todos los emojis") : t("Buscar GIFs en GIPHY")}
             className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder-slate-400"
           />
         </div>
@@ -1586,10 +1569,10 @@ function EmojiPicker({
           <>
             <div className="mb-2 flex items-center justify-between">
               <p className="pt-3 text-sm font-semibold text-slate-700">
-                {gifQuery.trim() ? "Resultados GIF" : "GIFs populares"}
+                {gifQuery.trim() ? t("Resultados GIF") : t("GIFs populares")}
               </p>
               {!gifLoading && !gifError && (
-                <span className="pt-3 text-xs text-slate-400">GIPHY</span>
+                <span className="pt-3 text-xs text-slate-400">{t("GIPHY")}</span>
               )}
             </div>
             {gifError ? (
@@ -1601,9 +1584,7 @@ function EmojiPicker({
                 <Spinner size="sm" muted />
               </div>
             ) : gifs.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
-                No hay GIFs para mostrar
-              </div>
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">{t("No hay GIFs para mostrar")}</div>
             ) : (
               <div className="grid grid-cols-2 gap-2 pb-1">
                 {gifs.map((gif) => {
@@ -1619,9 +1600,9 @@ function EmojiPicker({
                       }}
                       className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-left transition-all hover:border-red-200 hover:bg-white hover:shadow-sm"
                     >
-                      <img src={previewUrl} alt={gif.title || gif.slug || "GIF"} className="h-24 w-full object-cover" />
+                      <img src={previewUrl} alt={gif.title || gif.slug || t("GIF")} className="h-24 w-full object-cover" />
                       <div className="px-2.5 py-2 text-[11px] font-medium text-slate-500 transition-colors group-hover:text-red-700">
-                        {gif.title || gif.slug || "GIF"}
+                        {gif.title || gif.slug || t("GIF")}
                       </div>
                     </button>
                   );
@@ -1633,10 +1614,10 @@ function EmojiPicker({
         <>
         <div className="mb-2 flex items-center justify-between">
           <p className="pt-3 text-sm font-semibold text-slate-700">
-            {emojiQuery.trim() ? "Resultados" : activeGroup.label}
+            {emojiQuery.trim() ? t("Resultados") : activeGroup.label}
           </p>
           {!emojiQuery.trim() && activeGroup.key === "recent" && recentEmojis.length === 0 && (
-            <span className="pt-3 text-xs text-slate-400">Se llenará con tu uso</span>
+            <span className="pt-3 text-xs text-slate-400">{t("Se llenará con tu uso")}</span>
           )}
         </div>
         {emojiApiLoading && (!apiGroups || apiGroups.length === 0) ? (
@@ -1648,9 +1629,7 @@ function EmojiPicker({
             {emojiApiError}
           </div>
         ) : visibleEmojis.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
-            No hay emojis para mostrar
-          </div>
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">{t("No hay emojis para mostrar")}</div>
         ) : (
           <div className="grid grid-cols-8 gap-1.5 pb-1">
             {visibleEmojis.map(emoji=>(
@@ -1827,7 +1806,7 @@ function GifPicker({
 
   const search = useCallback(async (query: string) => {
     if (!GIPHY_API_KEY) {
-      setError("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat.");
+      setError(t("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat."));
       setGifs([]);
       setLoading(false);
       return;
@@ -1868,7 +1847,7 @@ function GifPicker({
     } catch {
       if (requestSeq !== gifSearchSeqRef.current) return;
       setGifs([]);
-      setError("No se pudieron cargar los GIFs de GIPHY.");
+      setError(t("No se pudieron cargar los GIFs de GIPHY."));
     }
     if (requestSeq !== gifSearchSeqRef.current) return;
     setLoading(false);
@@ -1902,7 +1881,7 @@ function GifPicker({
           <input
             value={q}
             onChange={e=>setQ(e.target.value)}
-            placeholder="Buscar GIFs en GIPHY"
+            placeholder={t("Buscar GIFs en GIPHY")}
             className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
           />
         </div>
@@ -1944,12 +1923,10 @@ function GifPicker({
         ) : error ? (
           <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 px-4 py-5 text-center">
             <p className="text-sm font-medium text-rose-700">{error}</p>
-            <p className="peligro mt-1 text-xs text-red-500">Añade la clave en `frontend/.env` y reinicia Vite.</p>
+            <p className="peligro mt-1 text-xs text-red-500">{t("Añade la clave en `frontend/.env` y reinicia Vite.")}</p>
           </div>
         ) : gifs.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
-            No he encontrado GIFs para esa búsqueda
-          </div>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">{t("No he encontrado GIFs para esa búsqueda")}</div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
             {gifs.map((gif) => {
@@ -1962,7 +1939,7 @@ function GifPicker({
                   onClick={() => onPick(fullUrl)}
                   className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-all hover:-translate-y-0.5 hover:border-red-200 hover:ring-2 hover:ring-red-100"
                 >
-                  <img src={previewUrl} alt={gif.title || gif.slug || "GIF"} className="h-24 w-full object-cover" />
+                  <img src={previewUrl} alt={gif.title || gif.slug || t("GIF")} className="h-24 w-full object-cover" />
                 </button>
               );
             })}
@@ -1971,8 +1948,8 @@ function GifPicker({
       </div>
 
       <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">
-        <span>GIFs con GIPHY</span>
-        <span className="font-medium text-slate-500">{q.trim() ? "Resultados de búsqueda" : "Tendencias"}</span>
+        <span>{t("GIFs con GIPHY")}</span>
+        <span className="font-medium text-slate-500">{q.trim() ? t("Resultados de búsqueda") : t("Tendencias")}</span>
       </div>
     </div>,
     document.body
@@ -2114,7 +2091,7 @@ function StatusSelector({
           <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
             <span className={`h-2.5 w-2.5 rounded-full ${currentColorClass}`}/>
             <span className="truncate">{currentLabel}</span>
-            {hasta && (current || customStatusText) && <span className="shrink-0 text-xs text-slate-400">· hasta {horaCorta(hasta)}</span>}
+            {hasta && (current || customStatusText) && <span className="shrink-0 text-xs text-slate-400">{t("· hasta")}{" "}{horaCorta(hasta)}</span>}
             {notificationsPaused ? (
               <BellOff size={13} className="shrink-0 text-slate-400" />
             ) : (
@@ -2127,13 +2104,13 @@ function StatusSelector({
       <div className="px-4 pb-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">{t("Estado")}</p>
             <label className="flex items-center gap-1.5 text-xs text-slate-500">
               <Clock3 size={12} className="text-slate-400"/>
-              <span className="hidden min-[360px]:inline">Quitar</span>
-              <select value={duracion} onChange={(e) => setDuracion(e.target.value)} title="Cuándo se quita solo el estado que elijas"
+              <span className="hidden min-[360px]:inline">{t("Quitar")}</span>
+              <select value={duracion} onChange={(e) => setDuracion(e.target.value)} title={t("Cuándo se quita solo el estado que elijas")}
                 className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700 outline-none focus:border-[#ab0433]/35">
-                {DURACIONES_ESTADO.map((d) => <option key={d.k} value={d.k}>{d.k ? `en ${d.label.toLowerCase()}` : d.label}</option>)}
+                {DURACIONES_ESTADO.map((d) => <option key={d.k} value={d.k}>{d.k ? t("en {toLowerCase}", { toLowerCase: d.label.toLowerCase() }) : d.label}</option>)}
               </select>
             </label>
           </div>
@@ -2145,7 +2122,7 @@ function StatusSelector({
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
               }`}>
               <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-green-500"/>
-              <span className="truncate">Automático (según uso real)</span>
+              <span className="truncate">{t("Automático (según uso real)")}</span>
               {!current&&<Check size={12} className="ml-auto shrink-0 text-emerald-500"/>}
             </button>
             {STATUS_OVERRIDE_LIST.map(k=>{
@@ -2165,7 +2142,7 @@ function StatusSelector({
             })}
           </div>
           <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-            <p className="mb-2 text-sm font-medium text-slate-700">Crear estado personalizado</p>
+            <p className="mb-2 text-sm font-medium text-slate-700">{t("Crear estado personalizado")}</p>
             <div className="mb-3 flex flex-wrap gap-2">
               {CUSTOM_STATUS_EMOJIS.map((emoji) => (
                 <button
@@ -2202,7 +2179,7 @@ function StatusSelector({
                 onChange={(e)=>setDraftStatus(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && draftStatus.trim()) { onSaveCustomStatus(draftStatus.trim(), draftEmoji, draftColor, hastaDeDuracion(duracion)); setDraftStatus(""); } }}
                 maxLength={100}
-                placeholder="Ej. En audiencia, revisando demanda..."
+                placeholder={t("Ej. En audiencia, revisando demanda...")}
                 className="h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-[#ab0433]/35 focus:ring-2 focus:ring-[#ab0433]/10"
               />
             </div>
@@ -2214,16 +2191,12 @@ function StatusSelector({
                 setDraftStatus("");
               }}
               className="mt-3 w-full rounded-xl bg-[#ab0433] px-3 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#92042c] active:scale-[0.985]"
-            >
-              Guardar estado personalizado
-            </button>
+            >{t("Guardar estado personalizado")}</button>
             <button
               type="button"
               onClick={onClearCustomStatus}
               className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-700"
-            >
-              Quitar estado personalizado
-            </button>
+            >{t("Quitar estado personalizado")}</button>
           </div>
           <button
             type="button"
@@ -2231,8 +2204,8 @@ function StatusSelector({
             className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.985]"
           >
             {current === "ausente"
-              ? <span>Volver a estar <span className="font-semibold">disponible</span></span>
-              : <span>Cambiar tu estado a <span className="font-semibold">ausente</span></span>}
+              ? <span>{t("Volver a estar")}{" "}<span className="font-semibold">{t("disponible")}</span></span>
+              : <span>{t("Cambiar tu estado a")}{" "}<span className="font-semibold">{t("ausente")}</span></span>}
             <ChevronRight size={14} className="text-slate-400"/>
           </button>
           <button
@@ -2240,7 +2213,7 @@ function StatusSelector({
             onClick={onToggleNotifications}
             className="mt-2 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.985]"
           >
-            <span>{notificationsPaused ? "Reanudar notificaciones" : "Pausar las notificaciones"}</span>
+            <span>{notificationsPaused ? t("Reanudar notificaciones") : t("Pausar las notificaciones")}</span>
             <ChevronRight size={14} className="text-slate-400"/>
           </button>
         </div>
@@ -2248,20 +2221,14 @@ function StatusSelector({
 
       <div className="border-t border-slate-200 py-1">
         <button type="button" onClick={onProfile} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
-          <User size={15} className="text-slate-400"/>
-          Perfil
-        </button>
+          <User size={15} className="text-slate-400"/>{t("Perfil")}</button>
         <button type="button" onClick={onPreferences} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
-          <Settings size={15} className="text-slate-400"/>
-          Preferencias
-        </button>
+          <Settings size={15} className="text-slate-400"/>{t("Preferencias")}</button>
       </div>
 
       <div className="border-t border-slate-200 py-1">
         <button type="button" onClick={onDownloads} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
-          <Download size={15} className="text-slate-400"/>
-          Descargas
-        </button>
+          <Download size={15} className="text-slate-400"/>{t("Descargas")}</button>
       </div>
     </div>,
     document.body
@@ -2299,42 +2266,30 @@ function ChannelMenu({
     <div ref={ref} className="absolute right-0 top-full z-30 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
       <button onClick={() => { onMembers(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <Users size={14} className="text-slate-400" />
-        Ver miembros
-      </button>
+        <Users size={14} className="text-slate-400" />{t("Ver miembros")}</button>
       <button onClick={() => { onPinned(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <Pin size={14} className="text-slate-400" />
-        Ver fijados
-      </button>
+        <Pin size={14} className="text-slate-400" />{t("Ver fijados")}</button>
       <button onClick={() => { onFavorites(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <Star size={14} className="text-amber-400" />
-        Ver favoritos
-      </button>
+        <Star size={14} className="text-amber-400" />{t("Ver favoritos")}</button>
       <button onClick={() => { onToggleSilencio(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
         {canal.silenciado ? <Bell size={14} className="text-slate-400" /> : <BellOff size={14} className="text-slate-400" />}
         {canal.silenciado
-          ? (canal.tipo === "directo" ? "Volver a avisarme" : "Quitar silencio")
-          : (canal.tipo === "directo" ? "Silenciar conversación" : "Silenciar canal")}
+          ? (canal.tipo === "directo" ? t("Volver a avisarme") : t("Quitar silencio"))
+          : (canal.tipo === "directo" ? t("Silenciar conversación") : t("Silenciar canal"))}
       </button>
       <button onClick={() => { onAtajos(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <Keyboard size={14} className="text-slate-400" />
-        Atajos de teclado
-      </button>
+        <Keyboard size={14} className="text-slate-400" />{t("Atajos de teclado")}</button>
       <button onClick={() => { onRefresh(); onClose(); }}
         className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50">
-        <RotateCcw size={14} className="text-slate-400" />
-        Actualizar
-      </button>
+        <RotateCcw size={14} className="text-slate-400" />{t("Actualizar")}</button>
       {canal.tipo !== "directo" && (
         <button onClick={() => { onLeave(); onClose(); }}
           className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-600 transition-colors hover:bg-red-50">
-          <LogOut size={14} />
-          Salir del canal
-        </button>
+          <LogOut size={14} />{t("Salir del canal")}</button>
       )}
     </div>
   );
@@ -2373,7 +2328,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
       ? prev.filter(i=>i.user_id!==u.user_id) : [...prev, u]);
 
   const handleCreate = async () => {
-    if (!nombreClean) { setErrorMsg("El nombre es obligatorio"); return; }
+    if (!nombreClean) { setErrorMsg(t("El nombre es obligatorio")); return; }
     setSaving(true); setErrorMsg("");
     try {
       const token = await getToken({ skipCache: true });
@@ -2383,7 +2338,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
         body: JSON.stringify({ nombre: nombreClean, descripcion: desc.trim()||null, tipo }),
       });
       const d = await safeJson(res);
-      if (!res.ok) { setErrorMsg(d.error||"Error al crear"); setSaving(false); return; }
+      if (!res.ok) { setErrorMsg(d.error||t("Error al crear")); setSaving(false); return; }
       const canal: Canal = d.data;
       await Promise.all(invitados.map(u =>
         fetch(`/api/chat/canales/${canal.id}/miembros`, {
@@ -2393,7 +2348,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
       ));
       onCreate({ ...canal, no_leidos:0, total_miembros: 1+invitados.length, archivado:false,
         ultimo_mensaje:null, ultimo_mensaje_autor:null, ultimo_mensaje_at:null });
-    } catch { setErrorMsg("Error de red"); setSaving(false); }
+    } catch { setErrorMsg(t("Error de red")); setSaving(false); }
   };
 
   return createPortal(
@@ -2404,7 +2359,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
         {step === 1 && (
           <>
             <div className="flex items-center justify-between px-6 py-5">
-              <h2 className="text-slate-900 font-bold text-xl">Crear un canal</h2>
+              <h2 className="text-slate-900 font-bold text-xl">{t("Crear un canal")}</h2>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
                 <X size={18}/>
               </button>
@@ -2413,7 +2368,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
             <div className="px-6 pb-6 space-y-5">
               {/* Nombre */}
               <div>
-                <label className="block text-sm font-bold text-slate-800 mb-2">Nombre</label>
+                <label className="block text-sm font-bold text-slate-800 mb-2">{t("Nombre")}</label>
                 <div className={`flex items-center border-2 rounded-lg px-3 gap-2 transition-all ${
                   nombre.length > 0 ? "border-blue-500" : "border-slate-300"
                 } focus-within:border-blue-500`}>
@@ -2424,15 +2379,12 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                     maxLength={MAX_NOMBRE}
                     onChange={e => setNombre(e.target.value)}
                     onKeyDown={e => e.key==="Enter" && nombreClean && setStep(2)}
-                    placeholder="ej. expedientes-urgentes"
+                    placeholder={t("ej. expedientes-urgentes")}
                     className="flex-1 bg-transparent text-slate-800 text-sm py-2.5 outline-none placeholder-slate-400"
                   />
                   <span className="text-slate-400 text-xs shrink-0">{MAX_NOMBRE - nombre.length}</span>
                 </div>
-                <p className="text-slate-500 text-xs mt-2 leading-relaxed">
-                  Los canales son el lugar donde se producen las conversaciones sobre un tema.<br/>
-                  Usa un nombre que sea fácil de encontrar y comprender.
-                </p>
+                <p className="text-slate-500 text-xs mt-2 leading-relaxed">{t("Los canales son el lugar donde se producen las conversaciones sobre un tema.")}<br/>{t("Usa un nombre que sea fácil de encontrar y comprender.")}</p>
               </div>
 
               {/* Visibilidad */}
@@ -2441,8 +2393,8 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                   onChange={e=>setTipo(e.target.checked?"privado":"publico")}
                   className="mt-0.5 w-4 h-4 rounded border-slate-300 accent-slate-700 cursor-pointer shrink-0"/>
                 <label htmlFor="privado" className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-sm text-slate-700 font-medium">Canal privado</span>
-                  <span className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600 cursor-help" title="Los canales privados solo son visibles para sus miembros">
+                  <span className="text-sm text-slate-700 font-medium">{t("Canal privado")}</span>
+                  <span className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600 cursor-help" title={t("Los canales privados solo son visibles para sus miembros")}>
                     <Lock size={12}/>
                   </span>
                 </label>
@@ -2453,12 +2405,10 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
               {/* Footer paso 1 */}
               <div className="flex justify-end pt-1">
                 <button
-                  onClick={() => { if (!nombreClean) { setErrorMsg("Escribe un nombre para el canal"); return; } setErrorMsg(""); setStep(2); }}
+                  onClick={() => { if (!nombreClean) { setErrorMsg(t("Escribe un nombre para el canal")); return; } setErrorMsg(""); setStep(2); }}
                   className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-50"
                   disabled={!nombre.trim()}
-                >
-                  Siguiente
-                </button>
+                >{t("Siguiente")}</button>
               </div>
             </div>
           </>
@@ -2469,13 +2419,13 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
           <>
             <div className="flex items-center justify-between px-6 py-5">
               <div>
-                <h2 className="text-slate-900 font-bold text-xl">Añadir miembros</h2>
+                <h2 className="text-slate-900 font-bold text-xl">{t("Añadir miembros")}</h2>
                 <p className="text-slate-500 text-sm mt-0.5">
                   <span className={tipo==="privado"?"text-slate-400":"text-slate-400"}>
                     {tipo==="privado"?<Lock size={11} className="inline mr-1"/>:<Hash size={11} className="inline mr-1"/>}
                   </span>
                   <span className="font-semibold text-slate-700">{nombreClean}</span>
-                  <span className="text-slate-400 ml-2 text-xs">({tipo==="privado"?"privado":"público"})</span>
+                  <span className="text-slate-400 ml-2 text-xs">({tipo==="privado"?t("privado"):t("público")})</span>
                 </p>
               </div>
               <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
@@ -2486,19 +2436,16 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
             <div className="px-6 pb-6 space-y-4 max-h-[60vh] overflow-y-auto">
               {/* Descripción opcional */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Descripción <span className="font-normal normal-case">(opcional)</span>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{t("Descripción")}{" "}<span className="font-normal normal-case">{t("(opcional)")}</span>
                 </label>
                 <input value={desc} onChange={e=>setDesc(e.target.value)}
-                  placeholder="¿De qué trata este canal?"
+                  placeholder={t("¿De qué trata este canal?")}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 text-sm outline-none placeholder-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"/>
               </div>
 
               {/* Buscar miembros */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Añadir personas
-                  {invitados.length>0 && (
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">{t("Añadir personas")}{invitados.length>0 && (
                     <span className="ml-2 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-xs font-bold normal-case">{invitados.length}</span>
                   )}
                 </label>
@@ -2519,13 +2466,13 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                 <div className="relative">
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                   <input value={buscarUser} onChange={e=>setBuscarUser(e.target.value)}
-                    placeholder="Buscar por nombre o email…"
+                    placeholder={t("Buscar por nombre o email…")}
                     className="w-full border border-slate-200 rounded-lg bg-slate-50 pl-8 pr-3 py-2.5 text-slate-800 text-sm outline-none placeholder-slate-400 focus:border-blue-400 transition-all"/>
                 </div>
                 {buscarUser.trim() && (
                   <div className="mt-1 border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm max-h-44 overflow-y-auto">
                     {opciones.length === 0
-                      ? <p className="text-slate-400 text-sm px-3 py-2.5">Sin resultados</p>
+                      ? <p className="text-slate-400 text-sm px-3 py-2.5">{t("Sin resultados")}</p>
                       : opciones.map(u=>(
                         <button key={u.user_id} onClick={()=>{ toggle(u); setBuscarUser(""); }}
                           className="flex items-center gap-2.5 w-full px-3 py-2.5 hover:bg-slate-50 text-left border-b border-slate-100 last:border-0 transition-colors">
@@ -2548,13 +2495,11 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
             <div className="px-6 pb-6 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
               <BackButton onClick={()=>setStep(1)} />
               <div className="flex gap-2.5">
-                <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">
-                  Cancelar
-                </button>
+                <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">{t("Cancelar")}</button>
                 <button onClick={handleCreate} disabled={saving}
                   className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-2">
                   {saving ? <Loader2 size={14} className="animate-spin"/> : null}
-                  {saving ? "Creando…" : "Crear canal"}
+                  {saving ? t("Creando…") : t("Crear canal")}
                 </button>
               </div>
             </div>
@@ -2635,9 +2580,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-slate-50">
         <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2">
-          <Users size={15} className="text-red-500"/>
-          Miembros
-          <span className="bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full font-semibold">{miembros.length}</span>
+          <Users size={15} className="text-red-500"/>{t("Miembros")}<span className="bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full font-semibold">{miembros.length}</span>
         </h3>
         <BackButton onClick={onClose} />
       </div>
@@ -2646,7 +2589,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
         {(["ver","añadir"] as const).map(t=>(
           <button key={t} onClick={()=>setTab(t)}
             className={`flex-1 py-2.5 text-xs font-bold transition-colors ${t===tab?"text-red-600 border-b-2 border-red-500":"text-slate-500 hover:text-slate-700"}`}>
-            {t==="ver"?"Lista":"+ Añadir"}
+            {t==="ver"?tr("Lista"):tr("+ Añadir")}
           </button>
         ))}
       </div>
@@ -2654,7 +2597,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
       <div className="px-3 py-2 border-b border-slate-100 shrink-0">
         <div className="relative">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"/>
-          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar…"
+          <input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder={t("Buscar…")}
             className="w-full bg-slate-100 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-700 outline-none placeholder-slate-400"/>
         </div>
       </div>
@@ -2665,24 +2608,24 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
           <>
             {admins.length>0&&(
               <>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">Administradores</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">{t("Administradores")}</p>
                 {admins.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)} presenceByUserId={presenceByUserId}/>)}
               </>
             )}
             {members.length>0&&(
               <>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">Miembros — {members.length}</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">{t("Miembros —")}{" "}{members.length}</p>
                 {members.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)} presenceByUserId={presenceByUserId}/>)}
               </>
             )}
-            {miembrosFilt.length===0&&<p className="text-slate-400 text-sm text-center py-6">Sin resultados</p>}
+            {miembrosFilt.length===0&&<p className="text-slate-400 text-sm text-center py-6">{t("Sin resultados")}</p>}
           </>
         )}
         {!loading&&tab==="añadir"&&(
           <>
-            <p className="text-xs text-slate-400 px-4 pt-3 pb-1.5">Usuarios del sistema ({noMiembros.length} disponibles)</p>
+            <p className="text-xs text-slate-400 px-4 pt-3 pb-1.5">{t("Usuarios del sistema (")}{noMiembros.length}{" "}{t("disponibles)")}</p>
             {noMiembros.length===0
-              ?<p className="text-slate-400 text-sm text-center py-6">Todos son miembros</p>
+              ?<p className="text-slate-400 text-sm text-center py-6">{t("Todos son miembros")}</p>
               :noMiembros.map(u=>(
               <div key={u.user_id} className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors">
                 <Av url={u.avatar_url} name={u.user_name} size={8}/>
@@ -2722,9 +2665,9 @@ function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserI
         <p className="text-slate-400 text-xs truncate">{m.role_label} · {st.label}</p>
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        {!isMe&&<button onClick={onDM} title="Mensaje directo" className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"><MessageSquare size={12}/></button>}
+        {!isMe&&<button onClick={onDM} title={t("Mensaje directo")} className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"><MessageSquare size={12}/></button>}
         {canAdmin&&(
-          <button onClick={onRemove} disabled={acting===m.user_id} title="Eliminar del canal"
+          <button onClick={onRemove} disabled={acting===m.user_id} title={t("Eliminar del canal")}
             className="peligro w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50">
             {acting===m.user_id?<Loader2 size={11} className="animate-spin"/>:<X size={12}/>}
           </button>
@@ -2764,7 +2707,7 @@ function PanelFijados({ canalId, getToken, onClose, onGoTo, onTogglePinned, reso
   return (
     <aside className="absolute inset-y-0 right-0 z-30 w-full max-w-sm shadow-2xl lg:static lg:z-auto lg:shadow-none lg:max-w-none lg:w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-slate-50">
-        <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Pin size={14} className="text-red-500"/>Mensajes fijados</h3>
+        <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Pin size={14} className="text-red-500"/>{t("Mensajes fijados")}</h3>
         <BackButton onClick={onClose} />
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -2772,7 +2715,7 @@ function PanelFijados({ canalId, getToken, onClose, onGoTo, onTogglePinned, reso
         {!loading&&fijados.length===0&&(
           <div className="flex flex-col items-center justify-center h-full py-12 text-slate-300">
             <Pin size={32} className="mb-2 opacity-40"/>
-            <p className="text-sm text-slate-400">Sin mensajes fijados</p>
+            <p className="text-sm text-slate-400">{t("Sin mensajes fijados")}</p>
           </div>
         )}
         {fijados.map(f=>(
@@ -2781,15 +2724,15 @@ function PanelFijados({ canalId, getToken, onClose, onGoTo, onTogglePinned, reso
               <div className="shrink-0 mt-0.5"><Av url={f.avatar_url} name={resolveDisplayName(f.user_id, f.user_name)} size={6}/></div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-slate-700">{resolveDisplayName(f.user_id, f.user_name)}</p>
-                {f.image_url ? <img src={mediaUrl(f.image_url) || undefined} alt="Imagen" className="w-28 rounded mt-1 border border-slate-200 object-cover"/>
-                  : f.gif_url ? <img src={f.gif_url} alt="GIF" className="w-28 rounded mt-1"/>
+                {f.image_url ? <img src={mediaUrl(f.image_url) || undefined} alt={t("Imagen")} className="w-28 rounded mt-1 border border-slate-200 object-cover"/>
+                  : f.gif_url ? <img src={f.gif_url} alt={t("GIF")} className="w-28 rounded mt-1"/>
                   :<p className="text-slate-500 text-xs mt-0.5 line-clamp-2">{f.contenido}</p>}
                 <p className="text-slate-300 text-xs mt-1">{fmtTime(f.msg_created_at)}</p>
               </div>
             </div>
             <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={()=>onGoTo(f.mensaje_id)} className="text-xs text-blue-500 hover:underline font-medium">Ver</button>
-              <button onClick={()=>unpin(f.mensaje_id)} className="text-xs text-red-400 hover:underline flex items-center gap-0.5 font-medium"><PinOff size={10}/>Desfijar</button>
+              <button onClick={()=>onGoTo(f.mensaje_id)} className="text-xs text-blue-500 hover:underline font-medium">{t("Ver")}</button>
+              <button onClick={()=>unpin(f.mensaje_id)} className="text-xs text-red-400 hover:underline flex items-center gap-0.5 font-medium"><PinOff size={10}/>{t("Desfijar")}</button>
             </div>
           </div>
         ))}
@@ -2828,7 +2771,7 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
   return (
     <aside className="absolute inset-y-0 right-0 z-30 w-full max-w-sm shadow-2xl lg:static lg:z-auto lg:shadow-none lg:max-w-none lg:w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-amber-50/70">
-        <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Star size={14} className="text-amber-500 fill-amber-300"/>Favoritos</h3>
+        <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Star size={14} className="text-amber-500 fill-amber-300"/>{t("Favoritos")}</h3>
         <BackButton onClick={onClose} />
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -2836,7 +2779,7 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
         {!loading&&favoritos.length===0&&(
           <div className="flex flex-col items-center justify-center h-full py-12 text-slate-300">
             <Star size={32} className="mb-2 opacity-40"/>
-            <p className="text-sm text-slate-400">Sin favoritos en este chat</p>
+            <p className="text-sm text-slate-400">{t("Sin favoritos en este chat")}</p>
           </div>
         )}
         {favoritos.map(f=>(
@@ -2845,15 +2788,15 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
               <div className="shrink-0 mt-0.5"><Av url={f.avatar_url} name={resolveDisplayName(f.user_id, f.user_name)} size={6}/></div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-slate-700">{resolveDisplayName(f.user_id, f.user_name)}</p>
-                {f.image_url ? <img src={mediaUrl(f.image_url) || undefined} alt="Imagen" className="w-28 rounded mt-1 border border-slate-200 object-cover"/>
-                  : f.gif_url ? <img src={f.gif_url} alt="GIF" className="w-28 rounded mt-1"/>
+                {f.image_url ? <img src={mediaUrl(f.image_url) || undefined} alt={t("Imagen")} className="w-28 rounded mt-1 border border-slate-200 object-cover"/>
+                  : f.gif_url ? <img src={f.gif_url} alt={t("GIF")} className="w-28 rounded mt-1"/>
                   :<p className="text-slate-500 text-xs mt-0.5 line-clamp-2">{f.contenido}</p>}
                 <p className="text-slate-300 text-xs mt-1">{fmtTime(f.msg_created_at)}</p>
               </div>
             </div>
             <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={()=>onGoTo(f.mensaje_id)} className="text-xs text-blue-500 hover:underline font-medium">Ver</button>
-              <button onClick={()=>removeFavorite(f.mensaje_id)} className="text-xs text-amber-500 hover:underline flex items-center gap-0.5 font-medium"><Star size={10} className="fill-amber-300"/>Quitar</button>
+              <button onClick={()=>onGoTo(f.mensaje_id)} className="text-xs text-blue-500 hover:underline font-medium">{t("Ver")}</button>
+              <button onClick={()=>removeFavorite(f.mensaje_id)} className="text-xs text-amber-500 hover:underline flex items-center gap-0.5 font-medium"><Star size={10} className="fill-amber-300"/>{t("Quitar")}</button>
             </div>
           </div>
         ))}
@@ -2935,7 +2878,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
       // archivo). Descargamos el contenido via fetch y forzamos la descarga
       // con un blob: URL, que si respeta el atributo download.
       const response = await fetch(fileSrc);
-      if (!response.ok) throw new Error("download failed");
+      if (!response.ok) throw new Error(t("download failed"));
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -3003,7 +2946,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   if (msg.deleted_at) return (
     <div className={`flex gap-3 items-center px-4 py-0.5 ${!sameAuthor ? "mt-3" : ""}`}>
       <div className="w-9 shrink-0" />
-      <span className="text-slate-400 italic text-xs">Mensaje eliminado</span>
+      <span className="text-slate-400 italic text-xs">{t("Mensaje eliminado")}</span>
     </div>
   );
 
@@ -3018,7 +2961,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
       {dragMagnitude > 6 && (
         <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 shadow-sm">
           <CornerDownRight size={12} className={dragReplyReady ? "text-red-700" : "text-red-400"} />
-          <span>{dragReplyReady ? "Respondiendo..." : "Arrastra para responder"}</span>
+          <span>{dragReplyReady ? t("Respondiendo...") : t("Arrastra para responder")}</span>
         </div>
       )}
 
@@ -3044,11 +2987,11 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
           {!sameAuthor && (
             <div className="flex items-baseline gap-2 mb-0.5">
               <span className="font-bold text-slate-800 text-[15px]">{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</span>
-              {isMe&&<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">{"T\u00FA"}</span>}
+              {isMe&&<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">{t("Tú")}</span>}
               <span className="text-xs text-slate-400">{fmtTime(msg.created_at)}</span>
               {isMe && showReadReceipt && (
                 <span
-                  title={isReadByRecipient ? "Leído por el destinatario" : "Pendiente de leer"}
+                  title={isReadByRecipient ? t("Leído por el destinatario") : t("Pendiente de leer")}
                   className={`inline-flex items-center rounded-full px-1.5 py-0.5 ${
                     isReadByRecipient ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
                   }`}
@@ -3056,7 +2999,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                   <Eye size={11} />
                 </span>
               )}
-              {msg.editado&&<span className="text-[10px] text-slate-400 italic">(editado)</span>}
+              {msg.editado&&<span className="text-[10px] text-slate-400 italic">{t("(editado)")}</span>}
             </div>
           )}
 
@@ -3082,11 +3025,11 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
               <>
                 <button type="button" onClick={() => setShowImageLightbox(true)}
                   className="group/image mt-1 block overflow-hidden rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md"
-                  aria-label="Ampliar imagen adjunta">
-                  <img src={imageSrc} alt="Imagen adjunta" className="max-w-[320px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
+                  aria-label={t("Ampliar imagen adjunta")}>
+                  <img src={imageSrc} alt={t("Imagen adjunta")} className="max-w-[320px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
                 </button>
                 {showImageLightbox && (
-                  <ImageLightbox src={imageSrc} alt="Imagen adjunta"
+                  <ImageLightbox src={imageSrc} alt={t("Imagen adjunta")}
                     authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
                     authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
                     createdAt={msg.created_at}
@@ -3106,10 +3049,10 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 {(fIsImg || fIsPdf) ? (
                   <div className="h-[150px] w-full overflow-hidden bg-slate-50">
                     {fIsImg ? (
-                      <img src={fileSrc} alt={msg.file_name || "Archivo"} className="h-full w-full object-cover" loading="lazy" />
+                      <img src={fileSrc} alt={msg.file_name || t("Archivo")} className="h-full w-full object-cover" loading="lazy" />
                     ) : (
                       <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
-                        <iframe src={`${fileSrc}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} title={msg.file_name || "PDF"} tabIndex={-1}
+                        <iframe src={`${fileSrc}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} title={msg.file_name || t("PDF")} tabIndex={-1}
                           className="h-[460px] w-[190px] origin-top-left border-0" />
                       </div>
                     )}
@@ -3123,11 +3066,11 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 )}
                 <div className="flex items-center gap-1.5 px-2.5 py-2 border-t border-slate-100">
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-xs font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
-                    <p className="text-[10px] text-slate-400">Ver archivo</p>
+                    <p className="truncate text-xs font-semibold text-slate-700">{msg.file_name || t("Archivo")}</p>
+                    <p className="text-[10px] text-slate-400">{t("Ver archivo")}</p>
                   </div>
                   <button type="button" onClick={(e) => { e.stopPropagation(); void handleFileDownload(); }}
-                    title="Descargar" disabled={downloadingFile}
+                    title={t("Descargar")} disabled={downloadingFile}
                     className="shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-70">
                     {downloadingFile
                       ? <Loader2 size={14} className="animate-spin"/>
@@ -3153,11 +3096,11 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 <>
                   <button type="button" onClick={() => setShowGifLightbox(true)}
                     className="group/image mt-1 block overflow-hidden rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md"
-                    aria-label="Ampliar GIF">
-                    <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
+                    aria-label={t("Ampliar GIF")}>
+                    <img src={msg.gif_url} alt={t("GIF")} className="max-w-[240px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
                   </button>
                   {showGifLightbox && (
-                    <ImageLightbox src={msg.gif_url} alt="GIF"
+                    <ImageLightbox src={msg.gif_url} alt={t("GIF")}
                       authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
                       authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
                       createdAt={msg.created_at}
@@ -3173,13 +3116,13 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
             {previewUrl && !msg._envio && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
           </div>
           {msg._envio === "enviando" && envioLento && (
-            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Clock3 size={11}/> Enviando…</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Clock3 size={11}/>{" "}{t("Enviando…")}</p>
           )}
           {msg._envio === "error" && (
             <p className="peligro mt-1 flex flex-wrap items-center gap-2 text-xs text-red-600">
-              <span>No se ha podido enviar.</span>
-              <button type="button" onClick={() => onReintentar?.(msg.id)} className="font-semibold underline-offset-2 hover:underline">Reintentar</button>
-              <button type="button" onClick={() => onDescartar?.(msg.id)} className="text-slate-500 underline-offset-2 hover:underline">Descartar</button>
+              <span>{t("No se ha podido enviar.")}</span>
+              <button type="button" onClick={() => onReintentar?.(msg.id)} className="font-semibold underline-offset-2 hover:underline">{t("Reintentar")}</button>
+              <button type="button" onClick={() => onDescartar?.(msg.id)} className="text-slate-500 underline-offset-2 hover:underline">{t("Descartar")}</button>
             </p>
           )}
 
@@ -3194,7 +3137,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 </button>
               ))}
               {!msg._envio && (
-                <button onClick={()=>setShowEmoji(true)} title="Añadir reacción"
+                <button onClick={()=>setShowEmoji(true)} title={t("Añadir reacción")}
                   className="flex items-center rounded-full border border-dashed border-slate-200 px-1.5 py-0.5 text-slate-400 opacity-0 transition-opacity hover:border-slate-300 hover:text-slate-600 group-hover:opacity-100">
                   <Smile size={13}/><Plus size={9} className="-ml-0.5"/>
                 </button>
@@ -3215,12 +3158,12 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 ))}
               </span>
               <span className="text-xs font-bold text-blue-600 group-hover/hilo:underline">
-                {msg.respuestas} {msg.respuestas === 1 ? "respuesta" : "respuestas"}
+                {msg.respuestas} {msg.respuestas === 1 ? t("respuesta") : t("respuestas")}
               </span>
               {msg.ultima_respuesta_at && (
-                <span className="text-xs text-slate-400 group-hover/hilo:hidden">Última {haceRato(msg.ultima_respuesta_at)}</span>
+                <span className="text-xs text-slate-400 group-hover/hilo:hidden">{t("Última")}{" "}{haceRato(msg.ultima_respuesta_at)}</span>
               )}
-              <span className="hidden text-xs text-slate-400 group-hover/hilo:inline">Ver hilo</span>
+              <span className="hidden text-xs text-slate-400 group-hover/hilo:inline">{t("Ver hilo")}</span>
               <ChevronRight size={13} className="text-slate-300 opacity-0 transition-opacity group-hover/hilo:opacity-100"/>
             </button>
           )}
@@ -3232,34 +3175,34 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
         <div className="absolute right-4 -top-4 flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-md px-1 py-0.5 z-20 animate-in fade-in zoom-in-95 duration-100">
           {/* Reacciones rápidas (un clic, sin abrir el selector). */}
           {REACCIONES_RAPIDAS.map((e) => (
-            <button key={e} onClick={()=>onReact(msg.id, e)} title={`Reaccionar con ${e}`}
+            <button key={e} onClick={()=>onReact(msg.id, e)} title={t("Reaccionar con {e}", { e: e })}
               className="hidden rounded-md p-1 transition-transform hover:scale-110 hover:bg-slate-100 sm:block">
               <EmojiImg emoji={e} size={16} />
             </button>
           ))}
           <span className="mx-0.5 hidden h-4 w-px bg-slate-200 sm:block"/>
           <div className="relative">
-            <button ref={emojiButtonRef} onClick={()=>setShowEmoji(v=>!v)} title="Reaccionar"
+            <button ref={emojiButtonRef} onClick={()=>setShowEmoji(v=>!v)} title={t("Reaccionar")}
               className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Smile size={14}/></button>
             {showEmoji&&<EmojiPicker anchorRef={emojiButtonRef} align="right" onPick={e=>{onReact(msg.id,e);setShowEmoji(false);setHover(false);}} onClose={()=>{setShowEmoji(false);setHover(false);}}/>}
           </div>
           {onThread && !enHilo && (
-            <button onClick={()=>onThread(msg)} title="Responder en hilo"
+            <button onClick={()=>onThread(msg)} title={t("Responder en hilo")}
               className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-blue-600 transition-colors"><MessageSquareText size={14}/></button>
           )}
-          <button onClick={()=>onReply(msg)} title="Citar y responder"
+          <button onClick={()=>onReply(msg)} title={t("Citar y responder")}
             className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><CornerDownRight size={14}/></button>
-          <button onClick={()=>{ void navigator.clipboard?.writeText(msg.contenido || "").then(()=>aviso.ok("Texto copiado"), ()=>{}); }} title="Copiar texto"
+          <button onClick={()=>{ void navigator.clipboard?.writeText(msg.contenido || "").then(()=>aviso.ok(t("Texto copiado")), ()=>{}); }} title={t("Copiar texto")}
             className="hidden p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors sm:block"><Copy size={14}/></button>
-          <button onClick={()=>onFavorite(msg.id)} title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
+          <button onClick={()=>onFavorite(msg.id)} title={isFavorite ? t("Quitar de favoritos") : t("Guardar en favoritos")}
             className={`p-1.5 rounded-md transition-colors ${isFavorite ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}><Star size={14} className={isFavorite ? "fill-amber-300" : ""}/></button>
-          <button onClick={()=>onPin(msg.id)} title={isPinned ? "Desfijar" : "Fijar"}
+          <button onClick={()=>onPin(msg.id)} title={isPinned ? t("Desfijar") : t("Fijar")}
             className={`p-1.5 rounded-md transition-colors ${isPinned ? "bg-red-50 text-red-500 hover:bg-red-100" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}><Pin size={14} className={isPinned ? "fill-red-200" : ""}/></button>
           {isMe && (
             <>
-              <button onClick={()=>onEdit(msg)} title="Editar"
+              <button onClick={()=>onEdit(msg)} title={t("Editar")}
                 className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Edit3 size={14}/></button>
-              <button onClick={()=>onDelete(msg.id)} title="Eliminar"
+              <button onClick={()=>onDelete(msg.id)} title={t("Eliminar")}
                 className="peligro p-1.5 hover:bg-red-50 rounded-md text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
             </>
           )}
@@ -3296,7 +3239,7 @@ function ListaMenciones({ items, activo, onSelect, onHover }: {
   if (!items.length) return null;
   return (
     <div className="absolute bottom-full left-2 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-2xl animate-in fade-in slide-in-from-bottom-1 duration-150">
-      <p className="px-3 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Mencionar</p>
+      <p className="px-3 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("Mencionar")}</p>
       {items.map((m, i) => (
         <button key={m.key} type="button"
           onMouseDown={(e) => e.preventDefault()}
@@ -3312,7 +3255,7 @@ function ListaMenciones({ items, activo, onSelect, onHover }: {
           <span className="shrink-0 truncate text-[11px] text-slate-400">{m.detalle}</span>
         </button>
       ))}
-      <p className="border-t border-slate-100 px-3 pt-1.5 pb-1 text-[10px] text-slate-400">↑↓ para elegir · Intro o Tab para mencionar · Esc para cerrar</p>
+      <p className="border-t border-slate-100 px-3 pt-1.5 pb-1 text-[10px] text-slate-400">{t("↑↓ para elegir · Intro o Tab para mencionar · Esc para cerrar")}</p>
     </div>
   );
 }
@@ -3758,16 +3701,16 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   };
 
   const canSend = !!text.trim() || !!editingMsg || selectedImages.length > 0 || selectedFiles.length > 0;
-  const textoPlaceholder = placeholder || (editingMsg ? "Editar mensaje..." : isDirect ? `Escribe a ${canalNombre}...` : `Escribe en #${canalNombre}...`);
+  const textoPlaceholder = placeholder || (editingMsg ? "Editar mensaje..." : isDirect ? t("Escribe a {nombre}...", { nombre: canalNombre }) : t("Escribe en #{nombre}...", { nombre: canalNombre }));
 
   return (
     <div className={`${compacto ? "px-3 pb-3 pt-2" : "px-4 pb-4 pt-3"} shrink-0`}>
       {(replyTo||editingMsg)&&(
         <div className={`mb-2 flex items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-200 ${editingMsg ? "border-amber-200 bg-amber-50 text-amber-800" : "border-blue-200 bg-gradient-to-r from-blue-50 to-sky-50 text-blue-700"}`}>
           {editingMsg ? <Edit3 size={12} className="shrink-0"/> : <CornerDownRight size={12} className="shrink-0"/>}
-          {replyTo && !editingMsg && <span className="min-w-0 truncate">Citando a <strong>{resolveDisplayName(replyTo.user_id, replyTo.user_name, replyTo.user_id === currentUserId)}</strong>: <span className="opacity-70">{replyTo.contenido.slice(0,80)}{replyTo.contenido.length>80?"…":""}</span></span>}
-          {editingMsg && <span><span className="font-semibold">Editando mensaje</span> <span className="opacity-70">· Intro para guardar · Esc para cancelar</span></span>}
-          <button type="button" onClick={()=>{ if (editingMsg) onCancelEdit(); else onCancelReply(); }} title="Cancelar (Esc)" className="ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/70 hover:text-red-500"><X size={12}/></button>
+          {replyTo && !editingMsg && <span className="min-w-0 truncate">{t("Citando a")}{" "}<strong>{resolveDisplayName(replyTo.user_id, replyTo.user_name, replyTo.user_id === currentUserId)}</strong>: <span className="opacity-70">{replyTo.contenido.slice(0,80)}{replyTo.contenido.length>80?"…":""}</span></span>}
+          {editingMsg && <span><span className="font-semibold">{t("Editando mensaje")}</span> <span className="opacity-70">{t("· Intro para guardar · Esc para cancelar")}</span></span>}
+          <button type="button" onClick={()=>{ if (editingMsg) onCancelEdit(); else onCancelReply(); }} title={t("Cancelar (Esc)")} className="ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/70 hover:text-red-500"><X size={12}/></button>
         </div>
       )}
       <div
@@ -3787,24 +3730,24 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-500">
                 <Paperclip size={20} />
               </div>
-              <p className="text-sm font-semibold text-slate-800">Suelta para adjuntar</p>
-              <p className="mt-1 text-xs text-slate-500">Imágenes, PDF, Word, Excel…</p>
+              <p className="text-sm font-semibold text-slate-800">{t("Suelta para adjuntar")}</p>
+              <p className="mt-1 text-xs text-slate-500">{t("Imágenes, PDF, Word, Excel…")}</p>
             </div>
           </div>
         )}
         {/* Barra de formato */}
         <div className="flex items-center gap-px overflow-x-auto rounded-t-[1.1rem] border-b border-slate-100 bg-slate-50/70 px-2 py-1">
-          <BotonFormato titulo={`Negrita (${MOD}+B)`} onClick={()=>envolver("**")}><Bold size={14}/></BotonFormato>
-          <BotonFormato titulo={`Cursiva (${MOD}+I)`} onClick={()=>envolver("_")}><Italic size={14}/></BotonFormato>
-          <BotonFormato titulo={`Tachado (${MOD}+Mayús+X)`} onClick={()=>envolver("~")}><Strikethrough size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Negrita ({MOD}+B)", { MOD: MOD })} onClick={()=>envolver("**")}><Bold size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Cursiva ({MOD}+I)", { MOD: MOD })} onClick={()=>envolver("_")}><Italic size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Tachado ({MOD}+Mayús+X)", { MOD: MOD })} onClick={()=>envolver("~")}><Strikethrough size={14}/></BotonFormato>
           <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
-          <BotonFormato titulo={`Enlace (${MOD}+Mayús+U)`} onClick={insertarEnlace}><Link2 size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Enlace ({MOD}+Mayús+U)", { MOD: MOD })} onClick={insertarEnlace}><Link2 size={14}/></BotonFormato>
           <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
-          <BotonFormato titulo={`Lista numerada (${MOD}+Mayús+7)`} onClick={()=>prefijarLineas("numerada")}><ListOrdered size={14}/></BotonFormato>
-          <BotonFormato titulo={`Lista con viñetas (${MOD}+Mayús+8)`} onClick={()=>prefijarLineas("lista")}><List size={14}/></BotonFormato>
-          <BotonFormato titulo={`Cita (${MOD}+Mayús+9)`} onClick={()=>prefijarLineas("cita")}><Quote size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Lista numerada ({MOD}+Mayús+7)", { MOD: MOD })} onClick={()=>prefijarLineas("numerada")}><ListOrdered size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Lista con viñetas ({MOD}+Mayús+8)", { MOD: MOD })} onClick={()=>prefijarLineas("lista")}><List size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Cita ({MOD}+Mayús+9)", { MOD: MOD })} onClick={()=>prefijarLineas("cita")}><Quote size={14}/></BotonFormato>
           <span className="mx-1 h-4 w-px shrink-0 bg-slate-200"/>
-          <BotonFormato titulo="Código (selecciona varias líneas para un bloque)" onClick={codigo}><Code size={14}/></BotonFormato>
+          <BotonFormato titulo={t("Código (selecciona varias líneas para un bloque)")} onClick={codigo}><Code size={14}/></BotonFormato>
         </div>
 
         {/* Textarea */}
@@ -3816,8 +3759,8 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
             <div className="mx-3 mt-3 flex flex-wrap gap-2">
               {selectedImages.map((img, i) => (
                 <div key={`${img.file.name}-${i}`} className="relative rounded-xl border border-slate-200 bg-white p-1 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-                  <img src={img.previewUrl} alt="Vista previa" className="h-20 w-20 rounded-lg object-cover" />
-                  <button type="button" title="Quitar" onClick={()=>{
+                  <img src={img.previewUrl} alt={t("Vista previa")} className="h-20 w-20 rounded-lg object-cover" />
+                  <button type="button" title={t("Quitar")} onClick={()=>{
                     URL.revokeObjectURL(img.previewUrl);
                     setSelectedImages(prev => prev.filter((_, idx) => idx !== i));
                     if (fileRef.current) fileRef.current.value = "";
@@ -3840,9 +3783,9 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-xs font-semibold text-slate-700">{sf.name}</p>
-                      <p className="text-[10px] text-slate-400">{sf.size >= 1024 * 1024 ? `${(sf.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(sf.size / 1024))} KB`}</p>
+                      <p className="text-[10px] text-slate-400">{sf.size >= 1024 * 1024 ? t("{toFixed} MB", { toFixed: (sf.size / 1024 / 1024).toFixed(1) }) : t("{max} KB", { max: Math.max(1, Math.round(sf.size / 1024)) })}</p>
                     </div>
-                    <button type="button" title="Quitar" onClick={()=>{
+                    <button type="button" title={t("Quitar")} onClick={()=>{
                       setSelectedFiles(prev => prev.filter((_, idx) => idx !== i));
                       if (attachFileRef.current) attachFileRef.current.value = "";
                     }}
@@ -3886,7 +3829,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               className="hidden"
               onChange={e => chooseFiles(Array.from(e.target.files || []))}
             />
-            <button type="button" title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>attachFileRef.current?.click()}
+            <button type="button" title={t("Adjuntar archivos (PDF, Word, Excel...)")} onClick={()=>attachFileRef.current?.click()}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Plus size={17}/>
             </button>
@@ -3898,7 +3841,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
                 syncSelection();
                 setShowMediaPicker((prev) => !prev);
               }}
-              title="Emoji y GIF"
+              title={t("Emoji y GIF")}
               className={`p-1.5 rounded-lg transition-colors ${showMediaPicker ? "bg-slate-100 text-slate-700" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}>
               <Smile size={16}/>
             </button>
@@ -3909,11 +3852,11 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
                 const nuevo = text.slice(0,s)+pre+text.slice(s);
                 aplicar(nuevo, s+pre.length);
                 setMentionQ("");
-              }} title="Mencionar a alguien"
+              }} title={t("Mencionar a alguien")}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <AtSign size={16}/>
             </button>
-            <button type="button" title="Adjuntar imagen" onClick={()=>fileRef.current?.click()}
+            <button type="button" title={t("Adjuntar imagen")} onClick={()=>fileRef.current?.click()}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <ImageIcon size={16}/>
             </button>
@@ -3933,10 +3876,9 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
           <div className="flex items-center gap-2">
             {!compacto && canSend && (
               <span className="hidden select-none text-[11px] text-slate-400 lg:block">
-                <kbd className="font-sans font-semibold">Mayús</kbd> + <kbd className="font-sans font-semibold">Intro</kbd> para otra línea
-              </span>
+                <kbd className="font-sans font-semibold">Mayús</kbd> + <kbd className="font-sans font-semibold">Intro</kbd>{" "}{t("para otra línea")}</span>
             )}
-            <button type="button" onClick={()=>void doSend()} disabled={!canSend} title={editingMsg ? "Guardar (Intro)" : "Enviar (Intro)"}
+            <button type="button" onClick={()=>void doSend()} disabled={!canSend} title={editingMsg ? t("Guardar (Intro)") : t("Enviar (Intro)")}
               className={`h-8 w-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-150 ${
                 canSend
                   ? (editingMsg ? "bg-amber-500 hover:bg-amber-600 text-white shadow-md" : "bg-[#ab0433] hover:bg-[#92042c] text-white shadow-md shadow-red-200 active:scale-95")
@@ -3981,8 +3923,8 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0, borrador = false }
         : <Hash size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
       }
       <span className={`flex-1 truncate ${activo || hasUnread ? "font-semibold" : "font-medium"}`}>{canal.nombre}</span>
-      {borrador && !activo && <span title="Tienes un borrador sin enviar" className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
-      {canal.silenciado && <span title="Silenciado" className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
+      {borrador && !activo && <span title={t("Tienes un borrador sin enviar")} className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
+      {canal.silenciado && <span title={t("Silenciado")} className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
         <span className="shrink-0 bg-[#dc2626] text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold">
           {unreadCount>99?"99+":unreadCount}
@@ -4020,8 +3962,8 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
         <p className={`truncate text-[11px] ${activo || hasUnread ? "text-slate-400" : "text-slate-400 group-hover:text-slate-500"}`}>{displayRole}</p>
       </div>
       {loading && <Loader2 size={10} className="animate-spin shrink-0 opacity-60"/>}
-      {borrador && !activo && <span title="Tienes un borrador sin enviar" className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
-      {dmCanal?.silenciado && <span title="Silenciado" className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
+      {borrador && !activo && <span title={t("Tienes un borrador sin enviar")} className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
+      {dmCanal?.silenciado && <span title={t("Silenciado")} className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
         <div className="shrink-0 flex items-center gap-1">
           <span className="rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-[#dc2626] text-white">
@@ -4047,15 +3989,13 @@ function CanalSearchResult({ c, onJoin, onSelect, joining }: {
       </div>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={c.ya_unido?onSelect:undefined}>
         <p className="text-slate-700 text-xs font-semibold truncate">#{c.nombre}</p>
-        <p className="text-slate-400 text-[10px] truncate">{c.total_miembros} miembros{c.descripcion?` · ${c.descripcion}`:""}</p>
+        <p className="text-slate-400 text-[10px] truncate">{c.total_miembros}{" "}{t("miembros")}{c.descripcion?` · ${c.descripcion}`:""}</p>
       </div>
       {c.ya_unido
-        ?<button onClick={onSelect} className="shrink-0 text-[10px] text-slate-500 hover:text-slate-700 font-semibold px-2 py-0.5 rounded hover:bg-slate-200 transition-colors">Abrir</button>
+        ?<button onClick={onSelect} className="shrink-0 text-[10px] text-slate-500 hover:text-slate-700 font-semibold px-2 py-0.5 rounded hover:bg-slate-200 transition-colors">{t("Abrir")}</button>
         :<button onClick={onJoin} disabled={joining}
           className="shrink-0 flex items-center gap-0.5 text-[10px] bg-[#ab0433]/90 hover:bg-[#ab0433] text-white font-bold px-2 py-0.5 rounded transition-colors disabled:opacity-50">
-          {joining?<Loader2 size={10} className="animate-spin"/>:<Plus size={10}/>}
-          Unirse
-        </button>
+          {joining?<Loader2 size={10} className="animate-spin"/>:<Plus size={10}/>}{t("Unirse")}</button>
       }
     </div>
   );
@@ -4095,15 +4035,15 @@ function PanelHilo({ canalTitulo, isDirect, datos, cargando, isMobile, currentUs
     <aside className={`${isMobile ? "fixed inset-0 z-40" : "w-[min(420px,40vw)] min-w-[320px] border-l border-slate-200"} flex min-h-0 shrink-0 flex-col bg-white animate-in fade-in slide-in-from-right-4 duration-200`}>
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3">
         {isMobile && (
-          <button type="button" onClick={onClose} title="Volver" className="-ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowLeft size={18}/></button>
+          <button type="button" onClick={onClose} title={t("Volver")} className="-ml-1 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><ArrowLeft size={18}/></button>
         )}
         <MessageSquareText size={16} className="shrink-0 text-slate-400"/>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-800">Hilo</p>
-          <p className="truncate text-[11px] text-slate-400">{isDirect ? `Con ${canalTitulo}` : `#${canalTitulo}`}</p>
+          <p className="text-sm font-bold text-slate-800">{t("Hilo")}</p>
+          <p className="truncate text-[11px] text-slate-400">{isDirect ? t("Con {canalTitulo}", { canalTitulo: canalTitulo }) : `#${canalTitulo}`}</p>
         </div>
         {!isMobile && (
-          <button type="button" onClick={onClose} title="Cerrar (Esc)" className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
+          <button type="button" onClick={onClose} title={t("Cerrar (Esc)")} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
         )}
       </div>
       <div ref={listaRef} onScroll={(e) => { const el = e.currentTarget; alFondoRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
@@ -4116,7 +4056,7 @@ function PanelHilo({ canalTitulo, isDirect, datos, cargando, isMobile, currentUs
         )}
         <div className="flex items-center gap-3 px-4 py-2">
           <span className="shrink-0 text-xs font-semibold text-slate-500">
-            {cargando && !n ? "Cargando respuestas…" : n ? `${n} ${n === 1 ? "respuesta" : "respuestas"}` : "Sin respuestas todavía"}
+            {cargando && !n ? t("Cargando respuestas…") : n ? `${n} ${n === 1 ? "respuesta" : "respuestas"}` : t("Sin respuestas todavía")}
           </span>
           <div className="h-px flex-1 bg-slate-200"/>
         </div>
@@ -4149,7 +4089,7 @@ function PanelHilo({ canalTitulo, isDirect, datos, cargando, isMobile, currentUs
           borradorInicial={borradorInicial}
           onBorrador={onBorrador}
           onEditarUltimo={onEditarUltimo}
-          placeholder={editandoMsg ? "Editar respuesta..." : "Responder en el hilo..."}
+          placeholder={editandoMsg ? t("Editar respuesta...") : t("Responder en el hilo...")}
         />
       )}
     </aside>
@@ -4204,14 +4144,14 @@ function SaltarA({ destinos, onElegir, onClose, onBuscarEnApp }: {
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
           <Search size={17} className="shrink-0 text-slate-400"/>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={teclas}
-            placeholder="Saltar a un canal o a una persona…" aria-label="Saltar a una conversación"
+            placeholder={t("Saltar a un canal o a una persona…")} aria-label={t("Saltar a una conversación")}
             className="w-full bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-400"/>
           <kbd className="shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">Esc</kbd>
         </div>
         <div ref={listaRef} className="max-h-[52vh] overflow-y-auto py-1.5">
-          {!q.trim() && <p className="px-4 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Recientes</p>}
+          {!q.trim() && <p className="px-4 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("Recientes")}</p>}
           {filtrados.length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-500">Nadie ni ningún canal se llama así.</p>
+            <p className="px-4 py-3 text-sm text-slate-500">{t("Nadie ni ningún canal se llama así.")}</p>
           )}
           {filtrados.map((d, i) => (
             <button key={d.key} type="button" data-idx={i}
@@ -4239,13 +4179,13 @@ function SaltarA({ destinos, onElegir, onClose, onBuscarEnApp }: {
             onMouseEnter={() => setFoco(filtrados.length)} onClick={() => onBuscarEnApp(q)}
             className={`mt-1 flex w-full items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-left text-sm text-slate-500 transition-colors ${foco === filtrados.length ? "bg-slate-100" : ""}`}>
             <Sparkles size={15} className="shrink-0 text-slate-400"/>
-            <span className="min-w-0 flex-1 truncate">{q.trim() ? <>Buscar «{q.trim()}» en toda la aplicación</> : "Buscar en toda la aplicación (expedientes, clientes…)"}</span>
+            <span className="min-w-0 flex-1 truncate">{q.trim() ? <>{t("Buscar «")}{q.trim()}{t("» en toda la aplicación")}</> : t("Buscar en toda la aplicación (expedientes, clientes…)")}</span>
           </button>
         </div>
         <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-400">
-          <span><kbd className="font-sans font-semibold">↑↓</kbd> moverse</span>
-          <span><kbd className="font-sans font-semibold">Intro</kbd> abrir</span>
-          <span className="ml-auto"><kbd className="font-sans font-semibold">Alt + ↑↓</kbd> conversación anterior / siguiente</span>
+          <span><kbd className="font-sans font-semibold">↑↓</kbd>{" "}{t("moverse")}</span>
+          <span><kbd className="font-sans font-semibold">Intro</kbd>{" "}{t("abrir")}</span>
+          <span className="ml-auto"><kbd className="font-sans font-semibold">Alt + ↑↓</kbd>{" "}{t("conversación anterior / siguiente")}</span>
         </div>
       </div>
     </div>,
@@ -4273,10 +4213,10 @@ const ATAJOS_CHAT: { grupo: string; items: [string, string][] }[] = [
   { grupo: "Formato", items: [
     [`${MOD} + B`, "**Negrita**"],
     [`${MOD} + I`, "_Cursiva_"],
-    [`${MOD} + Mayús + X`, "~Tachado~"],
-    [`${MOD} + Mayús + U`, "Enlace (o pega un enlace sobre el texto seleccionado)"],
-    [`${MOD} + Mayús + 7 / 8`, "Lista numerada / con viñetas"],
-    [`${MOD} + Mayús + 9`, "> Cita"],
+    [t("{mod} + Mayús + X", { mod: MOD }), "~Tachado~"],
+    [t("{mod} + Mayús + U", { mod: MOD }), "Enlace (o pega un enlace sobre el texto seleccionado)"],
+    [t("{mod} + Mayús + 7 / 8", { mod: MOD }), "Lista numerada / con viñetas"],
+    [t("{mod} + Mayús + 9", { mod: MOD }), "> Cita"],
     ["` y ```", "Código y bloque de código"],
   ] },
 ];
@@ -4292,8 +4232,8 @@ function AyudaAtajosChat({ onClose }: { onClose: () => void }) {
       <div className="max-h-[85vh] w-full max-w-[620px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150" onMouseDown={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center gap-2">
           <Keyboard size={18} className="text-slate-500"/>
-          <h2 className="flex-1 text-base font-bold text-slate-800">Atajos de teclado del chat</h2>
-          <button type="button" onClick={onClose} title="Cerrar" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
+          <h2 className="flex-1 text-base font-bold text-slate-800">{t("Atajos de teclado del chat")}</h2>
+          <button type="button" onClick={onClose} title={t("Cerrar")} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={16}/></button>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           {ATAJOS_CHAT.map((g) => (
@@ -4728,7 +4668,7 @@ export default function Chat() {
         const h = await hdr();
       const res = await fetch("/api/chat/canales", { headers: h });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error("canales");
+      if (!res.ok) throw new Error(t("canales"));
       const list: Canal[] = d.data||[];
         setCanales(prev => {
           // La primera vez tras montar, el servidor manda: no conservar nada
@@ -4767,7 +4707,7 @@ export default function Chat() {
         const h = await hdr();
         const res = await fetch("/api/chat/usuarios", { headers: h });
         const d = await safeJson(res);
-        if (!res.ok) throw new Error("usuarios");
+        if (!res.ok) throw new Error(t("usuarios"));
         const list: SysUser[] = d.data||[];
         setSysUsers(prev => {
           if (prev.length === list.length && prev.every((u, i) => {
@@ -5326,7 +5266,7 @@ export default function Chat() {
       const d = await safeJson(res);
       if (hiloIdRef.current !== id) return;
       if (!res.ok || !d?.data?.principal) {
-        if (res.status === 404) { aviso.error("Ese hilo ya no existe."); setRightPanel((p) => (p === "hilo" ? null : p)); }
+        if (res.status === 404) { aviso.error(t("Ese hilo ya no existe.")); setRightPanel((p) => (p === "hilo" ? null : p)); }
         return;
       }
       const principal: Mensaje = d.data.principal;
@@ -5419,11 +5359,11 @@ export default function Chat() {
           method:"PUT", headers: h, body: JSON.stringify({ contenido: text }),
         });
         const d = await safeJson(res);
-        if (!res.ok) throw new Error(d?.error || "No se pudo guardar el cambio");
+        if (!res.ok) throw new Error(d?.error || t("No se pudo guardar el cambio"));
         actualizarMensajes((m) => (m.id === editId ? { ...m, contenido: d.data?.contenido ?? text, editado: true } : m));
       } catch (e: any) {
         if (antes) actualizarMensajes((m) => (m.id === editId ? antes : m));
-        aviso.error(e?.message || "No se pudo guardar el cambio");
+        aviso.error(e?.message || t("No se pudo guardar el cambio"));
       }
       return;
     }
@@ -5438,7 +5378,7 @@ export default function Chat() {
       method:"POST", headers: h, body: JSON.stringify(body),
     });
     const d = await safeJson(res);
-    if (!res.ok) throw new Error(d?.error || "Error al enviar el mensaje");
+    if (!res.ok) throw new Error(d?.error || t("Error al enviar el mensaje"));
     const newMsg: Mensaje = { ...d.data, reacciones: null, reply_to: replyId ? mensajes.find(m=>m.id===replyId)||null : null };
     setMensajes(prev=>{
       const exists = prev.find(m=>m.id===newMsg.id);
@@ -5478,7 +5418,7 @@ export default function Chat() {
         const token = await getAuthToken();
         const res = await fetch(ruta, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: form });
         const d = await safeJson(res);
-        if (!res.ok) throw new Error(d?.error || "No se pudo subir");
+        if (!res.ok) throw new Error(d?.error || t("No se pudo subir"));
         return d.data;
       };
       const body: Record<string, any> = {
@@ -5495,7 +5435,7 @@ export default function Chat() {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canalId}/mensajes`, { method: "POST", headers: h, body: JSON.stringify(body) });
       const d = await safeJson(res);
-      if (!res.ok || !d?.data?.id) throw new Error(d?.error || "Error al enviar el mensaje");
+      if (!res.ok || !d?.data?.id) throw new Error(d?.error || t("Error al enviar el mensaje"));
       const real: Mensaje = { ...d.data, reacciones: null, reply_to: env.msg.reply_to };
       // Imagen: se espera a que la de verdad esté cargada antes de cambiarla,
       // para que no parpadee.
@@ -5628,18 +5568,18 @@ export default function Chat() {
       const res = await fetch(`/api/chat/mensajes/${msgId}/reacciones`, {
         method:"POST", headers: h, body: JSON.stringify({ emoji }),
       });
-      if (!res.ok) throw new Error("reaccion");
+      if (!res.ok) throw new Error(t("reaccion"));
     } catch {
       toggle(!alreadyMine); // revertir
     }
   }, [actualizarMensajes, buscarMensaje, hdr, currentUserId, user]);
 
   const handleDelete = useCallback(async (msgId: string) => {
-    const ok = await confirmar({ titulo: "¿Eliminar este mensaje?", mensaje: "Se quitará para todos los miembros de la conversación.", confirmar: "Eliminar", peligro: true });
+    const ok = await confirmar({ titulo: t("¿Eliminar este mensaje?"), mensaje: t("Se quitará para todos los miembros de la conversación."), confirmar: t("Eliminar"), peligro: true });
     if (!ok) return;
     const h = await hdr();
     const res = await fetch(`/api/chat/mensajes/${msgId}`, { method:"DELETE", headers: h });
-    if (!res.ok) { aviso.error("No se pudo eliminar el mensaje"); return; }
+    if (!res.ok) { aviso.error(t("No se pudo eliminar el mensaje")); return; }
     actualizarMensajes((m) => (m.id === msgId ? { ...m, deleted_at: new Date().toISOString() } : m));
     if (hiloIdRef.current) void fetchHiloRef.current(hiloIdRef.current);
   }, [actualizarMensajes, hdr]);
@@ -5657,7 +5597,7 @@ export default function Chat() {
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
-      if (!res.ok) throw new Error("fijar");
+      if (!res.ok) throw new Error(t("fijar"));
     } catch {
       setPinnedIds(prev => {
         const next = new Set(prev);
@@ -5678,7 +5618,7 @@ export default function Chat() {
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/mensajes/${msgId}/favorito`, { method:"POST", headers: h });
-      if (!res.ok) throw new Error("favorito");
+      if (!res.ok) throw new Error(t("favorito"));
     } catch {
       setFavoriteIds(prev => {
         const next = new Set(prev);
@@ -5700,11 +5640,11 @@ export default function Chat() {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/silenciar`, { method: "PUT", headers: h, body: JSON.stringify({ silenciado: nuevo }) });
       if (!res.ok) throw new Error();
-      aviso.ok(nuevo ? "Silenciado: solo te avisará si te mencionan." : "Vuelve a avisarte de todo.");
+      aviso.ok(nuevo ? t("Silenciado: solo te avisará si te mencionan.") : t("Vuelve a avisarte de todo."));
       void refreshUnread();
     } catch {
       aplicar(!nuevo);
-      aviso.error("No se pudo cambiar el aviso de esta conversación");
+      aviso.error(t("No se pudo cambiar el aviso de esta conversación"));
     }
   }, [hdr, refreshUnread]);
 
@@ -5716,8 +5656,8 @@ export default function Chat() {
       if (!res.ok) throw new Error();
       setCanales((prev) => prev.map((c) => ({ ...c, no_leidos: 0 })));
       await refreshUnread();
-      aviso.ok("Todo marcado como leído");
-    } catch { aviso.error("No se pudo marcar todo como leído"); }
+      aviso.ok(t("Todo marcado como leído"));
+    } catch { aviso.error(t("No se pudo marcar todo como leído")); }
   }, [hdr, refreshUnread]);
 
   // El sonido de aviso (ChatUnreadContext) no suena por la conversación que
@@ -5795,12 +5735,12 @@ export default function Chat() {
     const h = await hdr();
     const res = await fetch(`/api/chat/canales/${canalId}`, { method:"PUT", headers: h, body: JSON.stringify({ foto_url: fotoUrl }) });
     const d = await safeJson(res);
-    if (!res.ok) { aviso(d?.error || "No se pudo guardar la foto del grupo"); return; }
+    if (!res.ok) { aviso(d?.error || t("No se pudo guardar la foto del grupo")); return; }
     setCanales((prev) => prev.map((c) => (c.id === canalId ? { ...c, foto_url: fotoUrl } : c)));
     setCanalActivo((prev) => (prev && prev.id === canalId ? { ...prev, foto_url: fotoUrl } : prev));
   }, [hdr]);
   const subirFotoGrupo = async (canalId: string, file: File) => {
-    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { aviso("Elige una imagen (JPG, PNG, GIF o WebP)."); return; }
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { aviso(t("Elige una imagen (JPG, PNG, GIF o WebP).")); return; }
     setSubiendoFotoGrupo(true);
     try {
       const recortada = await recortarFotoCuadrada(file);
@@ -5809,10 +5749,10 @@ export default function Chat() {
       const token = await getAuthToken();
       const res = await fetch("/api/chat/uploads/image", { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: form });
       const d = await safeJson(res);
-      if (!res.ok || !d?.data?.image_url) throw new Error(d?.error || "No se pudo subir la foto");
+      if (!res.ok || !d?.data?.image_url) throw new Error(d?.error || t("No se pudo subir la foto"));
       await guardarFotoGrupo(canalId, d.data.image_url);
     } catch (e: any) {
-      aviso(e?.message || "No se pudo subir la foto");
+      aviso(e?.message || t("No se pudo subir la foto"));
     } finally {
       setSubiendoFotoGrupo(false);
     }
@@ -6139,47 +6079,45 @@ export default function Chat() {
             </div>
             <div className="flex-1 min-w-0 text-left">
               <div className="flex items-center gap-1">
-                <span className="text-slate-800 font-bold text-sm truncate leading-none">{organizacion?.nombre || "Despacho"}</span>
+                <span className="text-slate-800 font-bold text-sm truncate leading-none">{organizacion?.nombre || t("Despacho")}</span>
                 <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600 shrink-0"/>
               </div>
               {totalUnread > 0 && (
-                <p className="text-slate-400 text-[10px] leading-none mt-0.5">{totalUnread} sin leer</p>
+                <p className="text-slate-400 text-[10px] leading-none mt-0.5">{totalUnread}{" "}{t("sin leer")}</p>
               )}
             </div>
           </button>
           {menuEspacio && (
             <>
-              <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuEspacio(false)}/>
+              <button type="button" aria-label={t("Cerrar")} className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuEspacio(false)}/>
               <div className="absolute left-0 top-full z-40 mt-1 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100">
                 <button type="button" onClick={() => { setMenuEspacio(false); setSaltarAbierto(true); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
-                  <Search size={14} className="text-slate-400"/> <span className="flex-1">Saltar a una conversación</span>
+                  <Search size={14} className="text-slate-400"/> <span className="flex-1">{t("Saltar a una conversación")}</span>
                   <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-400">{MOD} K</kbd>
                 </button>
                 <button type="button" onClick={() => void marcarTodoLeido()} disabled={totalUnread === 0}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-                  <CheckCheck size={14} className="text-slate-400"/> Marcar todo como leído
-                </button>
+                  <CheckCheck size={14} className="text-slate-400"/>{" "}{t("Marcar todo como leído")}</button>
                 <button type="button" onClick={() => { setMenuEspacio(false); setNotificationsPaused((v) => !v); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
                   {notificationsPaused ? <Bell size={14} className="text-slate-400"/> : <BellOff size={14} className="text-slate-400"/>}
-                  {notificationsPaused ? "Reanudar avisos en pantalla" : "Pausar avisos en pantalla"}
+                  {notificationsPaused ? t("Reanudar avisos en pantalla") : t("Pausar avisos en pantalla")}
                 </button>
                 <button type="button" onClick={() => { setMenuEspacio(false); setAyudaAtajos(true); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
-                  <Keyboard size={14} className="text-slate-400"/> <span className="flex-1">Atajos de teclado</span>
+                  <Keyboard size={14} className="text-slate-400"/> <span className="flex-1">{t("Atajos de teclado")}</span>
                   <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-semibold text-slate-400">{MOD} /</kbd>
                 </button>
                 <div className="my-1 border-t border-slate-100"/>
                 <button type="button" onClick={() => { setMenuEspacio(false); window.location.assign("/dashboard/config?section=notificaciones"); }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">
-                  <Settings size={14} className="text-slate-400"/> Preferencias de avisos
-                </button>
+                  <Settings size={14} className="text-slate-400"/>{" "}{t("Preferencias de avisos")}</button>
               </div>
             </>
           )}
           </div>
-          <button title="Nuevo mensaje" onClick={()=>setShowCrear(true)}
+          <button title={t("Nuevo mensaje")} onClick={()=>setShowCrear(true)}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-all duration-200 shrink-0 shadow-sm">
             <Pencil size={15}/>
           </button>
@@ -6195,12 +6133,12 @@ export default function Chat() {
               <input
                 value={canalQ}
                 onChange={e=>setCanalQ(e.target.value)}
-                placeholder={`Buscar… (${MOD} K)`}
+                placeholder={t("Buscar… ({MOD} K)", { MOD: MOD })}
               className="w-full bg-white border border-slate-200 text-slate-700 text-xs pl-8 pr-3 py-2.5 rounded-md outline-none placeholder-slate-400 focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all shadow-sm"
               />
               {canalQ&&<button onClick={()=>{setCanalQ("");setCanalResults([]);}} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={11}/></button>}
             </div>
-            <button onClick={()=>setShowCrear(true)} title="Crear canal"
+            <button onClick={()=>setShowCrear(true)} title={t("Crear canal")}
               className="w-9 h-9 flex items-center justify-center bg-[#dc2626] hover:bg-[#b91c1c] text-white rounded-md transition-all duration-200 shrink-0 shadow-sm">
               <Plus size={14}/>
             </button>
@@ -6209,7 +6147,7 @@ export default function Chat() {
           {canalQ.trim()&&(
             <div className="mt-2 space-y-0.5">
               {canalResults.length===0&&!canalSearching&&(
-                <p className="text-slate-500 text-xs px-2 py-1.5">Sin resultados</p>
+                <p className="text-slate-500 text-xs px-2 py-1.5">{t("Sin resultados")}</p>
               )}
               {canalResults.map(c=>(
                 <CanalSearchResult key={c.id} c={c} joining={joiningId===c.id}
@@ -6244,7 +6182,7 @@ export default function Chat() {
                     className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
                     <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.canales?"":"-rotate-90"}`}/>
                     <Layers size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
-                    <span className="flex-1 text-left">Canales</span>
+                    <span className="flex-1 text-left">{t("Canales")}</span>
                     {!secOpen.canales && totalUnreadCanales>0 && (
                       <span className="shrink-0 bg-[#ab0433] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold">
                         {totalUnreadCanales>99?"99+":totalUnreadCanales}
@@ -6266,16 +6204,14 @@ export default function Chat() {
                     />
                   ))}
                   {canalesPublicos.length+canalesPrivados.length===0&&(
-                    <p className="text-slate-600 text-xs px-4 py-1">Sin canales aún</p>
+                    <p className="text-slate-600 text-xs px-4 py-1">{t("Sin canales aún")}</p>
                   )}
                   {/* Añadir canales */}
                   <button onClick={()=>setShowCrear(true)}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white hover:border-slate-200 border border-transparent transition-colors text-sm group">
                     <div className="w-5 h-5 rounded bg-slate-200 group-hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
                       <Plus size={11} className="text-slate-500 group-hover:text-slate-700"/>
-                    </div>
-                    Añadir canales
-                  </button>
+                    </div>{t("Añadir canales")}</button>
                 </div>
               )}
             </div>
@@ -6289,7 +6225,7 @@ export default function Chat() {
                     className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
                     <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.dms?"":"-rotate-90"}`}/>
                     <MessagesSquare size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
-                    <span className="flex-1 text-left">Mensajes directos</span>
+                    <span className="flex-1 text-left">{t("Mensajes directos")}</span>
                     {!secOpen.dms && totalUnreadDMs>0 && (
                       <span className="shrink-0 bg-[#ab0433] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold">
                         {totalUnreadDMs>99?"99+":totalUnreadDMs}
@@ -6301,7 +6237,7 @@ export default function Chat() {
               {secOpen.dms&&(
                 <div className="mt-1 space-y-1">
                   {dmConversationEntries.length===0 && dmProspectUsers.length===0 && (
-                    <p className="text-slate-600 text-xs px-4 py-1">{sysUsersCargados ? "Aún no hay nadie más en el despacho." : "Cargando usuarios…"}</p>
+                    <p className="text-slate-600 text-xs px-4 py-1">{sysUsersCargados ? t("Aún no hay nadie más en el despacho.") : t("Cargando usuarios…")}</p>
                   )}
                   {dmConversationEntries.map(({ user: u, dmCanal, unreadCount })=>{
                     const isActivo = !!(dmCanal && canalActivo?.id===dmCanal.id);
@@ -6335,9 +6271,7 @@ export default function Chat() {
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-colors text-sm group">
                     <div className="w-7 h-7 rounded-md bg-slate-200 group-hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
                       <UserPlus size={11} className="text-slate-500 group-hover:text-slate-700"/>
-                    </div>
-                    Invitar a otros
-                  </button>
+                    </div>{t("Invitar a otros")}</button>
                 </div>
               )}
             </div>
@@ -6353,7 +6287,7 @@ export default function Chat() {
               <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${displayedStatusColorClass}`}/>
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-slate-800 text-xs font-semibold truncate">{user?.fullName||"Tú"}</p>
+              <p className="text-slate-800 text-xs font-semibold truncate">{user?.fullName||t("Tú")}</p>
               <div className="flex items-center gap-1 text-slate-400 text-[10px]">
                 <p className="truncate">{displayedStatusLabel}</p>
                 {notificationsPaused ? (
@@ -6408,20 +6342,19 @@ export default function Chat() {
               <MessageSquare size={30} className="text-[#ab0433]"/>
             </div>
             <div className="text-center">
-              <p className="text-slate-800 font-bold text-xl">Selecciona un chat</p>
-              <p className="text-slate-500 text-sm mt-1">Cambia de canal, revisa un DM o crea uno nuevo para empezar</p>
+              <p className="text-slate-800 font-bold text-xl">{t("Selecciona un chat")}</p>
+              <p className="text-slate-500 text-sm mt-1">{t("Cambia de canal, revisa un DM o crea uno nuevo para empezar")}</p>
             </div>
             <button onClick={()=>setShowCrear(true)}
               className="flex items-center gap-2 px-5 py-3 bg-[#ab0433] hover:bg-[#92042c] text-white rounded-2xl font-semibold text-sm transition-all duration-200 shadow-lg shadow-red-200">
-              <Plus size={16}/> Crear canal
-            </button>
+              <Plus size={16}/>{" "}{t("Crear canal")}</button>
           </div>
         ):(
           <>
             {/* Canal header */}
             <div className={`flex items-center gap-3 px-3 sm:px-6 py-3.5 border-b border-slate-200 shrink-0 bg-white shadow-sm transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
               {isMobile && (
-                <button onClick={() => setCanalActivo(null)} title="Volver a la lista"
+                <button onClick={() => setCanalActivo(null)} title={t("Volver a la lista")}
                   className="shrink-0 -ml-1 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors md:hidden">
                   <ArrowLeft size={18} />
                 </button>
@@ -6436,7 +6369,7 @@ export default function Chat() {
                   <div className="relative shrink-0">
                     <button type="button" disabled={subiendoFotoGrupo}
                       onClick={() => (canalActivo.foto_url ? setMenuFotoGrupo((v) => !v) : fotoGrupoInputRef.current?.click())}
-                      title={canalActivo.foto_url ? "Foto del grupo" : "Poner foto al grupo"}
+                      title={canalActivo.foto_url ? t("Foto del grupo") : t("Poner foto al grupo")}
                       className="group/foto relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-slate-500">
                       <IconoCanal canal={canalActivo} size={16} className="text-slate-400"/>
                       <span className={`absolute inset-0 flex items-center justify-center bg-black/45 text-white transition-opacity ${subiendoFotoGrupo ? "opacity-100" : "opacity-0 group-hover/foto:opacity-100"}`}>
@@ -6445,16 +6378,14 @@ export default function Chat() {
                     </button>
                     {menuFotoGrupo && canalActivo.foto_url && (
                       <>
-                        <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuFotoGrupo(false)}/>
+                        <button type="button" aria-label={t("Cerrar")} className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuFotoGrupo(false)}/>
                         <div className="absolute left-0 top-11 z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
                           <button type="button" onClick={() => { setMenuFotoGrupo(false); fotoGrupoInputRef.current?.click(); }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                            <Camera size={14} className="text-slate-400"/> Cambiar foto
-                          </button>
+                            <Camera size={14} className="text-slate-400"/>{" "}{t("Cambiar foto")}</button>
                           <button type="button" onClick={() => { setMenuFotoGrupo(false); void guardarFotoGrupo(canalActivo.id, null); }}
                             className="peligro flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
-                            <Trash2 size={14}/> Quitar foto
-                          </button>
+                            <Trash2 size={14}/>{" "}{t("Quitar foto")}</button>
                         </div>
                       </>
                     )}
@@ -6484,30 +6415,30 @@ export default function Chat() {
               <div className="relative flex items-center gap-0.5 shrink-0">
                 <button
                   onClick={() => setMessageSearchOpen((prev) => !prev)}
-                  title="Buscar en la conversación"
+                  title={t("Buscar en la conversación")}
                   className={`p-2 rounded-xl transition-all duration-200 ${messageSearchOpen ? "bg-slate-100 text-slate-700 shadow-sm" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}
                 >
                   <Search size={15}/>
                 </button>
-                <button onClick={()=>setRightPanel(v=>v==="pinned"?null:"pinned")} title="Mensajes fijados"
+                <button onClick={()=>setRightPanel(v=>v==="pinned"?null:"pinned")} title={t("Mensajes fijados")}
                   className={`p-2 rounded-xl transition-all duration-200 ${rightPanel==="pinned"?"bg-red-50 text-red-500 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <Pin size={15}/>
                 </button>
-                <button onClick={()=>setRightPanel(v=>v==="favorites"?null:"favorites")} title="Favoritos"
+                <button onClick={()=>setRightPanel(v=>v==="favorites"?null:"favorites")} title={t("Favoritos")}
                   className={`p-2 rounded-xl transition-all duration-200 ${rightPanel==="favorites"?"bg-amber-50 text-amber-500 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}>
                   <Star size={15} className={rightPanel==="favorites" ? "fill-amber-300" : ""}/>
                 </button>
-                <button onClick={()=>setRightPanel(v=>v==="members"?null:"members")} title="Miembros"
+                <button onClick={()=>setRightPanel(v=>v==="members"?null:"members")} title={t("Miembros")}
                   className={`p-2 rounded-xl transition-all duration-200 ${rightPanel==="members"?"bg-slate-100 text-slate-700 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <Users size={15}/>
                 </button>
                 <button
                   onClick={() => sesionExpediente ? cerrarSesionExpediente() : setShowExpSearchModal(true)}
-                  title={sesionExpediente ? `Desasociar expediente ${sesionExpediente.expediente_ref || ""}` : "Asociar a expediente"}
+                  title={sesionExpediente ? t("Desasociar expediente {v}", { v: sesionExpediente.expediente_ref || "" }) : t("Asociar a expediente")}
                   className={`p-2 rounded-xl transition-all duration-200 ${sesionExpediente ? "bg-amber-50 text-amber-600 shadow-sm ring-1 ring-amber-200" : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"}`}>
                   <Briefcase size={15}/>
                 </button>
-                <button onClick={()=>setShowChannelMenu(v=>!v)} title="Acciones del canal"
+                <button onClick={()=>setShowChannelMenu(v=>!v)} title={t("Acciones del canal")}
                   className={`p-2 rounded-xl transition-all duration-200 ${showChannelMenu?"bg-slate-100 text-slate-700 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <MoreHorizontal size={15}/>
                 </button>
@@ -6529,14 +6460,11 @@ export default function Chat() {
             {sesionExpediente && (
               <div className="shrink-0 flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2">
                 <Briefcase size={13} className="text-amber-600 shrink-0"/>
-                <span className="text-xs text-amber-800 font-medium flex-1 min-w-0 truncate">
-                  Registrando para <strong>{sesionExpediente.expediente_ref || "expediente"}</strong>
-                  {" · "}<span className="font-normal text-amber-600">desde {new Date(sesionExpediente.iniciado_at).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" })}</span>
+                <span className="text-xs text-amber-800 font-medium flex-1 min-w-0 truncate">{t("Registrando para")}{" "}<strong>{sesionExpediente.expediente_ref || t("expediente")}</strong>
+                  {" · "}<span className="font-normal text-amber-600">{t("desde")}{" "}{new Date(sesionExpediente.iniciado_at).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" })}</span>
                 </span>
                 <button onClick={cerrarSesionExpediente}
-                  className="shrink-0 text-[11px] font-semibold text-amber-700 hover:text-red-600 bg-white border border-amber-200 hover:border-red-200 px-2 py-0.5 rounded-lg transition-colors">
-                  Cerrar registro
-                </button>
+                  className="shrink-0 text-[11px] font-semibold text-amber-700 hover:text-red-600 bg-white border border-amber-200 hover:border-red-200 px-2 py-0.5 rounded-lg transition-colors">{t("Cerrar registro")}</button>
               </div>
             )}
             {messageSearchOpen && (
@@ -6546,7 +6474,7 @@ export default function Chat() {
                   <input
                     value={messageSearchQ}
                     onChange={(e) => setMessageSearchQ(e.target.value)}
-                    placeholder="Buscar en esta conversación..."
+                    placeholder={t("Buscar en esta conversación...")}
                     className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                   {messageSearchQ && (
@@ -6560,8 +6488,8 @@ export default function Chat() {
                 </div>
                 <p className="mt-2 text-xs text-slate-400">
                   {messageSearchQ.trim()
-                    ? `${filteredMensajes.length} resultado${filteredMensajes.length === 1 ? "" : "s"} en la conversación`
-                    : "Busca por texto, autor o contenido citado"}
+                    ? t("{length} resultado{v} en la conversación", { length: filteredMensajes.length, v: filteredMensajes.length === 1 ? "" : "s" })
+                    : t("Busca por texto, autor o contenido citado")}
                 </p>
               </div>
             )}
@@ -6581,15 +6509,15 @@ export default function Chat() {
                       <h3 className="text-lg font-bold text-slate-800">{activeChatTitle}</h3>
                       <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
                         {canalActivo.tipo === "directo"
-                          ? `Este es el principio del historial de mensajes directos con ${activeChatTitle}.`
-                          : `Este es el principio del historial del canal #${canalActivo.nombre}.`}
+                          ? t("Este es el principio del historial de mensajes directos con {activeChatTitle}.", { activeChatTitle: activeChatTitle })
+                          : t("Este es el principio del historial del canal #{nombre}.", { nombre: canalActivo.nombre })}
                       </p>
                     </div>
                   )}
                   {loadingMsgs?(
                     <div className="flex flex-col items-center justify-center h-40 gap-3">
                       <div className="rounded-2xl bg-white/90 px-5 py-4 shadow-sm border border-slate-200 flex flex-col items-center gap-2">
-                        <Spinner size="md" muted label="Cargando mensajes…" />
+                        <Spinner size="md" muted label={t("Cargando mensajes…")} />
                       </div>
                     </div>
                   ):filteredMensajes.length===0 && messageSearchQ.trim()?(
@@ -6597,17 +6525,16 @@ export default function Chat() {
                       <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-slate-200 bg-slate-50">
                         <Search size={24} className="text-slate-400" />
                       </div>
-                      <p className="text-base font-semibold text-slate-700">Sin resultados en esta conversación</p>
-                      <p className="max-w-sm text-sm text-slate-500">Prueba con otro nombre, una frase distinta o limpia la búsqueda para volver al historial completo.</p>
+                      <p className="text-base font-semibold text-slate-700">{t("Sin resultados en esta conversación")}</p>
+                      <p className="max-w-sm text-sm text-slate-500">{t("Prueba con otro nombre, una frase distinta o limpia la búsqueda para volver al historial completo.")}</p>
                     </div>
                   ):mensajes.length===0?(
                     <div className="flex flex-col items-center justify-center h-full py-16 px-8 gap-4 text-center animate-in fade-in zoom-in-95 duration-300">
                       <div className="w-20 h-20 rounded-[1.7rem] bg-white border border-slate-200 shadow-lg flex items-center justify-center text-4xl">💬</div>
-                      <p className="font-bold text-slate-800 text-lg">
-                        ¡Empieza la conversación en <span className="text-[#ab0433]">#{canalActivo.tipo === "directo" ? activeChatTitle : canalActivo.nombre}</span>!
+                      <p className="font-bold text-slate-800 text-lg">{t("¡Empieza la conversación en")}{" "}<span className="text-[#ab0433]">#{canalActivo.tipo === "directo" ? activeChatTitle : canalActivo.nombre}</span>!
                       </p>
                       {canalActivo.descripcion&&<p className="text-slate-500 text-sm max-w-md">{canalActivo.descripcion}</p>}
-                      <p className="text-slate-400 text-xs">Sé el primero en escribir ✨</p>
+                      <p className="text-slate-400 text-xs">{t("Sé el primero en escribir ✨")}</p>
                     </div>
                   ):(
                     mensajesConSep.map((item,idx)=>{
@@ -6621,9 +6548,7 @@ export default function Chat() {
                             <div className="sticky top-0 z-10 px-4 py-2 bg-gradient-to-b from-white/95 via-white/90 to-transparent">
                               <div className="flex items-center gap-3">
                                 <div className="h-px flex-1 bg-red-200" />
-                                <span className="shrink-0 rounded-full bg-[#ab0433]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#ab0433] border border-[#ab0433]/20">
-                                  Mensajes nuevos
-                                </span>
+                                <span className="shrink-0 rounded-full bg-[#ab0433]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#ab0433] border border-[#ab0433]/20">{t("Mensajes nuevos")}</span>
                                 <div className="h-px flex-1 bg-red-200" />
                               </div>
                             </div>
@@ -6656,7 +6581,7 @@ export default function Chat() {
                     className="absolute left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 bg-[#ab0433] hover:bg-[#92042c] text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-xl shadow-red-200 transition-all animate-in fade-in zoom-in-95 duration-200"
                   >
                     <ChevronDown size={13}/>
-                    {newMsgCount} nuevo{newMsgCount!==1?"s":""} mensaje{newMsgCount!==1?"s":""}
+                    {newMsgCount}{" "}{t("nuevo")}{newMsgCount!==1?"s":""}{" "}{t("mensaje")}{newMsgCount!==1?"s":""}
                   </button>
                 )}
 
@@ -6839,24 +6764,24 @@ function ExpedienteSearchModal({ getToken, onSelect, onClose }: {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
           <Briefcase size={16} className="text-amber-500 shrink-0"/>
-          <span className="font-bold text-slate-800 flex-1">Asociar a expediente</span>
+          <span className="font-bold text-slate-800 flex-1">{t("Asociar a expediente")}</span>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"><X size={15}/></button>
         </div>
         <div className="px-4 pt-3 pb-2">
           <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
             <Search size={14} className="text-slate-400 shrink-0"/>
             <input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)}
-              placeholder="Buscar por referencia, cliente, descripción..."
+              placeholder={t("Buscar por referencia, cliente, descripción...")}
               className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder-slate-400"/>
             {loading && <Loader2 size={13} className="animate-spin text-slate-400 shrink-0"/>}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto max-h-72 px-2 pb-3">
           {results.length === 0 && q.trim() && !loading && (
-            <p className="text-center text-xs text-slate-400 py-6">Sin resultados para "{q}"</p>
+            <p className="text-center text-xs text-slate-400 py-6">{t("Sin resultados para \"")}{q}"</p>
           )}
           {results.length === 0 && !q.trim() && (
-            <p className="text-center text-xs text-slate-400 py-6">Escribe para buscar un expediente</p>
+            <p className="text-center text-xs text-slate-400 py-6">{t("Escribe para buscar un expediente")}</p>
           )}
           {results.map(exp => {
             const ref = exp.ref_propia || exp.ref_expediente || `${exp.anio}/${String(exp.num_exp).padStart(4,"0")}`;

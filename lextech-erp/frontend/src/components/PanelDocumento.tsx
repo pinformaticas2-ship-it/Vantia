@@ -5,6 +5,7 @@ import { Briefcase, Check, Download, ExternalLink, FileText, Loader2, X } from "
 import { BarraEditor, HojaEditor, contarPalabras } from "./EditorTexto";
 import { SIN_TITULO, useDocumento } from "../lib/useDocumento";
 import { Spinner } from "./Spinner";
+import { t } from '../lib/i18n';
 
 // Editor de Documentos en un panel lateral (Chat IA): el documento que acaba
 // de crear la IA se revisa y retoca sin salir de la conversación. Se guarda
@@ -25,27 +26,26 @@ export default function PanelDocumento({ id, onCerrar, movil }: { id: string; on
               value={titulo}
               onChange={(e) => cambiarTitulo(e.target.value)}
               placeholder={SIN_TITULO}
-              aria-label="Título del documento"
+              aria-label={t("Título del documento")}
               className="w-full truncate bg-transparent text-sm font-bold text-slate-900 outline-none"
             />
             <div className="flex flex-wrap items-center gap-x-3 text-[11px] text-slate-400">
               {doc?.expediente && <span className="inline-flex max-w-[260px] items-center gap-1 truncate text-blue-700"><Briefcase size={10} className="shrink-0" /><span className="truncate">{doc.expediente}</span></span>}
               <span className="inline-flex items-center gap-1">
-                {estadoGuardado === "guardando" ? <><Loader2 size={10} className="animate-spin" /> Guardando…</>
-                  : estadoGuardado === "pendiente" ? "Cambios sin guardar"
-                  : estadoGuardado === "error" ? <span className="text-red-500">No se ha podido guardar</span>
-                  : <><Check size={10} className="text-emerald-500" /> Guardado en Documentos</>}
+                {estadoGuardado === "guardando" ? <><Loader2 size={10} className="animate-spin" />{" "}{t("Guardando…")}</>
+                  : estadoGuardado === "pendiente" ? t("Cambios sin guardar")
+                  : estadoGuardado === "error" ? <span className="text-red-500">{t("No se ha podido guardar")}</span>
+                  : <><Check size={10} className="text-emerald-500" />{" "}{t("Guardado en Documentos")}</>}
               </span>
-              <span>{contarPalabras(editor).toLocaleString("es-ES")} palabras</span>
+              <span>{contarPalabras(editor).toLocaleString("es-ES")}{" "}{t("palabras")}</span>
             </div>
           </div>
-          <button type="button" onClick={async () => setFallo(await descargarWord())} disabled={exportando || !doc} title="Descargar en Word (.docx)" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-            {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Word
+          <button type="button" onClick={async () => setFallo(await descargarWord())} disabled={exportando || !doc} title={t("Descargar en Word (.docx)")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+            {exportando ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}{" "}{t("Word")}</button>
+          <button type="button" onClick={async () => { await guardarYa(); navigate(`/dashboard/documentos/${id}`); }} title={t("Abrir en Documentos (con la IA del editor, PDF y guardar en el expediente)")} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            <ExternalLink size={13} /> <span className="hidden xl:inline">{t("Abrir en Documentos")}</span>
           </button>
-          <button type="button" onClick={async () => { await guardarYa(); navigate(`/dashboard/documentos/${id}`); }} title="Abrir en Documentos (con la IA del editor, PDF y guardar en el expediente)" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            <ExternalLink size={13} /> <span className="hidden xl:inline">Abrir en Documentos</span>
-          </button>
-          <button type="button" onClick={async () => { await guardarYa(); onCerrar(); }} title="Cerrar" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+          <button type="button" onClick={async () => { await guardarYa(); onCerrar(); }} title={t("Cerrar")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={15} />
           </button>
         </div>
@@ -54,7 +54,7 @@ export default function PanelDocumento({ id, onCerrar, movil }: { id: string; on
       {fallo && <p className="mx-4 mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{fallo}</p>}
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6">
         {cargando && !doc ? (
-          <div className="flex justify-center py-16"><Spinner size="md" muted label="Abriendo documento..." /></div>
+          <div className="flex justify-center py-16"><Spinner size="md" muted label={t("Abriendo documento...")} /></div>
         ) : error ? (
           <p className="py-16 text-center text-sm text-slate-500">{error}</p>
         ) : (

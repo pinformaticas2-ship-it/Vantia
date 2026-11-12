@@ -9,6 +9,7 @@ import { Spinner } from "./Spinner";
 import { Modal } from "./Modal";
 import { safeJson } from "../lib/api";
 import { useIsMobile } from "../lib/useIsMobile";
+import { t } from '../lib/i18n';
 
 // Comunicación Externa → TikTok: conectar la cuenta del despacho, ver sus
 // vídeos con estadísticas y publicar. La conexión va por redirección completa
@@ -78,7 +79,7 @@ export default function TikTokPanel() {
     const token = await getToken({ skipCache: true });
     const res = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
     const json = await safeJson(res);
-    if (!res.ok || json?.success === false) throw new Error(json?.error || "Error con TikTok");
+    if (!res.ok || json?.success === false) throw new Error(json?.error || t("Error con TikTok"));
     return json.data;
   }, [getToken]);
 
@@ -210,15 +211,11 @@ export default function TikTokPanel() {
               <TikTokIcon size={30} className="text-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-800">Conecta la cuenta de TikTok del despacho</h2>
-              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-                Podrás ver tus vídeos con sus visualizaciones, me gusta, comentarios y compartidos, y publicar vídeos nuevos desde Vantia.
-              </p>
+              <h2 className="text-base font-bold text-slate-800">{t("Conecta la cuenta de TikTok del despacho")}</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{t("Podrás ver tus vídeos con sus visualizaciones, me gusta, comentarios y compartidos, y publicar vídeos nuevos desde Vantia.")}</p>
             </div>
             {status && !status.configured ? (
-              <p className="max-w-md rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                Falta configurar TikTok en el servidor (TIKTOK_CLIENT_KEY y TIKTOK_CLIENT_SECRET).
-              </p>
+              <p className="max-w-md rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-700">{t("Falta configurar TikTok en el servidor (TIKTOK_CLIENT_KEY y TIKTOK_CLIENT_SECRET).")}</p>
             ) : (
               <button
                 type="button"
@@ -226,11 +223,9 @@ export default function TikTokPanel() {
                 disabled={connecting}
                 className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
               >
-                {connecting ? <Loader2 size={15} className="animate-spin" /> : <TikTokIcon size={15} />}
-                Conectar TikTok
-              </button>
+                {connecting ? <Loader2 size={15} className="animate-spin" /> : <TikTokIcon size={15} />}{t("Conectar TikTok")}</button>
             )}
-            <p className="text-[11px] text-slate-400">Solo el propietario o un administrador pueden conectar la cuenta.</p>
+            <p className="text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden conectar la cuenta.")}</p>
           </div>
         ) : null}
       </div>
@@ -285,16 +280,15 @@ function BandejaTikTok({
         <div className="border-b border-slate-100 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Bandeja del equipo</p>
-              <h1 className="mt-1 text-base font-bold text-slate-900">TikTok</h1>
+              <p className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{t("Bandeja del equipo")}</p>
+              <h1 className="mt-1 text-base font-bold text-slate-900">{t("TikTok")}</h1>
             </div>
             <button
               type="button"
               onClick={onPublish}
               className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-black px-3.5 text-xs font-semibold text-white transition hover:bg-neutral-800"
             >
-              <Plus size={14} /> Publicar
-            </button>
+              <Plus size={14} />{" "}{t("Publicar")}</button>
           </div>
 
           <div className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
@@ -303,14 +297,13 @@ function BandejaTikTok({
               : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black"><TikTokIcon size={18} className="text-white" /></div>}
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1 truncate text-sm font-bold text-slate-800">
-                {acc?.displayName || "Cuenta de TikTok"}
+                {acc?.displayName || t("Cuenta de TikTok")}
                 {acc?.isVerified && <CheckCircle2 size={13} className="shrink-0 text-sky-500" />}
               </p>
               <p className="truncate text-[11px] text-slate-500">
-                {acc?.username ? `@${acc.username} · ` : ""}{fmt(acc?.followers)} seguidores · {fmt(acc?.likes)} me gusta
-              </p>
+                {acc?.username ? `@${acc.username} · ` : ""}{fmt(acc?.followers)}{" "}{t("seguidores ·")}{" "}{fmt(acc?.likes)}{" "}{t("me gusta")}</p>
             </div>
-            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Conectada" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title={t("Conectada")} />
           </div>
           {accountError && <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] text-amber-700">{accountError}</p>}
 
@@ -319,7 +312,7 @@ function BandejaTikTok({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar vídeo..."
+              placeholder={t("Buscar vídeo...")}
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
@@ -332,9 +325,9 @@ function BandejaTikTok({
                 <Video size={22} className="text-slate-300" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-600">{query.trim() ? "Sin resultados" : "Sin vídeos todavía"}</p>
+                <p className="text-sm font-semibold text-slate-600">{query.trim() ? t("Sin resultados") : t("Sin vídeos todavía")}</p>
                 <p className="mt-1 max-w-[220px] text-xs text-slate-400">
-                  {query.trim() ? "Ningún vídeo coincide con la búsqueda." : "Los vídeos públicos de la cuenta aparecerán aquí. Publica el primero desde Vantia."}
+                  {query.trim() ? t("Ningún vídeo coincide con la búsqueda.") : t("Los vídeos públicos de la cuenta aparecerán aquí. Publica el primero desde Vantia.")}
                 </p>
               </div>
             </div>
@@ -368,9 +361,7 @@ function BandejaTikTok({
           {loadingVideos && <div className="flex justify-center py-4"><Spinner size="sm" muted /></div>}
           {hasMore && !loadingVideos && (
             <div className="flex justify-center p-3">
-              <button type="button" onClick={onLoadMore} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                Cargar más
-              </button>
+              <button type="button" onClick={onLoadMore} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">{t("Cargar más")}</button>
             </div>
           )}
         </div>
@@ -381,34 +372,32 @@ function BandejaTikTok({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               {isMobile && (
-                <button type="button" onClick={() => setSelectedId("")} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500" title="Volver a la lista">
+                <button type="button" onClick={() => setSelectedId("")} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500" title={t("Volver a la lista")}>
                   <ArrowLeft size={16} />
                 </button>
               )}
               <div className="min-w-0">
-                <h2 className="truncate text-base font-bold text-slate-900">{selected ? tituloVideo(selected) : "Panel de TikTok"}</h2>
+                <h2 className="truncate text-base font-bold text-slate-900">{selected ? tituloVideo(selected) : t("Panel de TikTok")}</h2>
                 <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  {selected ? `Publicado el ${fmtFecha(selected.create_time)}` : "Selecciona un vídeo para ver sus estadísticas."}
+                  {selected ? t("Publicado el {v}", { v: fmtFecha(selected.create_time) }) : t("Selecciona un vídeo para ver sus estadísticas.")}
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {selected?.share_url && (
                 <a href={selected.share_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-                  <ExternalLink size={14} /> Abrir en TikTok
-                </a>
+                  <ExternalLink size={14} />{" "}{t("Abrir en TikTok")}</a>
               )}
               <button type="button" onClick={onRefresh} className="inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-                <RefreshCw size={14} /> Actualizar
-              </button>
+                <RefreshCw size={14} />{" "}{t("Actualizar")}</button>
               {confirmDisconnect ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <button type="button" onClick={() => { setConfirmDisconnect(false); onDisconnect(); }} className="rounded-2xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-red-700">Sí, desconectar</button>
-                  <button type="button" onClick={() => setConfirmDisconnect(false)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600">Cancelar</button>
+                  <button type="button" onClick={() => { setConfirmDisconnect(false); onDisconnect(); }} className="rounded-2xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-red-700">{t("Sí, desconectar")}</button>
+                  <button type="button" onClick={() => setConfirmDisconnect(false)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600">{t("Cancelar")}</button>
                 </span>
               ) : (
-                <button type="button" onClick={() => setConfirmDisconnect(true)} title="Desconectar la cuenta de TikTok" className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-red-600">
+                <button type="button" onClick={() => setConfirmDisconnect(true)} title={t("Desconectar la cuenta de TikTok")} className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-red-600">
                   <Unplug size={15} />
                 </button>
               )}
@@ -423,7 +412,7 @@ function BandejaTikTok({
             }`}>
               {notice?.tone === "ok" && !error ? <CheckCircle2 size={16} className="mt-0.5 shrink-0" /> : <AlertTriangle size={16} className="mt-0.5 shrink-0" />}
               <span className="flex-1">{error || notice?.text}</span>
-              {notice && !error && <button type="button" onClick={onDismissNotice} className="text-xs font-semibold opacity-60 hover:opacity-100">Cerrar</button>}
+              {notice && !error && <button type="button" onClick={onDismissNotice} className="text-xs font-semibold opacity-60 hover:opacity-100">{t("Cerrar")}</button>}
             </div>
           )}
 
@@ -431,16 +420,15 @@ function BandejaTikTok({
             <div className="flex h-full items-center justify-center">
               <div className="max-w-md rounded-[28px] border border-dashed border-slate-200 bg-white px-8 py-10 text-center">
                 <TikTokIcon size={28} className="mx-auto text-slate-300" />
-                <p className="mt-4 text-base font-semibold text-slate-700">{videos.length ? "Selecciona un vídeo" : "Publica tu primer vídeo"}</p>
+                <p className="mt-4 text-base font-semibold text-slate-700">{videos.length ? t("Selecciona un vídeo") : t("Publica tu primer vídeo")}</p>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
                   {videos.length
-                    ? "Aquí verás el vídeo, sus visualizaciones, me gusta, comentarios y compartidos."
-                    : "Súbelo desde Vantia o mándalo a los borradores de la app para editarlo allí."}
+                    ? t("Aquí verás el vídeo, sus visualizaciones, me gusta, comentarios y compartidos.")
+                    : t("Súbelo desde Vantia o mándalo a los borradores de la app para editarlo allí.")}
                 </p>
                 {!videos.length && (
                   <button type="button" onClick={onPublish} className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800">
-                    <Plus size={14} /> Publicar vídeo
-                  </button>
+                    <Plus size={14} />{" "}{t("Publicar vídeo")}</button>
                 )}
               </div>
             </div>
@@ -480,36 +468,28 @@ function BandejaTikTok({
                   ))}
                 </div>
                 {selected.view_count ? (
-                  <p className="text-xs text-slate-500">
-                    Interacción: <span className="font-bold text-slate-700">
+                  <p className="text-xs text-slate-500">{t("Interacción:")}{" "}<span className="font-bold text-slate-700">
                       {(((selected.like_count || 0) + (selected.comment_count || 0) + (selected.share_count || 0)) / selected.view_count * 100).toLocaleString("es-ES", { maximumFractionDigits: 1 })} %
-                    </span> de las visualizaciones (me gusta + comentarios + compartidos).
-                  </p>
+                    </span>{" "}{t("de las visualizaciones (me gusta + comentarios + compartidos).")}</p>
                 ) : null}
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Texto del vídeo</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{selected.video_description || selected.title || "Sin texto."}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Texto del vídeo")}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{selected.video_description || selected.title || t("Sin texto.")}</p>
                 </div>
 
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                   <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                     <p className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                      <MessageSquare size={15} className="text-slate-400" /> Comentarios
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{fmt(selected.comment_count)}</span>
+                      <MessageSquare size={15} className="text-slate-400" />{" "}{t("Comentarios")}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{fmt(selected.comment_count)}</span>
                     </p>
                   </div>
                   <div className="space-y-3 bg-slate-50 px-4 py-6 text-center">
-                    <p className="text-sm font-semibold text-slate-600">Leer y responder comentarios desde Vantia</p>
-                    <p className="mx-auto max-w-md text-xs leading-5 text-slate-400">
-                      TikTok solo da acceso a los comentarios a través de su API for Business, con una cuenta de empresa.
-                      En cuanto el despacho la active, aquí aparecerá el hilo de comentarios para contestar sin salir del ERP.
-                      Mientras tanto, puedes verlos en TikTok.
-                    </p>
+                    <p className="text-sm font-semibold text-slate-600">{t("Leer y responder comentarios desde Vantia")}</p>
+                    <p className="mx-auto max-w-md text-xs leading-5 text-slate-400">{t("TikTok solo da acceso a los comentarios a través de su API for Business, con una cuenta de empresa. En cuanto el despacho la active, aquí aparecerá el hilo de comentarios para contestar sin salir del ERP. Mientras tanto, puedes verlos en TikTok.")}</p>
                     {selected.share_url && (
                       <a href={selected.share_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                        <ExternalLink size={12} /> Ver comentarios en TikTok
-                      </a>
+                        <ExternalLink size={12} />{" "}{t("Ver comentarios en TikTok")}</a>
                     )}
                   </div>
                 </div>
@@ -617,7 +597,7 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
       const token = await getToken({ skipCache: true });
       const res = await fetch("/api/tiktok/publish", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form });
       const json = await safeJson(res);
-      if (!res.ok || json?.success === false) throw new Error(json?.error || "No se pudo publicar en TikTok");
+      if (!res.ok || json?.success === false) throw new Error(json?.error || t("No se pudo publicar en TikTok"));
 
       // TikTok procesa el vídeo después de recibirlo: se consulta el estado.
       setPhase("processing");
@@ -633,7 +613,7 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
           onPublished(privacy === "SELF_ONLY" ? "Vídeo publicado en TikTok (privado, solo lo ves tú)." : "Vídeo publicado en TikTok.");
           return;
         }
-        if (s.status === "FAILED") throw new Error(`TikTok no ha podido publicar el vídeo${s.failReason ? ` (${s.failReason})` : ""}.`);
+        if (s.status === "FAILED") throw new Error(t("TikTok no ha podido publicar el vídeo{v}.", { v: s.failReason ? ` (${s.failReason})` : "" }));
       }
       onPublished(modo === "borrador"
         ? "Vídeo enviado a TikTok. Aparecerá en tus borradores de la app en unos minutos."
@@ -655,16 +635,16 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
     <Modal
       open
       onClose={phase === "idle" ? onClose : () => {}}
-      title="Publicar en TikTok"
-      subtitle={creator ? `Se publicará en la cuenta ${creator.nickname || ""}${creator.username ? ` (@${creator.username})` : ""}` : undefined}
+      title={t("Publicar en TikTok")}
+      subtitle={creator ? t("Se publicará en la cuenta {v}{v2}", { v: creator.nickname || "", v2: creator.username ? ` (@${creator.username})` : "" }) : undefined}
       icon={<TikTokIcon size={18} />}
       maxWidth="max-w-2xl"
       footer={
         <div className="flex w-full items-center justify-end gap-2">
-          <button type="button" onClick={onClose} disabled={phase !== "idle"} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">Cancelar</button>
+          <button type="button" onClick={onClose} disabled={phase !== "idle"} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">{t("Cancelar")}</button>
           <button type="button" onClick={publish} disabled={!canPublish} className="inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
             {phase !== "idle" && <Loader2 size={14} className="animate-spin" />}
-            {phase === "uploading" ? "Subiendo vídeo..." : phase === "processing" ? "TikTok lo está procesando..." : modo === "borrador" ? "Enviar a borradores" : "Publicar"}
+            {phase === "uploading" ? t("Subiendo vídeo...") : phase === "processing" ? t("TikTok lo está procesando...") : modo === "borrador" ? t("Enviar a borradores") : t("Publicar")}
           </button>
         </div>
       }
@@ -672,7 +652,7 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
       {loadError ? (
         <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</p>
       ) : !creator ? (
-        <div className="flex justify-center py-10"><Spinner size="sm" muted label="Consultando la cuenta de TikTok..." /></div>
+        <div className="flex justify-center py-10"><Spinner size="sm" muted label={t("Consultando la cuenta de TikTok...")} /></div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-[200px_1fr]">
           <div>
@@ -683,10 +663,10 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
                 {modo === "directo" && duration ? (
                   <div className="rounded-xl border border-slate-200 p-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                      <span className="inline-flex items-center gap-1"><ImageIcon size={11} /> Portada</span>
+                      <span className="inline-flex items-center gap-1"><ImageIcon size={11} />{" "}{t("Portada")}</span>
                       {coverSec !== null
-                        ? <button type="button" onClick={() => setCoverSec(null)} className="text-slate-400 hover:text-slate-600">Automática</button>
-                        : <span className="text-slate-300">Automática</span>}
+                        ? <button type="button" onClick={() => setCoverSec(null)} className="text-slate-400 hover:text-slate-600">{t("Automática")}</button>
+                        : <span className="text-slate-300">{t("Automática")}</span>}
                     </div>
                     <input
                       type="range" min={0} max={duration} step={0.1} value={coverSec ?? 0}
@@ -696,23 +676,23 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
                         if (videoRef.current) { videoRef.current.pause(); videoRef.current.currentTime = t; }
                       }}
                       className="mt-1 w-full accent-black"
-                      aria-label="Fotograma de portada"
+                      aria-label={t("Fotograma de portada")}
                     />
                     <p className="text-[10px] text-slate-400">
-                      {coverSec === null ? "Mueve la barra para elegir el fotograma de portada." : `Portada en el segundo ${coverSec.toFixed(1)}`}
+                      {coverSec === null ? t("Mueve la barra para elegir el fotograma de portada.") : t("Portada en el segundo {toFixed}", { toFixed: coverSec.toFixed(1) })}
                     </p>
                   </div>
                 ) : null}
-                <button type="button" onClick={() => fileInput.current?.click()} disabled={phase !== "idle"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">Cambiar vídeo</button>
+                <button type="button" onClick={() => fileInput.current?.click()} disabled={phase !== "idle"} className="w-full rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">{t("Cambiar vídeo")}</button>
               </div>
             ) : (
               <button type="button" onClick={() => fileInput.current?.click()} className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-500">
                 <Upload size={22} />
-                <span className="text-xs font-semibold">Elegir vídeo</span>
-                <span className="text-[10px]">MP4, MOV o WebM</span>
+                <span className="text-xs font-semibold">{t("Elegir vídeo")}</span>
+                <span className="text-[10px]">{t("MP4, MOV o WebM")}</span>
               </button>
             )}
-            {tooLong && <p className="mt-2 text-xs text-red-600">El vídeo dura más de lo que permite esta cuenta ({creator.maxDurationSec} s).</p>}
+            {tooLong && <p className="mt-2 text-xs text-red-600">{t("El vídeo dura más de lo que permite esta cuenta (")}{creator.maxDurationSec} s).</p>}
           </div>
 
           <div className="space-y-4">
@@ -736,49 +716,43 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
 
             {modo === "borrador" ? (
               <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
-                <p className="font-semibold text-slate-800">El vídeo llegará a la app de TikTok como borrador</p>
-                <p>
-                  Te aparecerá una notificación en TikTok (en el móvil de la cuenta conectada). Desde ahí puedes añadir
-                  música, efectos, filtros, texto, stickers o voz, elegir la portada y la privacidad, y publicarlo.
-                </p>
-                <p className="text-slate-400">Úsalo cuando quieras editar con las herramientas de la app, que la API de TikTok no deja usar desde fuera.</p>
+                <p className="font-semibold text-slate-800">{t("El vídeo llegará a la app de TikTok como borrador")}</p>
+                <p>{t("Te aparecerá una notificación en TikTok (en el móvil de la cuenta conectada). Desde ahí puedes añadir música, efectos, filtros, texto, stickers o voz, elegir la portada y la privacidad, y publicarlo.")}</p>
+                <p className="text-slate-400">{t("Úsalo cuando quieras editar con las herramientas de la app, que la API de TikTok no deja usar desde fuera.")}</p>
               </div>
             ) : (<>
             <div>
-              <label className="text-xs font-semibold text-slate-500">Texto del vídeo</label>
-              <textarea value={title} onChange={(e) => setTitle(e.target.value.slice(0, 2200))} rows={4} placeholder="Descripción, #hashtags..." className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400" />
+              <label className="text-xs font-semibold text-slate-500">{t("Texto del vídeo")}</label>
+              <textarea value={title} onChange={(e) => setTitle(e.target.value.slice(0, 2200))} rows={4} placeholder={t("Descripción, #hashtags...")} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400" />
               <p className="text-right text-[10px] text-slate-300">{title.length} / 2200</p>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500">¿Quién puede verlo?</label>
+              <label className="text-xs font-semibold text-slate-500">{t("¿Quién puede verlo?")}</label>
               <select value={privacy} onChange={(e) => setPrivacy(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
-                <option value="" disabled>Elige una opción</option>
+                <option value="" disabled>{t("Elige una opción")}</option>
                 {privacyOptions.map((p) => <option key={p} value={p}>{PRIVACY_LABELS[p] || p}</option>)}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-slate-500">Permitir a los usuarios</p>
+              <p className="text-xs font-semibold text-slate-500">{t("Permitir a los usuarios")}</p>
               {check("Comentar", allowComment, setAllowComment, creator.commentDisabled)}
               {check("Hacer dúos", allowDuet, setAllowDuet, creator.duetDisabled)}
               {check("Hacer stitch", allowStitch, setAllowStitch, creator.stitchDisabled)}
             </div>
 
             <div className="space-y-2 rounded-2xl border border-slate-200 p-3">
-              <label className="flex items-center justify-between gap-3 text-sm font-medium text-slate-700">
-                Contenido comercial
-                <input type="checkbox" checked={commercial} onChange={(e) => { setCommercial(e.target.checked); if (!e.target.checked) { setBrandOrganic(false); setBrandContent(false); } }} className="h-4 w-4" />
+              <label className="flex items-center justify-between gap-3 text-sm font-medium text-slate-700">{t("Contenido comercial")}<input type="checkbox" checked={commercial} onChange={(e) => { setCommercial(e.target.checked); if (!e.target.checked) { setBrandOrganic(false); setBrandContent(false); } }} className="h-4 w-4" />
               </label>
-              <p className="text-[11px] text-slate-400">Indica si el vídeo promociona al despacho, a un producto o a un tercero.</p>
+              <p className="text-[11px] text-slate-400">{t("Indica si el vídeo promociona al despacho, a un producto o a un tercero.")}</p>
               {commercial && (
                 <div className="space-y-1.5 pt-1">
                   {check("Tu marca: promociona al despacho", brandOrganic, setBrandOrganic, false)}
                   {check("Contenido de marca: colaboración pagada con un tercero", brandContent, (v) => { setBrandContent(v); if (v && privacy === "SELF_ONLY") setPrivacy(""); }, false)}
-                  {commercialIncomplete && <p className="text-[11px] text-amber-600">Elige al menos una de las dos opciones.</p>}
+                  {commercialIncomplete && <p className="text-[11px] text-amber-600">{t("Elige al menos una de las dos opciones.")}</p>}
                   {(brandOrganic || brandContent) && (
-                    <p className="text-[11px] text-slate-500">
-                      El vídeo se etiquetará como {brandContent ? "“Colaboración pagada”" : "“Contenido promocional”"}.
+                    <p className="text-[11px] text-slate-500">{t("El vídeo se etiquetará como")}{" "}{brandContent ? t("“Colaboración pagada”") : t("“Contenido promocional”")}.
                     </p>
                   )}
                 </div>
@@ -788,17 +762,14 @@ function PublishModal({ api, getToken, onClose, onPublished }: {
             <label className="flex items-start gap-2 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
               <input type="checkbox" checked={isAigc} onChange={(e) => setIsAigc(e.target.checked)} className="mt-0.5 h-4 w-4" />
               <span>
-                <span className="font-medium">Contenido generado por IA</span>
-                <span className="block text-[11px] text-slate-400">TikTok lo etiquetará así. Obligatorio si el vídeo tiene imágenes o voces realistas creadas con IA.</span>
+                <span className="font-medium">{t("Contenido generado por IA")}</span>
+                <span className="block text-[11px] text-slate-400">{t("TikTok lo etiquetará así. Obligatorio si el vídeo tiene imágenes o voces realistas creadas con IA.")}</span>
               </span>
             </label>
 
-            <p className="text-[11px] leading-relaxed text-slate-400">
-              Al publicar aceptas la{" "}
-              {brandContent && (<><a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noreferrer" className="underline">Branded Content Policy</a> y la{" "}</>)}
-              <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer" className="underline">Music Usage Confirmation</a> de TikTok.
-              Después de publicar, TikTok puede tardar unos minutos en procesar el vídeo.
-            </p>
+            <p className="text-[11px] leading-relaxed text-slate-400">{t("Al publicar aceptas la")}{" "}
+              {brandContent && (<><a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noreferrer" className="underline">{t("Branded Content Policy")}</a>{" "}{t("y la")}{" "}</>)}
+              <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer" className="underline">{t("Music Usage Confirmation")}</a>{" "}{t("de TikTok. Después de publicar, TikTok puede tardar unos minutos en procesar el vídeo.")}</p>
             </>)}
             {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           </div>

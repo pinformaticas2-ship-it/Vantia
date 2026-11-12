@@ -27,6 +27,7 @@ import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
 import { confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
+import { t, t as tr } from '../lib/i18n';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Task {
@@ -291,12 +292,11 @@ function TaskPanel({
                 </span>
                 {overdue && !done && (
                   <span className="flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                    <AlertTriangle size={9} /> Vencida
-                  </span>
+                    <AlertTriangle size={9} />{" "}{t("Vencida")}</span>
                 )}
               </div>
               <h2 className="text-sm font-bold text-slate-800 mt-1 truncate">
-                {task ? task.titulo : "Nueva actuación"}
+                {task ? task.titulo : t("Nueva actuación")}
               </h2>
               {task && (
                 <div className="text-[11px] text-slate-500 mt-0.5 truncate">
@@ -307,8 +307,7 @@ function TaskPanel({
             {task && !done && (
               <button onClick={handleQuickComplete} disabled={saving}
                 className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50">
-                <CheckCircle2 size={13} /> Completar
-              </button>
+                <CheckCircle2 size={13} />{" "}{t("Completar")}</button>
             )}
             {task && (
               <button onClick={() => onDelete(task.id)} disabled={saving}
@@ -348,14 +347,13 @@ function TaskPanel({
           {activeTab === "detalles" && (
             <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Cliente <span className="text-red-500">*</span>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Cliente")}{" "}<span className="text-red-500">*</span>
                 </label>
                 <select value={clientId} onChange={e => setClientId(e.target.value)} required
                   disabled={!!task || clientsLoading}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white disabled:opacity-60 disabled:bg-slate-50">
-                  <option value="">— Selecciona un cliente —</option>
-                  {clientsLoading && <option value="">Cargando…</option>}
+                  <option value="">{t("— Selecciona un cliente —")}</option>
+                  {clientsLoading && <option value="">{t("Cargando…")}</option>}
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {clientsError && !clientsLoading && (
@@ -364,35 +362,34 @@ function TaskPanel({
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Título <span className="text-red-500">*</span>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Título")}{" "}<span className="text-red-500">*</span>
                 </label>
                 <input value={form.titulo} onChange={e => set("titulo", e.target.value)} required
-                  placeholder="Nombre de la actuación…"
+                  placeholder={t("Nombre de la actuación…")}
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-red-400 text-slate-800" />
               </div>
 
               <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Estado</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Estado")}</label>
                   <select value={form.estado} onChange={e => set("estado", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-400 bg-white text-slate-700">
-                    <option value="pendiente">Pendiente</option>
-                    <option value="urgente">Urgente</option>
-                    <option value="completada">Completada</option>
+                    <option value="pendiente">{t("Pendiente")}</option>
+                    <option value="urgente">{t("Urgente")}</option>
+                    <option value="completada">{t("Completada")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Prioridad</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Prioridad")}</label>
                   <select value={form.prioridad} onChange={e => set("prioridad", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-400 bg-white text-slate-700">
-                    <option value="alta">Alta</option>
-                    <option value="media">Media</option>
-                    <option value="baja">Baja</option>
+                    <option value="alta">{t("Alta@@prioridad")}</option>
+                    <option value="media">{t("Media@@prioridad")}</option>
+                    <option value="baja">{t("Baja@@prioridad")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Tipo")}</label>
                   <select value={form.tipo} onChange={e => set("tipo", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs font-semibold focus:outline-none focus:border-red-400 bg-white text-slate-700">
                     {Object.entries(TIPO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -402,52 +399,52 @@ function TaskPanel({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">📅 Fecha límite</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("📅 Fecha límite")}</label>
                   <input type="date" value={form.plazo} onChange={e => set("plazo", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                   <PlazoCalculator onCalculate={(d) => set("plazo", d)} />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">🔔 Aviso</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("🔔 Aviso")}</label>
                   <input type="date" value={form.fecha_aviso} onChange={e => set("fecha_aviso", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">🏷️ Etapa</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("🏷️ Etapa")}</label>
                 <EtapaSelect value={form.etapa} onChange={v => set("etapa", v)} getToken={getToken} />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Ref. Expediente</label>
-                <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder="EXP/2024/001"
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Ref. Expediente")}</label>
+                <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder={t("EXP/2024/001")}
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Juzgado</label>
-                  <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder="Juzgado nº…"
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Juzgado")}</label>
+                  <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder={t("Juzgado nº…")}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nº Proc.</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Nº Proc.")}</label>
                   <input value={form.num_proc} onChange={e => set("num_proc", e.target.value)} placeholder="123/2024"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">💶 Importe (€)</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("💶 Importe (€)")}</label>
                 <input type="number" step="0.01" min="0" value={form.importe} onChange={e => set("importe", e.target.value)} placeholder="0,00"
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Instrucciones / Contexto</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Instrucciones / Contexto")}</label>
                 <textarea value={form.descripcion} onChange={e => set("descripcion", e.target.value)} rows={3}
-                  placeholder="Descripción o contexto adicional…"
+                  placeholder={t("Descripción o contexto adicional…")}
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none" />
               </div>
 
@@ -455,12 +452,10 @@ function TaskPanel({
                 <button type="submit" disabled={saving || !form.titulo.trim() || !clientId}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors">
                   {saving && <Loader2 size={13} className="animate-spin" />}
-                  {task ? "Guardar cambios" : "Crear actuación"}
+                  {task ? t("Guardar cambios") : t("Crear actuación")}
                 </button>
                 <button type="button" onClick={onClose}
-                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
-                  Cancelar
-                </button>
+                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">{t("Cancelar")}</button>
               </div>
             </form>
           )}
@@ -472,8 +467,8 @@ function TaskPanel({
               <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
                 className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-200 rounded-xl text-sm font-semibold text-slate-500 hover:border-red-300 hover:text-red-600 hover:bg-red-50/30 transition-all disabled:opacity-50">
                 {uploading
-                  ? <><Loader2 size={15} className="animate-spin" /> Subiendo…</>
-                  : <><Upload size={15} /> Subir archivos</>}
+                  ? <><Loader2 size={15} className="animate-spin" />{" "}{t("Subiendo…")}</>
+                  : <><Upload size={15} />{" "}{t("Subir archivos")}</>}
               </button>
 
               {filesLoading ? (
@@ -481,8 +476,8 @@ function TaskPanel({
               ) : files.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
                   <Paperclip size={28} className="opacity-30" />
-                  <span className="text-sm font-medium">Sin archivos adjuntos</span>
-                  <span className="text-xs text-center">Sube documentos, escritos o adjuntos relacionados con esta actuación</span>
+                  <span className="text-sm font-medium">{t("Sin archivos adjuntos")}</span>
+                  <span className="text-xs text-center">{t("Sube documentos, escritos o adjuntos relacionados con esta actuación")}</span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -500,12 +495,12 @@ function TaskPanel({
                       </div>
                       <button onClick={() => handleDownload(f)} disabled={downloadingFile === f.id}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                        title="Descargar">
+                        title={t("Descargar")}>
                         {downloadingFile === f.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
                       </button>
                       <button onClick={() => handleDeleteFile(f.id)} disabled={deletingFile === f.id}
                         className="peligro w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        title="Eliminar">
+                        title={t("Eliminar")}>
                         {deletingFile === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                       </button>
                     </div>
@@ -519,18 +514,14 @@ function TaskPanel({
           {activeTab === "notas" && (
             <div className="p-5 flex flex-col gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Notas internas del letrado
-                </label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t("Notas internas del letrado")}</label>
                 <textarea value={form.notas} onChange={e => set("notas", e.target.value)} rows={12}
-                  placeholder="Observaciones, instrucciones internas, recordatorios…"
+                  placeholder={t("Observaciones, instrucciones internas, recordatorios…")}
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:border-red-400 resize-none text-slate-700 leading-relaxed" />
               </div>
               <button onClick={() => task && clientId && onSave(clientId, form)} disabled={saving || !task}
                 className="flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors">
-                {saving && <Loader2 size={13} className="animate-spin" />}
-                Guardar notas
-              </button>
+                {saving && <Loader2 size={13} className="animate-spin" />}{t("Guardar notas")}</button>
             </div>
           )}
         </div>
@@ -552,16 +543,14 @@ function BulkActionBar({ count, onComplete, onDelete, onClear }: {
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] animate-in slide-in-from-bottom duration-200">
       <div className="flex items-center gap-1 bg-slate-900 text-white rounded-2xl shadow-2xl px-4 py-2.5 border border-slate-700">
         <span className="text-xs font-bold text-slate-300 pr-3 border-r border-slate-600">
-          {count} seleccionada{count !== 1 ? "s" : ""}
+          {count}{" "}{t("seleccionada")}{count !== 1 ? "s" : ""}
         </span>
         <button onClick={onComplete}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-400 hover:bg-emerald-400/10 transition-colors">
-          <CheckCircle2 size={13} /> Completar
-        </button>
+          <CheckCircle2 size={13} />{" "}{t("Completar")}</button>
         <button onClick={onDelete}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-400 hover:bg-red-400/10 transition-colors">
-          <Trash2 size={13} /> Eliminar
-        </button>
+          <Trash2 size={13} />{" "}{t("Eliminar")}</button>
         <button onClick={onClear}
           className="ml-1 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors">
           <X size={14} />
@@ -632,7 +621,7 @@ function TaskRow({
             <button
               onClickCapture={e => { e.stopPropagation(); task.expediente_id && navigate(`/dashboard/expedientes/${task.expediente_id}`); }}
               className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:underline">
-              <Briefcase size={9} /> {task.expediente || "Expediente"}
+              <Briefcase size={9} /> {task.expediente || t("Expediente")}
             </button>
           )}
           {(task as any).etapa && (
@@ -673,7 +662,7 @@ function TaskRow({
                 days <= 3  ? "bg-orange-100 text-orange-700" :
                              "bg-slate-100 text-slate-500"
               }`}>
-                {days === 0 ? "Hoy" : `${days}d`}
+                {days === 0 ? t("Hoy") : `${days}d`}
               </span>
             )}
           </div>
@@ -787,30 +776,27 @@ function KanbanCardContent({
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${tipoConf.color}`}>{tipoConf.label}</span>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-            {(PRIO_CONFIG[task.prioridad] ?? PRIO_CONFIG.media).label}
+            {t(`${(PRIO_CONFIG[task.prioridad] ?? PRIO_CONFIG.media).label}@@prioridad`)}
           </span>
           {overdue && !done && (
             <span className="flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
-              <AlertTriangle size={9} /> Vencida
-            </span>
+              <AlertTriangle size={9} />{" "}{t("Vencida")}</span>
           )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div className="bg-slate-50 border border-slate-100 rounded-lg p-2">
             <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase mb-0.5">
-              <Users size={8} /> Cliente
-            </div>
+              <Users size={8} />{" "}{t("Cliente")}</div>
             <div className="text-[10px] font-bold text-slate-700 truncate">{clientName(task)}</div>
           </div>
           <div className={`rounded-lg p-2 border ${overdue && !done ? "bg-red-50/70 border-red-100" : "bg-slate-50 border-slate-100"}`}>
             <div className={`flex items-center gap-1 text-[9px] font-bold uppercase mb-0.5 ${overdue && !done ? "text-red-400" : "text-slate-400"}`}>
-              <Calendar size={8} /> Límite
-            </div>
+              <Calendar size={8} />{" "}{t("Límite")}</div>
             <div className={`text-[10px] font-bold truncate ${overdue && !done ? "text-red-600" : "text-slate-700"}`}>
-              {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
+              {task.plazo ? fmtDate(task.plazo) : t("Sin fecha")}
               {days !== null && !overdue && !done && days <= 7 && (
-                <span className="ml-1 text-slate-400 font-normal">{days === 0 ? "hoy" : `${days}d`}</span>
+                <span className="ml-1 text-slate-400 font-normal">{days === 0 ? t("hoy") : `${days}d`}</span>
               )}
             </div>
           </div>
@@ -877,14 +863,14 @@ function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAd
               <button
                 disabled={!onMoveLeft}
                 onClick={onMoveLeft}
-                title="Mover columna a la izquierda"
+                title={t("Mover columna a la izquierda")}
                 className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-0 disabled:pointer-events-none transition-colors">
                 <ChevronLeft size={13} />
               </button>
               <button
                 disabled={!onMoveRight}
                 onClick={onMoveRight}
-                title="Mover columna a la derecha"
+                title={t("Mover columna a la derecha")}
                 className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-0 disabled:pointer-events-none transition-colors">
                 <ChevronRight size={13} />
               </button>
@@ -908,7 +894,7 @@ function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAd
           <div className="flex items-center gap-2 px-3 py-2 bg-rose-50 border border-rose-200/70 rounded-xl shrink-0">
             <AlertTriangle size={10} className="text-rose-500 shrink-0" />
             <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-widest">
-              {overdueCount} {overdueCount === 1 ? "vencida" : "vencidas"}
+              {overdueCount} {overdueCount === 1 ? t("vencida") : t("vencidas")}
             </span>
           </div>
         )}
@@ -916,8 +902,8 @@ function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAd
           <div className={`flex-1 flex flex-col items-center justify-center gap-2 min-h-[160px] rounded-xl border-2 border-dashed transition-colors
             ${isOver ? "border-indigo-300 bg-indigo-50/60" : "border-slate-200/80 bg-white/40"}`}>
             {isOver
-              ? <span className="text-xs font-bold text-indigo-500">Soltar aquí</span>
-              : <><span className="text-slate-300 text-2xl">·</span><span className="text-xs font-medium text-slate-400">Sin tareas</span></>}
+              ? <span className="text-xs font-bold text-indigo-500">{t("Soltar aquí")}</span>
+              : <><span className="text-slate-300 text-2xl">·</span><span className="text-xs font-medium text-slate-400">{t("Sin tareas")}</span></>}
           </div>
         ) : (
           tasks.map(t => <KanbanCard key={t.id} task={t} onToggle={onToggle} onEdit={onEdit} />)
@@ -927,8 +913,7 @@ function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAd
             onPointerDown={e => e.stopPropagation()}
             onClick={e => { e.stopPropagation(); onAddNew(); }}
             className="w-full py-2.5 mt-0.5 border border-dashed border-slate-200 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-600 hover:border-slate-300 hover:bg-white/60 transition-all flex items-center justify-center gap-1.5">
-            <Plus size={12} /> Añadir tarea
-          </button>
+            <Plus size={12} />{" "}{t("Añadir tarea")}</button>
         )}
       </div>
     </div>
@@ -1018,9 +1003,7 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
 
   if (!ganttData) {
     return (
-      <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-20 text-center text-sm font-medium text-slate-400">
-        No hay tareas con fecha límite para mostrar en Gantt.
-      </div>
+      <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-20 text-center text-sm font-medium text-slate-400">{t("No hay tareas con fecha límite para mostrar en Gantt.")}</div>
     );
   }
 
@@ -1040,24 +1023,22 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
       style={{ userSelect: dragging ? "none" : undefined } as React.CSSProperties}>
       <div className="px-4 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-extrabold text-slate-800">Cronograma</span>
-          <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500">{list.length} tareas</span>
+          <span className="text-sm font-extrabold text-slate-800">{t("Cronograma")}</span>
+          <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500">{list.length}{" "}{t("tareas")}</span>
           <span className="px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-bold text-violet-600">
-            {dayWidth >= 56 ? "Vista detallada" : dayWidth <= 30 ? "Vista amplia" : "Vista semanal"}
+            {dayWidth >= 56 ? t("Vista detallada") : dayWidth <= 30 ? t("Vista amplia") : t("Vista semanal")}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={scrollToToday}
-            className="px-3 py-1.5 rounded-xl border border-indigo-200 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors">
-            Hoy
-          </button>
+            className="px-3 py-1.5 rounded-xl border border-indigo-200 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors">{t("Hoy")}</button>
           <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-1 py-1">
-            <button onClick={() => setDayWidth(w => Math.max(20, w - 10))} title="Alejar"
+            <button onClick={() => setDayWidth(w => Math.max(20, w - 10))} title={t("Alejar")}
               className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
               <ZoomOut size={13} />
             </button>
-            <span className="text-[11px] font-bold text-slate-500 w-8 text-center">{dayWidth}px</span>
-            <button onClick={() => setDayWidth(w => Math.min(80, w + 10))} title="Acercar"
+            <span className="text-[11px] font-bold text-slate-500 w-8 text-center">{dayWidth}{t("px")}</span>
+            <button onClick={() => setDayWidth(w => Math.min(80, w + 10))} title={t("Acercar")}
               className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
               <ZoomIn size={13} />
             </button>
@@ -1068,9 +1049,7 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
         <div style={{ minWidth: `${380 + totalDays * dayWidth}px` }}>
           <div className="grid border-b border-slate-200 bg-slate-50/80 sticky top-0 z-10"
             style={{ gridTemplateColumns: `380px repeat(${totalDays}, ${dayWidth}px)` }}>
-            <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-slate-500 border-r border-slate-200 row-span-2 flex items-center">
-              Nombre
-            </div>
+            <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-slate-500 border-r border-slate-200 row-span-2 flex items-center">{t("Nombre")}</div>
             <div className="col-span-full" style={{ gridColumn: `2 / span ${totalDays}` }}>
               <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, ${dayWidth}px)` }}>
                 {weekHeaders.map(w => (
@@ -1281,14 +1260,14 @@ export default function Tareas() {
       const token = await getToken({ skipCache: true });
       const res = await fetch("/api/entities?limit=500", { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
-      if (!res.ok) { setClientsError(data?.error || "No se pudieron cargar los clientes"); return; }
+      if (!res.ok) { setClientsError(data?.error || t("No se pudieron cargar los clientes")); return; }
       const mapped = (data.data || []).map((c: any) => ({
         id: c.id,
         name: c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.nif_cif || c.internal_number || c.id,
       }));
       setClients(mapped);
-      if (mapped.length === 0) setClientsError("No hay clientes disponibles");
-    } catch { setClientsError("Error de conexión al cargar clientes"); }
+      if (mapped.length === 0) setClientsError(t("No hay clientes disponibles"));
+    } catch { setClientsError(t("Error de conexión al cargar clientes")); }
     finally { setClientsLoading(false); }
   }, [getToken]);
 
@@ -1402,7 +1381,7 @@ export default function Tareas() {
   }, [selectedIds, getToken, fetchTasks]);
 
   const handleBulkDelete = useCallback(async () => {
-    if (!(await confirmar({ titulo: `¿Eliminar ${selectedIds.size} tarea${selectedIds.size !== 1 ? "s" : ""}?`, mensaje: "Esta acción no se puede deshacer.", confirmar: "Eliminar", peligro: true }))) return;
+    if (!(await confirmar({ titulo: t("¿Eliminar {size} tarea{v}?", { size: selectedIds.size, v: selectedIds.size !== 1 ? "s" : "" }), mensaje: t("Esta acción no se puede deshacer."), confirmar: t("Eliminar"), peligro: true }))) return;
     const ids = Array.from(selectedIds);
     setTasks(prev => prev.filter(t => !ids.includes(t.id)));
     setSelectedIds(new Set());
@@ -1484,10 +1463,10 @@ export default function Tareas() {
         body: JSON.stringify(data),
       });
       const json = await safeJson(res);
-      if (!res.ok) { setErrorMsg(json?.error || "Error al guardar"); return; }
+      if (!res.ok) { setErrorMsg(json?.error || t("Error al guardar")); return; }
       setShowPanel(false); setEditTask(null);
       fetchTasks(true);
-    } catch { setErrorMsg("Error de conexión"); }
+    } catch { setErrorMsg(t("Error de conexión")); }
     finally { setSaving(false); }
   };
 
@@ -1536,14 +1515,13 @@ export default function Tareas() {
             <CheckCircle2 size={20} className="text-red-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-800 leading-tight">Tareas y Plazos</h1>
-            <p className="text-xs font-medium text-slate-400 mt-0.5">Solo tus tareas asignadas</p>
+            <h1 className="text-xl font-bold text-slate-800 leading-tight">{t("Tareas y Plazos")}</h1>
+            <p className="text-xs font-medium text-slate-400 mt-0.5">{t("Solo tus tareas asignadas")}</p>
           </div>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-2 px-5 h-10 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors">
-          <Plus size={14} /> Nueva tarea
-        </button>
+          <Plus size={14} />{" "}{t("Nueva tarea")}</button>
       </div>
 
       {/* Stats */}
@@ -1576,7 +1554,7 @@ export default function Tareas() {
                   className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                     tab === t ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}>
-                  {t === "todas" ? "Todas" : "Solo con plazo"}
+                  {t === "todas" ? tr("Todas") : tr("Solo con plazo")}
                 </button>
               ))}
             </div>
@@ -1600,7 +1578,7 @@ export default function Tareas() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 h-8">
               <Search size={12} className="text-slate-400 shrink-0" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar tarea o cliente..."
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("Buscar tarea o cliente...")}
                 className="bg-transparent text-xs text-slate-700 placeholder-slate-400 focus:outline-none w-44" />
               {search && <button onClick={() => setSearch("")}><X size={11} className="text-slate-400" /></button>}
             </div>
@@ -1610,8 +1588,7 @@ export default function Tareas() {
                   ? "bg-red-50 border-red-200 text-red-700"
                   : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}>
-              <Filter size={11} /> Filtrar
-              {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-red-500" />}
+              <Filter size={11} />{" "}{t("Filtrar")}{hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-red-500" />}
             </button>
           </div>
         </div>
@@ -1620,7 +1597,7 @@ export default function Tareas() {
         {showFilters && (
           <div className="flex items-center gap-2 flex-wrap px-5 py-3 bg-slate-50 border-b border-slate-100">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado:</span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t("Estado:")}</span>
               {["pendiente", "urgente", "completada"].map(e => (
                 <button key={e} onClick={() => setFilterEstado(filterEstado === e ? "" : e)}
                   className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${
@@ -1631,21 +1608,19 @@ export default function Tareas() {
               ))}
             </div>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prioridad:</span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t("Prioridad:")}</span>
               {["alta", "media", "baja"].map(p => (
                 <button key={p} onClick={() => setFilterPrio(filterPrio === p ? "" : p)}
                   className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${
                     filterPrio === p ? "bg-red-600 text-white border-red-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                   }`}>
-                  {PRIO_CONFIG[p]?.label}
+                  {PRIO_CONFIG[p] && t(`${PRIO_CONFIG[p].label}@@prioridad`)}
                 </button>
               ))}
             </div>
             {hasFilter && (
               <button onClick={() => { setFilterEstado(""); setFilterTipo(""); setFilterPrio(""); setSearch(""); }}
-                className="ml-auto text-xs text-red-500 font-semibold hover:text-red-700">
-                Limpiar filtros
-              </button>
+                className="ml-auto text-xs text-red-500 font-semibold hover:text-red-700">{t("Limpiar filtros")}</button>
             )}
           </div>
         )}
@@ -1657,12 +1632,10 @@ export default function Tareas() {
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <CheckCircle2 size={36} className="text-slate-200" />
             <p className="font-semibold text-slate-400">
-              {hasFilter || tab === "plazos" ? "Sin tareas con esos filtros" : "No tienes tareas todavía"}
+              {hasFilter || tab === "plazos" ? t("Sin tareas con esos filtros") : t("No tienes tareas todavía")}
             </p>
             {!hasFilter && tab === "todas" && (
-              <button onClick={openNew} className="text-sm font-bold text-red-500 hover:underline">
-                + Crear primera tarea
-              </button>
+              <button onClick={openNew} className="text-sm font-bold text-red-500 hover:underline">{t("+ Crear primera tarea")}</button>
             )}
           </div>
         ) : view === "list" ? (
@@ -1694,13 +1667,13 @@ export default function Tareas() {
                     </button>
                   </div>
                   <div className="w-10 shrink-0" />
-                  <div className="flex-1 pr-4"><SortBtn col="titulo" label="Tarea" /></div>
+                  <div className="flex-1 pr-4"><SortBtn col="titulo" label={t("Tarea")} /></div>
                   <div className="w-[130px] hidden lg:block text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t("Tipo")}</span>
                   </div>
-                  <div className="w-[130px] hidden sm:block px-2"><SortBtn col="plazo" label="Fecha límite" /></div>
+                  <div className="w-[130px] hidden sm:block px-2"><SortBtn col="plazo" label={t("Fecha límite")} /></div>
                   <div className="w-[110px] pr-4 text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{t("Estado")}</span>
                   </div>
                 </div>
 
@@ -1708,8 +1681,7 @@ export default function Tareas() {
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 bg-rose-50/70 border-b border-rose-100">
                       <AlertTriangle size={11} className="text-rose-500 shrink-0" />
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-600">
-                        Vencidas · {overdueTasks.length}
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-600">{t("Vencidas ·")}{" "}{overdueTasks.length}
                       </span>
                     </div>
                     <div className="border-l-[3px] border-rose-400">
@@ -1724,8 +1696,7 @@ export default function Tareas() {
                 {activeTasks.length > 0 && (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100">
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
-                        Activas · {activeTasks.length}
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">{t("Activas ·")}{" "}{activeTasks.length}
                       </span>
                     </div>
                     {activeTasks.map(t => (
@@ -1740,8 +1711,7 @@ export default function Tareas() {
                     <button onClick={() => setShowCompletadas(v => !v)}
                       className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50/80 border-b border-emerald-100 hover:bg-emerald-100/60 transition-colors">
                       <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">
-                        Completadas · {completedTasks.length}
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">{t("Completadas ·")}{" "}{completedTasks.length}
                       </span>
                       {showCompletadas ? <ChevronUp size={13} className="text-emerald-500" /> : <ChevronDown size={13} className="text-emerald-500" />}
                     </button>
@@ -1764,7 +1734,7 @@ export default function Tareas() {
               modifiers={[kanbanCenterOnCursor]}
             >
               <div className="flex items-start gap-5 pb-3 min-h-[400px]">
-                <KanbanLane id={KANBAN_SIN_ETAPA_ID} title="Sin etapa" accent="#94a3b8" badgeCls="bg-slate-100 text-slate-600"
+                <KanbanLane id={KANBAN_SIN_ETAPA_ID} title={t("Sin etapa")} accent="#94a3b8" badgeCls="bg-slate-100 text-slate-600"
                   tasks={filtered.filter(t => !t.etapa)}
                   onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
                 {etapas.map((e, i) => {
@@ -1788,7 +1758,7 @@ export default function Tareas() {
                           if (e.key === "Enter") { e.preventDefault(); handleCreateEtapa(); }
                           if (e.key === "Escape") { setAddingEtapa(false); setNewEtapaName(""); }
                         }}
-                        placeholder="Nombre de la etapa…"
+                        placeholder={t("Nombre de la etapa…")}
                         className="w-full px-3 h-9 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
                       />
                       <div className="flex items-center gap-2">
@@ -1796,21 +1766,18 @@ export default function Tareas() {
                           onClick={handleCreateEtapa}
                           disabled={savingEtapa || !newEtapaName.trim()}
                           className="flex-1 h-8 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
-                          {savingEtapa ? "Guardando…" : "Crear"}
+                          {savingEtapa ? t("Guardando…") : t("Crear")}
                         </button>
                         <button
                           onClick={() => { setAddingEtapa(false); setNewEtapaName(""); }}
-                          className="h-8 px-3 text-xs font-semibold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors">
-                          Cancelar
-                        </button>
+                          className="h-8 px-3 text-xs font-semibold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors">{t("Cancelar")}</button>
                       </div>
                     </div>
                   ) : (
                     <button
                       onClick={() => setAddingEtapa(true)}
                       className="w-full flex items-center justify-center gap-2 h-12 text-xs font-bold text-slate-400 hover:text-indigo-600 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 rounded-2xl transition-colors">
-                      <Plus size={14} /> Nueva etapa
-                    </button>
+                      <Plus size={14} />{" "}{t("Nueva etapa")}</button>
                   )}
                 </div>
               </div>

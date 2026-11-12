@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Spinner } from "../components/Spinner";
 import { useParams } from "react-router-dom";
 import { Scale, Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ScanLine, X } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // Renombrada de "FormData" a "ClientFormFields" -- ese nombre tapaba el
 // FormData global del navegador, que hace falta más abajo para mandar la
@@ -44,12 +45,12 @@ export default function FormularioCliente() {
           setLinkInfo(d.data);
           setPageState("valid");
         } else {
-          setErrorMsg(d.error || "Enlace no válido");
+          setErrorMsg(d.error || t("Enlace no válido"));
           setPageState("invalid");
         }
       })
       .catch(() => {
-        setErrorMsg("No se pudo conectar con el servidor.");
+        setErrorMsg(t("No se pudo conectar con el servidor."));
         setPageState("invalid");
       });
   }, [token]);
@@ -68,7 +69,7 @@ export default function FormularioCliente() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.first_name.trim()) { setFieldError("El nombre es obligatorio."); return; }
+    if (!form.first_name.trim()) { setFieldError(t("El nombre es obligatorio.")); return; }
     setPageState("submitting");
     try {
       // multipart/form-data siempre (aunque no se adjunte foto) para no tener
@@ -86,11 +87,11 @@ export default function FormularioCliente() {
       if (res.ok && d.success) {
         setPageState("done");
       } else {
-        setErrorMsg(d.error || "Error al enviar los datos.");
+        setErrorMsg(d.error || t("Error al enviar los datos."));
         setPageState("error");
       }
     } catch {
-      setErrorMsg("No se pudo conectar con el servidor.");
+      setErrorMsg(t("No se pudo conectar con el servidor."));
       setPageState("error");
     }
   };
@@ -105,24 +106,21 @@ export default function FormularioCliente() {
           onClick={() => window.history.back()}
           className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
         >
-          <ChevronLeft className="w-4 h-4" /> Volver
-        </button>
+          <ChevronLeft className="w-4 h-4" />{" "}{t("Volver")}</button>
       </div>
 
       <div className="flex items-center gap-2 mb-8">
         <div className="p-2 bg-red-600 rounded-xl">
           <Scale className="w-6 h-6 text-white" />
         </div>
-        <span className="text-xl font-bold text-slate-800 tracking-tight">
-          Vantia Legis
-        </span>
+        <span className="text-xl font-bold text-slate-800 tracking-tight">{t("Vantia Legis")}</span>
       </div>
 
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
         {/* ── Loading ── */}
         {pageState === "loading" && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Spinner size="lg" label="Verificando enlace..." />
+            <Spinner size="lg" label={t("Verificando enlace...")} />
           </div>
         )}
 
@@ -132,8 +130,8 @@ export default function FormularioCliente() {
             <div className="p-4 bg-red-50 rounded-full mb-4">
               <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">Enlace no disponible</h2>
-            <p className="text-sm text-slate-500">{errorMsg || "Este enlace no es válido o ha caducado."}</p>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("Enlace no disponible")}</h2>
+            <p className="text-sm text-slate-500">{errorMsg || t("Este enlace no es válido o ha caducado.")}</p>
           </div>
         )}
 
@@ -143,14 +141,12 @@ export default function FormularioCliente() {
             <div className="p-4 bg-red-50 rounded-full mb-4">
               <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">No se pudo enviar</h2>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("No se pudo enviar")}</h2>
             <p className="text-sm text-slate-500 mb-4">{errorMsg}</p>
             <button
               onClick={() => setPageState("valid")}
               className="text-sm text-red-600 hover:underline"
-            >
-              Volver al formulario
-            </button>
+            >{t("Volver al formulario")}</button>
           </div>
         )}
 
@@ -160,12 +156,8 @@ export default function FormularioCliente() {
             <div className="p-4 bg-emerald-50 rounded-full mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">
-              Datos enviados correctamente
-            </h2>
-            <p className="text-sm text-slate-500">
-              Gracias. El despacho recibirá tus datos y se pondrá en contacto contigo.
-            </p>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("Datos enviados correctamente")}</h2>
+            <p className="text-sm text-slate-500">{t("Gracias. El despacho recibirá tus datos y se pondrá en contacto contigo.")}</p>
           </div>
         )}
 
@@ -175,12 +167,10 @@ export default function FormularioCliente() {
             {/* Header */}
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-1">
-                {linkInfo?.label ? linkInfo.label : "Formulario de alta"}
+                {linkInfo?.label ? linkInfo.label : t("Formulario de alta")}
               </h2>
-              <p className="text-sm text-slate-500">
-                Rellena tus datos para que el despacho pueda registrarte como cliente.
-                {linkInfo?.creator_name && (
-                  <> Gestión a cargo de <strong>{linkInfo.creator_name}</strong>.</>
+              <p className="text-sm text-slate-500">{t("Rellena tus datos para que el despacho pueda registrarte como cliente.")}{linkInfo?.creator_name && (
+                  <>{" "}{t("Gestión a cargo de")}{" "}<strong>{linkInfo.creator_name}</strong>.</>
                 )}
               </p>
             </div>
@@ -189,45 +179,44 @@ export default function FormularioCliente() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Nombre <span className="text-red-500">*</span>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t("Nombre")}{" "}<span className="text-red-500">*</span>
                   </label>
                   <input
                     name="first_name"
                     value={form.first_name}
                     onChange={handleChange}
-                    placeholder="Juan"
+                    placeholder={t("Juan")}
                     required
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Apellidos</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t("Apellidos")}</label>
                   <input
                     name="last_name"
                     value={form.last_name}
                     onChange={handleChange}
-                    placeholder="García López"
+                    placeholder={t("García López")}
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Correo electrónico</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{t("Correo electrónico")}</label>
                 <input
                   name="email"
                   type="email"
                   value={form.email}
                   onChange={handleChange}
-                  placeholder="juan@ejemplo.com"
+                  placeholder={t("juan@ejemplo.com")}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t("Teléfono")}</label>
                   <input
                     name="telefono"
                     type="tel"
@@ -238,7 +227,7 @@ export default function FormularioCliente() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">NIF / CIF</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">{t("NIF / CIF")}</label>
                   <input
                     name="nif_cif"
                     value={form.nif_cif}
@@ -250,19 +239,19 @@ export default function FormularioCliente() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Observaciones</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{t("Observaciones")}</label>
                 <textarea
                   name="observaciones"
                   value={form.observaciones}
                   onChange={handleChange}
-                  placeholder="Información adicional que desees comunicar al despacho..."
+                  placeholder={t("Información adicional que desees comunicar al despacho...")}
                   rows={3}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Foto del DNI (opcional)</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{t("Foto del DNI (opcional)")}</label>
                 <input
                   ref={dniInputRef}
                   type="file"
@@ -272,7 +261,7 @@ export default function FormularioCliente() {
                 />
                 {dniPreview ? (
                   <div className="relative inline-block">
-                    <img src={dniPreview} alt="Vista previa del DNI" className="h-24 rounded-lg border border-slate-200 object-cover" />
+                    <img src={dniPreview} alt={t("Vista previa del DNI")} className="h-24 rounded-lg border border-slate-200 object-cover" />
                     <button
                       type="button"
                       onClick={() => { setDniFile(null); if (dniPreview) URL.revokeObjectURL(dniPreview); setDniPreview(null); if (dniInputRef.current) dniInputRef.current.value = ""; }}
@@ -287,8 +276,7 @@ export default function FormularioCliente() {
                     onClick={() => dniInputRef.current?.click()}
                     className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500 hover:border-red-300 hover:text-red-600 transition-colors"
                   >
-                    <ScanLine className="w-4 h-4" /> Adjuntar foto del DNI
-                  </button>
+                    <ScanLine className="w-4 h-4" />{" "}{t("Adjuntar foto del DNI")}</button>
                 )}
               </div>
             </div>
@@ -307,15 +295,13 @@ export default function FormularioCliente() {
               className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-60 transition-colors"
             >
               {pageState === "submitting" ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+                <><Loader2 className="w-4 h-4 animate-spin" />{" "}{t("Enviando...")}</>
               ) : (
-                <>Enviar mis datos <ChevronRight className="w-4 h-4" /></>
+                <>{t("Enviar mis datos")}{" "}<ChevronRight className="w-4 h-4" /></>
               )}
             </button>
 
-            <p className="mt-4 text-center text-xs text-slate-400">
-              Tus datos serán tratados conforme a la normativa vigente de protección de datos (RGPD / LOPDGDD).
-            </p>
+            <p className="mt-4 text-center text-xs text-slate-400">{t("Tus datos serán tratados conforme a la normativa vigente de protección de datos (RGPD / LOPDGDD).")}</p>
           </form>
         )}
       </div>

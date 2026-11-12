@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { getStoredGmailToken as getOrgGmailToken, GMAIL_TOKEN_CLEARED_EVENT } from "../lib/mailLocalState";
+import { t } from '../lib/i18n';
 
 const KNOWN_IDS_KEY_BASE   = "lextech-gmail-known-ids-v1";
 const MAX_KNOWN            = 200;
@@ -34,7 +35,7 @@ async function gmailReq<T>(token: string, path: string): Promise<T> {
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Gmail error ${res.status}`);
+  if (!res.ok) throw new Error(t("Gmail error {status}", { status: res.status }));
   return res.json();
 }
 

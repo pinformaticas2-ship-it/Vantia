@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
+import { t } from '../lib/i18n';
 
 interface OptionItem {
   value: string;
@@ -226,8 +227,8 @@ export default function AppSelect({
                 onClick={() => select("")}
                 className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-slate-500 transition-colors hover:bg-white hover:text-slate-700"
               >
-                <span>Quitar selección</span>
-                <span className="text-xs uppercase tracking-wide text-slate-400">Limpiar</span>
+                <span>{t("Quitar selección")}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-400">{t("Limpiar")}</span>
               </button>
             </div>
           )}
@@ -249,9 +250,7 @@ export default function AppSelect({
 
           <ul className="max-h-56 overflow-y-auto p-1.5 scrollbar-thin scrollbar-thumb-slate-200">
             {filteredOptions.length === 0 && (
-              <li className="px-3 py-3 text-sm text-slate-400">
-                No hay resultados para esa busqueda.
-              </li>
+              <li className="px-3 py-3 text-sm text-slate-400">{t("No hay resultados para esa busqueda.")}</li>
             )}
 
             {filteredOptions.map((option, index) => {

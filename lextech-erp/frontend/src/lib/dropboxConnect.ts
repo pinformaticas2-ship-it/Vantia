@@ -1,3 +1,4 @@
+import { t } from './i18n';
 // Flujo de vinculación de Dropbox (popup + redirect_uri propio, porque a
 // diferencia de Google no hay una librería JS oficial para hacerlo sin salir
 // de la página). Requiere una app creada en dropbox.com/developers/apps con
@@ -40,7 +41,7 @@ export function startDropboxConnect(opts: {
     settled = true;
     cleanup();
     if (event.data.error) {
-      onError(event.data.error === 'access_denied' ? 'Conexión con Dropbox cancelada.' : `Error al conectar con Dropbox: ${event.data.error}`);
+      onError(event.data.error === 'access_denied' ? 'Conexión con Dropbox cancelada.' : t("Error al conectar con Dropbox: {error}", { error: event.data.error }));
       onBusy(false);
       return;
     }
@@ -57,7 +58,7 @@ export function startDropboxConnect(opts: {
         body: JSON.stringify({ code: event.data.code, redirectUri }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data.error || 'No se pudo conectar Dropbox');
+      if (!res.ok || data?.success === false) throw new Error(data.error || t("No se pudo conectar Dropbox"));
       onConnected();
     } catch (e: any) {
       onError(e.message || 'No se pudo conectar Dropbox');

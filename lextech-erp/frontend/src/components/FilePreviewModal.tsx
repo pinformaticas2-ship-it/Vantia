@@ -4,6 +4,7 @@ import {
   Loader2, Download, X, FileText, FileSpreadsheet, FileImage, FileVideo,
   FileAudio, FileCode, FileArchive, File as FileIcon, type LucideIcon,
 } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PREVISUALIZACIÓN DE ARCHIVO ADJUNTO -- compartida por Chat, Expedientes y
@@ -172,13 +173,13 @@ export function FilePreviewModal({
             className="inline-flex items-center gap-2 rounded-full bg-slate-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-600 disabled:opacity-60"
           >
             {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            {downloading ? "Descargando…" : "Descargar"}
+            {downloading ? t("Descargando…") : t("Descargar")}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-slate-700"
-            aria-label="Cerrar"
+            aria-label={t("Cerrar")}
           >
             <X size={16} />
           </button>
@@ -221,7 +222,7 @@ export function FilePreviewModal({
             </div>
             <div>
               <p className="text-sm font-semibold text-white">{displayName}</p>
-              <p className="mt-1 text-xs text-slate-300">Este tipo de archivo no se puede previsualizar aquí</p>
+              <p className="mt-1 text-xs text-slate-300">{t("Este tipo de archivo no se puede previsualizar aquí")}</p>
             </div>
             <button
               type="button"
@@ -230,7 +231,7 @@ export function FilePreviewModal({
               className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:opacity-60"
             >
               {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              {downloading ? "Descargando…" : "Descargar"}
+              {downloading ? t("Descargando…") : t("Descargar")}
             </button>
           </div>
         )}
@@ -256,7 +257,7 @@ function HtmlFilePreview({ src }: { src: string }) {
     (async () => {
       try {
         const res = await fetch(src);
-        if (!res.ok) throw new Error("fetch");
+        if (!res.ok) throw new Error(t("fetch"));
         const text = await res.text();
         if (!cancelled) setHtml(text.length > TEXT_PREVIEW_MAX_BYTES * 4 ? null : text);
         if (!cancelled && text.length > TEXT_PREVIEW_MAX_BYTES * 4) setError(true);
@@ -269,7 +270,7 @@ function HtmlFilePreview({ src }: { src: string }) {
   if (codigo) {
     return (
       <div className="relative h-full">
-        <button type="button" onClick={() => setCodigo(false)} className="absolute right-3 top-3 z-10 rounded-lg bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow hover:bg-white">Ver como página</button>
+        <button type="button" onClick={() => setCodigo(false)} className="absolute right-3 top-3 z-10 rounded-lg bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow hover:bg-white">{t("Ver como página")}</button>
         <TextFilePreview src={src} />
       </div>
     );
@@ -277,7 +278,7 @@ function HtmlFilePreview({ src }: { src: string }) {
   if (error) {
     return (
       <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
-        <p className="text-sm text-slate-300">No se ha podido previsualizar este archivo -- descárgalo para verlo.</p>
+        <p className="text-sm text-slate-300">{t("No se ha podido previsualizar este archivo -- descárgalo para verlo.")}</p>
       </div>
     );
   }
@@ -290,8 +291,8 @@ function HtmlFilePreview({ src }: { src: string }) {
   }
   return (
     <div className="relative h-full overflow-hidden rounded-xl border border-slate-700 bg-white">
-      <button type="button" onClick={() => setCodigo(true)} className="absolute right-3 top-3 z-10 rounded-lg bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-slate-900">Ver código</button>
-      <iframe title="Vista previa" sandbox="" srcDoc={html} className="h-full w-full bg-white" />
+      <button type="button" onClick={() => setCodigo(true)} className="absolute right-3 top-3 z-10 rounded-lg bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-slate-900">{t("Ver código")}</button>
+      <iframe title={t("Vista previa")} sandbox="" srcDoc={html} className="h-full w-full bg-white" />
     </div>
   );
 }
@@ -305,7 +306,7 @@ function TextFilePreview({ src }: { src: string }) {
     (async () => {
       try {
         const res = await fetch(src);
-        if (!res.ok) throw new Error("fetch");
+        if (!res.ok) throw new Error(t("fetch"));
         const len = Number(res.headers.get("content-length") || 0);
         if (len && len > TEXT_PREVIEW_MAX_BYTES) {
           if (!cancelled) setState({ status: "too-big" });
@@ -334,14 +335,14 @@ function TextFilePreview({ src }: { src: string }) {
   if (state.status === "too-big") {
     return (
       <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
-        <p className="text-sm text-slate-300">El archivo es demasiado grande para previsualizarlo aquí -- descárgalo para verlo.</p>
+        <p className="text-sm text-slate-300">{t("El archivo es demasiado grande para previsualizarlo aquí -- descárgalo para verlo.")}</p>
       </div>
     );
   }
   if (state.status === "error") {
     return (
       <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
-        <p className="text-sm text-slate-300">No se pudo cargar el contenido del archivo.</p>
+        <p className="text-sm text-slate-300">{t("No se pudo cargar el contenido del archivo.")}</p>
       </div>
     );
   }
@@ -365,7 +366,7 @@ function WordFilePreview({ src }: { src: string }) {
     (async () => {
       try {
         const [res, mammoth] = await Promise.all([fetch(src), import("mammoth")]);
-        if (!res.ok) throw new Error("fetch");
+        if (!res.ok) throw new Error(t("fetch"));
         const arrayBuffer = await res.arrayBuffer();
         const result = await mammoth.convertToHtml({ arrayBuffer });
         if (!cancelled) setState({ status: "ok", html: result.value });
@@ -386,7 +387,7 @@ function WordFilePreview({ src }: { src: string }) {
   if (state.status === "error") {
     return (
       <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
-        <p className="text-sm text-slate-300">No se pudo generar la vista previa de este documento.</p>
+        <p className="text-sm text-slate-300">{t("No se pudo generar la vista previa de este documento.")}</p>
       </div>
     );
   }
@@ -417,7 +418,7 @@ function ExcelFilePreview({ src }: { src: string }) {
     (async () => {
       try {
         const [res, XLSX] = await Promise.all([fetch(src), import("xlsx")]);
-        if (!res.ok) throw new Error("fetch");
+        if (!res.ok) throw new Error(t("fetch"));
         const arrayBuffer = await res.arrayBuffer();
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
         const sheets = workbook.SheetNames.map(name => ({
@@ -442,7 +443,7 @@ function ExcelFilePreview({ src }: { src: string }) {
   if (state.status === "error") {
     return (
       <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
-        <p className="text-sm text-slate-300">No se pudo generar la vista previa de esta hoja de cálculo.</p>
+        <p className="text-sm text-slate-300">{t("No se pudo generar la vista previa de esta hoja de cálculo.")}</p>
       </div>
     );
   }

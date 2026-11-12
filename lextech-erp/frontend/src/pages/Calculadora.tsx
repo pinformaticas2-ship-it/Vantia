@@ -15,6 +15,7 @@ import {
   borradorJuraDeCuentas, calcularCostas, calcularMinuta, fmtEur, honorariosPorEscala, redondear,
   type Escala,
 } from "../lib/calculoHonorarios";
+import { t, t as tr } from '../lib/i18n';
 
 type Pestana = "honorarios" | "costas" | "jura";
 
@@ -70,8 +71,8 @@ function Linea({ label, valor, fuerte, negativo, tenue }: { label: ReactNode; va
 }
 
 const copiar = async (texto: string) => {
-  try { await navigator.clipboard.writeText(texto); aviso.ok("Copiado al portapapeles"); }
-  catch { aviso.error("No se ha podido copiar."); }
+  try { await navigator.clipboard.writeText(texto); aviso.ok(t("Copiado al portapapeles")); }
+  catch { aviso.error(t("No se ha podido copiar.")); }
 };
 
 function CalculadoraRapida() {
@@ -165,8 +166,8 @@ function CalculadoraRapida() {
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-700"><Calculator size={20} /></div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Calculadora</h1>
-            <p className="text-xs text-slate-500">Honorarios, tasación de costas y jura de cuentas</p>
+            <h1 className="text-xl font-bold text-slate-900">{t("Calculadora")}</h1>
+            <p className="text-xs text-slate-500">{t("Honorarios, tasación de costas y jura de cuentas")}</p>
           </div>
         </div>
         <div className="flex rounded-2xl border border-slate-200 bg-white p-1">
@@ -185,69 +186,68 @@ function CalculadoraRapida() {
             {!escalaPropia && (
               <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                <span>Estás usando una <strong>escala de ejemplo</strong>. {puedeEditar ? "Pulsa «Escala» y pon los criterios orientativos de vuestro Colegio." : "Pide al propietario o a un administrador que configure la de vuestro Colegio."}</span>
+                <span>{t("Estás usando una")}{" "}<strong>{t("escala de ejemplo")}</strong>. {puedeEditar ? t("Pulsa «Escala» y pon los criterios orientativos de vuestro Colegio.") : t("Pide al propietario o a un administrador que configure la de vuestro Colegio.")}</span>
               </div>
             )}
             <div className="flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-xs text-slate-500">Escala: <strong className="text-slate-700">{escala.nombre || "Escala del despacho"}</strong></p>
+              <p className="min-w-0 truncate text-xs text-slate-500">{t("Escala:")}{" "}<strong className="text-slate-700">{escala.nombre || t("Escala del despacho")}</strong></p>
               {puedeEditar && (
                 <button type="button" onClick={() => setEditandoEscala(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                  <Settings2 size={13} /> Escala
-                </button>
+                  <Settings2 size={13} />{" "}{t("Escala")}</button>
               )}
             </div>
-            <Campo label="Cuantía del asunto">
+            <Campo label={t("Cuantía del asunto")}>
               <Importe value={indeterminada ? "18.000" : cuantia} onChange={setCuantia} disabled={indeterminada} />
             </Campo>
-            <Interruptor checked={indeterminada} onChange={setIndeterminada} label="Cuantía indeterminada"
-              ayuda={`Se valora en ${fmtEur(CUANTIA_INDETERMINADA)} (art. 394.3 LEC).`} />
+            <Interruptor checked={indeterminada} onChange={setIndeterminada} label={t("Cuantía indeterminada")}
+              ayuda={t("Se valora en {v} (art. 394.3 LEC).", { v: fmtEur(CUANTIA_INDETERMINADA) })} />
             <div className="grid grid-cols-2 gap-3">
-              <Campo label="% del trabajo" ayuda="Fase o parte realizada">
+              <Campo label={t("% del trabajo")} ayuda={t("Fase o parte realizada")}>
                 <input inputMode="decimal" value={pctTrabajo} onChange={(e) => setPctTrabajo(e.target.value)} className={campo} />
               </Campo>
-              <Campo label="Ajuste (±)" ayuda="Complejidad, urgencia…">
+              <Campo label={t("Ajuste (±)")} ayuda={t("Complejidad, urgencia…")}>
                 <Importe value={ajuste} onChange={setAjuste} />
               </Campo>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Interruptor checked={conIva} onChange={setConIva} label={`IVA ${IVA_PCT} %`} />
-              <Interruptor checked={conIrpf} onChange={setConIrpf} label={`Retención IRPF ${IRPF_PCT} %`} ayuda="Cliente empresa o profesional" />
+              <Interruptor checked={conIva} onChange={setConIva} label={t("IVA {IVA_PCT} %", { IVA_PCT: IVA_PCT })} />
+              <Interruptor checked={conIrpf} onChange={setConIrpf} label={t("Retención IRPF {IRPF_PCT} %", { IRPF_PCT: IRPF_PCT })} ayuda={t("Cliente empresa o profesional")} />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Campo label="Suplidos"><Importe value={suplidos} onChange={setSuplidos} /></Campo>
-              <Campo label="Provisiones recibidas"><Importe value={provisiones} onChange={setProvisiones} /></Campo>
+              <Campo label={t("Suplidos")}><Importe value={suplidos} onChange={setSuplidos} /></Campo>
+              <Campo label={t("Provisiones recibidas")}><Importe value={provisiones} onChange={setProvisiones} /></Campo>
             </div>
           </div>
 
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Minuta</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Minuta")}</p>
             {porEscala.detalle.length > 0 && (
               <div className="rounded-2xl bg-white p-3">
                 {porEscala.detalle.map((t) => (
                   <Linea key={t.desde} tenue valor={t.importe}
-                    label={`${fmtEur(t.desde)} – ${t.hasta === null ? "en adelante" : fmtEur(t.hasta)} · ${t.pct} % de ${fmtEur(t.base)}`} />
+                    label={tr("{v} – {v2} · {pct} % de {v3}", { v: fmtEur(t.desde), v2: t.hasta === null ? "en adelante" : fmtEur(t.hasta), pct: t.pct, v3: fmtEur(t.base) })} />
                 ))}
-                {porEscala.aplicadoMinimo && <p className="pt-1 text-xs text-amber-700">Se aplica el mínimo de la escala ({fmtEur(escala.minimo)}).</p>}
+                {porEscala.aplicadoMinimo && <p className="pt-1 text-xs text-amber-700">{t("Se aplica el mínimo de la escala (")}{fmtEur(escala.minimo)}).</p>}
               </div>
             )}
             <div>
-              <Linea label="Honorarios por escala" valor={porEscala.importe} />
-              {pct !== 100 && <Linea label={`× ${pct} % del trabajo`} valor={redondear((porEscala.importe * pct) / 100)} />}
-              {num(ajuste) !== 0 && <Linea label="Ajuste" valor={num(ajuste)} />}
-              <Linea label="Base imponible" valor={minuta.base} />
-              {conIva && <Linea label={`IVA ${IVA_PCT} %`} valor={minuta.iva} />}
-              {conIrpf && <Linea label={`Retención IRPF ${IRPF_PCT} %`} valor={minuta.irpf} negativo />}
-              {minuta.suplidos > 0 && <Linea label="Suplidos (sin IVA)" valor={minuta.suplidos} />}
-              <Linea label="Total minuta" valor={minuta.total} fuerte />
+              <Linea label={t("Honorarios por escala")} valor={porEscala.importe} />
+              {pct !== 100 && <Linea label={t("× {pct} % del trabajo", { pct: pct })} valor={redondear((porEscala.importe * pct) / 100)} />}
+              {num(ajuste) !== 0 && <Linea label={t("Ajuste")} valor={num(ajuste)} />}
+              <Linea label={t("Base imponible")} valor={minuta.base} />
+              {conIva && <Linea label={t("IVA {IVA_PCT} %", { IVA_PCT: IVA_PCT })} valor={minuta.iva} />}
+              {conIrpf && <Linea label={t("Retención IRPF {IRPF_PCT} %", { IRPF_PCT: IRPF_PCT })} valor={minuta.irpf} negativo />}
+              {minuta.suplidos > 0 && <Linea label={t("Suplidos (sin IVA)")} valor={minuta.suplidos} />}
+              <Linea label={t("Total minuta")} valor={minuta.total} fuerte />
               {minuta.provisiones > 0 && <>
-                <Linea label="Provisiones recibidas" valor={minuta.provisiones} negativo />
-                <Linea label="Pendiente de cobro" valor={minuta.pendiente} fuerte />
+                <Linea label={t("Provisiones recibidas")} valor={minuta.provisiones} negativo />
+                <Linea label={t("Pendiente de cobro")} valor={minuta.pendiente} fuerte />
               </>}
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
-              <button type="button" onClick={() => void copiar(textoMinuta)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} /> Copiar</button>
-              <button type="button" onClick={usarEnCostas} disabled={!baseHonorarios} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Scale size={13} /> Usar en costas</button>
-              <button type="button" onClick={usarEnJura} disabled={!baseHonorarios} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Gavel size={13} /> Usar en jura de cuentas</button>
+              <button type="button" onClick={() => void copiar(textoMinuta)} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} />{" "}{t("Copiar")}</button>
+              <button type="button" onClick={usarEnCostas} disabled={!baseHonorarios} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Scale size={13} />{" "}{t("Usar en costas")}</button>
+              <button type="button" onClick={usarEnJura} disabled={!baseHonorarios} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"><Gavel size={13} />{" "}{t("Usar en jura de cuentas")}</button>
             </div>
           </div>
         </div>
@@ -257,42 +257,38 @@ function CalculadoraRapida() {
         <div key="c" className="anim-fade-in grid grid-cols-1 gap-5 lg:grid-cols-[1fr_0.9fr]">
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo label="Honorarios del abogado" ayuda="Sin IVA"><Importe value={costasHonorarios} onChange={setCostasHonorarios} /></Campo>
-              <Campo label="Derechos del procurador" ayuda="Según arancel, sin IVA"><Importe value={costasProcurador} onChange={setCostasProcurador} /></Campo>
-              <Campo label="Suplidos" ayuda="Tasas, peritos, edictos…"><Importe value={costasSuplidos} onChange={setCostasSuplidos} /></Campo>
-              <Campo label="Cuantía del proceso"><Importe value={indeterminada ? "18.000" : cuantia} onChange={setCuantia} disabled={indeterminada} /></Campo>
+              <Campo label={t("Honorarios del abogado")} ayuda={t("Sin IVA")}><Importe value={costasHonorarios} onChange={setCostasHonorarios} /></Campo>
+              <Campo label={t("Derechos del procurador")} ayuda={t("Según arancel, sin IVA")}><Importe value={costasProcurador} onChange={setCostasProcurador} /></Campo>
+              <Campo label={t("Suplidos")} ayuda={t("Tasas, peritos, edictos…")}><Importe value={costasSuplidos} onChange={setCostasSuplidos} /></Campo>
+              <Campo label={t("Cuantía del proceso")}><Importe value={indeterminada ? "18.000" : cuantia} onChange={setCuantia} disabled={indeterminada} /></Campo>
             </div>
-            <Interruptor checked={indeterminada} onChange={setIndeterminada} label="Cuantía indeterminada" ayuda={`Se valora en ${fmtEur(CUANTIA_INDETERMINADA)} a estos efectos.`} />
-            <Interruptor checked={aplicarLimite} onChange={setAplicarLimite} label="Aplicar el límite del tercio (art. 394.3 LEC)"
-              ayuda="Condena en costas por vencimiento: los honorarios no pueden pasar de un tercio de la cuantía por cada litigante vencedor." />
+            <Interruptor checked={indeterminada} onChange={setIndeterminada} label={t("Cuantía indeterminada")} ayuda={t("Se valora en {v} a estos efectos.", { v: fmtEur(CUANTIA_INDETERMINADA) })} />
+            <Interruptor checked={aplicarLimite} onChange={setAplicarLimite} label={t("Aplicar el límite del tercio (art. 394.3 LEC)")}
+              ayuda={t("Condena en costas por vencimiento: los honorarios no pueden pasar de un tercio de la cuantía por cada litigante vencedor.")} />
             {aplicarLimite && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Campo label="Litigantes vencedores"><input inputMode="numeric" value={litigantes} onChange={(e) => setLitigantes(e.target.value)} className={campo} /></Campo>
-                <div className="sm:pt-6"><Interruptor checked={temeridad} onChange={setTemeridad} label="Declarada temeridad" ayuda="Entonces no hay límite" /></div>
+                <Campo label={t("Litigantes vencedores")}><input inputMode="numeric" value={litigantes} onChange={(e) => setLitigantes(e.target.value)} className={campo} /></Campo>
+                <div className="sm:pt-6"><Interruptor checked={temeridad} onChange={setTemeridad} label={t("Declarada temeridad")} ayuda={t("Entonces no hay límite")} /></div>
               </div>
             )}
-            <Interruptor checked={incluirIva} onChange={setIncluirIva} label="Incluir IVA" ayuda="Si la parte vencedora no puede deducírselo (particulares)." />
+            <Interruptor checked={incluirIva} onChange={setIncluirIva} label={t("Incluir IVA")} ayuda={t("Si la parte vencedora no puede deducírselo (particulares).")} />
           </div>
 
           <div className="space-y-2 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Tasación</p>
-            <Linea label="Honorarios del abogado solicitados" valor={costas.honorariosPedidos} />
-            {costas.limite !== null && <Linea tenue label="Límite: un tercio de la cuantía" valor={costas.limite} />}
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Tasación")}</p>
+            <Linea label={t("Honorarios del abogado solicitados")} valor={costas.honorariosPedidos} />
+            {costas.limite !== null && <Linea tenue label={t("Límite: un tercio de la cuantía")} valor={costas.limite} />}
             {costas.recortado && (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Los honorarios superan el límite: se reducen en {fmtEur(costas.honorariosPedidos - costas.honorariosReconocidos)}.
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">{t("Los honorarios superan el límite: se reducen en")}{" "}{fmtEur(costas.honorariosPedidos - costas.honorariosReconocidos)}.
               </p>
             )}
-            <Linea label="Honorarios reconocidos" valor={costas.honorariosReconocidos} />
-            {incluirIva && <Linea label={`IVA honorarios ${IVA_PCT} %`} valor={costas.ivaHonorarios} />}
-            <Linea label="Derechos del procurador" valor={costas.derechosProcurador} />
-            {incluirIva && <Linea label={`IVA procurador ${IVA_PCT} %`} valor={costas.ivaProcurador} />}
-            {costas.suplidos > 0 && <Linea label="Suplidos" valor={costas.suplidos} />}
-            <Linea label="Total costas" valor={costas.total} fuerte />
-            <p className="pt-2 text-[11px] leading-relaxed text-slate-400">
-              El límite se calcula sobre los honorarios sin IVA y no alcanza a los derechos del procurador (sujetos a arancel) ni a los suplidos.
-              Es una estimación: el criterio final es del Letrado de la Administración de Justicia.
-            </p>
+            <Linea label={t("Honorarios reconocidos")} valor={costas.honorariosReconocidos} />
+            {incluirIva && <Linea label={t("IVA honorarios {IVA_PCT} %", { IVA_PCT: IVA_PCT })} valor={costas.ivaHonorarios} />}
+            <Linea label={t("Derechos del procurador")} valor={costas.derechosProcurador} />
+            {incluirIva && <Linea label={t("IVA procurador {IVA_PCT} %", { IVA_PCT: IVA_PCT })} valor={costas.ivaProcurador} />}
+            {costas.suplidos > 0 && <Linea label={t("Suplidos")} valor={costas.suplidos} />}
+            <Linea label={t("Total costas")} valor={costas.total} fuerte />
+            <p className="pt-2 text-[11px] leading-relaxed text-slate-400">{t("El límite se calcula sobre los honorarios sin IVA y no alcanza a los derechos del procurador (sujetos a arancel) ni a los suplidos. Es una estimación: el criterio final es del Letrado de la Administración de Justicia.")}</p>
             <button type="button" onClick={() => void copiar([
               `Honorarios reconocidos: ${fmtEur(costas.honorariosReconocidos)}`,
               ...(incluirIva ? [`IVA honorarios: ${fmtEur(costas.ivaHonorarios)}`] : []),
@@ -300,7 +296,7 @@ function CalculadoraRapida() {
               ...(incluirIva ? [`IVA procurador: ${fmtEur(costas.ivaProcurador)}`] : []),
               ...(costas.suplidos ? [`Suplidos: ${fmtEur(costas.suplidos)}`] : []),
               `TOTAL COSTAS: ${fmtEur(costas.total)}`,
-            ].join("\n"))} className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} /> Copiar</button>
+            ].join("\n"))} className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} />{" "}{t("Copiar")}</button>
           </div>
         </div>
       )}
@@ -312,48 +308,48 @@ function CalculadoraRapida() {
               {(["abogado", "procurador"] as const).map((p) => (
                 <button key={p} type="button" onClick={() => setProfesional(p)}
                   className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${profesional === p ? "bg-slate-900 text-white" : "text-slate-500"}`}>
-                  {p === "abogado" ? "Abogado (art. 35 LEC)" : "Procurador (art. 34 LEC)"}
+                  {p === "abogado" ? t("Abogado (art. 35 LEC)") : t("Procurador (art. 34 LEC)")}
                 </button>
               ))}
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo label={profesional === "abogado" ? "Honorarios devengados" : "Derechos devengados"} ayuda="Sin IVA"><Importe value={juraBase} onChange={setJuraBase} /></Campo>
-              <Campo label="Suplidos"><Importe value={juraSuplidos} onChange={setJuraSuplidos} /></Campo>
-              <Campo label="Provisiones / pagos a cuenta"><Importe value={juraProvisiones} onChange={setJuraProvisiones} /></Campo>
+              <Campo label={profesional === "abogado" ? t("Honorarios devengados") : t("Derechos devengados")} ayuda={t("Sin IVA")}><Importe value={juraBase} onChange={setJuraBase} /></Campo>
+              <Campo label={t("Suplidos")}><Importe value={juraSuplidos} onChange={setJuraSuplidos} /></Campo>
+              <Campo label={t("Provisiones / pagos a cuenta")}><Importe value={juraProvisiones} onChange={setJuraProvisiones} /></Campo>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Interruptor checked={juraIva} onChange={setJuraIva} label={`IVA ${IVA_PCT} %`} />
-              <Interruptor checked={juraIrpf} onChange={setJuraIrpf} label={`Retención IRPF ${IRPF_PCT} %`} ayuda="Cliente empresa o profesional" />
+              <Interruptor checked={juraIva} onChange={setJuraIva} label={t("IVA {IVA_PCT} %", { IVA_PCT: IVA_PCT })} />
+              <Interruptor checked={juraIrpf} onChange={setJuraIrpf} label={t("Retención IRPF {IRPF_PCT} %", { IRPF_PCT: IRPF_PCT })} ayuda={t("Cliente empresa o profesional")} />
             </div>
-            <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Datos para el escrito</p>
+            <p className="pt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Datos para el escrito")}</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Campo label={profesional === "abogado" ? "Abogado/a" : "Procurador/a"}><input value={nombreProfesional} onChange={(e) => setNombreProfesional(e.target.value)} className={campo} /></Campo>
-              <Campo label="Cliente deudor"><input value={deudor} onChange={(e) => setDeudor(e.target.value)} className={campo} /></Campo>
-              <Campo label="Juzgado"><input value={juzgado} onChange={(e) => setJuzgado(e.target.value)} placeholder="Juzgado de Primera Instancia nº…" className={campo} /></Campo>
-              <Campo label="Procedimiento"><input value={procedimiento} onChange={(e) => setProcedimiento(e.target.value)} placeholder="Juicio ordinario 123/2026" className={campo} /></Campo>
+              <Campo label={profesional === "abogado" ? t("Abogado/a") : t("Procurador/a")}><input value={nombreProfesional} onChange={(e) => setNombreProfesional(e.target.value)} className={campo} /></Campo>
+              <Campo label={t("Cliente deudor")}><input value={deudor} onChange={(e) => setDeudor(e.target.value)} className={campo} /></Campo>
+              <Campo label={t("Juzgado")}><input value={juzgado} onChange={(e) => setJuzgado(e.target.value)} placeholder={t("Juzgado de Primera Instancia nº…")} className={campo} /></Campo>
+              <Campo label={t("Procedimiento")}><input value={procedimiento} onChange={(e) => setProcedimiento(e.target.value)} placeholder={t("Juicio ordinario 123/2026")} className={campo} /></Campo>
             </div>
           </div>
 
           <div className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <div>
-              <p className="pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Cuenta</p>
-              <Linea label={profesional === "abogado" ? "Honorarios" : "Derechos"} valor={juraMinuta.base} />
-              {juraIva && <Linea label={`IVA ${IVA_PCT} %`} valor={juraMinuta.iva} />}
-              {juraIrpf && <Linea label={`Retención IRPF ${IRPF_PCT} %`} valor={juraMinuta.irpf} negativo />}
-              {juraMinuta.suplidos > 0 && <Linea label="Suplidos" valor={juraMinuta.suplidos} />}
-              {juraMinuta.provisiones > 0 && <Linea label="Provisiones recibidas" valor={juraMinuta.provisiones} negativo />}
-              <Linea label="Importe a reclamar" valor={juraMinuta.pendiente} fuerte />
+              <p className="pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Cuenta")}</p>
+              <Linea label={profesional === "abogado" ? t("Honorarios") : t("Derechos")} valor={juraMinuta.base} />
+              {juraIva && <Linea label={t("IVA {IVA_PCT} %", { IVA_PCT: IVA_PCT })} valor={juraMinuta.iva} />}
+              {juraIrpf && <Linea label={t("Retención IRPF {IRPF_PCT} %", { IRPF_PCT: IRPF_PCT })} valor={juraMinuta.irpf} negativo />}
+              {juraMinuta.suplidos > 0 && <Linea label={t("Suplidos")} valor={juraMinuta.suplidos} />}
+              {juraMinuta.provisiones > 0 && <Linea label={t("Provisiones recibidas")} valor={juraMinuta.provisiones} negativo />}
+              <Linea label={t("Importe a reclamar")} valor={juraMinuta.pendiente} fuerte />
             </div>
             <div>
               <div className="flex items-center justify-between pb-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Borrador del escrito</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Borrador del escrito")}</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => void copiar(escrito)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} /> Copiar</button>
-                  <button type="button" onClick={() => imprimirTexto("Jura de cuentas", escrito)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Printer size={13} /> Imprimir</button>
+                  <button type="button" onClick={() => void copiar(escrito)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Copy size={13} />{" "}{t("Copiar")}</button>
+                  <button type="button" onClick={() => imprimirTexto("Jura de cuentas", escrito)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><Printer size={13} />{" "}{t("Imprimir")}</button>
                 </div>
               </div>
               <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 font-serif text-[13px] leading-relaxed text-slate-800">{escrito}</pre>
-              <p className="pt-2 text-[11px] text-slate-400">Revisa y completa los datos entre corchetes antes de presentarlo. Acompaña la cuenta detallada y justificada.</p>
+              <p className="pt-2 text-[11px] text-slate-400">{t("Revisa y completa los datos entre corchetes antes de presentarlo. Acompaña la cuenta detallada y justificada.")}</p>
             </div>
           </div>
         </div>
@@ -369,7 +365,7 @@ function CalculadoraRapida() {
 
 function imprimirTexto(titulo: string, texto: string) {
   const w = window.open("", "_blank", "width=820,height=900");
-  if (!w) { aviso.error("El navegador ha bloqueado la ventana. Permite las ventanas emergentes para Vantia."); return; }
+  if (!w) { aviso.error(t("El navegador ha bloqueado la ventana. Permite las ventanas emergentes para Vantia.")); return; }
   const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
   w.document.open();
   w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(titulo)}</title>
@@ -396,30 +392,27 @@ function EditorEscala({ inicial, onClose, onGuardada }: { inicial: Escala; onClo
         tramos: filas.map((f, i) => ({ hasta: i === filas.length - 1 ? null : num(f.hasta), pct: num(f.pct) })),
       };
       const r = await apiFetch("/api/organizacion/escala-honorarios", { getToken, method: "PUT", body: JSON.stringify(body) });
-      if (!r?.success) throw new Error(r?.error || "No se pudo guardar.");
-      aviso.ok("Escala guardada para todo el despacho");
+      if (!r?.success) throw new Error(r?.error || t("No se pudo guardar."));
+      aviso.ok(t("Escala guardada para todo el despacho"));
       onGuardada(r.data.escala);
     } catch (e: any) {
-      setError(e?.message || "No se pudo guardar.");
+      setError(e?.message || t("No se pudo guardar."));
     } finally {
       setGuardando(false);
     }
   };
 
   return (
-    <Modal open onClose={onClose} title="Escala de honorarios" subtitle="Calculadora" maxWidth="max-w-xl"
+    <Modal open onClose={onClose} title={t("Escala de honorarios")} subtitle={t("Calculadora")} maxWidth="max-w-xl"
       footer={<>
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-        <button type="button" onClick={() => void guardar()} disabled={guardando} className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">{guardando ? "Guardando…" : "Guardar"}</button>
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
+        <button type="button" onClick={() => void guardar()} disabled={guardando} className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">{guardando ? t("Guardando…") : t("Guardar")}</button>
       </>}>
       <div className="space-y-4">
-        <p className="text-xs text-slate-500">
-          Tramos acumulativos sobre la cuantía, como en los criterios orientativos de los Colegios: cada parte de la cuantía se multiplica por el porcentaje de su tramo y se suman.
-          El último tramo es «en adelante». La escala la comparte todo el despacho.
-        </p>
+        <p className="text-xs text-slate-500">{t("Tramos acumulativos sobre la cuantía, como en los criterios orientativos de los Colegios: cada parte de la cuantía se multiplica por el porcentaje de su tramo y se suman. El último tramo es «en adelante». La escala la comparte todo el despacho.")}</p>
         <div className="grid grid-cols-2 gap-3">
-          <Campo label="Nombre"><input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Criterios ICA… 2026" className={campo} /></Campo>
-          <Campo label="Honorarios mínimos"><Importe value={minimo} onChange={setMinimo} /></Campo>
+          <Campo label={t("Nombre")}><input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t("Criterios ICA… 2026")} className={campo} /></Campo>
+          <Campo label={t("Honorarios mínimos")}><Importe value={minimo} onChange={setMinimo} /></Campo>
         </div>
         <div className="space-y-2">
           {filas.map((f, i) => {
@@ -427,21 +420,21 @@ function EditorEscala({ inicial, onClose, onGuardada }: { inicial: Escala; onClo
             const desde = i === 0 ? 0 : num(filas[i - 1].hasta);
             return (
               <div key={i} className="flex items-center gap-2">
-                <span className="w-24 shrink-0 text-right text-xs text-slate-400">desde {fmtEur(desde)}</span>
+                <span className="w-24 shrink-0 text-right text-xs text-slate-400">{t("desde")}{" "}{fmtEur(desde)}</span>
                 {ultimo
-                  ? <span className="flex-1 rounded-xl border border-dashed border-slate-200 px-3 py-2.5 text-sm text-slate-400">en adelante</span>
-                  : <div className="flex-1"><Importe value={f.hasta} onChange={(v) => cambiar(i, "hasta", v)} placeholder="hasta" /></div>}
+                  ? <span className="flex-1 rounded-xl border border-dashed border-slate-200 px-3 py-2.5 text-sm text-slate-400">{t("en adelante")}</span>
+                  : <div className="flex-1"><Importe value={f.hasta} onChange={(v) => cambiar(i, "hasta", v)} placeholder={t("hasta")} /></div>}
                 <div className="relative w-24 shrink-0">
                   <input inputMode="decimal" value={f.pct} onChange={(e) => cambiar(i, "pct", e.target.value)} className={`${campo} pr-7`} />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
                 </div>
-                <button type="button" title="Quitar tramo" disabled={filas.length <= 1} onClick={() => setFilas((x) => x.filter((_, j) => j !== i))}
+                <button type="button" title={t("Quitar tramo")} disabled={filas.length <= 1} onClick={() => setFilas((x) => x.filter((_, j) => j !== i))}
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"><Trash2 size={14} /></button>
               </div>
             );
           })}
           <button type="button" onClick={() => setFilas((x) => [...x.slice(0, -1), { hasta: "", pct: "" }, x[x.length - 1]])}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus size={13} /> Añadir tramo</button>
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Plus size={13} />{" "}{t("Añadir tramo")}</button>
         </div>
         {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
       </div>
@@ -480,7 +473,7 @@ async function cargarVinculo(getToken: Parameters<typeof apiFetch>[1]["getToken"
   if (expId) {
     const r = await g(`/api/expedientes/${encodeURIComponent(expId)}`);
     expediente = r?.data || null;
-    if (!expediente) throw new Error("No se encontró el expediente o no tienes acceso.");
+    if (!expediente) throw new Error(t("No se encontró el expediente o no tienes acceso."));
   }
   const idCliente = cliId || expediente?.cliente_id || "";
   const [rc, rl] = await Promise.all([
@@ -488,7 +481,7 @@ async function cargarVinculo(getToken: Parameters<typeof apiFetch>[1]["getToken"
     cliId ? g(`/api/expedientes?limit=100&clienteId=${encodeURIComponent(cliId)}`) : null,
   ]);
   const cliente: ClienteCostas | null = rc?.data || null;
-  if (cliId && !cliente) throw new Error("No se encontró el cliente o no tienes acceso.");
+  if (cliId && !cliente) throw new Error(t("No se encontró el cliente o no tienes acceso."));
   delCliente = rl?.data || [];
   // Nº de colegiado y Colegio de nuestro procurador, si está en el Directorio.
   let procurador: ProcuradorCostas | null = null;
@@ -520,15 +513,14 @@ function BarraVinculo({ vinculo, cargando, docs, onElegirExpediente, onLeerDoc, 
     <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-amber-200 bg-amber-50/70 px-4 py-1.5 text-xs text-slate-700">
       <Link2 size={13} className="text-amber-700" />
       {e ? (
-        <Link to={`/dashboard/expedientes/${e.id}`} className="font-semibold text-slate-900 hover:underline">
-          Expediente {refExpediente(e)}{e.descripcion ? ` · ${e.descripcion.slice(0, 60)}` : ""}
+        <Link to={`/dashboard/expedientes/${e.id}`} className="font-semibold text-slate-900 hover:underline">{t("Expediente")}{" "}{refExpediente(e)}{e.descripcion ? ` · ${e.descripcion.slice(0, 60)}` : ""}
         </Link>
-      ) : <span className="font-semibold text-slate-900">Sin expediente</span>}
+      ) : <span className="font-semibold text-slate-900">{t("Sin expediente")}</span>}
       {c && <Link to={`/dashboard/clientes/${c.id}`} className="text-slate-500 hover:underline">{nombreCliente(c)}</Link>}
       {delCliente.length > 0 && (
         <select value={e?.id || ""} onChange={(ev) => onElegirExpediente(ev.target.value)}
           className="max-w-[16rem] rounded-lg border border-amber-200 bg-white px-2 py-1 text-xs">
-          <option value="">{e ? "Solo datos del cliente" : `Elegir expediente (${delCliente.length})`}</option>
+          <option value="">{e ? t("Solo datos del cliente") : t("Elegir expediente ({length})", { length: delCliente.length })}</option>
           {delCliente.map((x) => <option key={x.id} value={x.id}>{refExpediente(x)}{x.descripcion ? ` · ${x.descripcion.slice(0, 40)}` : ""}</option>)}
         </select>
       )}
@@ -537,12 +529,11 @@ function BarraVinculo({ vinculo, cargando, docs, onElegirExpediente, onLeerDoc, 
           <div className="relative">
             <button type="button" onClick={() => setVerDocs((v) => !v)} disabled={docs === null}
               className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50">
-              <FileText size={13} /> Leer resolución del expediente
-            </button>
+              <FileText size={13} />{" "}{t("Leer resolución del expediente")}</button>
             {verDocs && (
               <div className="absolute right-0 top-full z-20 mt-1 max-h-72 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                 {leibles.length === 0 ? (
-                  <p className="px-3 py-2 text-slate-500">El expediente no tiene PDF ni imágenes. Súbelo en la calculadora o en Documentos del expediente.</p>
+                  <p className="px-3 py-2 text-slate-500">{t("El expediente no tiene PDF ni imágenes. Súbelo en la calculadora o en Documentos del expediente.")}</p>
                 ) : leibles.map((d) => (
                   <button key={d.id} type="button" onClick={() => { setVerDocs(false); onLeerDoc(d); }}
                     className="block w-full truncate rounded-lg px-3 py-2 text-left hover:bg-slate-50">
@@ -554,9 +545,9 @@ function BarraVinculo({ vinculo, cargando, docs, onElegirExpediente, onLeerDoc, 
             )}
           </div>
         )}
-        <button type="button" onClick={onRecargar} title="Volver a cargar los datos del expediente (borra lo que hayas cambiado)"
+        <button type="button" onClick={onRecargar} title={t("Volver a cargar los datos del expediente (borra lo que hayas cambiado)")}
           className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100"><RotateCcw size={13} /></button>
-        <button type="button" onClick={onQuitar} title="Desvincular" className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100"><X size={13} /></button>
+        <button type="button" onClick={onQuitar} title={t("Desvincular")} className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100"><X size={13} /></button>
       </div>
     </div>
   );
@@ -574,11 +565,11 @@ function BuscarExpediente({ onElegir, onClose }: { onElegir: (id: string) => voi
     return () => clearTimeout(t);
   }, [q, getToken]);
   return (
-    <Modal open onClose={onClose} title="Cargar datos de un expediente" subtitle="Juzgado, autos, partes, procurador y cuantía pasan a la calculadora" maxWidth="max-w-lg">
-      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por número, cliente, contrario, autos…" className={campo} />
+    <Modal open onClose={onClose} title={t("Cargar datos de un expediente")} subtitle={t("Juzgado, autos, partes, procurador y cuantía pasan a la calculadora")} maxWidth="max-w-lg">
+      <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar por número, cliente, contrario, autos…")} className={campo} />
       <div className="mt-3 max-h-80 space-y-1 overflow-y-auto">
-        {lista === null ? <p className="px-1 py-2 text-sm text-slate-400">Buscando…</p>
-          : lista.length === 0 ? <p className="px-1 py-2 text-sm text-slate-500">Sin resultados.</p>
+        {lista === null ? <p className="px-1 py-2 text-sm text-slate-400">{t("Buscando…")}</p>
+          : lista.length === 0 ? <p className="px-1 py-2 text-sm text-slate-500">{t("Sin resultados.")}</p>
           : lista.map((x) => (
             <button key={x.id} type="button" onClick={() => onElegir(x.id)} className="block w-full rounded-xl px-3 py-2 text-left hover:bg-slate-50">
               <span className="font-mono text-xs text-slate-500">{refExpediente(x)}</span>{" "}
@@ -618,7 +609,7 @@ export default function Calculadora() {
     window.__vantiaIA = async (prompt, imagenes) => {
       const r = await apiFetch("/api/ia/json", { getToken, method: "POST", body: JSON.stringify({ prompt, imagenes }) });
       if (!r?.success) {
-        const e: any = new Error(r?.error || "La IA no respondió.");
+        const e: any = new Error(r?.error || t("La IA no respondió."));
         e.code = r?.motivo === "sin_clave" ? "capability_disabled" : "error";
         throw e;
       }
@@ -646,7 +637,7 @@ export default function Calculadora() {
     const w = iframeRef.current?.contentWindow as any;
     if (w?.__vantiaCargarExpediente && w.document?.readyState !== "loading") {
       window.__vantiaExpedientePendiente = null;
-      try { w.__vantiaCargarExpediente(d); } catch { aviso.error("La calculadora no pudo recibir los datos del expediente."); }
+      try { w.__vantiaCargarExpediente(d); } catch { aviso.error(t("La calculadora no pudo recibir los datos del expediente.")); }
     } else window.__vantiaExpedientePendiente = d; // la calculadora lo recoge al cargar
   };
 
@@ -676,7 +667,7 @@ export default function Calculadora() {
           if (vivo) setDocs(r?.data || []);
         } else setDocs(null);
       } catch (e: any) {
-        if (vivo) { aviso.error(e?.message || "No se pudieron cargar los datos."); setVinculo(null); }
+        if (vivo) { aviso.error(e?.message || t("No se pudieron cargar los datos.")); setVinculo(null); }
       } finally {
         if (vivo) setCargandoVinculo(false);
       }
@@ -694,7 +685,7 @@ export default function Calculadora() {
       const blob = await res.blob();
       const archivo = new File([blob], d.original_name, { type: d.mimetype || blob.type });
       (iframeRef.current?.contentWindow as any)?.__vantiaUsarResolucion?.(archivo, true);
-    } catch { aviso.error("No se pudo abrir el documento del expediente."); }
+    } catch { aviso.error(t("No se pudo abrir el documento del expediente.")); }
   };
 
   // Word descargado desde la calculadora → ofrecer guardarlo en el expediente.
@@ -702,10 +693,10 @@ export default function Calculadora() {
   useEffect(() => {
     if (!expVinculado) { delete window.__vantiaDocGenerado; return; }
     window.__vantiaDocGenerado = (blob, nombre) => {
-      aviso.info("Documento descargado", {
+      aviso.info(t("Documento descargado"), {
         duracion: 12000,
         accion: {
-          label: `Guardar en el exp. ${refExpediente(expVinculado)}`,
+          label: t("Guardar en el exp. {ref}", { ref: refExpediente(expVinculado) }),
           onClick: async () => {
             try {
               const token = await getToken({ skipCache: true });
@@ -719,8 +710,8 @@ export default function Calculadora() {
                 method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ document_name: nombre.replace(/\.[^/.]+$/, ""), attachment_type: "Sin clasificar" }),
               }).catch(() => {});
-              aviso.ok(`Guardado en Documentos del expediente ${refExpediente(expVinculado)}`);
-            } catch { aviso.error("No se pudo guardar en el expediente."); }
+              aviso.ok(t("Guardado en Documentos del expediente {v}", { v: refExpediente(expVinculado) }));
+            } catch { aviso.error(t("No se pudo guardar en el expediente.")); }
           },
         },
       });
@@ -733,7 +724,7 @@ export default function Calculadora() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
         <Calculator size={16} className="text-red-700" />
-        <span className="mr-2 text-sm font-semibold text-slate-800">Calculadora</span>
+        <span className="mr-2 text-sm font-semibold text-slate-800">{t("Calculadora")}</span>
         <div className="flex rounded-xl border border-slate-200 p-0.5">
           {([["completa", "Tasación de costas y jura de cuentas"], ["rapida", "Calculadora rápida"]] as const).map(([v, t]) => (
             <button key={v} type="button" onClick={() => cambiar(v)}
@@ -743,16 +734,15 @@ export default function Calculadora() {
         {vista === "completa" && !vinculo && !cargandoVinculo && (
           <button type="button" onClick={() => setBuscando(true)}
             className="ml-2 hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 sm:inline-flex">
-            <FolderSearch size={13} /> Cargar expediente
-          </button>
+            <FolderSearch size={13} />{" "}{t("Cargar expediente")}</button>
         )}
         {vista === "completa" && (
-          <button type="button" onClick={() => setEditandoLetrado(true)} title="Datos que salen en las notas y escritos"
+          <button type="button" onClick={() => setEditandoLetrado(true)} title={t("Datos que salen en las notas y escritos")}
             className="ml-auto inline-flex min-w-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-50">
             <Gavel size={13} className="shrink-0" />
             <span className="truncate">
-              {letrado.nombre || "Sin nombre"}{letrado.colegiado ? ` · nº ${letrado.colegiado}` : ""}
-              {!letrado.colegiado && <span className="ml-1 font-semibold text-amber-700">· añade tu nº de colegiado</span>}
+              {letrado.nombre || t("Sin nombre")}{letrado.colegiado ? ` · nº ${letrado.colegiado}` : ""}
+              {!letrado.colegiado && <span className="ml-1 font-semibold text-amber-700">{t("· añade tu nº de colegiado")}</span>}
             </span>
           </button>
         )}
@@ -767,12 +757,12 @@ export default function Calculadora() {
       {buscando && <BuscarExpediente onClose={() => setBuscando(false)} onElegir={(id) => { setBuscando(false); setParams({ expediente: id }); }} />}
       {editandoLetrado && (
         <DatosLetrado inicial={letrado} onClose={() => setEditandoLetrado(false)}
-          onGuardar={async (d) => { await guardar({ letradoNombre: d.nombre, colegiado: d.colegiado, colegio: d.colegio }); setEditandoLetrado(false); aviso.ok("Datos de letrado guardados"); }} />
+          onGuardar={async (d) => { await guardar({ letradoNombre: d.nombre, colegiado: d.colegiado, colegio: d.colegio }); setEditandoLetrado(false); aviso.ok(t("Datos de letrado guardados")); }} />
       )}
       {vista === "completa" ? (
         <div className="relative min-h-0 flex-1 bg-white">
           {!cargada && <div className="absolute inset-0 animate-pulse bg-slate-50" />}
-          <iframe ref={iframeRef} title="Calculadora de tasación de costas y jura de cuentas" src="/herramientas/costas.html"
+          <iframe ref={iframeRef} title={t("Calculadora de tasación de costas y jura de cuentas")} src="/herramientas/costas.html"
             onLoad={() => {
               setCargada(true);
               try {
@@ -800,19 +790,19 @@ function DatosLetrado({ inicial, onClose, onGuardar }: {
   const [d, setD] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
   return (
-    <Modal open onClose={onClose} title="Datos de letrado" subtitle="Salen en tus notas de honorarios y escritos" maxWidth="max-w-lg"
+    <Modal open onClose={onClose} title={t("Datos de letrado")} subtitle={t("Salen en tus notas de honorarios y escritos")} maxWidth="max-w-lg"
       footer={<>
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
         <button type="button" disabled={guardando || !d.nombre.trim()} onClick={async () => { setGuardando(true); try { await onGuardar(d); } finally { setGuardando(false); } }}
-          className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">{guardando ? "Guardando…" : "Guardar"}</button>
+          className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">{guardando ? t("Guardando…") : t("Guardar")}</button>
       </>}>
       <div className="space-y-4">
-        <Campo label="Nombre completo"><input value={d.nombre} onChange={(e) => setD({ ...d, nombre: e.target.value })} className={campo} /></Campo>
+        <Campo label={t("Nombre completo")}><input value={d.nombre} onChange={(e) => setD({ ...d, nombre: e.target.value })} className={campo} /></Campo>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.6fr_1.4fr]">
-          <Campo label="Nº de colegiado"><input value={d.colegiado} onChange={(e) => setD({ ...d, colegiado: e.target.value })} placeholder="1.234" className={campo} /></Campo>
-          <Campo label="Colegio"><input value={d.colegio} onChange={(e) => setD({ ...d, colegio: e.target.value })} placeholder="Ilustre Colegio de Abogados de …" className={campo} /></Campo>
+          <Campo label={t("Nº de colegiado")}><input value={d.colegiado} onChange={(e) => setD({ ...d, colegiado: e.target.value })} placeholder="1.234" className={campo} /></Campo>
+          <Campo label={t("Colegio")}><input value={d.colegio} onChange={(e) => setD({ ...d, colegio: e.target.value })} placeholder={t("Ilustre Colegio de Abogados de …")} className={campo} /></Campo>
         </div>
-        <p className="text-xs text-slate-500">Son tuyos: cada usuario tiene los suyos y no los ve nadie más del despacho salvo en los documentos que generes.</p>
+        <p className="text-xs text-slate-500">{t("Son tuyos: cada usuario tiene los suyos y no los ve nadie más del despacho salvo en los documentos que generes.")}</p>
       </div>
     </Modal>
   );

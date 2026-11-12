@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, Search, PencilLine, RefreshCw } from 'lucide-react';
 import { safeJson } from '../lib/api';
+import { t } from '../lib/i18n';
 
 interface VantiaHistoryEntry {
   id: string;
@@ -52,9 +53,9 @@ export function VantiaHistoryModal({ getToken, onClose }: {
       const res = await fetch('/api/vantia/history?limit=100', { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok && data?.success) setEntries(data.data);
-      else setError(data?.error || 'No se pudo cargar el historial.');
+      else setError(data?.error || t("No se pudo cargar el historial."));
     } catch (e: any) {
-      setError(e.message || 'No se pudo cargar el historial.');
+      setError(e.message || t("No se pudo cargar el historial."));
     } finally {
       setLoading(false);
     }
@@ -70,11 +71,11 @@ export function VantiaHistoryModal({ getToken, onClose }: {
       >
         <div className="shrink-0 flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Historial de Vantia</h3>
-            <p className="text-xs text-slate-400">Todo lo que la IA ha consultado o propuesto en este despacho.</p>
+            <h3 className="text-sm font-bold text-slate-900">{t("Historial de Vantia")}</h3>
+            <p className="text-xs text-slate-400">{t("Todo lo que la IA ha consultado o propuesto en este despacho.")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => void load()} title="Actualizar" className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">
+            <button onClick={() => void load()} title={t("Actualizar")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">
               <RefreshCw size={15} />
             </button>
             <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50">
@@ -88,7 +89,7 @@ export function VantiaHistoryModal({ getToken, onClose }: {
           ) : error ? (
             <p className="px-5 py-8 text-center text-xs text-rose-600">{error}</p>
           ) : entries.length === 0 ? (
-            <p className="px-5 py-8 text-center text-xs text-slate-400">Todavía no hay nada registrado.</p>
+            <p className="px-5 py-8 text-center text-xs text-slate-400">{t("Todavía no hay nada registrado.")}</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {entries.map(e => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t } from '../lib/i18n';
 
 // Página de aterrizaje del popup de OAuth de Dropbox (ver lib/dropboxConnect.ts).
 // No hace ninguna llamada a la API ni necesita sesión propia: solo lee el
@@ -25,7 +26,7 @@ export default function DropboxOAuthCallback() {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif", color: "#475569", textAlign: "center", padding: 24 }}>
-      <p>{canAutoClose ? "Conectando con Dropbox…" : "Ya puedes cerrar esta ventana."}</p>
+      <p>{canAutoClose ? t("Conectando con Dropbox…") : t("Ya puedes cerrar esta ventana.")}</p>
     </div>
   );
 }

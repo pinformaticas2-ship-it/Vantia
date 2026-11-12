@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Plus } from 'lucide-react';
 import { safeJson } from '../lib/api';
+import { t } from '../lib/i18n';
 
 interface EtapaSelectProps {
   value: string;
@@ -143,7 +144,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
     <>
       <button ref={triggerRef} type="button" onClick={toggleOpen} className={triggerCls}>
         <span className={value ? 'text-slate-800 font-medium truncate pr-2' : 'text-slate-400'}>
-          {value || 'Sin etapa'}
+          {value || t("Sin etapa")}
         </span>
         <ChevronDown
           size={13}
@@ -163,7 +164,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
               autoFocus
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar etapa…"
+              placeholder={t("Buscar etapa…")}
               className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-red-400"
             />
           </div>
@@ -174,9 +175,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
             <button type="button" onClick={() => select('')}
               className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors ${
                 !value ? 'font-bold text-red-600' : 'text-slate-400 italic'
-              }`}>
-              — Sin etapa —
-            </button>
+              }`}>{t("— Sin etapa —")}</button>
 
             {filtered.map(etapa => (
               <button key={etapa} type="button" onClick={() => select(etapa)}
@@ -188,7 +187,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
             ))}
 
             {filtered.length === 0 && !adding && (
-              <p className="px-3 py-3 text-xs text-slate-400 text-center italic">Sin resultados</p>
+              <p className="px-3 py-3 text-xs text-slate-400 text-center italic">{t("Sin resultados")}</p>
             )}
           </div>
 
@@ -204,7 +203,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
                     if (e.key === 'Enter')  { e.preventDefault(); handleAdd(); }
                     if (e.key === 'Escape') { setAdding(false); setNewEtapa(''); }
                   }}
-                  placeholder="Nombre de la nueva etapa…"
+                  placeholder={t("Nombre de la nueva etapa…")}
                   className="flex-1 text-xs border border-red-300 rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-500 min-w-0"
                 />
                 <button
@@ -213,7 +212,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
                   disabled={saving || !newEtapa.trim()}
                   className="px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 transition-colors shrink-0"
                 >
-                  {saving ? '…' : 'OK'}
+                  {saving ? '…' : t("OK")}
                 </button>
                 <button
                   type="button"
@@ -229,8 +228,7 @@ export function EtapaSelect({ value, onChange, getToken, size = 'md' }: EtapaSel
                 onClick={() => setAdding(true)}
                 className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
-                <Plus size={12} /> Añadir nueva etapa
-              </button>
+                <Plus size={12} />{" "}{t("Añadir nueva etapa")}</button>
             )}
           </div>
         </div>,

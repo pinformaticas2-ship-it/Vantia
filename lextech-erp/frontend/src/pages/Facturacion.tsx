@@ -40,6 +40,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { confirmar } from "../lib/avisos";
 import { ReciboAcciones, ReciboBadge, type ReciboEstado } from "../components/ReciboProcurador";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import { t } from '../lib/i18n';
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "analitica" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
@@ -493,7 +494,7 @@ function ClientRecordLink({ clientId, label }: { clientId?: string; label: strin
     <Link
       to={`/dashboard/clientes/${clientId}`}
       className="inline-flex items-center gap-1 font-medium text-red-700 transition-colors hover:text-red-800 hover:underline"
-      title="Abrir ficha del cliente"
+      title={t("Abrir ficha del cliente")}
     >
       <span>{label}</span>
       <ExternalLink size={12} />
@@ -672,9 +673,9 @@ class BillingErrorBoundary extends React.Component<{ children: React.ReactNode }
     if (this.state.hasError) {
       return (
         <div className="peligro min-h-[60vh] rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900">
-          <h2 className="text-lg font-bold">La pantalla de facturación encontró un error</h2>
+          <h2 className="text-lg font-bold">{t("La pantalla de facturación encontró un error")}</h2>
           <p className="mt-2 text-sm">{this.state.message}</p>
-          <p className="mt-2 text-sm">Recarga la página. Si vuelve a pasar, dime el texto exacto que aparece aquí.</p>
+          <p className="mt-2 text-sm">{t("Recarga la página. Si vuelve a pasar, dime el texto exacto que aparece aquí.")}</p>
         </div>
       );
     }
@@ -917,16 +918,13 @@ function StructuredBillingEditorModal({
       open
       onClose={onClose}
       title={`${title} ${subtitle}`}
-      subtitle="Facturación"
+      subtitle={t("Facturación")}
       maxWidth="max-w-5xl"
       footer={
         <>
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-            Cancelar
-          </button>
+          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
           <button onClick={submit} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
-            <Save size={14} /> Guardar
-          </button>
+            <Save size={14} />{" "}{t("Guardar")}</button>
         </>
       }
     >
@@ -934,22 +932,22 @@ function StructuredBillingEditorModal({
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Número</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Número")}</span>
                 <input value={form.num} onChange={(e) => setField("num", e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
               </label>
               {isGasto ? (
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Proveedor</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Proveedor")}</span>
                   <input value={form.proveedor} onChange={(e) => setField("proveedor", e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
                 </label>
               ) : (
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cliente del despacho</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Cliente del despacho")}</span>
                   <select value={form.clientId} onChange={(e) => setClient(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="">Selecciona un cliente</option>
+                    <option value="">{t("Selecciona un cliente")}</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.id}>
-                        {client.label} · {client.totalExpedientes} expediente{client.totalExpedientes === 1 ? "" : "s"}
+                        {client.label} · {client.totalExpedientes}{" "}{t("expediente")}{client.totalExpedientes === 1 ? "" : "s"}
                       </option>
                     ))}
                   </select>
@@ -959,20 +957,20 @@ function StructuredBillingEditorModal({
 
             {isGasto && (
               <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pago a procurador (opcional)</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Pago a procurador (opcional)")}</p>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <label className="space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Procurador</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Procurador")}</span>
                     <select value={form.procuradorId} onChange={(e) => setProcurador(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                      <option value="">No es un pago a procurador</option>
+                      <option value="">{t("No es un pago a procurador")}</option>
                       {procuradores.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
                     </select>
-                    {!procuradores.length && <span className="block text-xs text-slate-400">Da de alta a tus procuradores en Directorio → Procuradores.</span>}
+                    {!procuradores.length && <span className="block text-xs text-slate-400">{t("Da de alta a tus procuradores en Directorio → Procuradores.")}</span>}
                   </label>
                   <label className="space-y-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Expediente</span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Expediente")}</span>
                     <select value={form.expedienteId} onChange={(e) => setField("expedienteId", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                      <option value="">Sin expediente</option>
+                      <option value="">{t("Sin expediente")}</option>
                       {expedientes.map((expediente) => (
                         <option key={expediente.id} value={expediente.id}>{expediente.label} · {expediente.description || expediente.clientLabel}</option>
                       ))}
@@ -980,14 +978,11 @@ function StructuredBillingEditorModal({
                   </label>
                 </div>
                 <label className="block space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Concepto</span>
-                  <input value={form.concepto} onChange={(e) => setField("concepto", e.target.value)} placeholder="Ej.: provisión de fondos, derechos, suplidos…" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Concepto")}</span>
+                  <input value={form.concepto} onChange={(e) => setField("concepto", e.target.value)} placeholder={t("Ej.: provisión de fondos, derechos, suplidos…")} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
                 </label>
                 {necesitaRecibo && (
-                  <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                    Pago en <strong>efectivo</strong>: al guardarlo quedará <strong>pendiente el recibo</strong> del procurador.
-                    Desde la lista de gastos podrás pedírselo por correo o imprimir uno para que lo firme ahora.
-                  </p>
+                  <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-800">{t("Pago en")}{" "}<strong>{t("efectivo")}</strong>{t(": al guardarlo quedará")}{" "}<strong>{t("pendiente el recibo")}</strong>{" "}{t("del procurador. Desde la lista de gastos podrás pedírselo por correo o imprimir uno para que lo firme ahora.")}</p>
                 )}
               </div>
             )}
@@ -995,9 +990,9 @@ function StructuredBillingEditorModal({
             {!isGasto && (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Expediente asociado</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Expediente asociado")}</span>
                   <select value={form.expedienteId} onChange={(e) => setExpediente(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="">Selecciona un expediente</option>
+                    <option value="">{t("Selecciona un expediente")}</option>
                     {expedientesForClient.map((expediente) => (
                       <option key={expediente.id} value={expediente.id}>
                         {expediente.label} · {expediente.description || expediente.clientLabel}
@@ -1006,13 +1001,13 @@ function StructuredBillingEditorModal({
                   </select>
                 </label>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Relación cliente-expediente</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Relación cliente-expediente")}</p>
                   <div className="mt-2 space-y-1 text-sm text-slate-600">
                     <p>
-                      <span className="font-semibold text-slate-800">Cliente:</span>{" "}
-                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : "Sin seleccionar"}
+                      <span className="font-semibold text-slate-800">{t("Cliente:")}</span>{" "}
+                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : t("Sin seleccionar")}
                     </p>
-                    <p><span className="font-semibold text-slate-800">Expediente:</span> {selectedExpediente?.label || "Sin seleccionar"}</p>
+                    <p><span className="font-semibold text-slate-800">{t("Expediente:")}</span> {selectedExpediente?.label || t("Sin seleccionar")}</p>
                   </div>
                 </div>
               </div>
@@ -1020,17 +1015,17 @@ function StructuredBillingEditorModal({
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Fecha</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Fecha")}</span>
                 <input type="date" value={form.fecha} onChange={(e) => setField("fecha", e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
               </label>
               {isFactura ? (
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Vencimiento</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Vencimiento")}</span>
                   <input type="date" value={form.vencimiento} onChange={(e) => setField("vencimiento", e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
                 </label>
               ) : (
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Total")}</span>
                   <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
                 </label>
               )}
@@ -1041,15 +1036,15 @@ function StructuredBillingEditorModal({
             {isFactura && (
               <>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Total")}</span>
                   <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Serie</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Serie")}</span>
                   <input value={form.serie} onChange={(e) => setField("serie", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Forma de pago")}</span>
                   <select value={form.formaPago} onChange={(e) => setField("formaPago", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
                     {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
@@ -1060,23 +1055,23 @@ function StructuredBillingEditorModal({
             {isGasto && (
               <>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Categoría</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Categoría")}</span>
                   <input value={form.cat} onChange={(e) => setField("cat", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Total")}</span>
                   <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Forma de pago")}</span>
                   <select value={form.formaPago} onChange={(e) => setField("formaPago", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="">Sin indicar</option>
+                    <option value="">{t("Sin indicar")}</option>
                     {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
                 </label>
                 <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
                   <input type="checkbox" checked={form.deducible} onChange={(e) => setField("deducible", e.target.checked)} />
-                  <span className="text-sm text-slate-700">Gasto deducible</span>
+                  <span className="text-sm text-slate-700">{t("Gasto deducible")}</span>
                 </label>
               </>
             )}
@@ -1084,22 +1079,22 @@ function StructuredBillingEditorModal({
             {!isFactura && !isGasto && (
               <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3">
                 <input type="checkbox" checked={form.iguala} onChange={(e) => setField("iguala", e.target.checked)} />
-                <span className="text-sm text-slate-700">Iguala / servicio recurrente</span>
+                <span className="text-sm text-slate-700">{t("Iguala / servicio recurrente")}</span>
               </label>
             )}
 
             <label className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsable</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Responsable")}</span>
               <input value={form.responsable} onChange={(e) => setField("responsable", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" />
             </label>
             <label className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Área jurídica</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Área jurídica")}</span>
               <select value={form.area} onChange={(e) => setField("area", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
                 {Object.entries(AREA_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
             </label>
             <label className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Estado</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Estado")}</span>
               <select value={form.estado} onChange={(e) => setField("estado", e.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
                 {(isFactura
                   ? [["pendiente", "Pendiente"], ["enviada", "Enviada"], ["vencida", "Vencida"], ["cobrada", "Cobrada"]]
@@ -1240,45 +1235,40 @@ function FacturaWorkspacePage({
       <div>
         <div>
           <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800">
-            <ArrowLeft size={15} /> Volver a facturación
-          </button>
+            <ArrowLeft size={15} />{" "}{t("Volver a facturación")}</button>
           <h1 className="mt-4 text-xl font-bold tracking-tight text-slate-900">
-            {initialValues?.id ? "Editar factura de ingreso" : "Nueva factura de ingreso"}
+            {initialValues?.id ? t("Editar factura de ingreso") : t("Nueva factura de ingreso")}
           </h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-500">
-            Crea la factura en una pantalla completa, manteniendo la relación con el cliente del despacho, su expediente y los datos de cobro internos del ERP.
-          </p>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">{t("Crea la factura en una pantalla completa, manteniendo la relación con el cliente del despacho, su expediente y los datos de cobro internos del ERP.")}</p>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-700">
-        La factura se guarda primero en Vantia. Si Quipu está conectado, después podrás enviarla o dejar que el flujo automático haga la sincronización.
-      </div>
+      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-700">{t("La factura se guarda primero en Vantia. Si Quipu está conectado, después podrás enviarla o dejar que el flujo automático haga la sincronización.")}</div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_360px]">
         <div className="space-y-6">
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
             <div className="border-b border-slate-100 px-6 py-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Datos principales</p>
-              <h2 className="mt-2 text-xl font-bold text-slate-900">Cliente, expediente y numeración</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{t("Datos principales")}</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">{t("Cliente, expediente y numeración")}</h2>
             </div>
             <div className="space-y-5 px-6 py-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cliente del despacho</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Cliente del despacho")}</span>
                   <select value={form.clientId} onChange={(e) => setClient(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-                    <option value="">Selecciona un cliente</option>
+                    <option value="">{t("Selecciona un cliente")}</option>
                     {clients.map((client) => (
                       <option key={client.id} value={client.id}>
-                        {client.label} · {client.totalExpedientes} expediente{client.totalExpedientes === 1 ? "" : "s"}
+                        {client.label} · {client.totalExpedientes}{" "}{t("expediente")}{client.totalExpedientes === 1 ? "" : "s"}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Expediente asociado</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Expediente asociado")}</span>
                   <select value={form.expedienteId} onChange={(e) => setExpediente(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-                    <option value="">Selecciona un expediente</option>
+                    <option value="">{t("Selecciona un expediente")}</option>
                     {expedientesForClient.map((expediente) => (
                       <option key={expediente.id} value={expediente.id}>
                         {expediente.label} · {expediente.description || expediente.clientLabel}
@@ -1290,35 +1280,35 @@ function FacturaWorkspacePage({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Serie</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Serie")}</span>
                   <input value={form.serie} onChange={(e) => setField("serie", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Número</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Número")}</span>
                   <input value={form.num} onChange={(e) => setField("num", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Fecha de emisión</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Fecha de emisión")}</span>
                   <input type="date" value={form.fecha} onChange={(e) => setField("fecha", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Vencimiento</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Vencimiento")}</span>
                   <input type="date" value={form.vencimiento} onChange={(e) => setField("vencimiento", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 </label>
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Relación cliente-expediente</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{t("Relación cliente-expediente")}</p>
                 <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <p className="text-xs font-semibold text-slate-500">Cliente</p>
+                    <p className="text-xs font-semibold text-slate-500">{t("Cliente")}</p>
                     <p className="mt-1 text-sm text-slate-700">
-                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : "Sin seleccionar"}
+                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : t("Sin seleccionar")}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-slate-500">Expediente</p>
-                    <p className="mt-1 text-sm text-slate-700">{selectedExpediente?.label || "Sin seleccionar"}</p>
+                    <p className="text-xs font-semibold text-slate-500">{t("Expediente")}</p>
+                    <p className="mt-1 text-sm text-slate-700">{selectedExpediente?.label || t("Sin seleccionar")}</p>
                   </div>
                 </div>
               </div>
@@ -1327,41 +1317,40 @@ function FacturaWorkspacePage({
 
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
             <div className="border-b border-slate-100 px-6 py-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Cobro y organización</p>
-              <h2 className="mt-2 text-xl font-bold text-slate-900">Importe, forma de pago y seguimiento interno</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{t("Cobro y organización")}</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">{t("Importe, forma de pago y seguimiento interno")}</h2>
             </div>
             <div className="grid grid-cols-1 gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Total")}</span>
                 <input type="number" min="0" max="9999999.99" step="0.01" onKeyDown={blockInvalidKeys} value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 {totalLineaCalculado > 0 && (
                   <button
                     type="button"
                     onClick={() => { lastAutoTotalRef.current = totalLineaCalculado.toFixed(2); setField("total", totalLineaCalculado.toFixed(2)); }}
                     className="text-left text-xs font-semibold text-sky-600 transition-colors hover:text-sky-800"
-                  >
-                    Usar total calculado de la línea: {fmtEur(totalLineaCalculado)}
+                  >{t("Usar total calculado de la línea:")}{" "}{fmtEur(totalLineaCalculado)}
                   </button>
                 )}
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Forma de pago")}</span>
                 <select value={form.formaPago} onChange={(e) => setField("formaPago", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                   {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsable</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Responsable")}</span>
                 <input value={form.responsable} onChange={(e) => setField("responsable", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Área jurídica</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Área jurídica")}</span>
                 <select value={form.area} onChange={(e) => setField("area", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                   {Object.entries(AREA_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                 </select>
               </label>
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Estado</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Estado")}</span>
                 <select value={form.estado} onChange={(e) => setField("estado", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                   {[
                     ["pendiente", "Pendiente"],
@@ -1375,23 +1364,23 @@ function FacturaWorkspacePage({
           </section>
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
             <div className="border-b border-slate-100 px-6 py-5">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Contenido de la factura</p>
-              <h2 className="mt-2 text-xl font-bold text-slate-900">Concepto principal y notas visibles</h2>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{t("Contenido de la factura")}</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">{t("Concepto principal y notas visibles")}</h2>
             </div>
             <div className="space-y-5 px-6 py-6">
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Concepto</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Concepto")}</span>
                 <input
                   value={form.concepto}
                   onChange={(e) => setField("concepto", e.target.value)}
-                  placeholder="Ej. Honorarios por asistencia letrada, redacción de escrito o seguimiento de expediente"
+                  placeholder={t("Ej. Honorarios por asistencia letrada, redacción de escrito o seguimiento de expediente")}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 />
               </label>
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
                   <label className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Base unitaria</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Base unitaria")}</span>
                     <input
                       type="number"
                       min="0"
@@ -1404,7 +1393,7 @@ function FacturaWorkspacePage({
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cantidad</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Cantidad")}</span>
                     <input
                       type="number"
                       min="0"
@@ -1417,7 +1406,7 @@ function FacturaWorkspacePage({
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Dto. %</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Dto. %")}</span>
                     <input
                       type="number"
                       min="0"
@@ -1430,7 +1419,7 @@ function FacturaWorkspacePage({
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">IVA %</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("IVA %")}</span>
                     <input
                       type="number"
                       min="0"
@@ -1443,7 +1432,7 @@ function FacturaWorkspacePage({
                     />
                   </label>
                   <label className="space-y-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">IRPF %</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("IRPF %")}</span>
                     <input
                       type="number"
                       min="0"
@@ -1458,30 +1447,30 @@ function FacturaWorkspacePage({
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
                   <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Base</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t("Base")}</p>
                     <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
                   </div>
                   <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IVA</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t("IVA")}</p>
                     <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
                   </div>
                   <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IRPF</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{t("IRPF")}</p>
                     <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                   </div>
                   <div className={`min-w-0 rounded-xl border px-3 py-3 ${totalLineaCalculado > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
-                    <p className={`text-[11px] font-semibold uppercase tracking-wider ${totalLineaCalculado > 0 ? "text-emerald-600" : "text-slate-400"}`}>Total línea</p>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider ${totalLineaCalculado > 0 ? "text-emerald-600" : "text-slate-400"}`}>{t("Total línea")}</p>
                     <p className={`mt-1 truncate text-sm font-bold ${totalLineaCalculado > 0 ? "text-emerald-700" : "text-slate-500"}`}>{fmtEur(totalLineaCalculado)}</p>
                   </div>
                 </div>
               </div>
               <label className="space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Notas")}</span>
                 <textarea
                   value={form.notas}
                   onChange={(e) => setField("notas", e.target.value)}
                   rows={5}
-                  placeholder="Observaciones para el cliente, instrucciones de pago o aclaraciones internas visibles en la factura."
+                  placeholder={t("Observaciones para el cliente, instrucciones de pago o aclaraciones internas visibles en la factura.")}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 />
               </label>
@@ -1492,60 +1481,59 @@ function FacturaWorkspacePage({
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
             <div className="border-b border-slate-100 px-5 py-4">
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Vista rápida</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{t("Vista rápida")}</p>
             </div>
             <div className="space-y-4 px-5 py-5">
               <div className="rounded-2xl bg-slate-900 px-4 py-4 text-white">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-300">Factura</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-300">{t("Factura")}</p>
                 <p className="mt-2 text-2xl font-bold">{displayNumber}</p>
-                <p className="mt-1 text-sm text-slate-300">{selectedClient?.label || "Sin cliente asignado"}</p>
+                <p className="mt-1 text-sm text-slate-300">{selectedClient?.label || t("Sin cliente asignado")}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-400">Total</p>
+                  <p className="text-xs font-semibold text-slate-400">{t("Total")}</p>
                   <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(Number(form.total || 0))}</p>
                 </div>
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-400">Cobro</p>
+                  <p className="text-xs font-semibold text-slate-400">{t("Cobro")}</p>
                   <p className="mt-1 truncate font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago as PaymentMethod]}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-400">Base</p>
+                  <p className="text-xs font-semibold text-slate-400">{t("Base")}</p>
                   <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
                 </div>
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-400">IVA</p>
+                  <p className="text-xs font-semibold text-slate-400">{t("IVA")}</p>
                   <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
                 </div>
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
-                  <p className="text-xs font-semibold text-slate-400">IRPF</p>
+                  <p className="text-xs font-semibold text-slate-400">{t("IRPF")}</p>
                   <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                 </div>
               </div>
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-800">Resumen listo para ERP</p>
+                <p className="font-semibold text-slate-800">{t("Resumen listo para ERP")}</p>
                 <ul className="mt-2 space-y-1">
-                  <li>Cliente: {selectedClient?.label || "Pendiente"}</li>
-                  <li>Expediente: {selectedExpediente?.label || "Pendiente"}</li>
-                  <li>Estado: {form.estado.charAt(0).toUpperCase() + form.estado.slice(1)}</li>
-                  <li>Responsable: {form.responsable || "Pendiente"}</li>
+                  <li>{t("Cliente:")}{" "}{selectedClient?.label || t("Pendiente")}</li>
+                  <li>{t("Expediente:")}{" "}{selectedExpediente?.label || t("Pendiente")}</li>
+                  <li>{t("Estado:")}{" "}{form.estado.charAt(0).toUpperCase() + form.estado.slice(1)}</li>
+                  <li>{t("Responsable:")}{" "}{form.responsable || t("Pendiente")}</li>
                 </ul>
               </div>
               <div className="rounded-2xl border border-slate-200 px-4 py-4 text-sm text-slate-600">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Concepto actual</p>
-                <p className="mt-2 text-sm text-slate-800">{form.concepto.trim() || "Pendiente de definir"}</p>
-                <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Notas</p>
-                <p className="mt-2 whitespace-pre-line text-sm text-slate-800">{form.notas.trim() || "Sin notas adicionales"}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t("Concepto actual")}</p>
+                <p className="mt-2 text-sm text-slate-800">{form.concepto.trim() || t("Pendiente de definir")}</p>
+                <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">{t("Notas")}</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-slate-800">{form.notas.trim() || t("Sin notas adicionales")}</p>
               </div>
             </div>
           </section>
 
           <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
             {!canSubmit && missingFields.length > 0 && (
-              <p className="text-xs text-amber-600">
-                Falta: {missingFields.join(", ")}.
+              <p className="text-xs text-amber-600">{t("Falta:")}{" "}{missingFields.join(", ")}.
               </p>
             )}
             <button
@@ -1554,11 +1542,9 @@ function FacturaWorkspacePage({
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-700 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-              {initialValues?.id ? "Guardar cambios" : "Crear factura"}
+              {initialValues?.id ? t("Guardar cambios") : t("Crear factura")}
             </button>
-            <button onClick={onBack} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50">
-              Cancelar
-            </button>
+            <button onClick={onBack} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50">{t("Cancelar")}</button>
           </div>
         </aside>
       </div>
@@ -1588,43 +1574,38 @@ function QuipuConnectModal({
     <Modal
       open
       onClose={onClose}
-      title="Conectar Quipu"
-      subtitle="Integración"
+      title={t("Conectar Quipu")}
+      subtitle={t("Integración")}
       maxWidth="max-w-2xl"
       footer={
         <>
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-            Cancelar
-          </button>
+          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
           <button
             onClick={() => onSave({ appId: appId.trim(), appSecret: appSecret.trim(), baseUrl: baseUrl.trim(), ownerSlug: ownerSlug.trim() })}
             className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800"
           >
-            <Save size={14} /> Guardar y validar
-          </button>
+            <Save size={14} />{" "}{t("Guardar y validar")}</button>
         </>
       }
     >
       <div className="grid grid-cols-1 gap-4">
         <label className="space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App ID</span>
-          <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("App ID")}</span>
+          <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder={alreadyConnected ? t("Dejalo vacio para conservar el actual") : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
         </label>
         <label className="space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App Secret</span>
-          <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("App Secret")}</span>
+          <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={alreadyConnected ? t("Dejalo vacio para conservar el actual") : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
         </label>
         <label className="space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Base URL</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Base URL")}</span>
           <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
         </label>
         <label className="space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Owner Slug</span>
-          <input value={ownerSlug} onChange={(e) => setOwnerSlug(e.target.value)} placeholder="ej. mi-despacho" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Owner Slug")}</span>
+          <input value={ownerSlug} onChange={(e) => setOwnerSlug(e.target.value)} placeholder={t("ej. mi-despacho")} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
         </label>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          Quipu usa OAuth2 con <code>app_id</code> y <code>app_secret</code>. El backend ya está preparado para validar la conexión y sincronizar contactos, facturas y series de numeración.
-        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">{t("Quipu usa OAuth2 con")}{" "}<code>app_id</code> y <code>app_secret</code>{t(". El backend ya está preparado para validar la conexión y sincronizar contactos, facturas y series de numeración.")}</div>
       </div>
     </Modal>
   );
@@ -1789,7 +1770,7 @@ function FacturacionContent() {
         if (!selectedBankAccountId) setSelectedBankAccountId(String(data.quipuBankAccounts[0].id));
       }
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo cargar el módulo de facturación.");
+      setErrorMsg(error?.message || t("No se pudo cargar el módulo de facturación."));
     } finally {
       setLoading(false);
     }
@@ -1977,7 +1958,7 @@ function FacturacionContent() {
       await loadQuipuStatus();
       setShowQuipuModal(false);
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo conectar con Quipu.");
+      setErrorMsg(error?.message || t("No se pudo conectar con Quipu."));
     } finally {
       setSaving(false);
     }
@@ -1999,7 +1980,7 @@ function FacturacionContent() {
           if (done && s?.syncError) {
             // Only show rate-limit errors briefly to the user (not as a permanent banner)
             const isRateLimit = s.syncError.includes('429') || s.syncError.toLowerCase().includes('rate limit');
-            if (!isRateLimit) setErrorMsg(`Quipu: ${s.syncError}`);
+            if (!isRateLimit) setErrorMsg(t("Quipu: {syncError}", { syncError: s.syncError }));
             else console.warn('[Quipu polling] sync error (rate limit, not shown to user):', s.syncError);
             resolve(); return;
           }
@@ -2022,7 +2003,7 @@ function FacturacionContent() {
       setIsSilentSyncing(true);
       await pollQuipuStatus(prevLastSyncAt);
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo iniciar la sincronización con Quipu.");
+      setErrorMsg(error?.message || t("No se pudo iniciar la sincronización con Quipu."));
     } finally {
       setSaving(false);
       setIsSilentSyncing(false);
@@ -2036,7 +2017,7 @@ function FacturacionContent() {
       await apiFetch("/api/quipu/disconnect", { method: "DELETE", getToken });
       setQuipuStatus({ connected: false });
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo desconectar Quipu.");
+      setErrorMsg(error?.message || t("No se pudo desconectar Quipu."));
     } finally {
       setSaving(false);
     }
@@ -2091,7 +2072,7 @@ function FacturacionContent() {
         return next;
       }
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo guardar el registro.");
+      setErrorMsg(error?.message || t("No se pudo guardar el registro."));
       throw error;
     } finally {
       setSaving(false);
@@ -2128,7 +2109,7 @@ function FacturacionContent() {
       if (type === "gasto") setGastos((current) => current.filter((item) => item.id !== id));
       if (type === "presupuesto") setPresupuestos((current) => current.filter((item) => item.id !== id));
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo eliminar el registro.");
+      setErrorMsg(error?.message || t("No se pudo eliminar el registro."));
     }
   };
 
@@ -2166,7 +2147,7 @@ function FacturacionContent() {
         country: r.country || "",
         countryCode: r.country_code || "ES",
       })));
-    } catch (e: any) { setQuipuError(e?.message || "Error al cargar contactos"); }
+    } catch (e: any) { setQuipuError(e?.message || t("Error al cargar contactos")); }
     finally { setLoadingQuipu(false); }
   }, [getToken, quipuStatus.connected]);
 
@@ -2187,7 +2168,7 @@ function FacturacionContent() {
         updatedAt: r.updated_at || "",
       })));
       if (rows.length > 0 && !selectedBankAccountId) setSelectedBankAccountId(String(rows[0].id));
-    } catch (e: any) { setQuipuError(e?.message || "Error al cargar cuentas bancarias"); }
+    } catch (e: any) { setQuipuError(e?.message || t("Error al cargar cuentas bancarias")); }
     finally { setLoadingQuipu(false); }
   }, [getToken, quipuStatus.connected, selectedBankAccountId]);
 
@@ -2225,7 +2206,7 @@ function FacturacionContent() {
         paymentMethod: r.attributes?.payment_method || "",
         kind: r.attributes?.kind || "",
       })));
-    } catch (e: any) { setQuipuError(e?.message || "Error al cargar cobros"); }
+    } catch (e: any) { setQuipuError(e?.message || t("Error al cargar cobros")); }
     finally { setLoadingQuipu(false); }
   }, [getToken, quipuStatus.connected]);
 
@@ -2247,7 +2228,7 @@ function FacturacionContent() {
     try {
       await apiFetch(`/api/quipu/push-factura/${facturaId}`, { method: "POST", getToken });
       await loadBilling();
-    } catch (e: any) { setErrorMsg(e?.message || "Error al enviar factura a Quipu."); }
+    } catch (e: any) { setErrorMsg(e?.message || t("Error al enviar factura a Quipu.")); }
     finally { setPushingToQuipuId(null); }
   }, [getToken, loadBilling]);
 
@@ -2275,13 +2256,13 @@ function FacturacionContent() {
       const stage = String(attributes?.stage || attributes?.status || "").trim().toLowerCase();
       if (!pdfUrl) {
         if (stage === "draft" || stage === "borrador") {
-          throw new Error("Quipu no devuelve PDF para esta factura porque sigue en borrador.");
+          throw new Error(t("Quipu no devuelve PDF para esta factura porque sigue en borrador."));
         }
-        throw new Error("Quipu no devolvio una URL de PDF para esta factura desde la API.");
+        throw new Error(t("Quipu no devolvio una URL de PDF para esta factura desde la API."));
       }
       window.open(String(pdfUrl), "_blank", "noopener,noreferrer");
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo abrir el PDF de Quipu.");
+      setErrorMsg(error?.message || t("No se pudo abrir el PDF de Quipu."));
     } finally {
       setOpeningQuipuPdfId(null);
     }
@@ -2327,16 +2308,16 @@ function FacturacionContent() {
       }
       await loadQuipuContacts();
       setShowContactEditor(false); setEditingContact(null);
-    } catch (e: any) { setErrorMsg(e?.message || "Error al guardar contacto."); }
+    } catch (e: any) { setErrorMsg(e?.message || t("Error al guardar contacto.")); }
     finally { setSavingContact(false); }
   };
 
   const deleteContact = async (id: string) => {
-    if (!(await confirmar({ titulo: "¿Eliminar este contacto de Quipu?", confirmar: "Eliminar contacto", peligro: true }))) return;
+    if (!(await confirmar({ titulo: t("¿Eliminar este contacto de Quipu?"), confirmar: t("Eliminar contacto"), peligro: true }))) return;
     try {
       await apiFetch(`/api/quipu/contacts/${id}`, { method: "DELETE", getToken });
       setQuipuContacts(prev => prev.filter(c => c.id !== id));
-    } catch (e: any) { setErrorMsg(e?.message || "Error al eliminar contacto."); }
+    } catch (e: any) { setErrorMsg(e?.message || t("Error al eliminar contacto.")); }
   };
 
   const totalPendiente = filteredCobrosPendientes.reduce((sum, row) => sum + row.pendiente, 0);
@@ -2361,7 +2342,7 @@ function FacturacionContent() {
             <div className="peligro flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold">No se pudo completar la operación de facturación</p>
+                <p className="font-semibold">{t("No se pudo completar la operación de facturación")}</p>
                 <p className="peligro mt-1 text-red-600">{errorMsg}</p>
               </div>
             </div>
@@ -2374,49 +2355,42 @@ function FacturacionContent() {
                   <LinkIcon size={16} className="text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-amber-800">Conecta Quipu para completar la capa contable</p>
-                  <p className="mt-0.5 text-xs text-amber-600">La pantalla ya trabaja con backend real del ERP; cuando conectes Quipu podrás preparar conciliación y sincronización de series, contactos y facturas.</p>
+                  <p className="text-sm font-semibold text-amber-800">{t("Conecta Quipu para completar la capa contable")}</p>
+                  <p className="mt-0.5 text-xs text-amber-600">{t("La pantalla ya trabaja con backend real del ERP; cuando conectes Quipu podrás preparar conciliación y sincronización de series, contactos y facturas.")}</p>
                 </div>
               </div>
               <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-white hover:bg-amber-600">
-                <ExternalLink size={13} /> Conectar Quipu
-              </button>
+                <ExternalLink size={13} />{" "}{t("Conectar Quipu")}</button>
             </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
-                  {isSilentSyncing && <span className="flex items-center gap-1 text-[11px] text-emerald-600"><Loader2 size={11} className="animate-spin" /> sincronizando…</span>}
+                  <p className="text-sm font-semibold text-emerald-800">{t("Quipu conectado")}</p>
+                  {isSilentSyncing && <span className="flex items-center gap-1 text-[11px] text-emerald-600"><Loader2 size={11} className="animate-spin" />{" "}{t("sincronizando…")}</span>}
                 </div>
                 <p className="mt-0.5 text-xs text-emerald-700">
                   {quipuStatus.syncError
                     ? <span className="text-red-600">{quipuStatus.syncError}</span>
                     : quipuStatus.lastSyncAt
-                      ? `Última sincronización: ${fmtDateTime(quipuStatus.lastSyncAt)}`
-                      : "Sincronización pendiente"}
+                      ? t("Última sincronización: {v}", { v: fmtDateTime(quipuStatus.lastSyncAt) })
+                      : t("Sincronización pendiente")}
                 </p>
                 {quipuStatus.ownerSlug && (
-                  <p className="mt-1 text-xs text-emerald-700">
-                    Owner slug activo: <span className="font-semibold">{quipuStatus.ownerSlug}</span>
+                  <p className="mt-1 text-xs text-emerald-700">{t("Owner slug activo:")}{" "}<span className="font-semibold">{quipuStatus.ownerSlug}</span>
                   </p>
                 )}
                 {quipuStatus.syncSummary && (
-                  <p className="mt-1 text-xs text-emerald-700">
-                    Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas Quipu: {quipuStatus.syncSummary.invoices || 0} · Importadas: {quipuStatus.syncSummary.importedToFacturacion ?? 0} · Actualizadas: {quipuStatus.syncSummary.updatedInFacturacion ?? 0}
+                  <p className="mt-1 text-xs text-emerald-700">{t("Contactos:")}{" "}{quipuStatus.syncSummary.contacts || 0}{" "}{t("· Facturas Quipu:")}{" "}{quipuStatus.syncSummary.invoices || 0}{" "}{t("· Importadas:")}{" "}{quipuStatus.syncSummary.importedToFacturacion ?? 0}{" "}{t("· Actualizadas:")}{" "}{quipuStatus.syncSummary.updatedInFacturacion ?? 0}
                   </p>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => setShowQuipuModal(true)} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
-                  <ExternalLink size={13} /> Editar conexion
-                </button>
+                  <ExternalLink size={13} />{" "}{t("Editar conexion")}</button>
                 <button onClick={syncQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
-                  <RefreshCw size={13} className={saving ? "animate-spin" : ""} /> Sincronizar
-                </button>
-                <button onClick={disconnectQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
-                  Desconectar
-                </button>
+                  <RefreshCw size={13} className={saving ? "animate-spin" : ""} />{" "}{t("Sincronizar")}</button>
+                <button onClick={disconnectQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">{t("Desconectar")}</button>
               </div>
             </div>
           ))}
@@ -2424,15 +2398,14 @@ function FacturacionContent() {
           {facturaRouteMode ? (
             loading ? (
               <div className="flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
-                <Spinner size="sm" muted label="Preparando la pantalla de factura…" />
+                <Spinner size="sm" muted label={t("Preparando la pantalla de factura…")} />
               </div>
             ) : facturaRouteMode === "edit" && !facturaRouteRecord ? (
               <div className="rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
-                <p className="text-lg font-bold text-slate-900">No encontramos esa factura</p>
-                <p className="mt-2 text-sm text-slate-500">Puede que haya sido borrada o que el enlace ya no sea válido.</p>
+                <p className="text-lg font-bold text-slate-900">{t("No encontramos esa factura")}</p>
+                <p className="mt-2 text-sm text-slate-500">{t("Puede que haya sido borrada o que el enlace ya no sea válido.")}</p>
                 <button onClick={closeFacturaWorkspace} className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                  <ArrowLeft size={14} /> Volver
-                </button>
+                  <ArrowLeft size={14} />{" "}{t("Volver")}</button>
               </div>
             ) : (
               <FacturaWorkspacePage
@@ -2450,7 +2423,7 @@ function FacturacionContent() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    <span>Tesorería</span>
+                    <span>{t("Tesorería")}</span>
                     <span className="text-slate-300">/</span>
                     <span className="text-red-600">{SECTION_META[tab].crumb}</span>
                   </div>
@@ -2460,38 +2433,35 @@ function FacturacionContent() {
                 <div className="flex flex-wrap items-center gap-2">
                   {tab === "facturas" && (
                     <button onClick={() => openEditor("factura")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      <Plus size={14} /> Nueva factura
-                    </button>
+                      <Plus size={14} />{" "}{t("Nueva factura")}</button>
                   )}
                   {tab === "presupuestos" && (
                     <button onClick={() => openEditor("presupuesto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      <FileSpreadsheet size={14} /> Nuevo presupuesto
-                    </button>
+                      <FileSpreadsheet size={14} />{" "}{t("Nuevo presupuesto")}</button>
                   )}
                   {tab === "gastos" && (
                     <button onClick={() => openEditor("gasto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                      <Plus size={14} /> Registrar gasto
-                    </button>
+                      <Plus size={14} />{" "}{t("Registrar gasto")}</button>
                   )}
                 </div>
               </div>
 
               {tab === "dashboard" && (
                 <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-                  <OdooMiniStat label="Facturado" value={fmtEur(totalFacturado)} tone="blue" />
-                  <OdooMiniStat label="Cobrado" value={fmtEur(totalCobrado)} tone="emerald" />
-                  <OdooMiniStat label="Pendiente de cobro" value={fmtEur(totalPendiente)} tone="amber" />
-                  <OdooMiniStat label="Pagos pendientes" value={fmtEur(pagosPendientes)} tone="red" />
-                  <OdooMiniStat label="Expedientes facturables" value={String(expedientesFacturables)} tone="violet" />
-                  <OdooMiniStat label="Clientes con movimiento" value={String(clientesFacturables)} tone="slate" />
+                  <OdooMiniStat label={t("Facturado")} value={fmtEur(totalFacturado)} tone="blue" />
+                  <OdooMiniStat label={t("Cobrado")} value={fmtEur(totalCobrado)} tone="emerald" />
+                  <OdooMiniStat label={t("Pendiente de cobro")} value={fmtEur(totalPendiente)} tone="amber" />
+                  <OdooMiniStat label={t("Pagos pendientes")} value={fmtEur(pagosPendientes)} tone="red" />
+                  <OdooMiniStat label={t("Expedientes facturables")} value={String(expedientesFacturables)} tone="violet" />
+                  <OdooMiniStat label={t("Clientes con movimiento")} value={String(clientesFacturables)} tone="slate" />
                 </div>
               )}
             </div>
 
             <div className="space-y-5 bg-slate-50/70 p-5">
               {(["dashboard","facturas","gastos","presupuestos"] as TabKey[]).includes(tab) && <OdooSection
-                title="Criterios de facturación"
-                subtitle="Busca por cliente, expediente, número, proveedor o responsable y refina por área, estado, serie y cobro."
+                title={t("Criterios de facturación")}
+                subtitle={t("Busca por cliente, expediente, número, proveedor o responsable y refina por área, estado, serie y cobro.")}
                 action={
                   <button
                     onClick={() => {
@@ -2504,40 +2474,39 @@ function FacturacionContent() {
                     }}
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
                   >
-                    <RefreshCw size={12} /> Restablecer
-                  </button>
+                    <RefreshCw size={12} />{" "}{t("Restablecer")}</button>
                 }
               >
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por cliente, expediente, factura o proveedor..." className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm xl:col-span-2" />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Buscar por cliente, expediente, factura o proveedor...")} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm xl:col-span-2" />
                   <select value={filterResponsable} onChange={(e) => setFilterResponsable(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="todos">Todos los responsables</option>
+                    <option value="todos">{t("Todos los responsables")}</option>
                     {responsables.map((responsable) => <option key={responsable} value={responsable}>{responsable}</option>)}
                   </select>
                   <select value={filterArea} onChange={(e) => setFilterArea(e.target.value as "todas" | BillingArea)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="todas">Todas las áreas</option>
+                    <option value="todas">{t("Todas las áreas")}</option>
                     {Object.entries(AREA_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
                   <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="todos">Todos los estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="vencida">Vencida</option>
-                    <option value="enviada">Enviada</option>
-                    <option value="cobrada">Cobrada</option>
-                    <option value="contabilizado">Contabilizado</option>
-                    <option value="aprobado">Aprobado</option>
-                    <option value="rechazado">Rechazado</option>
-                    <option value="facturado">Facturado</option>
+                    <option value="todos">{t("Todos los estados")}</option>
+                    <option value="pendiente">{t("Pendiente")}</option>
+                    <option value="vencida">{t("Vencida")}</option>
+                    <option value="enviada">{t("Enviada")}</option>
+                    <option value="cobrada">{t("Cobrada")}</option>
+                    <option value="contabilizado">{t("Contabilizado")}</option>
+                    <option value="aprobado">{t("Aprobado")}</option>
+                    <option value="rechazado">{t("Rechazado")}</option>
+                    <option value="facturado">{t("Facturado")}</option>
                   </select>
                   <select value={filterFormaPago} onChange={(e) => setFilterFormaPago(e.target.value as "todas" | PaymentMethod)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option value="todas">Todas las formas de pago</option>
+                    <option value="todas">{t("Todas las formas de pago")}</option>
                     {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Series contables</span>
-                  <button onClick={() => setFilterSerie("todas")} className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${filterSerie === "todas" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>Todas</button>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Series contables")}</span>
+                  <button onClick={() => setFilterSerie("todas")} className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${filterSerie === "todas" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{t("Todas")}</button>
                   {series.map((serie) => (
                     <button key={serie} onClick={() => setFilterSerie(serie)} className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${filterSerie === serie ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{serie}</button>
                   ))}
@@ -2548,37 +2517,33 @@ function FacturacionContent() {
               {tab === "contacts" && (
                 <div className="space-y-4">
                   {!quipuStatus.connected ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">
-                      Conecta Quipu para gestionar contactos.
-                    </div>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">{t("Conecta Quipu para gestionar contactos.")}</div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-600">{quipuContacts.length} contactos en Quipu</p>
+                        <p className="text-sm font-semibold text-slate-600">{quipuContacts.length}{" "}{t("contactos en Quipu")}</p>
                         <div className="flex gap-2">
                           <button onClick={loadQuipuContacts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                            <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
-                          </button>
+                            <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} />{" "}{t("Actualizar")}</button>
                           <button onClick={() => { setEditingContact(null); setShowContactEditor(true); }} className="inline-flex items-center gap-1.5 rounded-xl bg-red-700 px-3 py-2 text-xs font-bold text-white hover:bg-red-800">
-                            <Plus size={12} /> Nuevo contacto
-                          </button>
+                            <Plus size={12} />{" "}{t("Nuevo contacto")}</button>
                         </div>
                       </div>
                       {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
-                      <TableShell title="Contactos de Quipu" count={`${quipuContacts.length} registros`} headers={["Nombre", "Tipo", "NIF/CIF", "Email", "Teléfono", ""]}>
+                      <TableShell title={t("Contactos de Quipu")} count={`${quipuContacts.length} registros`} headers={["Nombre", "Tipo", "NIF/CIF", "Email", "Teléfono", ""]}>
                         {loadingQuipu ? (
-                          <tr><td colSpan={6} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">Cargando...</span></div></td></tr>
+                          <tr><td colSpan={6} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">{t("Cargando...")}</span></div></td></tr>
                         ) : quipuContacts.map(c => (
                           <tr key={c.id} className="transition-colors hover:bg-slate-50/60">
                             <td className="px-5 py-3 text-sm font-semibold text-slate-800">{c.name}</td>
-                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${c.kind === "client" ? "bg-blue-100 text-blue-700" : c.kind === "provider" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{c.kind === "client" ? "Cliente" : c.kind === "provider" ? "Proveedor" : c.kind}</span></td>
+                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${c.kind === "client" ? "bg-blue-100 text-blue-700" : c.kind === "provider" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{c.kind === "client" ? t("Cliente") : c.kind === "provider" ? t("Proveedor") : c.kind}</span></td>
                             <td className="px-5 py-3 text-sm text-slate-500 font-mono">{c.taxId || "—"}</td>
                             <td className="px-5 py-3 text-sm text-slate-500">{c.email || "—"}</td>
                             <td className="px-5 py-3 text-sm text-slate-500">{c.phone || "—"}</td>
                             <td className="px-5 py-3">
                               <div className="flex justify-end gap-2">
-                                <ActionIconButton title="Editar" onClick={() => { setEditingContact(c); setShowContactEditor(true); }}><Pencil size={13} /></ActionIconButton>
-                                <ActionIconButton title="Eliminar" tone="red" onClick={() => deleteContact(c.id)}><Trash2 size={13} /></ActionIconButton>
+                                <ActionIconButton title={t("Editar")} onClick={() => { setEditingContact(c); setShowContactEditor(true); }}><Pencil size={13} /></ActionIconButton>
+                                <ActionIconButton title={t("Eliminar")} tone="red" onClick={() => deleteContact(c.id)}><Trash2 size={13} /></ActionIconButton>
                               </div>
                             </td>
                           </tr>
@@ -2609,21 +2574,20 @@ function FacturacionContent() {
               {tab === "receipts" && (
                 <div className="space-y-4">
                   {!quipuStatus.connected ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cobros.</div>
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">{t("Conecta Quipu para ver cobros.")}</div>
                   ) : (
                     <>
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-600">{quipuReceipts.length} cobros registrados en Quipu</p>
+                        <p className="text-sm font-semibold text-slate-600">{quipuReceipts.length}{" "}{t("cobros registrados en Quipu")}</p>
                         <button onClick={loadQuipuReceipts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                          <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
-                        </button>
+                          <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} />{" "}{t("Actualizar")}</button>
                       </div>
                       {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
-                      <TableShell title="Cobros de Quipu" count={`${quipuReceipts.length} registros`} headers={["Número", "Contacto", "Factura", "Fecha cobro", "Importe", "Forma de pago", "Tipo"]}>
+                      <TableShell title={t("Cobros de Quipu")} count={`${quipuReceipts.length} registros`} headers={["Número", "Contacto", "Factura", "Fecha cobro", "Importe", "Forma de pago", "Tipo"]}>
                         {loadingQuipu ? (
-                          <tr><td colSpan={7} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">Cargando cobros...</span></div></td></tr>
+                          <tr><td colSpan={7} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">{t("Cargando cobros...")}</span></div></td></tr>
                         ) : quipuReceipts.length === 0 ? (
-                          <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">Sin cobros registrados</td></tr>
+                          <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">{t("Sin cobros registrados")}</td></tr>
                         ) : quipuReceipts.map(r => (
                           <tr key={r.id} className="transition-colors hover:bg-slate-50/60">
                             <td className="px-5 py-3 text-sm font-semibold text-slate-800">{r.number || "—"}</td>
@@ -2632,7 +2596,7 @@ function FacturacionContent() {
                             <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(r.settlementDate)}</td>
                             <td className="px-5 py-3 text-sm font-bold text-emerald-700">{fmtEur(r.amount)}</td>
                             <td className="px-5 py-3 text-xs text-slate-500">{r.paymentMethod || "—"}</td>
-                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${r.kind === "revenue" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{r.kind === "revenue" ? "Cobro" : r.kind || "—"}</span></td>
+                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${r.kind === "revenue" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{r.kind === "revenue" ? t("Cobro") : r.kind || "—"}</span></td>
                           </tr>
                         ))}
                       </TableShell>
@@ -2644,30 +2608,26 @@ function FacturacionContent() {
               {/* ══ CONFIGURACIÓN ═══════════════════════════════════════════════════ */}
               {tab === "config" && (
                 <div className="space-y-4 max-w-2xl">
-                  <OdooSection title="Conexión con Quipu" subtitle="Gestiona las credenciales API para sincronizar facturas, contactos y cuentas bancarias.">
+                  <OdooSection title={t("Conexión con Quipu")} subtitle={t("Gestiona las credenciales API para sincronizar facturas, contactos y cuentas bancarias.")}>
                     {quipuStatus.needsOrganizacion && (
                       <div className="mb-3 flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
                         <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-900">
-                          Ahora cada organización tiene su propia facturación y Quipu pertenece a la organización en la que se conecta. Si esta es la organización de tu Quipu, pulsa <b>Conectar</b> (no hace falta volver a escribir App ID ni App Secret, solo el owner_slug).
-                        </p>
+                        <p className="text-sm text-amber-900">{t("Ahora cada organización tiene su propia facturación y Quipu pertenece a la organización en la que se conecta. Si esta es la organización de tu Quipu, pulsa")}{" "}<b>{t("Conectar")}</b>{" "}{t("(no hace falta volver a escribir App ID ni App Secret, solo el owner_slug).")}</p>
                       </div>
                     )}
                     {quipuStatus.connectedInOtherOrg ? (
                       <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
                         <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-900">
-                          Tu Quipu está conectado en la organización <b>{quipuStatus.connectedInOtherOrg}</b>. Cada organización tiene su propia facturación: cámbiate a ella para usarlo, o desconéctalo allí si quieres conectarlo en esta.
-                        </p>
+                        <p className="text-sm text-amber-900">{t("Tu Quipu está conectado en la organización")}{" "}<b>{quipuStatus.connectedInOtherOrg}</b>{t(". Cada organización tiene su propia facturación: cámbiate a ella para usarlo, o desconéctalo allí si quieres conectarlo en esta.")}</p>
                       </div>
                     ) : quipuStatus.connected ? (
                       <div className="space-y-4">
                         <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
                           <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                           <div>
-                            <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
+                            <p className="text-sm font-semibold text-emerald-800">{t("Quipu conectado")}</p>
                             <p className="text-xs text-emerald-700 mt-0.5">
-                              {quipuStatus.lastSyncAt ? `Última sincronización: ${fmtDateTime(quipuStatus.lastSyncAt)}` : "Sin sincronizar aún"}
+                              {quipuStatus.lastSyncAt ? t("Última sincronización: {v}", { v: fmtDateTime(quipuStatus.lastSyncAt) }) : t("Sin sincronizar aún")}
                             </p>
                           </div>
                         </div>
@@ -2675,36 +2635,32 @@ function FacturacionContent() {
                           <div className="grid grid-cols-3 gap-3">
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
                               <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.contacts || 0}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">Contactos</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{t("Contactos")}</p>
                             </div>
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
                               <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.invoices || 0}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">Facturas Quipu</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{t("Facturas Quipu")}</p>
                             </div>
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
                               <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.numberingSeries || 0}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">Series</p>
+                              <p className="text-xs text-slate-500 mt-0.5">{t("Series")}</p>
                             </div>
                           </div>
                         )}
                         <div className="flex gap-3">
                           <button onClick={syncQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
-                            <RefreshCw size={14} className={saving ? "animate-spin" : ""} /> Sincronizar ahora
-                          </button>
+                            <RefreshCw size={14} className={saving ? "animate-spin" : ""} />{" "}{t("Sincronizar ahora")}</button>
                           <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            <Settings size={14} /> Editar credenciales
-                          </button>
+                            <Settings size={14} />{" "}{t("Editar credenciales")}</button>
                           <button onClick={disconnectQuipu} disabled={saving} className="peligro inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
-                            <Trash2 size={14} /> Desconectar
-                          </button>
+                            <Trash2 size={14} />{" "}{t("Desconectar")}</button>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <p className="text-sm text-slate-500">Conecta con Quipu para sincronizar tu contabilidad automáticamente.</p>
+                        <p className="text-sm text-slate-500">{t("Conecta con Quipu para sincronizar tu contabilidad automáticamente.")}</p>
                         <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
-                          <ExternalLink size={14} /> Conectar Quipu
-                        </button>
+                          <ExternalLink size={14} />{" "}{t("Conectar Quipu")}</button>
                       </div>
                     )}
                   </OdooSection>
@@ -2747,7 +2703,7 @@ function FacturacionContent() {
                           onClick={() => { setShowPeriodMenu(v => !v); setShowYearMenu(false); }}
                           className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${showPeriodMenu ? "border-slate-300 bg-slate-100 text-slate-800" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
                         >
-                          {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"}
+                          {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? t("Todo el año")}
                           <ChevronDown size={13} className={`transition-transform ${showPeriodMenu ? "rotate-180" : ""}`} />
                         </button>
                         {showPeriodMenu && (
@@ -2781,9 +2737,9 @@ function FacturacionContent() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Tickets pendientes: {ticketsPendientes}</span>
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Margen bruto: {fmtEur(margenBruto)}</span>
-                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">Presupuestado: {fmtEur(totalPresupuestado)}</span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">{t("Tickets pendientes:")}{" "}{ticketsPendientes}</span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">{t("Margen bruto:")}{" "}{fmtEur(margenBruto)}</span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">{t("Presupuestado:")}{" "}{fmtEur(totalPresupuestado)}</span>
                     </div>
                   </div>
 
@@ -2798,46 +2754,46 @@ function FacturacionContent() {
                     return (
                       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                          <p className="text-sm font-bold text-slate-700">Resumen financiero</p>
+                          <p className="text-sm font-bold text-slate-700">{t("Resumen financiero")}</p>
                         </div>
                         {/* Fila 1: Ingresos | Gastos */}
                         <div className="grid grid-cols-2 border-b border-slate-100">
                           <div className="px-6 py-4 border-r border-slate-100">
-                            <p className="text-xs text-slate-500 font-medium">Ingresos</p>
+                            <p className="text-xs text-slate-500 font-medium">{t("Ingresos")}</p>
                             <p className="mt-1 text-2xl font-bold text-emerald-600">{fmtEur(totalFacturado)}</p>
                           </div>
                           <div className="px-6 py-4">
-                            <p className="text-xs text-slate-500 font-medium">Gastos</p>
+                            <p className="text-xs text-slate-500 font-medium">{t("Gastos")}</p>
                             <p className="mt-1 text-2xl font-bold text-red-500">{fmtEur(gastosMensuales)}</p>
                           </div>
                         </div>
                         {/* Fila 2: IVA+IRPF desglosados */}
                         <div className="grid grid-cols-4 border-b border-slate-100 text-xs">
                           <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="text-slate-400 font-medium">{t("IVA")}</p>
                             <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaRep)}</p>
                           </div>
                           <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="text-slate-400 font-medium">{t("IRPF")}</p>
                             <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfRet)}</p>
                           </div>
                           <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="text-slate-400 font-medium">{t("IVA")}</p>
                             <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaSop)}</p>
                           </div>
                           <div className="px-5 py-3">
-                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="text-slate-400 font-medium">{t("IRPF")}</p>
                             <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfDed)}</p>
                           </div>
                         </div>
                         {/* Fila 3: IVA a liquidar | IRPF a liquidar */}
                         <div className="grid grid-cols-2 bg-slate-50/60 text-xs">
                           <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA a liquidar</p>
+                            <p className="text-slate-400 font-medium">{t("IVA a liquidar")}</p>
                             <p className={`mt-0.5 font-bold ${ivaLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(ivaLiq)}</p>
                           </div>
                           <div className="px-5 py-3">
-                            <p className="text-slate-400 font-medium">IRPF a liquidar</p>
+                            <p className="text-slate-400 font-medium">{t("IRPF a liquidar")}</p>
                             <p className={`mt-0.5 font-bold ${irpfLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(irpfLiq)}</p>
                           </div>
                         </div>
@@ -2847,7 +2803,7 @@ function FacturacionContent() {
 
                   {/* ── Ingresos y Gastos (gráfico barras tipo Quipu) ── */}
                   <OdooSection
-                    title="Ingresos y Gastos"
+                    title={t("Ingresos y Gastos")}
                     action={
                       <div className="flex items-center gap-2">
                         <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
@@ -2877,7 +2833,7 @@ function FacturacionContent() {
                         </div>
                         <div className="relative" ref={periodMenuRef}>
                           <button onClick={() => setShowPeriodMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                            {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"} <ChevronDown size={11} />
+                            {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? t("Todo el año")} <ChevronDown size={11} />
                           </button>
                           {showPeriodMenu && (
                             <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl max-h-60 overflow-y-auto">
@@ -2902,8 +2858,8 @@ function FacturacionContent() {
 
                   {/* ── Análisis de ingresos por cliente (tipo Quipu) ── */}
                   <OdooSection
-                    title="Análisis de ingresos"
-                    action={<span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">Clientes</span>}
+                    title={t("Análisis de ingresos")}
+                    action={<span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">{t("Clientes")}</span>}
                   >
                     <ClientIncomeChart facturas={filteredFacturas} />
                   </OdooSection>
@@ -2912,17 +2868,17 @@ function FacturacionContent() {
                   {quipuStatus.connected && (
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-                        <p className="text-sm font-bold text-slate-700">Cuentas bancarias</p>
+                        <p className="text-sm font-bold text-slate-700">{t("Cuentas bancarias")}</p>
                         <button onClick={loadQuipuBankAccounts} disabled={loadingQuipu} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
                           <RefreshCw size={11} className={loadingQuipu ? "animate-spin" : ""} />
                         </button>
                       </div>
                       {loadingQuipu && quipuBankAccounts.length === 0 ? (
                         <div className="flex items-center justify-center gap-2 py-8">
-                          <Spinner size="sm" muted label="Cargando cuentas..." />
+                          <Spinner size="sm" muted label={t("Cargando cuentas...")} />
                         </div>
                       ) : quipuBankAccounts.length === 0 ? (
-                        <div className="px-5 py-6 text-sm text-slate-400 text-center">Sin cuentas bancarias. Sincroniza Quipu primero.</div>
+                        <div className="px-5 py-6 text-sm text-slate-400 text-center">{t("Sin cuentas bancarias. Sincroniza Quipu primero.")}</div>
                       ) : (
                         <div className="flex gap-0 divide-x divide-slate-100">
                           {/* Lista de cuentas */}
@@ -2932,7 +2888,7 @@ function FacturacionContent() {
                               onClick={() => setSelectedBankAccountId(null)}
                               className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${!selectedBankAccountId ? "bg-emerald-600 text-white" : "text-slate-700 hover:bg-slate-50"}`}
                             >
-                              <span>Todos</span>
+                              <span>{t("Todos")}</span>
                               <span>{fmtEur(quipuBankAccounts.reduce((s, a) => s + a.balance, 0))}</span>
                             </button>
                             {quipuBankAccounts.map(acc => (
@@ -2963,7 +2919,7 @@ function FacturacionContent() {
                   )}
 
                   {/* ── Vencimiento (aging) ── */}
-                  <OdooSection title="Vencimiento" subtitle="Análisis de cobros y pagos por antigüedad.">
+                  <OdooSection title={t("Vencimiento")} subtitle={t("Análisis de cobros y pagos por antigüedad.")}>
                     {(() => {
                       const now = new Date(); now.setHours(0,0,0,0);
                       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -2985,10 +2941,10 @@ function FacturacionContent() {
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-left text-sm">
                             <thead><tr className="border-b border-slate-100">
-                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 pr-8">Periodo</th>
-                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">A cobrar</th>
-                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">A pagar</th>
-                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Resultado</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 pr-8">{t("Periodo")}</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">{t("A cobrar")}</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">{t("A pagar")}</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">{t("Resultado")}</th>
                             </tr></thead>
                             <tbody className="divide-y divide-slate-50">
                               {rows.map(r => (
@@ -3001,7 +2957,7 @@ function FacturacionContent() {
                               ))}
                             </tbody>
                             <tfoot><tr className="border-t-2 border-slate-200">
-                              <td className="pt-2.5 pr-8 text-[11px] font-bold uppercase tracking-widest text-slate-500">Total</td>
+                              <td className="pt-2.5 pr-8 text-[11px] font-bold uppercase tracking-widest text-slate-500">{t("Total")}</td>
                               <td className="pt-2.5 pr-8 text-right font-bold text-emerald-600">{fmtEur(totCobrar)}</td>
                               <td className="pt-2.5 pr-8 text-right font-bold text-red-500">{fmtEur(totPagar)}</td>
                               <td className={`pt-2.5 text-right font-bold ${totCobrar - totPagar >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totCobrar - totPagar)}</td>
@@ -3014,16 +2970,16 @@ function FacturacionContent() {
 
                   {/* ── KPIs rápidos ── */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <KpiCard label="Cobros pendientes" value={fmtEur(totalPendiente)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="amber" icon={Banknote} />
-                    <KpiCard label="Facturas vencidas" value={String(facturasVencidas)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="red" icon={AlertCircle} />
-                    <KpiCard label="Presupuestos pendientes de respuesta" value={String(presupuestosPendientes)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="blue" icon={FileSpreadsheet} />
-                    <KpiCard label="Presupuestos aprobados sin facturar" value={String(presupuestosAprobados)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="violet" icon={CheckCircle2} />
-                    <KpiCard label="Pagos pendientes" value={fmtEur(pagosPendientes)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="slate" icon={Clock} />
-                    <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
+                    <KpiCard label={t("Cobros pendientes")} value={fmtEur(totalPendiente)} sub={`${filterYear} · ${t(PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "")}`} color="amber" icon={Banknote} />
+                    <KpiCard label={t("Facturas vencidas")} value={String(facturasVencidas)} sub={`${filterYear} · ${t(PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "")}`} color="red" icon={AlertCircle} />
+                    <KpiCard label={t("Presupuestos pendientes de respuesta")} value={String(presupuestosPendientes)} sub={`${filterYear} · ${t(PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "")}`} color="blue" icon={FileSpreadsheet} />
+                    <KpiCard label={t("Presupuestos aprobados sin facturar")} value={String(presupuestosAprobados)} sub={`${filterYear} · ${t(PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "")}`} color="violet" icon={CheckCircle2} />
+                    <KpiCard label={t("Pagos pendientes")} value={fmtEur(pagosPendientes)} sub={`${filterYear} · ${t(PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "")}`} color="slate" icon={Clock} />
+                    <KpiCard label={t("Gastos del periodo")} value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
 
                   <TableShell
-                    title="Cobros pendientes de facturas"
+                    title={t("Cobros pendientes de facturas")}
                     count={`${filteredCobrosPendientes.length} registros`}
                     headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}
                     headerAction={
@@ -3032,7 +2988,7 @@ function FacturacionContent() {
                           onClick={() => setShowAllPendingInvoices((current) => !current)}
                           className="min-w-[9.5rem] rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                         >
-                          {showAllPendingInvoices ? "Ver menos" : `Ver todos (${filteredCobrosPendientes.length})`}
+                          {showAllPendingInvoices ? t("Ver menos") : t("Ver todos ({length})", { length: filteredCobrosPendientes.length })}
                         </button>
                       ) : null
                     }
@@ -3043,13 +2999,13 @@ function FacturacionContent() {
                         <td className="px-5 py-3 text-sm text-slate-600">
                           <ClientRecordLink clientId={row.clientId} label={row.contacto} />
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || t("Sin expediente")}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(row.vencimiento)}</td>
                         <td className="px-5 py-3 text-sm font-bold text-slate-900">{fmtEur(row.pendiente)}</td>
                         <td className="px-5 py-3"><EstadoBadge estado={row.estado} /></td>
                         <td className="px-5 py-3">
                           <div className="flex justify-end gap-2">
-                            <ActionIconButton title="Editar factura" onClick={() => {
+                            <ActionIconButton title={t("Editar factura")} onClick={() => {
                               const factura = facturas.find((item) => item.id === row.id);
                               if (factura) openEditor("factura", factura);
                             }}>
@@ -3088,26 +3044,26 @@ function FacturacionContent() {
                     {/* KPIs superiores */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                       <AnaliticaKpiCard icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600"
-                        label="Ingresos Totales" value={fmtEur(totalFacturado)}
-                        footer={<span className="text-[10px] text-slate-400">Año {filterYear}</span>} />
+                        label={t("Ingresos Totales")} value={fmtEur(totalFacturado)}
+                        footer={<span className="text-[10px] text-slate-400">{t("Año")}{" "}{filterYear}</span>} />
                       <AnaliticaKpiCard icon={TrendingDown} iconBg="bg-rose-100" iconColor="text-rose-600"
-                        label="Gastos Totales" value={fmtEur(gastosMensuales)}
-                        footer={<span className="text-[10px] text-slate-400">Año {filterYear}</span>} />
+                        label={t("Gastos Totales")} value={fmtEur(gastosMensuales)}
+                        footer={<span className="text-[10px] text-slate-400">{t("Año")}{" "}{filterYear}</span>} />
                       <AnaliticaKpiCard icon={Scale} iconBg="bg-indigo-100" iconColor="text-indigo-600"
-                        label="Beneficio Neto" value={fmtEur(beneficioNeto)}
+                        label={t("Beneficio Neto")} value={fmtEur(beneficioNeto)}
                         footer={
                           <div className="flex w-full items-center gap-2">
                             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                               <div className="h-full bg-indigo-500" style={{ width: `${Math.max(0, Math.min(100, margenPct))}%` }} />
                             </div>
-                            <span className="whitespace-nowrap text-[10px] font-bold text-indigo-600">Margen {margenPct.toFixed(0)}%</span>
+                            <span className="whitespace-nowrap text-[10px] font-bold text-indigo-600">{t("Margen")}{" "}{margenPct.toFixed(0)}%</span>
                           </div>
                         } />
                       <AnaliticaKpiCard icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600"
-                        label="Pendiente de Cobro" value={fmtEur(pendienteTotal)}
+                        label={t("Pendiente de Cobro")} value={fmtEur(pendienteTotal)}
                         footer={
                           <span className="rounded border border-amber-200/50 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                            {vencidasFacturas.length} {vencidasFacturas.length === 1 ? "factura vencida" : "facturas vencidas"}
+                            {vencidasFacturas.length} {vencidasFacturas.length === 1 ? t("factura vencida") : t("facturas vencidas")}
                           </span>
                         } />
                     </div>
@@ -3115,13 +3071,13 @@ function FacturacionContent() {
                     {/* Evolución mensual + Ingresos por área */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                       <div className="lg:col-span-2">
-                        <OdooSection title="Evolución de Ingresos y Gastos" subtitle={`Año ${filterYear}`}>
+                        <OdooSection title={t("Evolución de Ingresos y Gastos")} subtitle={t("Año {filterYear}", { filterYear: filterYear })}>
                           <MonthlyBarChart facturas={filteredFacturas} gastos={filteredGastos} year={filterYear} chartType="bar" />
                         </OdooSection>
                       </div>
-                      <OdooSection title="Ingresos por Área">
+                      <OdooSection title={t("Ingresos por Área")}>
                         {porArea.length === 0 ? (
-                          <p className="py-10 text-center text-sm text-slate-400">Sin datos para el periodo seleccionado.</p>
+                          <p className="py-10 text-center text-sm text-slate-400">{t("Sin datos para el periodo seleccionado.")}</p>
                         ) : (
                           <div className="flex flex-col items-center gap-4">
                             <AreaDonutChart data={porArea} colors={AREA_COLORS} />
@@ -3141,14 +3097,14 @@ function FacturacionContent() {
 
                     {/* Top clientes + Estado de facturación */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                      <OdooSection title="Top Clientes por Facturación">
+                      <OdooSection title={t("Top Clientes por Facturación")}>
                         <ClientIncomeChart facturas={filteredFacturas} />
                       </OdooSection>
-                      <OdooSection title="Estado de Facturación">
+                      <OdooSection title={t("Estado de Facturación")}>
                         <div className="flex flex-col gap-5 py-2">
-                          <EstadoBar color="bg-emerald-500" label="Facturas Cobradas" value={cobradoTotal} pct={pctCobrado} />
-                          <EstadoBar color="bg-blue-500" label="Pendientes (en plazo)" value={pendienteEnPlazoTotal} pct={pctPendiente} />
-                          <EstadoBar color="bg-rose-500" label="Vencidas (impagadas)" value={vencidoTotal} pct={pctVencido} />
+                          <EstadoBar color="bg-emerald-500" label={t("Facturas Cobradas")} value={cobradoTotal} pct={pctCobrado} />
+                          <EstadoBar color="bg-blue-500" label={t("Pendientes (en plazo)")} value={pendienteEnPlazoTotal} pct={pctPendiente} />
+                          <EstadoBar color="bg-rose-500" label={t("Vencidas (impagadas)")} value={vencidoTotal} pct={pctVencido} />
                         </div>
                       </OdooSection>
                     </div>
@@ -3160,32 +3116,30 @@ function FacturacionContent() {
                       const quipuCobrosTotal = quipuCobrosAnio.reduce((s, r) => s + (r.amount || 0), 0);
                       return (
                         <OdooSection
-                          title="Datos de Quipu"
-                          subtitle="Saldo bancario y cobros reales desde Quipu, en tiempo real (no incluidos en los KPIs del ERP de arriba)."
+                          title={t("Datos de Quipu")}
+                          subtitle={t("Saldo bancario y cobros reales desde Quipu, en tiempo real (no incluidos en los KPIs del ERP de arriba).")}
                           action={
                             quipuStatus.connected ? (
                               <button onClick={() => { loadQuipuBankAccounts(); loadQuipuReceipts(); }} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                                <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
-                              </button>
+                                <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} />{" "}{t("Actualizar")}</button>
                             ) : undefined
                           }
                         >
                           {!quipuStatus.connected ? (
                             <div className="flex flex-col items-center gap-3 py-6 text-center">
-                              <p className="text-sm text-slate-400">Conecta Quipu para ver aquí el saldo bancario y los cobros reales.</p>
+                              <p className="text-sm text-slate-400">{t("Conecta Quipu para ver aquí el saldo bancario y los cobros reales.")}</p>
                               <button onClick={() => { setTab("config"); }} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-xs font-bold text-white hover:bg-red-800">
-                                <ExternalLink size={13} /> Ir a Configuración
-                              </button>
+                                <ExternalLink size={13} />{" "}{t("Ir a Configuración")}</button>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-5">
                               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <AnaliticaKpiCard icon={Landmark} iconBg="bg-teal-100" iconColor="text-teal-600"
-                                  label="Saldo en cuentas bancarias" value={fmtEur(quipuBalanceTotal)}
-                                  footer={<span className="text-[10px] text-slate-400">{quipuBankAccounts.length} {quipuBankAccounts.length === 1 ? "cuenta sincronizada" : "cuentas sincronizadas"}</span>} />
+                                  label={t("Saldo en cuentas bancarias")} value={fmtEur(quipuBalanceTotal)}
+                                  footer={<span className="text-[10px] text-slate-400">{quipuBankAccounts.length} {quipuBankAccounts.length === 1 ? t("cuenta sincronizada") : t("cuentas sincronizadas")}</span>} />
                                 <AnaliticaKpiCard icon={Banknote} iconBg="bg-emerald-100" iconColor="text-emerald-600"
-                                  label="Cobros registrados en Quipu" value={fmtEur(quipuCobrosTotal)}
-                                  footer={<span className="text-[10px] text-slate-400">{quipuCobrosAnio.length} cobros · Año {filterYear}</span>} />
+                                  label={t("Cobros registrados en Quipu")} value={fmtEur(quipuCobrosTotal)}
+                                  footer={<span className="text-[10px] text-slate-400">{quipuCobrosAnio.length}{" "}{t("cobros · Año")}{" "}{filterYear}</span>} />
                               </div>
                               {quipuBankAccounts.length > 0 && (
                                 <div className="flex flex-col gap-1.5">
@@ -3208,22 +3162,22 @@ function FacturacionContent() {
               })()}
 
               {tab === "facturas" && (
-                <TableShell title="Facturas de cliente" count={`${filteredFacturas.length} facturas`} headers={["Número", "Cliente", "Expediente", "Área", "Serie", "Vencimiento", "Total", "Estado", ""]}
+                <TableShell title={t("Facturas de cliente")} count={`${filteredFacturas.length} facturas`} headers={["Número", "Cliente", "Expediente", "Área", "Serie", "Vencimiento", "Total", "Estado", ""]}
                   mobileCards={filteredFacturas.map((row) => (
                     <FinanceRecordCard
                       key={row.id}
                       num={row.num}
                       title={row.contacto}
-                      subtitle={row.expedienteRef || "Sin expediente"}
+                      subtitle={row.expedienteRef || t("Sin expediente")}
                       meta={`${AREA_LABELS[row.area]} · Vence ${fmtDate(row.vencimiento)}`}
                       amount={fmtEur(row.total)}
                       estado={row.estado}
                       actions={
                         <>
-                          <ActionIconButton title="Editar factura" onClick={() => openEditor("factura", row)}>
+                          <ActionIconButton title={t("Editar factura")} onClick={() => openEditor("factura", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar factura" tone="red" onClick={() => removeRecord("factura", row.id)}>
+                          <ActionIconButton title={t("Borrar factura")} tone="red" onClick={() => removeRecord("factura", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </>
@@ -3238,7 +3192,7 @@ function FacturacionContent() {
                         <ClientRecordLink clientId={row.clientId} label={row.contacto} />
                         <div className="text-xs text-slate-400">{row.responsable}</div>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || t("Sin expediente")}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{AREA_LABELS[row.area]}</td>
                       <td className="px-5 py-3"><span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{row.serie}</span></td>
                       <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(row.vencimiento)}</td>
@@ -3247,7 +3201,7 @@ function FacturacionContent() {
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
                           {quipuStatus.connected && !row.quipuId && (
-                            <ActionIconButton title="Enviar a Quipu" onClick={() => pushToQuipu(row.id)}>
+                            <ActionIconButton title={t("Enviar a Quipu")} onClick={() => pushToQuipu(row.id)}>
                               {pushingToQuipuId === row.id
                                 ? <Loader2 size={13} className="animate-spin" />
                                 : <Upload size={13} />}
@@ -3255,20 +3209,20 @@ function FacturacionContent() {
                           )}
                           {row.quipuId && (
                             <>
-                              <span title="Ya en Quipu" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-500">
+                              <span title={t("Ya en Quipu")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-500">
                                 <CheckCircle2 size={13} />
                               </span>
-                              <ActionIconButton title="Abrir PDF de Quipu" onClick={() => openQuipuInvoicePdf(row)}>
+                              <ActionIconButton title={t("Abrir PDF de Quipu")} onClick={() => openQuipuInvoicePdf(row)}>
                                 {openingQuipuPdfId === row.id
                                   ? <Loader2 size={13} className="animate-spin" />
                                   : <ExternalLink size={13} />}
                               </ActionIconButton>
                             </>
                           )}
-                          <ActionIconButton title="Editar factura" onClick={() => openEditor("factura", row)}>
+                          <ActionIconButton title={t("Editar factura")} onClick={() => openEditor("factura", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar factura" tone="red" onClick={() => removeRecord("factura", row.id)}>
+                          <ActionIconButton title={t("Borrar factura")} tone="red" onClick={() => removeRecord("factura", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </div>
@@ -3281,31 +3235,28 @@ function FacturacionContent() {
               {tab === "gastos" && gastos.some((g) => g.reciboEstado && g.reciboEstado !== "recibido") && (
                 <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  <span>
-                    Hay <strong>{gastos.filter((g) => g.reciboEstado && g.reciboEstado !== "recibido").length}</strong> pago(s) en efectivo a procuradores sin recibo.
-                    Pídelo con el sobre o imprime uno para que lo firme, y márcalo con el ✓ cuando lo tengáis.
-                  </span>
+                  <span>{t("Hay")}{" "}<strong>{gastos.filter((g) => g.reciboEstado && g.reciboEstado !== "recibido").length}</strong>{" "}{t("pago(s) en efectivo a procuradores sin recibo. Pídelo con el sobre o imprime uno para que lo firme, y márcalo con el ✓ cuando lo tengáis.")}</span>
                 </div>
               )}
 
               {tab === "gastos" && (
-                <TableShell title="Gastos del despacho" count={`${filteredGastos.length} gastos`} headers={["Número", "Proveedor", "Categoría", "Área", "Responsable", "Fecha", "Total", "Estado", ""]}
+                <TableShell title={t("Gastos del despacho")} count={`${filteredGastos.length} gastos`} headers={["Número", "Proveedor", "Categoría", "Área", "Responsable", "Fecha", "Total", "Estado", ""]}
                   mobileCards={filteredGastos.map((row) => (
                     <FinanceRecordCard
                       key={row.id}
                       num={row.num}
                       title={row.proveedor}
-                      subtitle={row.reciboEstado ? ({ pendiente: "Recibo pendiente", solicitado: "Recibo solicitado", recibido: "Recibo recibido" } as const)[row.reciboEstado] : row.deducible ? "Deducible" : "No deducible"}
+                      subtitle={row.reciboEstado ? ({ pendiente: "Recibo pendiente", solicitado: "Recibo solicitado", recibido: "Recibo recibido" } as const)[row.reciboEstado] : row.deducible ? t("Deducible") : t("No deducible")}
                       meta={`${row.cat} · ${AREA_LABELS[row.area]} · ${fmtDate(row.fecha)}`}
                       amount={fmtEur(row.total)}
                       estado={row.estado}
                       actions={
                         <>
                           <ReciboAcciones pago={row} despacho={organizacion?.nombre || "el despacho"} onActualizado={(fila) => setGastos((current) => current.map((g) => (g.id === fila.id ? { ...g, reciboEstado: (fila.recibo_estado || null) as ReciboEstado } : g)))} />
-                          <ActionIconButton title="Editar gasto" onClick={() => openEditor("gasto", row)}>
+                          <ActionIconButton title={t("Editar gasto")} onClick={() => openEditor("gasto", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar gasto" tone="red" onClick={() => removeRecord("gasto", row.id)}>
+                          <ActionIconButton title={t("Borrar gasto")} tone="red" onClick={() => removeRecord("gasto", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </>
@@ -3319,7 +3270,7 @@ function FacturacionContent() {
                       <td className="px-5 py-3 text-sm text-slate-600">
                         <div className="font-medium text-slate-700">{row.proveedor}</div>
                         <div className="text-xs text-slate-400">
-                          {row.procuradorId ? "Pago a procurador" : row.deducible ? "Deducible" : "No deducible"}
+                          {row.procuradorId ? t("Pago a procurador") : row.deducible ? t("Deducible") : t("No deducible")}
                           {row.formaPago ? ` · ${PAYMENT_LABELS[row.formaPago as PaymentMethod] || row.formaPago}` : ""}
                           {row.expedienteRef ? ` · ${row.expedienteRef}` : ""}
                         </div>
@@ -3338,10 +3289,10 @@ function FacturacionContent() {
                       <td className="px-5 py-3"><EstadoBadge estado={row.estado} /></td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
-                          <ActionIconButton title="Editar gasto" onClick={() => openEditor("gasto", row)}>
+                          <ActionIconButton title={t("Editar gasto")} onClick={() => openEditor("gasto", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar gasto" tone="red" onClick={() => removeRecord("gasto", row.id)}>
+                          <ActionIconButton title={t("Borrar gasto")} tone="red" onClick={() => removeRecord("gasto", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </div>
@@ -3352,22 +3303,22 @@ function FacturacionContent() {
               )}
 
               {tab === "presupuestos" && (
-                <TableShell title="Presupuestos y ofertas" count={`${filteredPresupuestos.length} presupuestos`} headers={["Número", "Cliente", "Expediente", "Área", "Fecha", "Total", "Estado", ""]}
+                <TableShell title={t("Presupuestos y ofertas")} count={`${filteredPresupuestos.length} presupuestos`} headers={["Número", "Cliente", "Expediente", "Área", "Fecha", "Total", "Estado", ""]}
                   mobileCards={filteredPresupuestos.map((row) => (
                     <FinanceRecordCard
                       key={row.id}
                       num={row.num}
                       title={row.contacto}
-                      subtitle={row.expedienteRef || "Sin expediente"}
+                      subtitle={row.expedienteRef || t("Sin expediente")}
                       meta={`${AREA_LABELS[row.area]} · ${fmtDate(row.fecha)}`}
                       amount={fmtEur(row.total)}
                       estado={row.estado}
                       actions={
                         <>
-                          <ActionIconButton title="Editar presupuesto" onClick={() => openEditor("presupuesto", row)}>
+                          <ActionIconButton title={t("Editar presupuesto")} onClick={() => openEditor("presupuesto", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar presupuesto" tone="red" onClick={() => removeRecord("presupuesto", row.id)}>
+                          <ActionIconButton title={t("Borrar presupuesto")} tone="red" onClick={() => removeRecord("presupuesto", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </>
@@ -3382,17 +3333,17 @@ function FacturacionContent() {
                         <ClientRecordLink clientId={row.clientId} label={row.contacto} />
                         <div className="text-xs text-slate-400">{row.responsable}</div>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || t("Sin expediente")}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{AREA_LABELS[row.area]}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(row.fecha)}</td>
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{fmtEur(row.total)}</td>
                       <td className="px-5 py-3"><EstadoBadge estado={row.estado} /></td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
-                          <ActionIconButton title="Editar presupuesto" onClick={() => openEditor("presupuesto", row)}>
+                          <ActionIconButton title={t("Editar presupuesto")} onClick={() => openEditor("presupuesto", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
-                          <ActionIconButton title="Borrar presupuesto" tone="red" onClick={() => removeRecord("presupuesto", row.id)}>
+                          <ActionIconButton title={t("Borrar presupuesto")} tone="red" onClick={() => removeRecord("presupuesto", row.id)}>
                             <Trash2 size={14} />
                           </ActionIconButton>
                         </div>
@@ -3407,9 +3358,7 @@ function FacturacionContent() {
 
           {loading && (
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
-              <RefreshCw size={16} className="animate-spin" />
-              Cargando datos reales de facturación...
-            </div>
+              <RefreshCw size={16} className="animate-spin" />{t("Cargando datos reales de facturación...")}</div>
           )}
         </div>
       </div>
@@ -3554,7 +3503,7 @@ function BankAccountsTab({
   const hasAnyAccount = manualAccounts.length > 0 || accounts.length > 0;
 
   if (!connected) {
-    return <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cuentas bancarias.</div>;
+    return <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">{t("Conecta Quipu para ver cuentas bancarias.")}</div>;
   }
 
   return (
@@ -3564,54 +3513,51 @@ function BankAccountsTab({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-base font-bold text-slate-800">Bancos</h3>
+          <h3 className="text-base font-bold text-slate-800">{t("Bancos")}</h3>
           {!selectedId && hasAnyAccount && (
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${totalBalance >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-              <Landmark size={12} /> Saldo total: {fmtEur(totalBalance)}
+              <Landmark size={12} />{" "}{t("Saldo total:")}{" "}{fmtEur(totalBalance)}
             </span>
           )}
         </div>
         <button onClick={onRefresh} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Actualizar
-        </button>
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />{" "}{t("Actualizar")}</button>
       </div>
 
       {/* Add account modal */}
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editingAcc ? "Editar cuenta" : "Nueva cuenta bancaria"}
+        title={editingAcc ? t("Editar cuenta") : t("Nueva cuenta bancaria")}
         maxWidth="max-w-md"
         footer={
           <>
-            <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+            <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
             <button onClick={saveForm} disabled={saving || !form.name.trim()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
-            </button>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{" "}{t("Guardar")}</button>
           </>
         }
       >
         <div className="space-y-4">
-          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nombre *</span>
-            <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Ej: Cuenta corriente Sabadell" /></label>
-          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Nombre *")}</span>
+            <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder={t("Ej: Cuenta corriente Sabadell")} /></label>
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Saldo (€)")}</span>
             <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
 
           {showMoreFields ? (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
-                  <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
-                  <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Banco")}</span>
+                  <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder={t("Sabadell")} /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("IBAN")}</span>
+                  <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder={t("ES12 1234...")} /></label>
               </div>
-              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Notas")}</span>
                 <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
             </>
           ) : (
             <button type="button" onClick={() => setShowMoreFields(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
-              <ChevronDown size={13} /> Añadir banco, IBAN o notas (opcional)
-            </button>
+              <ChevronDown size={13} />{" "}{t("Añadir banco, IBAN o notas (opcional)")}</button>
           )}
         </div>
       </Modal>
@@ -3624,14 +3570,11 @@ function BankAccountsTab({
               <Landmark size={28} />
             </div>
             <div>
-              <h4 className="text-base font-bold text-slate-800">Aún no tienes cuentas bancarias</h4>
-              <p className="mt-1.5 max-w-sm text-sm text-slate-500">
-                Añade una cuenta manualmente para llevar el control del saldo, o sincroniza Quipu desde Configuración para importarlas automáticamente.
-              </p>
+              <h4 className="text-base font-bold text-slate-800">{t("Aún no tienes cuentas bancarias")}</h4>
+              <p className="mt-1.5 max-w-sm text-sm text-slate-500">{t("Añade una cuenta manualmente para llevar el control del saldo, o sincroniza Quipu desde Configuración para importarlas automáticamente.")}</p>
             </div>
             <button onClick={() => openForm()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-800 transition-colors">
-              <Plus size={14} /> Añadir cuenta bancaria
-            </button>
+              <Plus size={14} />{" "}{t("Añadir cuenta bancaria")}</button>
           </div>
         ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -3645,7 +3588,7 @@ function BankAccountsTab({
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{acc.bank_name ? `${acc.bank_name}${acc.iban ? ` *${acc.iban.slice(-4)}` : ""}` : acc.iban || "Cuenta manual"}</p>
+                    <p className="text-xs text-slate-500 truncate">{acc.bank_name ? `${acc.bank_name}${acc.iban ? ` *${acc.iban.slice(-4)}` : ""}` : acc.iban || t("Cuenta manual")}</p>
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -3654,19 +3597,19 @@ function BankAccountsTab({
                 </div>
               </div>
               <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2">{acc.currency} · Introducida manualmente</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2">{acc.currency}{" "}{t("· Introducida manualmente")}</p>
             </div>
           ))}
 
           {/* Add account button */}
           <button onClick={() => openForm()} className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center hover:border-red-300 hover:bg-red-50/50 transition-colors group min-h-[140px] flex flex-col items-center justify-center">
             <Plus size={24} className="text-slate-400 group-hover:text-red-600 mb-2 transition-colors" />
-            <p className="text-sm font-semibold text-slate-500 group-hover:text-red-700 transition-colors">Añadir cuenta bancaria</p>
-            <p className="text-xs text-slate-400 mt-1">Introduce el saldo manualmente</p>
+            <p className="text-sm font-semibold text-slate-500 group-hover:text-red-700 transition-colors">{t("Añadir cuenta bancaria")}</p>
+            <p className="text-xs text-slate-400 mt-1">{t("Introduce el saldo manualmente")}</p>
           </button>
 
           {loading ? (
-            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted label="Cargando..." /></div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted label={t("Cargando...")} /></div>
           ) : null}
           {accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
@@ -3688,10 +3631,10 @@ function BankAccountsTab({
               <div className="mt-3 flex items-center justify-between">
                 <div>
                   <p className="text-lg font-bold text-slate-700">{transactions.filter(t => !reviewed.has(t.id)).length || "—"}</p>
-                  <p className="text-[11px] text-slate-400">Movimientos por conciliar</p>
+                  <p className="text-[11px] text-slate-400">{t("Movimientos por conciliar")}</p>
                 </div>
                 {lastSyncAt && (
-                  <p className="text-[11px] text-slate-400 text-right">Sincronizada: {fmtDate(lastSyncAt)}</p>
+                  <p className="text-[11px] text-slate-400 text-right">{t("Sincronizada:")}{" "}{fmtDate(lastSyncAt)}</p>
                 )}
               </div>
             </button>
@@ -3717,7 +3660,7 @@ function BankAccountsTab({
               <p className={`text-xl font-bold ${(selectedAcc?.balance ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {fmtEur(selectedAcc?.balance ?? 0)}
               </p>
-              {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {fmtDate(lastSyncAt)}</p>}
+              {lastSyncAt && <p className="text-[11px] text-slate-400">{t("Última sincronización")}{" "}{fmtDate(lastSyncAt)}</p>}
             </div>
           </div>
 
@@ -3725,9 +3668,9 @@ function BankAccountsTab({
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
             <select value={txDirection} onChange={e => setTxDirection(e.target.value as any)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
-              <option value="all">Cualquier estado</option>
-              <option value="in">Entradas</option>
-              <option value="out">Salidas</option>
+              <option value="all">{t("Cualquier estado")}</option>
+              <option value="in">{t("Entradas")}</option>
+              <option value="out">{t("Salidas")}</option>
             </select>
             <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2">
               <input type="date" value={txFromDate} onChange={e => setTxFromDate(e.target.value)}
@@ -3739,7 +3682,7 @@ function BankAccountsTab({
             <div className="flex items-center gap-2 ml-auto">
               <div className="relative">
                 <input value={txSearch} onChange={e => setTxSearch(e.target.value)}
-                  placeholder="Buscar por concepto..."
+                  placeholder={t("Buscar por concepto...")}
                   className="rounded-lg border border-slate-200 bg-white pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-300 w-48" />
                 {txSearch && (
                   <button onClick={() => setTxSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -3753,17 +3696,16 @@ function BankAccountsTab({
           {/* Transactions table */}
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
-              <p className="text-xs text-slate-500">Mostrando {filtered.length} de {transactions.length} movimientos</p>
+              <p className="text-xs text-slate-500">{t("Mostrando")}{" "}{filtered.length}{" "}{t("de")}{" "}{transactions.length}{" "}{t("movimientos")}</p>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                  {pendingCount} por conciliar
-                </span>
+                  {pendingCount}{" "}{t("por conciliar")}</span>
               </div>
             </div>
             {loading ? (
-              <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label="Cargando movimientos..." /></div>
+              <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label={t("Cargando movimientos...")} /></div>
             ) : filtered.length === 0 ? (
-              <div className="py-12 text-center text-sm text-slate-400">No existen resultados para tu búsqueda.</div>
+              <div className="py-12 text-center text-sm text-slate-400">{t("No existen resultados para tu búsqueda.")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
@@ -3781,11 +3723,11 @@ function BankAccountsTab({
                         <tr key={tx.id} className="transition-colors hover:bg-slate-50/60">
                           <td className="px-5 py-3">
                             <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${isReviewed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                              {isReviewed ? "Revisado" : "Pendiente"}
+                              {isReviewed ? t("Revisado") : t("Pendiente")}
                             </span>
                           </td>
                           <td className="px-5 py-3">
-                            <p className="text-sm font-medium text-slate-700">{tx.description || "Sin descripción"}</p>
+                            <p className="text-sm font-medium text-slate-700">{tx.description || t("Sin descripción")}</p>
                             <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(tx.date)}</p>
                           </td>
                           <td className={`px-5 py-3 text-sm font-bold ${tx.amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>
@@ -3801,7 +3743,7 @@ function BankAccountsTab({
                               return next;
                             })}
                               className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${isReviewed ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}>
-                              {isReviewed ? "Desmarcar" : "Marcar revisado"}
+                              {isReviewed ? t("Desmarcar") : t("Marcar revisado")}
                             </button>
                           </td>
                         </tr>
@@ -3851,8 +3793,8 @@ function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Fact
 
   const legend = (
     <div className="mt-2 flex items-center justify-center gap-5">
-      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> Gastos</span>
-      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Ingresos</span>
+      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" />{" "}{t("Gastos")}</span>
+      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />{" "}{t("Ingresos")}</span>
     </div>
   );
 
@@ -3860,8 +3802,8 @@ function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Fact
     <div className="pointer-events-none absolute z-10 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl"
       style={{ left: tooltip.x, top: 10, transform: "translateX(-50%)" }}>
       <p className="font-bold mb-1">{tooltip.mes}</p>
-      <p className="text-emerald-400">Ingresos: {fmtEur(tooltip.ing)}</p>
-      <p className="text-red-400">Gastos: {fmtEur(tooltip.gas)}</p>
+      <p className="text-emerald-400">{t("Ingresos:")}{" "}{fmtEur(tooltip.ing)}</p>
+      <p className="text-red-400">{t("Gastos:")}{" "}{fmtEur(tooltip.gas)}</p>
     </div>
   );
 
@@ -3872,7 +3814,7 @@ function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Fact
     const total = totalIng + totalGas;
 
     if (total === 0) {
-      return <p className="py-10 text-center text-sm text-slate-400">Sin datos para el periodo seleccionado.</p>;
+      return <p className="py-10 text-center text-sm text-slate-400">{t("Sin datos para el periodo seleccionado.")}</p>;
     }
 
     const CX = 90; const CY = 90; const OR = 70; const IR = 40;
@@ -3894,21 +3836,21 @@ function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Fact
         <svg viewBox="0 0 180 180" style={{ width: 180, height: 180 }}>
           {totalIng > 0 && <path d={arc(0, ingAngle > 0 && ingAngle < 2 * Math.PI ? ingAngle : ingAngle - 0.001)} fill="#22c55e" />}
           {totalGas > 0 && <path d={arc(ingAngle, 2 * Math.PI - 0.001)} fill="#ef4444" />}
-          <text x={CX} y={CY - 6} textAnchor="middle" fontSize={9} fill="#64748b">Balance</text>
+          <text x={CX} y={CY - 6} textAnchor="middle" fontSize={9} fill="#64748b">{t("Balance")}</text>
           <text x={CX} y={CY + 8} textAnchor="middle" fontSize={11} fill={balance >= 0 ? "#16a34a" : "#dc2626"} fontWeight="bold">
             {balance >= 0 ? "+" : ""}{Math.abs(balance) >= 1000 ? `${(balance / 1000).toFixed(1)}K€` : `${balance.toFixed(0)}€`}
           </text>
         </svg>
         <div className="space-y-4">
           <div>
-            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-emerald-500 inline-block" /><span className="text-xs text-slate-500">Ingresos</span></div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-emerald-500 inline-block" /><span className="text-xs text-slate-500">{t("Ingresos")}</span></div>
             <p className="mt-1 text-base font-bold text-slate-800">{fmtEur(totalIng)}</p>
-            <p className="text-[11px] text-slate-400">{Math.round((totalIng / total) * 100)}% del total</p>
+            <p className="text-[11px] text-slate-400">{Math.round((totalIng / total) * 100)}{t("% del total")}</p>
           </div>
           <div>
-            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-red-500 inline-block" /><span className="text-xs text-slate-500">Gastos</span></div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-red-500 inline-block" /><span className="text-xs text-slate-500">{t("Gastos")}</span></div>
             <p className="mt-1 text-base font-bold text-slate-800">{fmtEur(totalGas)}</p>
-            <p className="text-[11px] text-slate-400">{Math.round((totalGas / total) * 100)}% del total</p>
+            <p className="text-[11px] text-slate-400">{Math.round((totalGas / total) * 100)}{t("% del total")}</p>
           </div>
         </div>
       </div>
@@ -4012,7 +3954,7 @@ function ClientIncomeChart({ facturas }: { facturas: Factura[] }) {
   const rows = Array.from(byClient.values()).sort((a, b) => b.total - a.total).slice(0, 8);
 
   if (rows.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-400">Sin datos de ingresos para el periodo seleccionado.</p>;
+    return <p className="py-6 text-center text-sm text-slate-400">{t("Sin datos de ingresos para el periodo seleccionado.")}</p>;
   }
 
   const maxVal = Math.max(...rows.map(r => r.total), 1);
@@ -4083,7 +4025,7 @@ function BankBalanceChart({
     // Just show a flat line at current balance
     return (
       <div className="flex items-center justify-center h-full text-xs text-slate-400">
-        {allPts.length === 0 ? "Sin movimientos" : fmtEur(currentBalance)}
+        {allPts.length === 0 ? t("Sin movimientos") : fmtEur(currentBalance)}
       </div>
     );
   }
@@ -4174,13 +4116,13 @@ function ContactEditorModal({
     <Modal
       open
       onClose={onClose}
-      title={initial ? "Editar contacto" : "Nuevo contacto"}
-      subtitle="Contacto Quipu"
+      title={initial ? t("Editar contacto") : t("Nuevo contacto")}
+      subtitle={t("Contacto Quipu")}
       icon={<Users size={16} />}
       maxWidth="max-w-md"
       footer={
         <>
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">{t("Cancelar")}</button>
           <button
             onClick={() => form.name.trim() && onSave({
               ...form,
@@ -4197,7 +4139,7 @@ function ContactEditorModal({
             disabled={!form.name.trim() || saving}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 rounded-xl active:scale-95 transition-all">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {initial ? "Guardar cambios" : "Crear contacto"}
+            {initial ? t("Guardar cambios") : t("Crear contacto")}
           </button>
         </>
       }
@@ -4205,48 +4147,48 @@ function ContactEditorModal({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Tipo</label>
+              <label className={lbl}>{t("Tipo")}</label>
               <select value={form.kind} onChange={e => set("kind", e.target.value)} className={inp}>
-                <option value="client">Cliente</option>
-                <option value="provider">Proveedor</option>
-                <option value="both">Ambos</option>
+                <option value="client">{t("Cliente")}</option>
+                <option value="provider">{t("Proveedor")}</option>
+                <option value="both">{t("Ambos")}</option>
               </select>
             </div>
             <div>
-              <label className={lbl}>NIF / CIF</label>
+              <label className={lbl}>{t("NIF / CIF")}</label>
               <input value={form.taxId} onChange={e => set("taxId", e.target.value)} placeholder="B12345678" className={inp} />
             </div>
           </div>
           <div>
-            <label className={lbl}>Nombre *</label>
-            <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Nombre del contacto" className={inp} />
+            <label className={lbl}>{t("Nombre *")}</label>
+            <input value={form.name} onChange={e => set("name", e.target.value)} placeholder={t("Nombre del contacto")} className={inp} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Email</label>
-              <input value={form.email} onChange={e => set("email", e.target.value)} placeholder="email@ejemplo.com" type="email" className={inp} />
+              <label className={lbl}>{t("Email")}</label>
+              <input value={form.email} onChange={e => set("email", e.target.value)} placeholder={t("email@ejemplo.com")} type="email" className={inp} />
             </div>
             <div>
-              <label className={lbl}>Teléfono</label>
+              <label className={lbl}>{t("Teléfono")}</label>
               <input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+34 600 000 000" className={inp} />
             </div>
           </div>
           <div>
-            <label className={lbl}>Dirección</label>
-            <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Calle Mayor 1, Madrid" className={inp} />
+            <label className={lbl}>{t("Dirección")}</label>
+            <input value={form.address} onChange={e => set("address", e.target.value)} placeholder={t("Calle Mayor 1, Madrid")} className={inp} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className={lbl}>Ciudad</label>
-              <input value={form.town} onChange={e => set("town", e.target.value)} placeholder="Madrid" className={inp} />
+              <label className={lbl}>{t("Ciudad")}</label>
+              <input value={form.town} onChange={e => set("town", e.target.value)} placeholder={t("Madrid")} className={inp} />
             </div>
             <div>
-              <label className={lbl}>Código postal</label>
+              <label className={lbl}>{t("Código postal")}</label>
               <input value={form.zipCode} onChange={e => set("zipCode", e.target.value)} placeholder="28001" className={inp} />
             </div>
             <div>
-              <label className={lbl}>País</label>
-              <input value={form.country} onChange={e => set("country", e.target.value)} placeholder="España" className={inp} />
+              <label className={lbl}>{t("País")}</label>
+              <input value={form.country} onChange={e => set("country", e.target.value)} placeholder={t("España")} className={inp} />
             </div>
           </div>
         </div>

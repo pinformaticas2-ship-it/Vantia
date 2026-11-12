@@ -1,3 +1,4 @@
+import { t } from './i18n';
 // Datos del ERP → campos de la calculadora de tasación de costas y jura de
 // cuentas (public/herramientas/costas.html). Las claves son los id de sus
 // campos. Lo que no se sabe no se manda: la calculadora lo deja en blanco.
@@ -124,9 +125,9 @@ export function datosCalculadora(opts: {
     if (!f.cuant && !f.indet) falta.push("cuantía");
     if (!f.proc) falta.push("tipo de procedimiento");
   }
-  const origen = e ? `del expediente ${refExpediente(e)}` : c ? "del cliente" : "";
+  const origen = e ? t("del expediente {ref}", { ref: refExpediente(e) }) : c ? "del cliente" : "";
   const aviso = origen
-    ? `Datos cargados ${origen}.` + (falta.length ? ` Faltan: ${falta.join(", ")}.` : "") +
+    ? t("Datos cargados {origen}.", { origen }) + (falta.length ? ` Faltan: ${falta.join(", ")}.` : "") +
       " Sube la sentencia o el decreto para completar fechas, condena y posición del cliente."
     : undefined;
   return { campos: f, localidad: e?.centro || undefined, aviso };

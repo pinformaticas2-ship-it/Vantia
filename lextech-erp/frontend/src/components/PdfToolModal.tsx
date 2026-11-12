@@ -5,6 +5,7 @@ import {
   X, Loader2, Plus, ArrowUp, ArrowDown, Trash2, RotateCw, ChevronDown, ChevronRight,
   ChevronLeft, FileText, Combine, AlertTriangle, CheckCircle2,
 } from "lucide-react";
+import { t } from '../lib/i18n';
 
 // Herramienta PDF de los documentos de un cliente o expediente: fusionar
 // varios documentos (PDF, Word, Excel, imágenes) en un único PDF y retoques
@@ -74,7 +75,7 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
       const res = await fetch(`/api/files/${entityId}/${file.id}/as-pdf`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const j = await res.json().catch(() => null);
-        throw new Error(j?.error || "No se pudo abrir el documento");
+        throw new Error(j?.error || t("No se pudo abrir el documento"));
       }
       const data = new Uint8Array(await res.arrayBuffer());
       const pdfjs = await loadPdfjs();
@@ -148,11 +149,11 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
         body: JSON.stringify(body),
       });
       const j = await res.json().catch(() => null);
-      if (!res.ok || !j?.success) throw new Error(j?.error || "No se pudo crear el PDF");
+      if (!res.ok || !j?.success) throw new Error(j?.error || t("No se pudo crear el PDF"));
       setHecho(j.data);
       onDone(j.data);
     } catch (e: any) {
-      setError(e?.message || "No se pudo crear el PDF");
+      setError(e?.message || t("No se pudo crear el PDF"));
     } finally {
       setGuardando(false);
     }
@@ -165,8 +166,8 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
       <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-800"><Combine size={18} className="text-red-600" /> Fusionar y editar PDF</h2>
-            <p className="text-xs text-slate-500">Une documentos en un solo PDF, quita, ordena o gira páginas. Se guarda como un documento nuevo; los originales no se tocan.</p>
+            <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-800"><Combine size={18} className="text-red-600" />{" "}{t("Fusionar y editar PDF")}</h2>
+            <p className="text-xs text-slate-500">{t("Une documentos en un solo PDF, quita, ordena o gira páginas. Se guarda como un documento nuevo; los originales no se tocan.")}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
         </div>
@@ -174,19 +175,19 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
         {hecho ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
             <CheckCircle2 size={40} className="text-emerald-500" />
-            <p className="text-lg font-bold text-slate-800">PDF creado</p>
-            <p className="text-sm text-slate-500"><b>{hecho.original_name}</b> · {hecho.paginas} página{hecho.paginas === 1 ? "" : "s"} · ya está en los documentos.</p>
+            <p className="text-lg font-bold text-slate-800">{t("PDF creado")}</p>
+            <p className="text-sm text-slate-500"><b>{hecho.original_name}</b> · {hecho.paginas}{" "}{t("página")}{hecho.paginas === 1 ? "" : "s"}{" "}{t("· ya está en los documentos.")}</p>
             <div className="mt-2 flex gap-2">
-              <button type="button" onClick={() => { setHecho(null); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Crear otro</button>
-              <button type="button" onClick={onClose} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">Cerrar</button>
+              <button type="button" onClick={() => { setHecho(null); }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Crear otro")}</button>
+              <button type="button" onClick={onClose} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">{t("Cerrar")}</button>
             </div>
           </div>
         ) : (
           <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[280px_1fr]">
             {/* Documentos disponibles */}
             <div className="min-h-0 overflow-y-auto border-slate-200 bg-slate-50 p-4 lg:border-r">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Documentos de la ficha</h3>
-              {disponibles.length === 0 && <p className="text-xs text-slate-400">No hay documentos PDF, Word, Excel o imágenes.</p>}
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">{t("Documentos de la ficha")}</h3>
+              {disponibles.length === 0 && <p className="text-xs text-slate-400">{t("No hay documentos PDF, Word, Excel o imágenes.")}</p>}
               <ul className="space-y-1">
                 {disponibles.map((f) => (
                   <li key={f.id}>
@@ -194,13 +195,13 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
                       className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-white">
                       <FileText size={14} className="shrink-0 text-slate-400" />
                       <span className="min-w-0 flex-1 truncate" title={nombreDe(f)}>{nombreDe(f)}</span>
-                      {enLista.has(f.id) && <span className="text-[10px] text-emerald-600">añadido</span>}
+                      {enLista.has(f.id) && <span className="text-[10px] text-emerald-600">{t("añadido")}</span>}
                       <Plus size={14} className="shrink-0 text-slate-300 group-hover:text-red-600" />
                     </button>
                   </li>
                 ))}
               </ul>
-              <p className="mt-3 text-[11px] text-slate-400">Los Word, Excel e imágenes se convierten a PDF. Puedes añadir el mismo documento varias veces.</p>
+              <p className="mt-3 text-[11px] text-slate-400">{t("Los Word, Excel e imágenes se convierten a PDF. Puedes añadir el mismo documento varias veces.")}</p>
             </div>
 
             {/* Composición */}
@@ -208,48 +209,46 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
                 {partes.length === 0 && (
                   <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-center text-sm text-slate-400">
-                    <Combine size={28} className="mb-2" />
-                    Elige a la izquierda los documentos a unir, en orden.<br />Con uno solo, puedes quitar, ordenar o girar sus páginas.
-                  </div>
+                    <Combine size={28} className="mb-2" />{t("Elige a la izquierda los documentos a unir, en orden.")}<br />{t("Con uno solo, puedes quitar, ordenar o girar sus páginas.")}</div>
                 )}
                 {partes.map((p, i) => {
                   const incluidas = p.paginas.filter((x) => x.incluida).length;
                   return (
                     <div key={p.key} className="rounded-xl border border-slate-200 bg-white">
                       <div className="flex items-center gap-2 px-3 py-2">
-                        {numerarDocumentos && <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">Doc. {primerNumero + i}</span>}
+                        {numerarDocumentos && <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">{t("Doc.")}{" "}{primerNumero + i}</span>}
                         <button type="button" onClick={() => updateParte(p.key, { abierta: !p.abierta })} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                           {p.abierta ? <ChevronDown size={14} className="shrink-0 text-slate-400" /> : <ChevronRight size={14} className="shrink-0 text-slate-400" />}
                           <span className="truncate text-sm font-semibold text-slate-800" title={nombreDe(p.file)}>{nombreDe(p.file)}</span>
                         </button>
                         <span className="shrink-0 text-xs text-slate-500">
                           {p.estado === "cargando" ? <Loader2 size={13} className="animate-spin" />
-                            : p.estado === "error" ? <span className="peligro text-red-600">no se puede abrir</span>
-                            : `${incluidas} de ${p.paginas.length} pág.`}
+                            : p.estado === "error" ? <span className="peligro text-red-600">{t("no se puede abrir")}</span>
+                            : t("{incluidas} de {length} pág.", { incluidas: incluidas, length: p.paginas.length })}
                         </span>
-                        <button type="button" title="Subir" onClick={() => mover(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp size={14} /></button>
-                        <button type="button" title="Bajar" onClick={() => mover(i, 1)} disabled={i === partes.length - 1} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown size={14} /></button>
-                        <button type="button" title="Quitar" onClick={() => setPartes((ps) => ps.filter((x) => x.key !== p.key))} className="peligro rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                        <button type="button" title={t("Subir")} onClick={() => mover(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp size={14} /></button>
+                        <button type="button" title={t("Bajar")} onClick={() => mover(i, 1)} disabled={i === partes.length - 1} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown size={14} /></button>
+                        <button type="button" title={t("Quitar")} onClick={() => setPartes((ps) => ps.filter((x) => x.key !== p.key))} className="peligro rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                       </div>
                       {p.estado === "error" && <p className="peligro flex items-center gap-1.5 border-t border-slate-100 px-3 py-2 text-xs text-red-600"><AlertTriangle size={12} /> {p.error}</p>}
                       {p.abierta && p.estado === "ok" && (
                         <div className="border-t border-slate-100 p-3">
-                          <p className="mb-2 text-[11px] text-slate-400">Pulsa una página para quitarla o volver a incluirla. Las flechas la mueven; ↻ la gira.</p>
+                          <p className="mb-2 text-[11px] text-slate-400">{t("Pulsa una página para quitarla o volver a incluirla. Las flechas la mueven; ↻ la gira.")}</p>
                           <div className="flex flex-wrap gap-3">
                             {p.paginas.map((pg, k) => (
                               <div key={`${pg.index}-${k}`} className="w-[96px]">
                                 <button type="button" onClick={() => setPagina(p.key, k, { incluida: !pg.incluida })}
                                   className={`relative flex h-[128px] w-[96px] items-center justify-center overflow-hidden rounded-lg border-2 bg-slate-50 ${pg.incluida ? "border-slate-200 hover:border-red-300" : "border-dashed border-slate-300 opacity-40"}`}
-                                  title={pg.incluida ? "Quitar esta página" : "Volver a incluirla"}>
+                                  title={pg.incluida ? t("Quitar esta página") : t("Volver a incluirla")}>
                                   {p.miniaturas[pg.index]
                                     ? <img src={p.miniaturas[pg.index]} alt="" className="max-h-full max-w-full transition-transform" style={{ transform: `rotate(${pg.rotacion}deg)` }} />
                                     : <Loader2 size={14} className="animate-spin text-slate-300" />}
-                                  {!pg.incluida && <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-600">Quitada</span>}
+                                  {!pg.incluida && <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-red-600">{t("Quitada")}</span>}
                                 </button>
                                 <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500">
                                   <button type="button" onClick={() => moverPagina(p.key, k, -1)} disabled={k === 0} className="rounded p-0.5 hover:bg-slate-100 disabled:opacity-30"><ChevronLeft size={12} /></button>
                                   <span>{pg.index + 1}</span>
-                                  <button type="button" title="Girar" onClick={() => setPagina(p.key, k, { rotacion: (pg.rotacion + 90) % 360 })} className="rounded p-0.5 hover:bg-slate-100"><RotateCw size={11} /></button>
+                                  <button type="button" title={t("Girar")} onClick={() => setPagina(p.key, k, { rotacion: (pg.rotacion + 90) % 360 })} className="rounded p-0.5 hover:bg-slate-100"><RotateCw size={11} /></button>
                                   <button type="button" onClick={() => moverPagina(p.key, k, 1)} disabled={k === p.paginas.length - 1} className="rounded p-0.5 hover:bg-slate-100 disabled:opacity-30"><ChevronRight size={12} /></button>
                                 </div>
                               </div>
@@ -266,30 +265,26 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
               <div className="space-y-3 border-t border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-700">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={numerarDocumentos} onChange={(e) => setNumerarDocumentos(e.target.checked)} className="h-4 w-4 accent-red-600" />
-                    Sellar «DOCUMENTO Nº» en cada documento, desde el
-                    <input type="number" min={1} value={primerNumero} disabled={!numerarDocumentos}
+                    <input type="checkbox" checked={numerarDocumentos} onChange={(e) => setNumerarDocumentos(e.target.checked)} className="h-4 w-4 accent-red-600" />{t("Sellar «DOCUMENTO Nº» en cada documento, desde el")}<input type="number" min={1} value={primerNumero} disabled={!numerarDocumentos}
                       onChange={(e) => setPrimerNumero(Math.max(1, Number(e.target.value) || 1))}
                       className="w-14 rounded border border-slate-300 px-1.5 py-0.5 text-sm disabled:bg-slate-50" />
                   </label>
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={numerarPaginas} onChange={(e) => setNumerarPaginas(e.target.checked)} className="h-4 w-4 accent-red-600" />
-                    Numerar páginas («Página X de Y»)
-                  </label>
+                    <input type="checkbox" checked={numerarPaginas} onChange={(e) => setNumerarPaginas(e.target.checked)} className="h-4 w-4 accent-red-600" />{t("Numerar páginas («Página X de Y»)")}</label>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={180}
-                    placeholder={unSoloDoc ? `${nombreDe(partes[0].file).replace(/\.[^.]+$/, "")} (editado).pdf` : "Nombre del PDF (opcional)"}
+                    placeholder={unSoloDoc ? t("{replace} (editado).pdf", { replace: nombreDe(partes[0].file).replace(/\.[^.]+$/, "") }) : t("Nombre del PDF (opcional)")}
                     className="min-w-[200px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100" />
-                  <span className="text-xs text-slate-500">{totalPaginas} página{totalPaginas === 1 ? "" : "s"}</span>
+                  <span className="text-xs text-slate-500">{totalPaginas}{" "}{t("página")}{totalPaginas === 1 ? "" : "s"}</span>
                   <button type="button" onClick={() => void crear()}
                     disabled={guardando || cargando || conError || totalPaginas === 0}
                     className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
                     {guardando ? <Loader2 size={14} className="animate-spin" /> : <Combine size={14} />}
-                    {unSoloDoc ? "Guardar PDF editado" : "Crear PDF fusionado"}
+                    {unSoloDoc ? t("Guardar PDF editado") : t("Crear PDF fusionado")}
                   </button>
                 </div>
-                {conError && <p className="text-xs text-amber-700">Quita los documentos que no se pueden abrir para continuar.</p>}
+                {conError && <p className="text-xs text-amber-700">{t("Quita los documentos que no se pueden abrir para continuar.")}</p>}
                 {error && <p className="peligro text-xs text-red-600">{error}</p>}
               </div>
             </div>

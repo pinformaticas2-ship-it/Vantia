@@ -10,6 +10,7 @@ import {
   Minus, Quote, Redo2, Strikethrough, Table as TableIcon, Underline as UnderlineIcon, Undo2,
 } from "lucide-react";
 import "./editorTexto.css";
+import { t } from '../lib/i18n';
 
 // Editor de texto de Vantia (Documentos). TipTap guarda y devuelve HTML
 // sencillo (p, h1-h3, listas, tablas, cita...), que es lo que el backend
@@ -50,9 +51,9 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
   const enTabla = editor.isActive("table");
 
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto px-3 py-1.5" role="toolbar" aria-label="Formato del texto">
-      <button type="button" title="Deshacer (Ctrl+Z)" className={btn(false)} onClick={() => c().undo().run()} disabled={!editor.can().undo()}><Undo2 size={15} /></button>
-      <button type="button" title="Rehacer (Ctrl+Y)" className={btn(false)} onClick={() => c().redo().run()} disabled={!editor.can().redo()}><Redo2 size={15} /></button>
+    <div className="flex items-center gap-0.5 overflow-x-auto px-3 py-1.5" role="toolbar" aria-label={t("Formato del texto")}>
+      <button type="button" title={t("Deshacer (Ctrl+Z)")} className={btn(false)} onClick={() => c().undo().run()} disabled={!editor.can().undo()}><Undo2 size={15} /></button>
+      <button type="button" title={t("Rehacer (Ctrl+Y)")} className={btn(false)} onClick={() => c().redo().run()} disabled={!editor.can().redo()}><Redo2 size={15} /></button>
       <Separador />
       <select
         value={estilo}
@@ -62,40 +63,40 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
           else c().setHeading({ level: Number(v.slice(1)) as 1 | 2 | 3 }).run();
         }}
         className="h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none"
-        aria-label="Estilo de párrafo"
+        aria-label={t("Estilo de párrafo")}
       >
-        <option value="p">Texto normal</option>
-        <option value="h1">Título</option>
-        <option value="h2">Subtítulo</option>
-        <option value="h3">Apartado</option>
+        <option value="p">{t("Texto normal")}</option>
+        <option value="h1">{t("Título")}</option>
+        <option value="h2">{t("Subtítulo")}</option>
+        <option value="h3">{t("Apartado")}</option>
       </select>
       <Separador />
-      <button type="button" title="Negrita (Ctrl+B)" className={btn(editor.isActive("bold"))} onClick={() => c().toggleBold().run()}><Bold size={15} /></button>
-      <button type="button" title="Cursiva (Ctrl+I)" className={btn(editor.isActive("italic"))} onClick={() => c().toggleItalic().run()}><Italic size={15} /></button>
-      <button type="button" title="Subrayado (Ctrl+U)" className={btn(editor.isActive("underline"))} onClick={() => c().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
-      <button type="button" title="Tachado" className={btn(editor.isActive("strike"))} onClick={() => c().toggleStrike().run()}><Strikethrough size={15} /></button>
-      <button type="button" title="Resaltar" className={btn(editor.isActive("highlight"))} onClick={() => c().toggleHighlight().run()}><Highlighter size={15} /></button>
+      <button type="button" title={t("Negrita (Ctrl+B)")} className={btn(editor.isActive("bold"))} onClick={() => c().toggleBold().run()}><Bold size={15} /></button>
+      <button type="button" title={t("Cursiva (Ctrl+I)")} className={btn(editor.isActive("italic"))} onClick={() => c().toggleItalic().run()}><Italic size={15} /></button>
+      <button type="button" title={t("Subrayado (Ctrl+U)")} className={btn(editor.isActive("underline"))} onClick={() => c().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
+      <button type="button" title={t("Tachado")} className={btn(editor.isActive("strike"))} onClick={() => c().toggleStrike().run()}><Strikethrough size={15} /></button>
+      <button type="button" title={t("Resaltar")} className={btn(editor.isActive("highlight"))} onClick={() => c().toggleHighlight().run()}><Highlighter size={15} /></button>
       <Separador />
-      <button type="button" title="Alinear a la izquierda" className={btn(editor.isActive({ textAlign: "left" }))} onClick={() => c().setTextAlign("left").run()}><AlignLeft size={15} /></button>
-      <button type="button" title="Centrar" className={btn(editor.isActive({ textAlign: "center" }))} onClick={() => c().setTextAlign("center").run()}><AlignCenter size={15} /></button>
-      <button type="button" title="Alinear a la derecha" className={btn(editor.isActive({ textAlign: "right" }))} onClick={() => c().setTextAlign("right").run()}><AlignRight size={15} /></button>
-      <button type="button" title="Justificar" className={btn(editor.isActive({ textAlign: "justify" }))} onClick={() => c().setTextAlign("justify").run()}><AlignJustify size={15} /></button>
+      <button type="button" title={t("Alinear a la izquierda")} className={btn(editor.isActive({ textAlign: "left" }))} onClick={() => c().setTextAlign("left").run()}><AlignLeft size={15} /></button>
+      <button type="button" title={t("Centrar")} className={btn(editor.isActive({ textAlign: "center" }))} onClick={() => c().setTextAlign("center").run()}><AlignCenter size={15} /></button>
+      <button type="button" title={t("Alinear a la derecha")} className={btn(editor.isActive({ textAlign: "right" }))} onClick={() => c().setTextAlign("right").run()}><AlignRight size={15} /></button>
+      <button type="button" title={t("Justificar")} className={btn(editor.isActive({ textAlign: "justify" }))} onClick={() => c().setTextAlign("justify").run()}><AlignJustify size={15} /></button>
       <Separador />
-      <button type="button" title="Lista con viñetas" className={btn(editor.isActive("bulletList"))} onClick={() => c().toggleBulletList().run()}><List size={15} /></button>
-      <button type="button" title="Lista numerada" className={btn(editor.isActive("orderedList"))} onClick={() => c().toggleOrderedList().run()}><ListOrdered size={15} /></button>
-      <button type="button" title="Cita" className={btn(editor.isActive("blockquote"))} onClick={() => c().toggleBlockquote().run()}><Quote size={15} /></button>
-      <button type="button" title="Línea separadora" className={btn(false)} onClick={() => c().setHorizontalRule().run()}><Minus size={15} /></button>
+      <button type="button" title={t("Lista con viñetas")} className={btn(editor.isActive("bulletList"))} onClick={() => c().toggleBulletList().run()}><List size={15} /></button>
+      <button type="button" title={t("Lista numerada")} className={btn(editor.isActive("orderedList"))} onClick={() => c().toggleOrderedList().run()}><ListOrdered size={15} /></button>
+      <button type="button" title={t("Cita")} className={btn(editor.isActive("blockquote"))} onClick={() => c().toggleBlockquote().run()}><Quote size={15} /></button>
+      <button type="button" title={t("Línea separadora")} className={btn(false)} onClick={() => c().setHorizontalRule().run()}><Minus size={15} /></button>
       <Separador />
       {enTabla ? (
         <span className="flex shrink-0 items-center gap-0.5">
-          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().addRowAfter().run()}>+ Fila</button>
-          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().addColumnAfter().run()}>+ Columna</button>
-          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().deleteRow().run()}>− Fila</button>
-          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().deleteColumn().run()}>− Columna</button>
-          <button type="button" className={`${btn(false)} text-[11px] font-semibold text-red-600`} onClick={() => c().deleteTable().run()}>Quitar tabla</button>
+          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().addRowAfter().run()}>{t("+ Fila")}</button>
+          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().addColumnAfter().run()}>{t("+ Columna")}</button>
+          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().deleteRow().run()}>{t("− Fila")}</button>
+          <button type="button" className={`${btn(false)} text-[11px] font-semibold`} onClick={() => c().deleteColumn().run()}>{t("− Columna")}</button>
+          <button type="button" className={`${btn(false)} text-[11px] font-semibold text-red-600`} onClick={() => c().deleteTable().run()}>{t("Quitar tabla")}</button>
         </span>
       ) : (
-        <button type="button" title="Insertar tabla" className={btn(false)} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon size={15} /></button>
+        <button type="button" title={t("Insertar tabla")} className={btn(false)} onClick={() => c().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon size={15} /></button>
       )}
     </div>
   );

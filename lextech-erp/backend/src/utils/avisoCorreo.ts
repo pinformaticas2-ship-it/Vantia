@@ -4,6 +4,7 @@ import { decryptPassword } from './emailCrypto';
 import { dispatchEmail } from './mailer';
 import { SmtpConfig } from './smtp';
 import { TipoAviso } from './avisoPreferencias';
+import { idiomasDe, textosCorreoAviso, traducirAviso } from './idiomaAviso';
 
 // ── Avisos por correo (16/10/2026) ───────────────────────────────────────────
 // Segundo canal de los avisos push, para quien lo activa en Ajustes →
@@ -58,15 +59,20 @@ export async function enviarAvisoPorCorreo(
       const base = urlApp();
       const enlace = base && aviso.url ? `${base}${aviso.url.startsWith('/') ? '' : '/'}${aviso.url}` : '';
       const ajustes = base ? `${base}/dashboard/config?section=notificaciones` : '';
+      // En el idioma de cada persona (12/11/2026).
+      const idioma = (await idiomasDe([userId])).get(userId) || 'es';
+      const tx = textosCorreoAviso(idioma);
+      const titulo = idioma === 'en' ? traducirAviso(aviso.title) : aviso.title;
+      const cuerpo = idioma === 'en' ? traducirAviso(aviso.body) : aviso.body;
       const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1e293b;max-width:560px">
-<p style="font-size:16px;font-weight:bold;margin:0 0 8px">${escapar(aviso.title)}</p>
-<p style="margin:0 0 16px;white-space:pre-line">${escapar(aviso.body)}</p>
-${enlace ? `<p style="margin:0 0 24px"><a href="${escapar(enlace)}" style="background:#b91c1c;color:#fff;padding:9px 16px;border-radius:8px;text-decoration:none;font-weight:bold">Abrir en Vantia</a></p>` : ''}
-<p style="font-size:11px;color:#94a3b8;margin:0">Te llega porque tienes activados los avisos por correo en Vantia.${ajustes ? ` <a href="${escapar(ajustes)}" style="color:#94a3b8">Cambiar qué avisos recibo</a>.` : ''}</p>
+<p style="font-size:16px;font-weight:bold;margin:0 0 8px">${escapar(titulo)}</p>
+<p style="margin:0 0 16px;white-space:pre-line">${escapar(cuerpo)}</p>
+${enlace ? `<p style="margin:0 0 24px"><a href="${escapar(enlace)}" style="background:#b91c1c;color:#fff;padding:9px 16px;border-radius:8px;text-decoration:none;font-weight:bold">${tx.abrir}</a></p>` : ''}
+<p style="font-size:11px;color:#94a3b8;margin:0">${tx.motivo}${ajustes ? ` <a href="${escapar(ajustes)}" style="color:#94a3b8">${tx.cambiar}</a>.` : ''}</p>
 </div>`;
       await dispatchEmail(cuenta.smtp, {
-        from: cuenta.email, fromName: 'Avisos de Vantia', to: [destino],
-        subject: `Vantia · ${aviso.title}`, html, text: `${aviso.title}\n\n${aviso.body}${enlace ? `\n\n${enlace}` : ''}`,
+        from: cuenta.email, fromName: tx.remitente, to: [destino],
+        subject: `Vantia · ${titulo}`, html, text: `${titulo}\n\n${cuerpo}${enlace ? `\n\n${enlace}` : ''}`,
       });
       enviados++;
     } catch (e: any) {

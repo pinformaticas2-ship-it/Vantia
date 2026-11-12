@@ -2,3 +2,9 @@
 import './armazon';
 import './ajustes';
 import './mensajes';
+import './modulos';
+import './listas';
+import './variables';
+import './servidor';
+import './opciones';
+import './contextos';

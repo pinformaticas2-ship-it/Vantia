@@ -5,6 +5,7 @@ import { Link2, Plus, Trash2, Copy, Check, Loader2, AlertCircle, RefreshCw, Cloc
 import { safeJson } from "../lib/api";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { t } from '../lib/i18n';
 
 interface InviteLink {
   id: string;
@@ -67,7 +68,7 @@ export default function AltaConEnlace() {
       });
       const d = await safeJson(res);
       if (res.ok) setLinks(d.data || []);
-      else throw new Error(d.error || "Error al cargar los enlaces");
+      else throw new Error(d.error || t("Error al cargar los enlaces"));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -91,7 +92,7 @@ export default function AltaConEnlace() {
         body: JSON.stringify({ label: label.trim() }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "Error al crear el enlace");
+      if (!res.ok) throw new Error(d.error || t("Error al crear el enlace"));
       setLabel("");
       await fetchLinks();
     } catch (e: any) {
@@ -130,23 +131,21 @@ export default function AltaConEnlace() {
           <Link2 className="w-6 h-6 text-blue-600" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">Alta con enlace</h1>
-          <p className="text-sm text-slate-500">
-            Genera un enlace único para que el cliente rellene sus datos directamente.
-          </p>
+          <h1 className="text-xl font-semibold text-slate-800">{t("Alta con enlace")}</h1>
+          <p className="text-sm text-slate-500">{t("Genera un enlace único para que el cliente rellene sus datos directamente.")}</p>
         </div>
       </div>
 
       {/* Formulario nuevo enlace */}
       <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-xl p-5 mb-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Nuevo enlace de alta</h2>
+        <h2 className="text-sm font-semibold text-slate-700 mb-3">{t("Nuevo enlace de alta")}</h2>
         <div className="flex gap-3">
           <div className="flex-1">
             <input
               type="text"
               value={label}
               onChange={e => setLabel(e.target.value)}
-              placeholder="Etiqueta opcional (ej: Juan García - Divorcio)"
+              placeholder={t("Etiqueta opcional (ej: Juan García - Divorcio)")}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               maxLength={100}
             />
@@ -156,13 +155,9 @@ export default function AltaConEnlace() {
             disabled={creating}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            Generar enlace
-          </button>
+            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{t("Generar enlace")}</button>
         </div>
-        <p className="text-xs text-slate-400 mt-2">
-          El enlace estará activo durante 30 días y solo puede usarse una vez.
-        </p>
+        <p className="text-xs text-slate-400 mt-2">{t("El enlace estará activo durante 30 días y solo puede usarse una vez.")}</p>
       </form>
 
       {/* Error */}
@@ -177,7 +172,7 @@ export default function AltaConEnlace() {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <h2 className="text-sm font-semibold text-slate-700">
-            {loading ? "Cargando..." : `${links.length} enlace${links.length !== 1 ? "s" : ""}`}
+            {loading ? t("Cargando...") : t("{length} enlace{v}", { length: links.length, v: links.length !== 1 ? "s" : "" })}
           </h2>
           <button
             onClick={fetchLinks}
@@ -190,12 +185,12 @@ export default function AltaConEnlace() {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <Spinner size="md" label="Cargando enlaces..." />
+            <Spinner size="md" label={t("Cargando enlaces...")} />
           </div>
         ) : links.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
             <Link2 className="w-8 h-8 mb-2 opacity-30" />
-            <p className="text-sm">No hay enlaces generados aún.</p>
+            <p className="text-sm">{t("No hay enlaces generados aún.")}</p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
@@ -215,7 +210,7 @@ export default function AltaConEnlace() {
                             {link.label}
                           </span>
                         ) : (
-                          <span className="text-sm text-slate-400 italic">Sin etiqueta</span>
+                          <span className="text-sm text-slate-400 italic">{t("Sin etiqueta")}</span>
                         )}
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_BADGE[effectiveStatus]}`}>
                           {effectiveStatus}
@@ -230,8 +225,7 @@ export default function AltaConEnlace() {
                       {/* Info de uso */}
                       {link.status === "completado" && link.client_name && (
                         <p className="flex items-center gap-1 text-xs text-emerald-600 mb-1">
-                          <User className="w-3.5 h-3.5" />
-                          Completado por: <strong>{link.client_name}</strong>
+                          <User className="w-3.5 h-3.5" />{t("Completado por:")}{" "}<strong>{link.client_name}</strong>
                           {link.used_at && ` · ${fmtDate(link.used_at)}`}
                         </p>
                       )}
@@ -239,11 +233,10 @@ export default function AltaConEnlace() {
                       {/* Fechas */}
                       <div className="flex items-center gap-3 text-xs text-slate-400">
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          Creado {fmtDate(link.created_at)}
+                          <Clock className="w-3 h-3" />{t("Creado")}{" "}{fmtDate(link.created_at)}
                         </span>
                         {link.status === "pendiente" && !isExpired && (
-                          <span>Expira {fmtDate(link.expires_at)}</span>
+                          <span>{t("Expira")}{" "}{fmtDate(link.expires_at)}</span>
                         )}
                       </div>
                     </div>
@@ -256,9 +249,9 @@ export default function AltaConEnlace() {
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                         >
                           {copied === link.token ? (
-                            <><Check className="w-3.5 h-3.5" /> Copiado</>
+                            <><Check className="w-3.5 h-3.5" />{" "}{t("Copiado")}</>
                           ) : (
-                            <><Copy className="w-3.5 h-3.5" /> Copiar enlace</>
+                            <><Copy className="w-3.5 h-3.5" />{" "}{t("Copiar enlace")}</>
                           )}
                         </button>
                       )}
@@ -285,13 +278,13 @@ export default function AltaConEnlace() {
                 <AlertTriangle size={18} className="peligro text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">¿Eliminar este enlace?</h3>
-                <p className="text-xs text-slate-500 mt-1">Si el cliente aún no lo ha usado, quedará invalidado. Tendrás 15 segundos para deshacer.</p>
+                <h3 className="font-bold text-slate-900 text-sm">{t("¿Eliminar este enlace?")}</h3>
+                <p className="text-xs text-slate-500 mt-1">{t("Si el cliente aún no lo ha usado, quedará invalidado. Tendrás 15 segundos para deshacer.")}</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDelete(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+              <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
+              <button onClick={() => handleDelete(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Eliminar")}</button>
             </div>
           </div>
         </div>

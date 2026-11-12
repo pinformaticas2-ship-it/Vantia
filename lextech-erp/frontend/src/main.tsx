@@ -10,7 +10,7 @@ import './lib/temasOscuroColores.css'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { clerkEs } from './lib/clerkEs'
 import { enGB } from '@clerk/localizations'
-import { idioma } from './lib/i18n'
+import { idioma, t, instalarTraduccionEnPantalla } from './lib/i18n';
 import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
 import { AppSegura, instalarCapturaGlobal } from './lib/errores'
 
@@ -33,7 +33,7 @@ fetch(resolveApiUrl("/api/health/version"))
   .catch(() => {});
 
 if (!PUBLISHABLE_KEY) {
-  throw new Error("❌ Error: No se encontró VITE_CLERK_PUBLISHABLE_KEY. Asegúrate de configurar el archivo .env.");
+  throw new Error(t("❌ Error: No se encontró VITE_CLERK_PUBLISHABLE_KEY. Asegúrate de configurar el archivo .env."));
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -151,3 +151,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
+
+// Con la app en inglés: los textos que vienen de listas de datos también.
+instalarTraduccionEnPantalla();

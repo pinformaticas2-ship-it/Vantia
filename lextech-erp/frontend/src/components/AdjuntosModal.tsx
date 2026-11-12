@@ -15,6 +15,7 @@ import { useUndoDelete } from "../lib/useUndoDelete";
 import { Modal } from "./Modal";
 import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 import { aviso } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 // ── helpers ───────────────────────────────────────────────────
 function fileIcon(mime: string, name: string) {
@@ -200,7 +201,7 @@ export default function AdjuntosModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        aviso(`Error al descargar: ${err.error || res.status}`);
+        aviso(t("Error al descargar: {v}", { v: err.error || res.status }));
         return;
       }
       const blob = await res.blob();
@@ -213,7 +214,7 @@ export default function AdjuntosModal({
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      aviso("Error al descargar el archivo");
+      aviso(t("Error al descargar el archivo"));
     }
   }, [entityId, getToken]);
 
@@ -230,10 +231,10 @@ export default function AdjuntosModal({
           if (f.mimetype?.startsWith("image/")) loadThumb(f.id);
         }
       } else {
-        setErrorMsg(data?.error || `Error al cargar archivos (${res.status})`);
+        setErrorMsg(data?.error || t("Error al cargar archivos ({status})", { status: res.status }));
       }
     } catch (e: any) {
-      setErrorMsg(e?.message || "Error de conexión al cargar archivos");
+      setErrorMsg(e?.message || t("Error de conexión al cargar archivos"));
     }
     finally { if (!silent) setLoadingFiles(false); }
   }, [entityId, loadThumb, getToken]);
@@ -302,10 +303,10 @@ export default function AdjuntosModal({
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        setErrorMsg(`Error al subir "${file.name}": ${errData?.error || `HTTP ${res.status}`}`);
+        setErrorMsg(t("Error al subir \"{name}\": {v}", { name: file.name, v: errData?.error || `HTTP ${res.status}` }));
       }
     } catch (e: any) {
-      setErrorMsg(`Error al subir "${file?.name}": ${e?.message || "Error de conexión"}`);
+      setErrorMsg(t("Error al subir \"{name}\": {v}", { name: file?.name, v: e?.message || "Error de conexión" }));
     }
     finally {
       setSavingMetadata(false);
@@ -357,10 +358,10 @@ export default function AdjuntosModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setErrorMsg(err?.error || "No se pudo abrir el documento en local");
+        setErrorMsg(err?.error || t("No se pudo abrir el documento en local"));
       }
     } catch (_err) {
-      setErrorMsg("No se pudo abrir el documento en local");
+      setErrorMsg(t("No se pudo abrir el documento en local"));
     }
   }, [entityId, getToken]);
 
@@ -409,7 +410,7 @@ export default function AdjuntosModal({
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const errorMsg = errorData.error || `Error ${res.status}`;
-      const errorHtml = `<html><body style="font-family:Arial;margin:20px;color:#d32f2f"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
+      const errorHtml = `<html><body style="font-family:Arial;margin:20px;color:#d32f2f"><h2>${t("Error al cargar vista previa")}</h2><p>${errorMsg}</p></body></html>`;
       const blob = new Blob([errorHtml], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
@@ -460,7 +461,7 @@ export default function AdjuntosModal({
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ document_name: editDocName, attachment_type: editAttachmentType }),
       });
-      if (!res.ok) throw new Error(`Error: ${res.status}`);
+      if (!res.ok) throw new Error(t("Error: {status}", { status: res.status }));
       const data = await res.json();
       if (data.success && data.data) {
         setEditingFile(null);
@@ -483,7 +484,7 @@ export default function AdjuntosModal({
       const html = await res.text();
       setTplPreviewHtml(html);
     } catch (e: any) {
-      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
+      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>${t("Error al cargar vista previa")}</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
     } finally { setTplPreviewLoading(false); }
   };
 
@@ -498,20 +499,20 @@ export default function AdjuntosModal({
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch("/api/files/templates", { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+      if (!res.ok) throw new Error(t("Error {status}: {statusText}", { status: res.status, statusText: res.statusText }));
       const data = await res.json();
       if (data.success) {
         setDocPlantFolders(data.data || []);
         if (data.data && data.data.length > 0) {
           setExpandedFolders(new Set([data.data[0].name]));
         } else {
-          setDocPlantError(data.warning || "No se encontraron plantillas en la carpeta DocPlant.");
+          setDocPlantError(data.warning || t("No se encontraron plantillas en la carpeta DocPlant."));
         }
       } else {
-        setDocPlantError(data.error || "Error al cargar plantillas.");
+        setDocPlantError(data.error || t("Error al cargar plantillas."));
       }
     } catch (e: any) {
-      setDocPlantError(e.message || "Error de conexión al cargar plantillas.");
+      setDocPlantError(e.message || t("Error de conexión al cargar plantillas."));
     } finally { setDocPlantLoading(false); }
   };
 
@@ -582,10 +583,10 @@ export default function AdjuntosModal({
         setEditingFile(null);
       } else {
         const errData = await res.json().catch(() => ({}));
-        setErrorMsg(`Error al guardar: ${errData?.error || `HTTP ${res.status}`}`);
+        setErrorMsg(t("Error al guardar: {v}", { v: errData?.error || `HTTP ${res.status}` }));
       }
     } catch (e: any) {
-      setErrorMsg(`Error al guardar: ${e?.message || "Error de conexión"}`);
+      setErrorMsg(t("Error al guardar: {v}", { v: e?.message || "Error de conexión" }));
     }
     finally { setSavingMetadata(false); }
   };
@@ -672,9 +673,7 @@ export default function AdjuntosModal({
             onClick={onClose}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
           >
-            <X size={14} />
-            Cerrar
-          </button>
+            <X size={14} />{t("Cerrar")}</button>
           )}
         </div>
 
@@ -694,61 +693,45 @@ export default function AdjuntosModal({
               onClick={() => fileInputRef.current?.click()}
               className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors"
             >
-              <Upload size={15} />
-              Subir archivo
-            </button>
+              <Upload size={15} />{t("Subir archivo")}</button>
             <button
               onClick={showCreateBlankModal}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <FilePlus2 size={15} className="text-indigo-500" />
-              Nuevo documento
-            </button>
+              <FilePlus2 size={15} className="text-indigo-500" />{t("Nuevo documento")}</button>
             <button
               onClick={() => openTemplatesModal()}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <Sparkles size={15} className="text-amber-500" />
-              Plantillas
-            </button>
+              <Sparkles size={15} className="text-amber-500" />{t("Plantillas")}</button>
             <button
               onClick={() => setPdfTool([])}
-              title="Unir varios documentos en un PDF o quitar, ordenar y girar páginas"
+              title={t("Unir varios documentos en un PDF o quitar, ordenar y girar páginas")}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <Combine size={15} className="text-red-500" />
-              Fusionar PDF
-            </button>
+              <Combine size={15} className="text-red-500" />{t("Fusionar PDF")}</button>
             <button
               onClick={() => folderInputRef.current?.click()}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <FolderOpen size={15} className="text-emerald-600" />
-              Importar carpeta
-            </button>
+              <FolderOpen size={15} className="text-emerald-600" />{t("Importar carpeta")}</button>
             <button
               onClick={() => openMailDraft(mailSubject, mailBody)}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <Mail size={15} className="text-blue-500" />
-              Enviar correo
-            </button>
+              <Mail size={15} className="text-blue-500" />{t("Enviar correo")}</button>
           </div>
           <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
             <button
               onClick={() => setViewMode("list")}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${viewMode === "list" ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              <LayoutList size={13} />
-              Lista
-            </button>
+              <LayoutList size={13} />{t("Lista")}</button>
             <button
               onClick={() => setViewMode("grid")}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${viewMode === "grid" ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              <Grid3X3 size={13} />
-              Cuadrícula
-            </button>
+              <Grid3X3 size={13} />{t("Cuadrícula")}</button>
           </div>
         </div>
 
@@ -758,12 +741,12 @@ export default function AdjuntosModal({
             <input
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              placeholder="Buscar por archivo o nombre de documento…"
+              placeholder={t("Buscar por archivo o nombre de documento…")}
               className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 bg-white rounded-xl focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipo</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Tipo")}</span>
             <select
               value={filterTipo}
               onChange={e => setFilterTipo(e.target.value)}
@@ -774,32 +757,26 @@ export default function AdjuntosModal({
           </div>
           {selectedFile && (
             <div className="flex items-center gap-2 ml-auto flex-wrap">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Seleccionado</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Seleccionado")}</span>
               {(isPreviewable(selectedFile.mimetype) || isWordFile(selectedFile.mimetype, selectedFile.original_name) || isExcelFile(selectedFile.mimetype, selectedFile.original_name)) && (
                 <button
                   onClick={() => openPreview(selectedFile)}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <Eye size={14} />
-                  Vista previa
-                </button>
+                  <Eye size={14} />{t("Vista previa")}</button>
               )}
               {(isWordFile(selectedFile.mimetype, selectedFile.original_name) || isExcelFile(selectedFile.mimetype, selectedFile.original_name)) ? (
                 <button
                   onClick={() => openInWord(selectedFile)}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <ExternalLink size={14} />
-                  Abrir
-                </button>
+                  <ExternalLink size={14} />{t("Abrir")}</button>
               ) : (
                 <button
                   onClick={() => downloadWithAuth(selectedFile.id, selectedFile.original_name)}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <Download size={14} />
-                  Descargar
-                </button>
+                  <Download size={14} />{t("Descargar")}</button>
               )}
               <button
                 onClick={() => {
@@ -809,23 +786,17 @@ export default function AdjuntosModal({
                 }}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                <Edit3 size={14} />
-                Editar
-              </button>
+                <Edit3 size={14} />{t("Editar")}</button>
               <button
                 onClick={() => openMailDraft(mailSubject, mailBody)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                <Mail size={14} />
-                Enviar correo
-              </button>
+                <Mail size={14} />{t("Enviar correo")}</button>
               <button
                 onClick={() => setConfirmDeleteFileId(selectedFile.id)}
                 className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors"
               >
-                <Trash2 size={14} />
-                Eliminar
-              </button>
+                <Trash2 size={14} />{t("Eliminar")}</button>
             </div>
           )}
         </div>
@@ -839,18 +810,14 @@ export default function AdjuntosModal({
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide"
           >
-            <Upload size={15} className="text-emerald-600" />
-            Alta
-          </button>
+            <Upload size={15} className="text-emerald-600" />{t("Alta@@nuevo")}</button>
           {/* Baja */}
           <button
             onClick={() => selectedFile && handleDelete(selectedFile.id)}
             disabled={!selectedFileId}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide disabled:opacity-30"
           >
-            <Trash2 size={15} className="peligro text-red-500" />
-            Baja
-          </button>
+            <Trash2 size={15} className="peligro text-red-500" />{t("Baja@@quitar")}</button>
           {/* Modificar */}
           <button
             onClick={() => {
@@ -862,22 +829,16 @@ export default function AdjuntosModal({
             disabled={!selectedFileId}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide disabled:opacity-30"
           >
-            <Edit3 size={15} className="text-blue-500" />
-            Modificar
-          </button>
+            <Edit3 size={15} className="text-blue-500" />{t("Modificar")}</button>
 
           <div className="w-px h-7 bg-slate-200 mx-1.5" />
 
           {/* Correo */}
           <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide">
-            <Mail size={15} className="text-blue-500" />
-            Correo
-          </button>
+            <Mail size={15} className="text-blue-500" />{t("Correo")}</button>
           {/* Whatsapp */}
           <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide">
-            <MessageCircle size={15} className="text-green-500" />
-            Whatsapp
-          </button>
+            <MessageCircle size={15} className="text-green-500" />{t("Whatsapp")}</button>
 
           <div className="w-px h-7 bg-slate-200 mx-1.5" />
 
@@ -887,14 +848,10 @@ export default function AdjuntosModal({
             disabled={!selectedFile || selectedFile?.mimetype !== "application/pdf"}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[72px] uppercase tracking-wide disabled:opacity-30"
           >
-            <FileOutput size={15} className="text-red-600" />
-            Herram. PDF
-          </button>
+            <FileOutput size={15} className="text-red-600" />{t("Herram. PDF")}</button>
           {/* Excel */}
           <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[48px] uppercase tracking-wide">
-            <Table2 size={15} className="text-emerald-700" />
-            Excel
-          </button>
+            <Table2 size={15} className="text-emerald-700" />{t("Excel")}</button>
 
           <div className="w-px h-7 bg-slate-200 mx-1.5" />
 
@@ -903,33 +860,25 @@ export default function AdjuntosModal({
             onClick={showCreateBlankModal}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide"
           >
-            <FilePlus2 size={15} className="text-indigo-500" />
-            Nuevo
-          </button>
+            <FilePlus2 size={15} className="text-indigo-500" />{t("Nuevo")}</button>
           {/* Plantillas */}
           <button
             onClick={() => openTemplatesModal()}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide"
           >
-            <Sparkles size={15} className="text-amber-500" />
-            Plantillas
-          </button>
+            <Sparkles size={15} className="text-amber-500" />{t("Plantillas")}</button>
           {/* Carpeta */}
           <button
             onClick={() => folderInputRef.current?.click()}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide"
           >
-            <FolderOpen size={15} className="text-amber-500" />
-            Importar
-          </button>
+            <FolderOpen size={15} className="text-amber-500" />{t("Importar")}</button>
 
           <div className="flex-1" />
 
           {/* Opciones */}
           <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[56px] uppercase tracking-wide">
-            <Settings2 size={15} className="text-slate-400" />
-            Opciones
-          </button>
+            <Settings2 size={15} className="text-slate-400" />{t("Opciones")}</button>
         </div>
 
         {/* ── Filter bar ── */}
@@ -939,17 +888,17 @@ export default function AdjuntosModal({
             <input
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              placeholder="Buscar adjunto…"
+              placeholder={t("Buscar adjunto…")}
               className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 bg-white rounded-lg focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
             />
           </div>
           <select className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 text-slate-600">
-            <option>Nombre Adjunto</option>
-            <option>Tipo Adjunto</option>
-            <option>Fecha Adjunto</option>
+            <option>{t("Nombre Adjunto")}</option>
+            <option>{t("Tipo Adjunto")}</option>
+            <option>{t("Fecha Adjunto")}</option>
           </select>
           <div className="w-px h-5 bg-slate-200" />
-          <span className="text-xs text-slate-500 font-medium">Tipo:</span>
+          <span className="text-xs text-slate-500 font-medium">{t("Tipo:")}</span>
           <select
             value={filterTipo}
             onChange={e => setFilterTipo(e.target.value)}
@@ -989,11 +938,9 @@ export default function AdjuntosModal({
             <div className="px-3 pt-4 pb-2">
               <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <Folder size={13} className="text-amber-500 shrink-0" />
-                <span className="truncate">Almacenamiento</span>
+                <span className="truncate">{t("Almacenamiento")}</span>
               </div>
-              <p className="px-2 text-[11px] leading-5 text-slate-400">
-                Organiza los documentos por tipo para encontrarlos más rápido.
-              </p>
+              <p className="px-2 text-[11px] leading-5 text-slate-400">{t("Organiza los documentos por tipo para encontrarlos más rápido.")}</p>
             </div>
             <div className="px-3 pb-4 space-y-1">
               {[
@@ -1043,8 +990,8 @@ export default function AdjuntosModal({
             {isDragOver && (
               <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-50/95 border-2 border-dashed border-red-400 rounded-lg pointer-events-none">
                 <Upload size={40} className="text-red-500 mb-3 animate-bounce" />
-                <p className="text-base font-bold text-red-600">Suelta los archivos para subirlos</p>
-                <p className="text-xs text-red-400 mt-1">Se guardarán en «{sidebarSection}»</p>
+                <p className="text-base font-bold text-red-600">{t("Suelta los archivos para subirlos")}</p>
+                <p className="text-xs text-red-400 mt-1">{t("Se guardarán en «")}{sidebarSection}»</p>
               </div>
             )}
 
@@ -1058,13 +1005,13 @@ export default function AdjuntosModal({
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-8 text-center">Fav.</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre Adjunto</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Nombre Documento</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Usuario</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-8 text-center">{t("Fav.")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Fecha")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Nombre Adjunto")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">{t("Nombre Documento")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tipo")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tamaño")}</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">{t("Usuario")}</th>
                       <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24"></th>
                     </tr>
                   </thead>
@@ -1082,16 +1029,15 @@ export default function AdjuntosModal({
                             </div>
                             <p className="text-sm font-semibold text-slate-500 group-hover:text-red-600 transition-colors">
                               {files.length === 0
-                                ? "No hay documentos adjuntos"
-                                : `Sin archivos en «${sidebarSection}»`}
+                                ? t("No hay documentos adjuntos")
+                                : t("Sin archivos en «{sidebarSection}»", { sidebarSection: sidebarSection })}
                             </p>
-                            <p className="text-xs text-slate-400 mt-1">Haz clic aquí o arrastra archivos para subir</p>
+                            <p className="text-xs text-slate-400 mt-1">{t("Haz clic aquí o arrastra archivos para subir")}</p>
                             <button
                               onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
                               className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
                             >
-                              <Upload size={13} /> Subir archivo
-                            </button>
+                              <Upload size={13} />{" "}{t("Subir archivo")}</button>
                           </div>
                         </td>
                       </tr>
@@ -1148,7 +1094,7 @@ export default function AdjuntosModal({
                           {/* Tipo */}
                           <td className="px-3 py-2.5 hidden md:table-cell">
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>
-                              {f.attachment_type || "Sin clasificar"}
+                              {f.attachment_type || t("Sin clasificar")}
                             </span>
                           </td>
                           {/* Tamaño */}
@@ -1161,33 +1107,33 @@ export default function AdjuntosModal({
                           <td className="px-3 py-2.5">
                             <div className={`flex items-center gap-1 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} onClick={e => e.stopPropagation()}>
                               {(canPreview || canWord || canExcel) && (
-                                <button onClick={() => openPreview(f)} title="Vista previa"
+                                <button onClick={() => openPreview(f)} title={t("Vista previa")}
                                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                                   <Eye size={13} />
                                 </button>
                               )}
                               {isPdfToolCompatible(f) && (
-                                <button onClick={() => setPdfTool([f.id])} title="Editar páginas / fusionar con otros"
+                                <button onClick={() => setPdfTool([f.id])} title={t("Editar páginas / fusionar con otros")}
                                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                                   <Combine size={13} />
                                 </button>
                               )}
                               {(canWord || canExcel) && (
-                                <button title={canWord ? "Abrir en Word" : "Abrir en Excel"}
+                                <button title={canWord ? t("Abrir en Word") : t("Abrir en Excel")}
                                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                                   onClick={() => openInWord(f)}>
                                   <ExternalLink size={13} />
                                 </button>
                               )}
                               {!canWord && !canExcel && (
-                                <button title="Descargar"
+                                <button title={t("Descargar")}
                                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                                   onClick={() => downloadWithAuth(f.id, f.original_name)}>
                                   <Download size={13} />
                                 </button>
                               )}
                               <button
-                                title="Editar nombre/tipo"
+                                title={t("Editar nombre/tipo")}
                                 className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                                 onClick={() => {
                                   setEditingFile({ id: f.id, document_name: f.document_name || "", attachment_type: f.attachment_type || "Sin clasificar" });
@@ -1197,7 +1143,7 @@ export default function AdjuntosModal({
                               >
                                 <Edit3 size={13} />
                               </button>
-                              <button onClick={() => setConfirmDeleteFileId(f.id)} title="Eliminar"
+                              <button onClick={() => setConfirmDeleteFileId(f.id)} title={t("Eliminar")}
                                 className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                 <Trash2 size={13} />
                               </button>
@@ -1215,7 +1161,7 @@ export default function AdjuntosModal({
                 {visibleFiles.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                     <FileText size={36} className="opacity-20 mb-2" />
-                    <p className="text-sm font-medium">No hay documentos adjuntos en esta sección</p>
+                    <p className="text-sm font-medium">{t("No hay documentos adjuntos en esta sección")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -1254,13 +1200,13 @@ export default function AdjuntosModal({
 
             {/* Status bar */}
             <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-white border-t border-slate-200 text-[11px] text-slate-500">
-              <span className="font-medium">{visibleFiles.length} elemento(s)</span>
+              <span className="font-medium">{visibleFiles.length}{" "}{t("elemento(s)")}</span>
               {selectedFile && (
                 <span className="truncate max-w-xs text-slate-600">
                   <strong className="text-slate-700">{selectedFile.document_name || selectedFile.original_name}</strong> — {fmtSize(selectedFile.size_bytes)}
                 </span>
               )}
-              <span className="font-medium">{loadingFiles ? "Cargando…" : `Total: ${files.length}`}</span>
+              <span className="font-medium">{loadingFiles ? t("Cargando…") : t("Total: {length}", { length: files.length })}</span>
             </div>
           </div>
 
@@ -1275,7 +1221,7 @@ export default function AdjuntosModal({
                       onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
                       className="text-[11px] font-semibold text-slate-700 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
                     >
-                      {preview.appType === "excel" ? "Abrir Excel" : "Abrir Word"}
+                      {preview.appType === "excel" ? t("Abrir Excel") : t("Abrir Word")}
                     </button>
                   )}
                   <button
@@ -1316,8 +1262,8 @@ export default function AdjuntosModal({
               <div className="flex items-center gap-3">
                 <Sparkles size={16} className="text-red-600" />
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Plantillas del despacho</h2>
-                  <p className="text-[11px] text-slate-400">Selecciona una plantilla para previsualizarla</p>
+                  <h2 className="text-sm font-bold text-slate-900">{t("Plantillas del despacho")}</h2>
+                  <p className="text-[11px] text-slate-400">{t("Selecciona una plantilla para previsualizarla")}</p>
                 </div>
               </div>
               <button onClick={() => setShowTemplates(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
@@ -1334,7 +1280,7 @@ export default function AdjuntosModal({
                     <input
                       value={templateSearch}
                       onChange={e => setTemplateSearch(e.target.value)}
-                      placeholder="Buscar plantilla…"
+                      placeholder={t("Buscar plantilla…")}
                       className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
                     />
                   </div>
@@ -1343,23 +1289,22 @@ export default function AdjuntosModal({
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                   {docPlantLoading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                      <Spinner size="md" label="Cargando plantillas…" />
+                      <Spinner size="md" label={t("Cargando plantillas…")} />
                     </div>
                   ) : docPlantError ? (
                     <div className="p-3">
                       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
-                        <p className="text-xs font-bold text-amber-700 mb-1">Error al cargar</p>
+                        <p className="text-xs font-bold text-amber-700 mb-1">{t("Error al cargar")}</p>
                         <p className="text-[11px] text-amber-600">{docPlantError}</p>
                       </div>
                       <button
                         onClick={() => openTemplatesModal(true)}
                         className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all"
                       >
-                        <Loader2 size={11} /> Reintentar
-                      </button>
+                        <Loader2 size={11} />{" "}{t("Reintentar")}</button>
                     </div>
                   ) : docPlantFolders.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 py-8">No se encontraron plantillas</p>
+                    <p className="text-center text-xs text-slate-400 py-8">{t("No se encontraron plantillas")}</p>
                   ) : (() => {
                     const q = templateSearch.toLowerCase().trim();
                     const filteredFolders = docPlantFolders.map(folder => ({
@@ -1367,7 +1312,7 @@ export default function AdjuntosModal({
                       files: q ? folder.files.filter(f => f.name.toLowerCase().includes(q)) : folder.files,
                     })).filter(f => f.files.length > 0);
 
-                    if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">Sin resultados</p>;
+                    if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">{t("Sin resultados")}</p>;
 
                     return filteredFolders.map(folder => {
                       const isOpen = q ? true : expandedFolders.has(folder.name);
@@ -1418,7 +1363,7 @@ export default function AdjuntosModal({
                 {!selectedTpl ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
                     <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-30"><rect x="8" y="4" width="32" height="40" rx="3" fill="#94a3b8"/><rect x="13" y="14" width="22" height="2" rx="1" fill="white"/><rect x="13" y="20" width="22" height="2" rx="1" fill="white"/><rect x="13" y="26" width="14" height="2" rx="1" fill="white"/></svg>
-                    <p className="text-sm">Selecciona una plantilla para previsualizar</p>
+                    <p className="text-sm">{t("Selecciona una plantilla para previsualizar")}</p>
                   </div>
                 ) : (
                   <>
@@ -1432,16 +1377,15 @@ export default function AdjuntosModal({
                         onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
                         className="shrink-0 ml-3 flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg active:scale-95 transition-all"
                       >
-                        <Download size={12} /> Seleccionar
-                      </button>
+                        <Download size={12} />{" "}{t("Seleccionar")}</button>
                     </div>
                     <div className="flex-1 overflow-hidden relative">
                       {tplPreviewLoading ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                          <Spinner size="lg" label="Cargando vista previa…" />
+                          <Spinner size="lg" label={t("Cargando vista previa…")} />
                         </div>
                       ) : tplPreviewHtml ? (
-                        <iframe srcDoc={tplPreviewHtml} className="w-full h-full border-0" title="Vista previa de plantilla" sandbox="allow-same-origin" />
+                        <iframe srcDoc={tplPreviewHtml} className="w-full h-full border-0" title={t("Vista previa de plantilla")} sandbox="allow-same-origin" />
                       ) : null}
                     </div>
                   </>
@@ -1460,16 +1404,15 @@ export default function AdjuntosModal({
               <div>
                 <h2 className="text-base font-bold text-slate-900">
                   {editingFile.id === "NEW_BLANK"
-                    ? "Nuevo documento"
+                    ? t("Nuevo documento")
                     : editingFile.id === "PENDING_TEMPLATE"
-                    ? "Usar plantilla"
+                    ? t("Usar plantilla")
                     : editingFile.id === "PENDING_UPLOAD"
-                    ? "Adjuntar archivo"
-                    : "Editar documento"}
+                    ? t("Adjuntar archivo")
+                    : t("Editar documento")}
                 </h2>
                 {editingFile.id === "PENDING_UPLOAD" && uploadQueueTotal > 1 && (
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Archivo {uploadQueueTotal - uploadQueue.length} de {uploadQueueTotal}
+                  <p className="text-[11px] text-slate-400 mt-0.5">{t("Archivo")}{" "}{uploadQueueTotal - uploadQueue.length}{" "}{t("de")}{" "}{uploadQueueTotal}
                   </p>
                 )}
               </div>
@@ -1486,34 +1429,33 @@ export default function AdjuntosModal({
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre del documento</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Nombre del documento")}</label>
                 <input
                   type="text"
                   value={editDocName}
                   onChange={e => setEditDocName(e.target.value)}
-                  placeholder="Ej: 1. - Consentimiento"
+                  placeholder={t("Ej: 1. - Consentimiento")}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   autoFocus
                 />
                 {editingFile.id === "PENDING_UPLOAD" && pendingUploadFile.current && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Archivo: <span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
+                  <p className="text-[11px] text-slate-400 mt-1">{t("Archivo:")}{" "}<span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
                   </p>
                 )}
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Tipo de adjunto</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t("Tipo de adjunto")}</label>
                 <select
                   value={editAttachmentType}
                   onChange={e => setEditAttachmentType(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 >
-                  <option value="Sin clasificar">Sin clasificar</option>
-                  <option value="AUTO">AUTO</option>
-                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
-                  <option value="FACTURAS">FACTURAS</option>
-                  <option value="PODER">PODER</option>
-                  <option value="EVIDENCIA">EVIDENCIA</option>
+                  <option value="Sin clasificar">{t("Sin clasificar")}</option>
+                  <option value="AUTO">{t("AUTO")}</option>
+                  <option value="ESCRITO PROCESAL">{t("ESCRITO PROCESAL")}</option>
+                  <option value="FACTURAS">{t("FACTURAS")}</option>
+                  <option value="PODER">{t("PODER")}</option>
+                  <option value="EVIDENCIA">{t("EVIDENCIA")}</option>
                 </select>
               </div>
             </div>
@@ -1526,7 +1468,7 @@ export default function AdjuntosModal({
                 }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                {editingFile.id === "PENDING_UPLOAD" && uploadQueueTotal > 1 ? "Cancelar todo" : "Cancelar"}
+                {editingFile.id === "PENDING_UPLOAD" && uploadQueueTotal > 1 ? t("Cancelar todo") : t("Cancelar")}
               </button>
               <button
                 onClick={() => {
@@ -1539,14 +1481,14 @@ export default function AdjuntosModal({
                 className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {savingMetadata
-                  ? "Subiendo..."
+                  ? t("Subiendo...")
                   : editingFile.id === "NEW_BLANK"
-                  ? "Crear"
+                  ? t("Crear")
                   : editingFile.id === "PENDING_TEMPLATE"
-                  ? "Usar"
+                  ? t("Usar")
                   : editingFile.id === "PENDING_UPLOAD"
-                  ? (uploadQueue.length > 0 ? `Adjuntar (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : "Adjuntar")
-                  : "Guardar"}
+                  ? (uploadQueue.length > 0 ? t("Adjuntar ({v}/{uploadQueueTotal})", { v: uploadQueueTotal - uploadQueue.length, uploadQueueTotal: uploadQueueTotal }) : t("Adjuntar"))
+                  : t("Guardar")}
               </button>
             </div>
           </div>
@@ -1567,13 +1509,13 @@ export default function AdjuntosModal({
         variant="confirm"
         icon={<AlertTriangle size={18} />}
         iconTone="danger"
-        title="¿Eliminar este archivo?"
-        subtitle="Tendrás 15 segundos para deshacer."
+        title={t("¿Eliminar este archivo?")}
+        subtitle={t("Tendrás 15 segundos para deshacer.")}
         zIndex={9999}
         footer={
           <>
-            <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => handleDelete(confirmDeleteFileId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
+            <button onClick={() => handleDelete(confirmDeleteFileId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Eliminar")}</button>
           </>
         }
       />

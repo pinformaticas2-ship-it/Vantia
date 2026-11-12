@@ -39,7 +39,11 @@ export function registrarEn(dic: Record<string, string>) { Object.assign(en, dic
 
 /** Traduce un texto en español. {nombre} se sustituye por vars.nombre. */
 export function t(texto: string, vars?: Record<string, string | number | null | undefined>): string {
-  let s = actual === 'en' ? (en[texto] ?? texto) : texto;
+  // "Alta@@prioridad": la misma palabra con otro sentido según el sitio. En
+  // español se muestra "Alta"; en inglés se busca la clave entera.
+  const ctx = texto.indexOf('@@');
+  const base = ctx >= 0 ? texto.slice(0, ctx) : texto;
+  let s = actual === 'en' ? (en[texto] ?? en[base] ?? base) : base;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars && vars[k] != null ? String(vars[k]) : m));
   return s;
 }
@@ -106,6 +110,74 @@ export function instalarFormatoFechas() {
   Envuelto.prototype = DTF.prototype;
   Envuelto.supportedLocalesOf = DTF.supportedLocalesOf;
   (Intl as any).DateTimeFormat = Envuelto;
+}
+
+// ── Red de seguridad en pantalla (12/11/2026) ───────────────────────────────
+// Con la app en inglés, cualquier texto visible que coincida EXACTAMENTE con
+// una frase del diccionario se cambia por su traducción (también title,
+// placeholder y aria-label). Así se traducen también las etiquetas que vienen
+// de listas de datos (columnas, opciones, estados...) sin tocar sus valores
+// internos. Nunca dentro de lo que se edita o se genera para un cliente o un
+// juzgado: editores, vistas previas de documentos, campos de texto, código.
+const NO_TRADUCIR = 'textarea, input, script, style, pre, code, kbd, [contenteditable=""], [contenteditable="true"], .ProseMirror, .ql-editor, [data-sin-traducir]';
+const ATRIBUTOS_TEXTO = ['placeholder', 'title', 'aria-label'];
+
+function traducirNodoTexto(n: Text) {
+  const v = n.nodeValue;
+  if (!v || v.length > 600) return;
+  const k = v.trim();
+  if (!k) return;
+  const tr = en[k];
+  if (!tr || tr === k) return;
+  const padre = n.parentElement;
+  if (!padre || padre.closest(NO_TRADUCIR)) return;
+  const i = v.indexOf(k);
+  n.nodeValue = v.slice(0, i) + tr + v.slice(i + k.length);
+}
+function traducirAtributos(el: Element) {
+  for (const a of ATRIBUTOS_TEXTO) {
+    const v = el.getAttribute(a);
+    if (!v) continue;
+    const tr = en[v.trim()];
+    if (tr && tr !== v && !el.closest(NO_TRADUCIR.replace('textarea, input, ', ''))) el.setAttribute(a, tr);
+  }
+}
+function traducirArbol(raiz: Node) {
+  if (raiz.nodeType === Node.TEXT_NODE) { traducirNodoTexto(raiz as Text); return; }
+  if (raiz.nodeType !== Node.ELEMENT_NODE) return;
+  const el = raiz as Element;
+  if (el.matches?.('script, style')) return;
+  traducirAtributos(el);
+  const recorrido = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  for (let n = recorrido.nextNode(); n; n = recorrido.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) traducirNodoTexto(n as Text);
+    else traducirAtributos(n as Element);
+  }
+}
+
+export function instalarTraduccionEnPantalla() {
+  if (actual !== 'en' || typeof MutationObserver === 'undefined') return;
+  const pendientes = new Set<Node>();
+  let programado = false;
+  const procesar = () => {
+    programado = false;
+    for (const n of pendientes) if (n.isConnected) traducirArbol(n);
+    pendientes.clear();
+  };
+  const obs = new MutationObserver((cambios) => {
+    for (const c of cambios) {
+      if (c.type === 'characterData') pendientes.add(c.target);
+      else if (c.type === 'attributes') pendientes.add(c.target);
+      else c.addedNodes.forEach((n) => pendientes.add(n));
+    }
+    // Antes de pintar: así no se llega a ver el texto en español.
+    if (!programado) { programado = true; queueMicrotask(procesar); }
+  });
+  obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATRIBUTOS_TEXTO });
+  traducirArbol(document.body);
+  // También el título de la pestaña.
+  const tit = en[document.title.trim()];
+  if (tit) document.title = tit;
 }
 
 if (typeof document !== 'undefined') {

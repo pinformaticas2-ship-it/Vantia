@@ -11,6 +11,7 @@ import AppSelect from "../components/AppSelect";
 import { loadColegiosAbogados, getProvincias as getProvinciasAbogados, getColegiosDeProvincia, detectarProvinciaDeColegio } from "../lib/colegiosAbogados";
 import type { ColegioAbogadosProvinciaData } from "../lib/colegiosAbogadosData";
 import { loadColegiosProcuradores } from "../lib/colegiosProcuradores";
+import { t } from '../lib/i18n';
 
 const EMPTY_FORM = {
   first_name: "", last_name: "", nif_cif: "", estado: "Alta",
@@ -58,7 +59,7 @@ function ColegioAbogadoField({ value, onChange }: { value: string; onChange: (v:
           searchable
           searchPlaceholder="Buscar provincia..."
         >
-          <option value="">{data ? "— Provincia —" : "Cargando..."}</option>
+          <option value="">{data ? t("— Provincia —") : t("Cargando...")}</option>
           {provincias.map(p => <option key={p} value={p}>{p}</option>)}
         </AppSelect>
         <AppSelect
@@ -71,16 +72,14 @@ function ColegioAbogadoField({ value, onChange }: { value: string; onChange: (v:
           searchable
           searchPlaceholder="Buscar colegio..."
         >
-          <option value={MANUAL}>{provincia ? "Escribir manualmente…" : "Elige antes la provincia"}</option>
+          <option value={MANUAL}>{provincia ? t("Escribir manualmente…") : t("Elige antes la provincia")}</option>
           {colegios.map(c => <option key={c} value={c}>{c}</option>)}
         </AppSelect>
       </div>
       {modoManual && (
-        <input value={value} onChange={e => onChange(e.target.value)} placeholder="Nombre del colegio" className={inputCls} />
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder={t("Nombre del colegio")} className={inputCls} />
       )}
-      <p className="text-[10px] text-slate-400 leading-snug">
-        Listado oficial de Colegios de la Abogacía de España — si no encuentras el tuyo, escríbelo manualmente.
-      </p>
+      <p className="text-[10px] text-slate-400 leading-snug">{t("Listado oficial de Colegios de la Abogacía de España — si no encuentras el tuyo, escríbelo manualmente.")}</p>
     </div>
   );
 }
@@ -117,15 +116,13 @@ function ColegioProcuradorField({ value, onChange }: { value: string; onChange: 
         searchable
         searchPlaceholder="Buscar colegio..."
       >
-        <option value={MANUAL}>{data ? "Escribir manualmente…" : "Cargando..."}</option>
+        <option value={MANUAL}>{data ? t("Escribir manualmente…") : t("Cargando...")}</option>
         {(data || []).map(c => <option key={c} value={c}>{c}</option>)}
       </AppSelect>
       {modoManual && (
-        <input value={value} onChange={e => onChange(e.target.value)} placeholder="Nombre del colegio" className={inputCls} />
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder={t("Nombre del colegio")} className={inputCls} />
       )}
-      <p className="text-[10px] text-slate-400 leading-snug">
-        Listado oficial de Colegios de Procuradores de España — si no encuentras el tuyo, escríbelo manualmente.
-      </p>
+      <p className="text-[10px] text-slate-400 leading-snug">{t("Listado oficial de Colegios de Procuradores de España — si no encuentras el tuyo, escríbelo manualmente.")}</p>
     </div>
   );
 }
@@ -161,7 +158,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
         const token = await getToken({ skipCache: true });
         const res = await fetch(`/api/directorio/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         const d = await safeJson(res);
-        if (!res.ok) throw new Error(d.error || "No se pudo cargar el registro");
+        if (!res.ok) throw new Error(d.error || t("No se pudo cargar el registro"));
         const p = d.data;
         if (!cancelled) {
           setForm({
@@ -177,7 +174,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           });
         }
       } catch (e: any) {
-        if (!cancelled) setLoadError(e.message || "No se pudo cargar el registro");
+        if (!cancelled) setLoadError(e.message || t("No se pudo cargar el registro"));
       } finally {
         if (!cancelled) setLoadingData(false);
       }
@@ -192,7 +189,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.first_name.trim()) { setError("El nombre es obligatorio"); return; }
+    if (!form.first_name.trim()) { setError(t("El nombre es obligatorio")); return; }
     setSaving(true);
     setError("");
     try {
@@ -203,11 +200,11 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
         body: JSON.stringify({ ...form, tipo }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo guardar");
+      if (!res.ok) throw new Error(d.error || t("No se pudo guardar"));
       setShowSuccess(true);
       setTimeout(() => navigate(backTo), 700);
     } catch (e: any) {
-      setError(e.message || "No se pudo guardar");
+      setError(e.message || t("No se pudo guardar"));
     } finally {
       setSaving(false);
     }
@@ -215,7 +212,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
 
   if (loadingData) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Spinner size="xl" label={`Cargando ${singular.toLowerCase()}...`} />
+      <Spinner size="xl" label={t("Cargando {toLowerCase}...", { toLowerCase: singular.toLowerCase() })} />
     </div>
   );
 
@@ -223,8 +220,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
     <div className="space-y-4 p-8">
       <Link to={backTo}>
         <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
-          <ChevronLeft size={13} /> Volver
-        </button>
+          <ChevronLeft size={13} />{" "}{t("Volver")}</button>
       </Link>
       <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertTriangle size={20} className="shrink-0" />
@@ -241,8 +237,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
         <div className="flex items-center gap-4">
           <Link to={backTo} className="shrink-0">
             <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
-              <ChevronLeft size={13} /> Volver
-            </button>
+              <ChevronLeft size={13} />{" "}{t("Volver")}</button>
           </Link>
           <div className="h-8 w-px bg-slate-200 hidden sm:block" />
           <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
@@ -250,17 +245,17 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           </div>
           <div className="flex flex-col justify-center">
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-0.5">
-              {isEdit ? `Editar ${singular.toLowerCase()}` : `${esContrario ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}`}
+              {isEdit ? t("Editar {toLowerCase}", { toLowerCase: singular.toLowerCase() }) : `${esContrario ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}`}
             </h1>
             <p className="text-[11px] font-medium text-slate-500">
-              {isEdit ? "Modifica los datos y pulsa Guardar cambios" : `Rellena la ficha de alta ${esContrario ? "de la" : "del"} ${singular.toLowerCase()}`}
+              {isEdit ? t("Modifica los datos y pulsa Guardar cambios") : t("Rellena la ficha de alta {v} {toLowerCase}", { v: esContrario ? "de la" : "del", toLowerCase: singular.toLowerCase() })}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {showSuccess && (
             <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
-              <CheckCircle2 size={14} /> {isEdit ? "¡Cambios guardados!" : "¡Registrado!"}
+              <CheckCircle2 size={14} /> {isEdit ? t("¡Cambios guardados!") : t("¡Registrado!")}
             </span>
           )}
           {error && (
@@ -270,14 +265,13 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           )}
           <Link to={backTo}>
             <button type="button" className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors">
-              <X size={14} className="text-slate-400" /> Cancelar
-            </button>
+              <X size={14} className="text-slate-400" />{" "}{t("Cancelar")}</button>
           </Link>
           <button type="submit" disabled={saving || showSuccess}
             className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 border border-red-700 rounded-md shadow-sm transition-all active:scale-[0.98]">
             {saving
-              ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
-              : <><Save size={13} /> {isEdit ? "Guardar cambios" : "Guardar"}</>}
+              ? <><Loader2 size={13} className="animate-spin" />{" "}{t("Guardando...")}</>
+              : <><Save size={13} /> {isEdit ? t("Guardar cambios") : t("Guardar")}</>}
           </button>
         </div>
       </div>
@@ -289,26 +283,25 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           {/* IDENTIFICACIÓN */}
           <div>
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <Icon size={16} className="text-slate-400" /> Identificación
-            </h3>
+              <Icon size={16} className="text-slate-400" />{" "}{t("Identificación")}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col gap-2">
-                <label className={lbl}>{esContrario ? "Nombre / Razón social *" : "Nombre *"}</label>
+                <label className={lbl}>{esContrario ? t("Nombre / Razón social *") : t("Nombre *")}</label>
                 <input name="first_name" value={form.first_name} onChange={handleChange} className={inputCls} autoFocus />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Apellidos</label>
+                <label className={lbl}>{t("Apellidos")}</label>
                 <input name="last_name" value={form.last_name} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>NIF / CIF</label>
+                <label className={lbl}>{t("NIF / CIF")}</label>
                 <input name="nif_cif" value={form.nif_cif} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Estado</label>
+                <label className={lbl}>{t("Estado")}</label>
                 <select name="estado" value={form.estado} onChange={handleChange} className={inputCls}>
-                  <option value="Alta">Alta</option>
-                  <option value="Baja">Baja</option>
+                  <option value="Alta">{t("Alta")}</option>
+                  <option value="Baja">{t("Baja")}</option>
                 </select>
               </div>
             </div>
@@ -318,11 +311,10 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           {!esContrario && (
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <BadgeCheck size={16} className="text-slate-400" /> Colegiación
-            </h3>
+              <BadgeCheck size={16} className="text-slate-400" />{" "}{t("Colegiación")}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col gap-2 md:col-span-2">
-                <label className={lbl}>Colegio</label>
+                <label className={lbl}>{t("Colegio")}</label>
                 {tipo === "ABOGADO" ? (
                   <ColegioAbogadoField value={form.colegio} onChange={v => setForm(prev => ({ ...prev, colegio: v }))} />
                 ) : (
@@ -330,24 +322,24 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Nº Colegiado</label>
+                <label className={lbl}>{t("Nº Colegiado")}</label>
                 <input name="num_colegiado" value={form.num_colegiado} onChange={handleChange} className={inputCls} />
               </div>
               {tipo === "PROCURADOR" ? (
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Código REPRE</label>
-                  <input name="codigo_repre" value={form.codigo_repre} onChange={handleChange} placeholder="Identificador LexNET" className={inputCls} />
+                  <label className={lbl}>{t("Código REPRE")}</label>
+                  <input name="codigo_repre" value={form.codigo_repre} onChange={handleChange} placeholder={t("Identificador LexNET")} className={inputCls} />
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Especialidad</label>
-                  <input name="especialidad" value={form.especialidad} onChange={handleChange} placeholder="Ej. Civil, Penal, Laboral..." className={inputCls} />
+                  <label className={lbl}>{t("Especialidad")}</label>
+                  <input name="especialidad" value={form.especialidad} onChange={handleChange} placeholder={t("Ej. Civil, Penal, Laboral...")} className={inputCls} />
                 </div>
               )}
               {tipo === "PROCURADOR" ? (
                 <div className="flex flex-col gap-2 md:col-span-3">
-                  <label className={lbl}>Cuenta de consignaciones (IBAN)</label>
-                  <input name="cuenta_consignaciones" value={form.cuenta_consignaciones} onChange={handleChange} placeholder="ES00 0000 0000 0000 0000 0000" className={`${inputCls} font-mono`} />
+                  <label className={lbl}>{t("Cuenta de consignaciones (IBAN)")}</label>
+                  <input name="cuenta_consignaciones" value={form.cuenta_consignaciones} onChange={handleChange} placeholder={t("ES00 0000 0000 0000 0000 0000")} className={`${inputCls} font-mono`} />
                 </div>
               ) : (
                 <div className="flex items-center gap-2 md:col-span-3 pt-1">
@@ -358,7 +350,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
                     onChange={e => setForm(prev => ({ ...prev, turno_oficio: e.target.checked }))}
                     className="w-4 h-4 accent-red-600 cursor-pointer"
                   />
-                  <label htmlFor="turno_oficio" className="text-sm text-slate-700 font-medium cursor-pointer select-none">Está en turno de oficio</label>
+                  <label htmlFor="turno_oficio" className="text-sm text-slate-700 font-medium cursor-pointer select-none">{t("Está en turno de oficio")}</label>
                 </div>
               )}
             </div>
@@ -368,33 +360,33 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           {/* DIRECCIÓN */}
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <Building2 size={16} className="text-slate-400" /> {esContrario ? "Dirección" : "Despacho y dirección"}
+              <Building2 size={16} className="text-slate-400" /> {esContrario ? t("Dirección") : t("Despacho y dirección")}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               {!esContrario && (
               <div className="flex flex-col gap-2 md:col-span-3">
-                <label className={lbl}>Despacho / Bufete</label>
+                <label className={lbl}>{t("Despacho / Bufete")}</label>
                 <input name="despacho" value={form.despacho} onChange={handleChange} className={inputCls} />
               </div>
               )}
               <div className="flex flex-col gap-2 md:col-span-3">
-                <label className={lbl}>Dirección</label>
+                <label className={lbl}>{t("Dirección")}</label>
                 <input name="address_street" value={form.address_street} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Código Postal</label>
+                <label className={lbl}>{t("Código Postal")}</label>
                 <input name="address_cp" value={form.address_cp} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Población</label>
+                <label className={lbl}>{t("Población")}</label>
                 <input name="address_town" value={form.address_town} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Provincia</label>
+                <label className={lbl}>{t("Provincia")}</label>
                 <input name="address_province" value={form.address_province} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>País</label>
+                <label className={lbl}>{t("País")}</label>
                 <input name="address_country" value={form.address_country} onChange={handleChange} className={inputCls} />
               </div>
             </div>
@@ -403,35 +395,34 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           {/* CONTACTO */}
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <Phone size={16} className="text-slate-400" /> Contacto
-            </h3>
+              <Phone size={16} className="text-slate-400" />{" "}{t("Contacto")}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col gap-2 md:col-span-2">
-                <label className={lbl}>Correo electrónico</label>
-                <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="nombre@despacho.com" className={inputCls} />
+                <label className={lbl}>{t("Correo electrónico")}</label>
+                <input type="email" name="email" value={form.email} onChange={handleChange} placeholder={t("nombre@despacho.com")} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Página web</label>
-                <input name="website" value={form.website} onChange={handleChange} placeholder="www.despacho.com" className={inputCls} />
+                <label className={lbl}>{t("Página web")}</label>
+                <input name="website" value={form.website} onChange={handleChange} placeholder={t("www.despacho.com")} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Teléfono 1</label>
+                <label className={lbl}>{t("Teléfono 1")}</label>
                 <input name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Teléfono 2</label>
+                <label className={lbl}>{t("Teléfono 2")}</label>
                 <input name="phone_2" value={form.phone_2} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Teléfono 3</label>
+                <label className={lbl}>{t("Teléfono 3")}</label>
                 <input name="phone_3" value={form.phone_3} onChange={handleChange} className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Móvil</label>
+                <label className={lbl}>{t("Móvil")}</label>
                 <input name="mobile" value={form.mobile} onChange={handleChange} placeholder="600 000 000" className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Fax</label>
+                <label className={lbl}>{t("Fax")}</label>
                 <input name="fax" value={form.fax} onChange={handleChange} className={inputCls} />
               </div>
             </div>
@@ -440,8 +431,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           {/* NOTAS */}
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <StickyNote size={16} className="text-slate-400" /> Notas
-            </h3>
+              <StickyNote size={16} className="text-slate-400" />{" "}{t("Notas")}</h3>
             <div className="flex flex-col gap-2">
               <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className={inputCls} />
             </div>

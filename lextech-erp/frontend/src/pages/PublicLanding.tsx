@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { KeyRound } from "lucide-react";
 import VantiaBrand from "../components/VantiaBrand";
 import { aviso } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 const LEGAL_QUOTES = [
   {
@@ -117,38 +118,32 @@ export default function PublicLanding() {
         </div>
 
         <div className="relative z-10 w-full max-w-xl">
-          <div className="mb-8 inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#fff1c9]">
-            Plataforma legal
-          </div>
+          <div className="mb-8 inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#fff1c9]">{t("Plataforma legal")}</div>
 
           <QuoteRotator />
 
-          <p className="mt-6 max-w-md text-lg leading-relaxed text-white">
-            Automatización de expedientes, investigación con IA y gestión integral en una sola plataforma segura.
-          </p>
+          <p className="mt-6 max-w-md text-lg leading-relaxed text-white">{t("Automatización de expedientes, investigación con IA y gestión integral en una sola plataforma segura.")}</p>
         </div>
 
         <div className="relative z-10 w-full max-w-xl space-y-3">
           <FeatureCard
             emoji="🛡️"
-            title="Seguridad Zero-Trust"
-            desc="Cada expediente viaja y se guarda bajo el mismo nivel de exigencia que un banco, verificado en cada paso."
+            title={t("Seguridad Zero-Trust")}
+            desc={t("Cada expediente viaja y se guarda bajo el mismo nivel de exigencia que un banco, verificado en cada paso.")}
           />
           <FeatureCard
             emoji="⚡"
-            title="Extracción con IA"
-            desc="Sube un ZIP de documentos y la IA extrae partes, juzgado, cuantías y fechas automáticamente."
+            title={t("Extracción con IA")}
+            desc={t("Sube un ZIP de documentos y la IA extrae partes, juzgado, cuantías y fechas automáticamente.")}
           />
           <FeatureCard
             emoji="📋"
-            title="Trazabilidad total"
-            desc="Cada acción queda registrada con usuario, fecha y hora. Auditoría completa siempre disponible."
+            title={t("Trazabilidad total")}
+            desc={t("Cada acción queda registrada con usuario, fecha y hora. Auditoría completa siempre disponible.")}
           />
         </div>
 
-        <div className="relative z-10 text-sm font-semibold text-white">
-          © 2026 Vantia Systems. Enterprise.
-        </div>
+        <div className="relative z-10 text-sm font-semibold text-white">{t("© 2026 Vantia Systems. Enterprise.")}</div>
       </div>
 
       {/* Columna anclada arriba (no centrada en vertical): al pasar de «Entrar»
@@ -164,10 +159,9 @@ export default function PublicLanding() {
         <div className="relative z-10 w-full max-w-[400px] space-y-7">
           {/* Marca, pestañas y formulario: misma columna, mismo ancho, centrados. */}
           <div className="flex flex-col items-center gap-1.5">
-            <VantiaBrand size={64} subtitle="Suite legal profesional" className="justify-center" />
+            <VantiaBrand size={64} subtitle={t("Suite legal profesional")} className="justify-center" />
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#1e2f45]/45">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" aria-hidden /> Acceso seguro
-            </p>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/80" aria-hidden />{" "}{t("Acceso seguro")}</p>
           </div>
 
           <SignedOut>
@@ -176,13 +170,9 @@ export default function PublicLanding() {
 
           <SignedIn>
             <div className="text-center space-y-4">
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 shadow-sm">
-                Sesion activa detectada.
-              </div>
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 shadow-sm">{t("Sesion activa detectada.")}</div>
               <Link to="/dashboard">
-                <button className="w-full rounded-2xl bg-[#b3924a] px-4 py-4 font-bold text-[#1e2f45] shadow-[0_18px_45px_rgba(179,146,74,0.2)] transition-all hover:bg-[#c19f58]">
-                  Entrar al dashboard
-                </button>
+                <button className="w-full rounded-2xl bg-[#b3924a] px-4 py-4 font-bold text-[#1e2f45] shadow-[0_18px_45px_rgba(179,146,74,0.2)] transition-all hover:bg-[#c19f58]">{t("Entrar al dashboard")}</button>
               </Link>
             </div>
           </SignedIn>
@@ -244,7 +234,7 @@ function AccesoORegistro() {
         @keyframes accesoEntrada { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
       `}</style>
       {/* Pestañas con indicador que se desliza; mismo ancho que la tarjeta. */}
-      <div role="tablist" aria-label="Acceso" className="relative grid grid-cols-2 rounded-2xl bg-[#1e2f45]/[0.06] p-1 ring-1 ring-inset ring-[#1e2f45]/[0.06]">
+      <div role="tablist" aria-label={t("Acceso")} className="relative grid grid-cols-2 rounded-2xl bg-[#1e2f45]/[0.06] p-1 ring-1 ring-inset ring-[#1e2f45]/[0.06]">
         <span aria-hidden
           className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-xl bg-white shadow-[0_1px_2px_rgba(30,47,69,0.08),0_6px_16px_rgba(30,47,69,0.10)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
           style={{ transform: modo === "registro" ? "translateX(100%)" : "translateX(0)" }} />
@@ -263,9 +253,7 @@ function AccesoORegistro() {
           ) : (
             <>
               <SignUp routing="hash" signInUrl="/#entrar" appearance={APARIENCIA_ACCESO} />
-              <p className="mt-4 px-2 text-center text-xs leading-relaxed text-[#1e2f45]/55">
-                Después de crear tu cuenta podrás dar de alta tu despacho o unirte al de tu equipo con el código que te den.
-              </p>
+              <p className="mt-4 px-2 text-center text-xs leading-relaxed text-[#1e2f45]/55">{t("Después de crear tu cuenta podrás dar de alta tu despacho o unirte al de tu equipo con el código que te den.")}</p>
             </>
           )}
         </div>
@@ -340,15 +328,14 @@ function AyudasContrasena({ contenedor, modo }: { contenedor: HTMLElement | null
     }
     let copiada = false;
     try { await navigator.clipboard.writeText(clave); copiada = true; } catch { /* sin permiso: se ve en el campo */ }
-    aviso.ok(copiada ? "Contraseña segura generada y copiada. Guárdala en tu gestor de contraseñas." : "Contraseña segura generada: cópiala y guárdala en tu gestor de contraseñas.", { duracion: 7000 });
+    aviso.ok(copiada ? t("Contraseña segura generada y copiada. Guárdala en tu gestor de contraseñas.") : t("Contraseña segura generada: cópiala y guárdala en tu gestor de contraseñas."), { duracion: 7000 });
   };
 
   if (!hueco) return null;
   return createPortal(
-    <button type="button" onClick={generar} title="Crear una contraseña segura al azar, rellenarla y copiarla"
+    <button type="button" onClick={generar} title={t("Crear una contraseña segura al azar, rellenarla y copiarla")}
       className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[13px] font-semibold text-[#b3924a] transition-colors hover:bg-[#b3924a]/10 hover:text-[#8a6e35]">
-      <KeyRound size={13} /> Generar segura
-    </button>,
+      <KeyRound size={13} />{" "}{t("Generar segura")}</button>,
     hueco,
   );
 }
@@ -500,7 +487,7 @@ function QuoteRotator() {
             key={i}
             type="button"
             onClick={() => setIndex(i)}
-            aria-label={`Ver frase ${i + 1} de ${LEGAL_QUOTES.length}`}
+            aria-label={t("Ver frase {v} de {length}", { v: i + 1, length: LEGAL_QUOTES.length })}
             aria-current={i === index}
             className={`h-1.5 rounded-full transition-all duration-300 ${
               i === index ? "w-6 bg-[#d7c08a]" : "w-1.5 bg-white/20 hover:bg-white/35"

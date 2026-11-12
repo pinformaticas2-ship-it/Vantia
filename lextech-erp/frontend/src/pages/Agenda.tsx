@@ -21,6 +21,7 @@ import { primerDiaSemana, duracionEventoMin, vistaAgendaInicial } from "../lib/p
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
 import { useAvisoSalida } from "../lib/borradores";
 import "./agenda.css";
+import { t } from '../lib/i18n';
 
 // ── Google Calendar Types ─────────────────────────────────────────────────────
 interface GCalEvent {
@@ -480,16 +481,16 @@ function EventModal({
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
                   <typeConf.icon size={14} className="text-red-600" />
-                  {event ? "Editar evento" : "Nuevo evento"}
+                  {event ? t("Editar evento") : t("Nuevo evento")}
                 </div>
                 <input
                   value={form.title}
                   onChange={e => set("title", e.target.value)}
-                  placeholder="Añade un titulo"
+                  placeholder={t("Añade un titulo")}
                   required
                   className="w-full border-0 border-b-2 border-slate-200 bg-transparent px-0 pb-3 text-xl font-semibold text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none"
                 />
-                {missingTitle && <p className="mt-2 text-xs font-medium text-amber-600">Escribe un título para poder guardar el evento.</p>}
+                {missingTitle && <p className="mt-2 text-xs font-medium text-amber-600">{t("Escribe un título para poder guardar el evento.")}</p>}
               </div>
             </div>
             <button
@@ -499,9 +500,7 @@ function EventModal({
               title={saveDisabledReason}
               className="flex shrink-0 items-center gap-2 rounded-full bg-red-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
             >
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              Guardar
-            </button>
+              {saving && <Loader2 size={14} className="animate-spin" />}{t("Guardar")}</button>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -529,9 +528,7 @@ function EventModal({
                 checked={form.all_day}
                 onChange={e => set("all_day", e.target.checked)}
                 className="rounded border-slate-300 text-red-600 focus:ring-red-400"
-              />
-              Todo el dia
-            </label>
+              />{t("Todo el dia")}</label>
           </div>
         </div>
 
@@ -553,11 +550,11 @@ function EventModal({
           <div className="space-y-6 lg:col-start-1">
           {/* Título */}
           <div className="hidden">
-            <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t("Título")}{" "}<span className="text-red-500">*</span></label>
             <input
               value={form.title}
               onChange={e => set("title", e.target.value)}
-              placeholder="Ej: Reunión cliente García, Vista oral J1ª…"
+              placeholder={t("Ej: Reunión cliente García, Vista oral J1ª…")}
               required
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-200"
             />
@@ -570,16 +567,12 @@ function EventModal({
                 type="button"
                 onClick={() => setActiveTab("details")}
                 className={`pb-2 ${activeTab === "details" ? "border-b-2 border-red-500 text-red-600" : "text-slate-400"}`}
-              >
-                Detalles del evento
-              </button>
+              >{t("Detalles del evento")}</button>
               <button
                 type="button"
                 onClick={() => setActiveTab("organization")}
                 className={`pb-2 ${activeTab === "organization" ? "border-b-2 border-red-500 text-red-600" : "text-slate-400"}`}
-              >
-                Organizacion
-              </button>
+              >{t("Organizacion")}</button>
             </div>
             <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
               activeTab === "details"
@@ -587,12 +580,12 @@ function EventModal({
                 : "border-red-100 bg-red-50/70 text-slate-700"
             }`}>
               {activeTab === "details"
-                ? "Usa esta pestaña para eventos generales que no estén vinculados a ningún expediente."
-                : "Usa esta pestaña cuando el evento esté relacionado con un expediente o con un cliente del despacho."}
+                ? t("Usa esta pestaña para eventos generales que no estén vinculados a ningún expediente.")
+                : t("Usa esta pestaña cuando el evento esté relacionado con un expediente o con un cliente del despacho.")}
             </div>
             <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Tipo")}</label>
               <select
                 value={form.type}
                 onChange={e => set("type", e.target.value)}
@@ -604,7 +597,7 @@ function EventModal({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Estado")}</label>
               <select
                 value={form.status}
                 onChange={e => set("status", e.target.value)}
@@ -619,7 +612,7 @@ function EventModal({
 
             {/* Color */}
             <div className="mt-4">
-              <label className="block text-xs font-bold text-slate-700 mb-2">Color del evento</label>
+              <label className="block text-xs font-bold text-slate-700 mb-2">{t("Color del evento")}</label>
               <div className="flex flex-wrap gap-2">
                 {EVENT_COLORS.map(hex => (
                   <button
@@ -636,9 +629,7 @@ function EventModal({
                     type="button"
                     onClick={() => set("color", "")}
                     className="px-2 h-6 rounded-full text-[10px] font-semibold text-slate-500 border border-slate-200 hover:border-slate-400 transition-colors"
-                  >
-                    Reset
-                  </button>
+                  >{t("Reset")}</button>
                 )}
               </div>
             </div>
@@ -652,14 +643,14 @@ function EventModal({
               onChange={e => set("all_day", e.target.checked)}
               className="rounded border-slate-300 text-red-600 focus:ring-red-400"
             />
-            <span className="text-sm text-slate-700 font-medium">Todo el día</span>
+            <span className="text-sm text-slate-700 font-medium">{t("Todo el día")}</span>
           </label>
 
           {/* Fechas */}
           <div className="hidden">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                {form.all_day ? "Fecha" : "Inicio"} <span className="text-red-500">*</span>
+                {form.all_day ? t("Fecha") : t("Inicio")} <span className="text-red-500">*</span>
               </label>
               <input
                 type={form.all_day ? "date" : "datetime-local"}
@@ -671,7 +662,7 @@ function EventModal({
             </div>
             {!form.all_day && (
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Fin</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t("Fin")}</label>
                 <input
                   type="datetime-local"
                   value={form.end_at}
@@ -684,22 +675,22 @@ function EventModal({
 
           {/* Lugar */}
           <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Lugar / ubicación</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t("Lugar / ubicación")}</label>
             <input
               value={form.location}
               onChange={e => set("location", e.target.value)}
-              placeholder="Ej: Sala A, Juzgado nº3, Online…"
+              placeholder={t("Ej: Sala A, Juzgado nº3, Online…")}
               className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* Descripción */}
           <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Notas</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t("Notas")}</label>
             <textarea
               value={form.description}
               onChange={e => set("description", e.target.value)}
-              placeholder="Notas adicionales sobre el evento…"
+              placeholder={t("Notas adicionales sobre el evento…")}
               rows={8}
               className="w-full rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none resize-none"
             />
@@ -708,18 +699,18 @@ function EventModal({
           <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "organization" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "hidden"}`}>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Contexto</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t("Contexto")}</label>
                 <textarea
                   value={form.organization_context}
                   onChange={e => set("organization_context", e.target.value)}
-                  placeholder="Escribe el contexto del evento dentro del expediente..."
+                  placeholder={t("Escribe el contexto del evento dentro del expediente...")}
                   rows={4}
                   className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 focus:border-red-400 focus:outline-none resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Expediente existente</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{t("Expediente existente")}</label>
                   <select
                     value={form.expediente_id}
                     onChange={e => {
@@ -730,16 +721,16 @@ function EventModal({
                     }}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   >
-                    <option value="">Seleccionar expediente...</option>
+                    <option value="">{t("Seleccionar expediente...")}</option>
                     {expedientesForSelectedUser.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {expedienteOptionLabel(item)} · {item.descripcion || "Sin descripcion"}
+                        {expedienteOptionLabel(item)} · {item.descripcion || t("Sin descripcion")}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Usuario existente</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{t("Usuario existente")}</label>
                   <select
                     value={form.related_user_id}
                     onChange={e => {
@@ -750,7 +741,7 @@ function EventModal({
                     }}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   >
-                    <option value="">Seleccionar usuario...</option>
+                    <option value="">{t("Seleccionar usuario...")}</option>
                     {usersForSelectedExpediente.map((item) => (
                       <option key={item.user_id} value={item.user_id}>
                         {item.user_name}
@@ -761,27 +752,27 @@ function EventModal({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Cliente vinculado</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{t("Cliente vinculado")}</label>
                   <input
                     value={selectedExpediente?.cliente_nombre || form.cliente_id || ""}
                     onChange={e => set("cliente_id", e.target.value)}
-                    placeholder="Cliente del expediente"
+                    placeholder={t("Cliente del expediente")}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Usuario seleccionado</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">{t("Usuario seleccionado")}</label>
                   <input
                     value={form.related_user_name || ""}
                     onChange={e => set("related_user_name", e.target.value)}
-                    placeholder="Nombre del usuario relacionado"
+                    placeholder={t("Nombre del usuario relacionado")}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   />
                 </div>
               </div>
               <div className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-4 text-sm text-slate-600">
-                <div className="font-semibold text-red-700">Contexto del ERP</div>
-                <p className="mt-1">Puedes seleccionar un expediente existente, un usuario existente vinculado a ese expediente y dejar por escrito el contexto del evento.</p>
+                <div className="font-semibold text-red-700">{t("Contexto del ERP")}</div>
+                <p className="mt-1">{t("Puedes seleccionar un expediente existente, un usuario existente vinculado a ese expediente y dejar por escrito el contexto del evento.")}</p>
               </div>
             </div>
           </div>
@@ -790,34 +781,32 @@ function EventModal({
           <div className="space-y-4 lg:col-start-2">
             <div className="rounded-[28px] border border-red-100 bg-gradient-to-br from-white to-red-50/40 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
               <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <Users size={16} className="text-red-600" />
-                Resumen
-              </div>
+                <Users size={16} className="text-red-600" />{t("Resumen")}</div>
               <div className="space-y-3 text-sm">
                 <div className="rounded-2xl border border-red-100 bg-white px-4 py-3">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Tipo</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Tipo")}</div>
                   <div className="mt-1 font-semibold text-slate-700">{typeConf.label}</div>
                 </div>
                 <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Estado</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Estado")}</div>
                   <div className={`mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConf.cls}`}>
                     {statusConf.label}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Sincronizacion</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Sincronizacion")}</div>
                   <div className="mt-1 text-slate-600">
                     {event?.external_provider === "google"
-                      ? "Este evento esta vinculado con Google Calendar."
-                      : "Si Google esta conectado, se sincronizara al guardar."}
+                      ? t("Este evento esta vinculado con Google Calendar.")
+                      : t("Si Google esta conectado, se sincronizara al guardar.")}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Relacion</div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t("Relacion")}</div>
                   <div className="mt-1 text-slate-700">
                     {activeTab === "organization"
-                      ? "Relacionado con expediente"
-                      : "Evento independiente"}
+                      ? t("Relacionado con expediente")
+                      : t("Evento independiente")}
                   </div>
                 </div>
               </div>
@@ -825,22 +814,18 @@ function EventModal({
 
             <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <Video size={15} className="text-emerald-600" />
-                Videollamada
-              </div>
+                <Video size={15} className="text-emerald-600" />{t("Videollamada")}</div>
               {event?.meet_url ? (
                 <div className="space-y-2">
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-1">Meet activo</div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-1">{t("Meet activo")}</div>
                     <a
                       href={event.meet_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
                     >
-                      <ExternalLink size={13} />
-                      Unirse a Meet
-                    </a>
+                      <ExternalLink size={13} />{t("Unirse a Meet")}</a>
                   </div>
                 </div>
               ) : (
@@ -852,18 +837,18 @@ function EventModal({
                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
                   />
                   <div>
-                    <div className="text-sm font-semibold text-slate-700">Crear videollamada</div>
-                    <div className="text-[11px] text-slate-400">Genera un enlace de Google Meet</div>
+                    <div className="text-sm font-semibold text-slate-700">{t("Crear videollamada")}</div>
+                    <div className="text-[11px] text-slate-400">{t("Genera un enlace de Google Meet")}</div>
                   </div>
                 </label>
               )}
               {!(event?.meet_url) && (form as any).with_meet && !gcalEnabled && (
-                <p className="mt-2 text-[11px] text-amber-600 font-medium">Conecta Google Calendar para generar el enlace.</p>
+                <p className="mt-2 text-[11px] text-amber-600 font-medium">{t("Conecta Google Calendar para generar el enlace.")}</p>
               )}
             </div>
 
             <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
-              <div className="mb-3 text-sm font-semibold text-slate-800">Acciones</div>
+              <div className="mb-3 text-sm font-semibold text-slate-800">{t("Acciones")}</div>
               <div className="space-y-2">
                 {event ? (
                   <button
@@ -872,16 +857,13 @@ function EventModal({
                     disabled={saving}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                   >
-                    <Trash2 size={14} /> Eliminar evento
-                  </button>
+                    <Trash2 size={14} />{" "}{t("Eliminar evento")}</button>
                 ) : null}
                 <button
                   type="button"
                   onClick={onClose}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                >
-                  Cancelar
-                </button>
+                >{t("Cancelar")}</button>
               </div>
             </div>
           </div>
@@ -942,8 +924,8 @@ function GoogleEventModal({
         {/* Cabecera */}
         <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-blue-100">
           <div className="flex items-center gap-2 min-w-0">
-            <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="Google Calendar" className="w-3 h-3 shrink-0" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-blue-500">Google Calendar</span>
+            <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt={t("Google Calendar")} className="w-3 h-3 shrink-0" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-blue-500">{t("Google Calendar")}</span>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors">
             <X size={14} />
@@ -953,7 +935,7 @@ function GoogleEventModal({
         {/* Cuerpo */}
         <div className="p-4 space-y-3 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 420) }}>
           <p className="text-[15px] font-semibold text-slate-900 leading-snug">
-            {event.summary || "(Sin título)"}
+            {event.summary || t("(Sin título)")}
           </p>
 
           <div className="flex items-start gap-2 text-xs text-slate-600">
@@ -961,7 +943,7 @@ function GoogleEventModal({
             <div>
               <p className="font-medium capitalize">{dateLabel}</p>
               {isAllDay
-                ? <p className="text-slate-500 mt-0.5">Todo el día</p>
+                ? <p className="text-slate-500 mt-0.5">{t("Todo el día")}</p>
                 : startDate && endDate && (
                   <p className="text-slate-500 mt-0.5 flex items-center gap-1">
                     <Clock size={10} />
@@ -995,9 +977,7 @@ function GoogleEventModal({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
             >
-              <Video size={14} />
-              Unirse a Meet
-            </a>
+              <Video size={14} />{t("Unirse a Meet")}</a>
           )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -1007,17 +987,14 @@ function GoogleEventModal({
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              <ExternalLink size={11} /> Abrir en Google
-            </a>
+              <ExternalLink size={11} />{" "}{t("Abrir en Google")}</a>
             <button
               type="button"
               onClick={() => onImport(event)}
               disabled={importing}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors"
             >
-              {importing ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-              Importar
-            </button>
+              {importing ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}{t("Importar")}</button>
           </div>
         </div>
       </div>
@@ -1363,7 +1340,7 @@ function QuickEventPopover({
       <div className="flex flex-1 min-h-0 flex-col quick-popup popup-card">
         {/* Cabecera */}
         <div className="flex flex-shrink-0 items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Nuevo evento</span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Nuevo evento")}</span>
           <button
             onClick={onClose}
             className="rounded-lg p-1 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
@@ -1400,7 +1377,7 @@ function QuickEventPopover({
               ref={titleRef}
               value={form.title}
               onChange={e => set("title", e.target.value)}
-              placeholder="Añade un título"
+              placeholder={t("Añade un título")}
               className="w-full border-0 border-b-2 border-slate-100 bg-transparent pb-2 text-[15px] font-semibold text-slate-900 placeholder:text-slate-300 focus:border-red-400 focus:outline-none transition-colors"
             />
           )}
@@ -1420,7 +1397,7 @@ function QuickEventPopover({
                 </div>
                 {!form.all_day && (
                   <div className="flex items-center gap-2 pl-[21px]">
-                    <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                    <span className="text-[11px] text-slate-400 shrink-0">{t("hasta")}</span>
                     <input
                       type="datetime-local"
                       value={form.end_at}
@@ -1440,9 +1417,7 @@ function QuickEventPopover({
                     checked={form.all_day}
                     onChange={e => set("all_day", e.target.checked)}
                     className="rounded border-slate-300 text-red-600 focus:ring-red-300"
-                  />
-                  Todo el día
-                </label>
+                  />{t("Todo el día")}</label>
               </div>
 
               {/* Tipo + Color */}
@@ -1478,7 +1453,7 @@ function QuickEventPopover({
                 <input
                   value={form.location}
                   onChange={e => set("location", e.target.value)}
-                  placeholder="Añadir ubicación"
+                  placeholder={t("Añadir ubicación")}
                   className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
               </div>
@@ -1492,9 +1467,9 @@ function QuickEventPopover({
                   onChange={e => set("with_meet", e.target.checked)}
                   className="rounded border-slate-300 text-red-600 focus:ring-red-300"
                 />
-                <span className="flex-1">Añadir videoconferencia de Google Meet</span>
+                <span className="flex-1">{t("Añadir videoconferencia de Google Meet")}</span>
                 {!gcalEnabled && (form as any).with_meet && (
-                  <span className="shrink-0 text-[10px] font-semibold text-amber-600">Conecta Google</span>
+                  <span className="shrink-0 text-[10px] font-semibold text-amber-600">{t("Conecta Google")}</span>
                 )}
               </label>
 
@@ -1507,7 +1482,7 @@ function QuickEventPopover({
                     onChange={e => setGuestInput(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGuest(); } }}
                     onBlur={addGuest}
-                    placeholder="Añadir invitados (email + Intro)"
+                    placeholder={t("Añadir invitados (email + Intro)")}
                     className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                   />
                 </div>
@@ -1539,7 +1514,7 @@ function QuickEventPopover({
                       }}
                       className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                     >
-                      <option value="">Comprobar disponibilidad de...</option>
+                      <option value="">{t("Comprobar disponibilidad de...")}</option>
                       {organizationUsers.map(u => (
                         <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
                       ))}
@@ -1547,7 +1522,7 @@ function QuickEventPopover({
                   </div>
                   {availability && (
                     <p className={`pl-[21px] text-[11px] font-semibold ${availability === "free" ? "text-emerald-600" : "text-amber-600"}`}>
-                      {availability === "free" ? "✓ Todo el mundo está disponible" : "⚠ Puede haber conflicto de horario"}
+                      {availability === "free" ? t("✓ Todo el mundo está disponible") : t("⚠ Puede haber conflicto de horario")}
                     </p>
                   )}
                 </div>
@@ -1559,7 +1534,7 @@ function QuickEventPopover({
                 <textarea
                   value={form.description}
                   onChange={e => set("description", e.target.value)}
-                  placeholder="Añadir descripción"
+                  placeholder={t("Añadir descripción")}
                   rows={2}
                   className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
@@ -1590,17 +1565,15 @@ function QuickEventPopover({
                     disabled={loadingClientes}
                     className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors disabled:opacity-60"
                   >
-                    <option value="">Sin cliente (tarea personal)</option>
+                    <option value="">{t("Sin cliente (tarea personal)")}</option>
                     {clientes.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
-                {loadingClientes && <p className="pl-[21px] text-[11px] text-slate-400">Cargando clientes...</p>}
+                {loadingClientes && <p className="pl-[21px] text-[11px] text-slate-400">{t("Cargando clientes...")}</p>}
                 {form.cliente_id && (
-                  <p className="pl-[21px] text-[11px] text-slate-500">
-                    Se creará también en el módulo Tareas, vinculada a este cliente.
-                  </p>
+                  <p className="pl-[21px] text-[11px] text-slate-500">{t("Se creará también en el módulo Tareas, vinculada a este cliente.")}</p>
                 )}
               </div>
             </>
@@ -1620,7 +1593,7 @@ function QuickEventPopover({
                   />
                 </div>
                 <div className="flex items-center gap-2 pl-[21px]">
-                  <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                  <span className="text-[11px] text-slate-400 shrink-0">{t("hasta")}</span>
                   <input
                     type="date"
                     value={form.end_at ? form.end_at.slice(0, 10) : form.start_at.slice(0, 10)}
@@ -1635,7 +1608,7 @@ function QuickEventPopover({
                 <textarea
                   value={form.description}
                   onChange={e => set("description", e.target.value)}
-                  placeholder="Mensaje (opcional) — queda como nota, no se envía ni rechaza reuniones automáticamente"
+                  placeholder={t("Mensaje (opcional) — queda como nota, no se envía ni rechaza reuniones automáticamente")}
                   rows={2}
                   className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
@@ -1655,7 +1628,7 @@ function QuickEventPopover({
                 />
               </div>
               <div className="flex items-center gap-2 pl-[21px]">
-                <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                <span className="text-[11px] text-slate-400 shrink-0">{t("hasta")}</span>
                 <input
                   type="datetime-local"
                   value={form.end_at}
@@ -1663,9 +1636,7 @@ function QuickEventPopover({
                   className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
               </div>
-              <p className="pl-[21px] text-[11px] text-slate-400">
-                Se bloquea en tu calendario. No silencia notificaciones ni bloquea otras apps: eso aún no existe en el sistema.
-              </p>
+              <p className="pl-[21px] text-[11px] text-slate-400">{t("Se bloquea en tu calendario. No silencia notificaciones ni bloquea otras apps: eso aún no existe en el sistema.")}</p>
             </div>
           )}
 
@@ -1685,7 +1656,7 @@ function QuickEventPopover({
                 <input
                   value={form.location}
                   onChange={e => set("location", e.target.value)}
-                  placeholder="¿Dónde trabajas? (ej. Oficina, Casa, Cliente X)"
+                  placeholder={t("¿Dónde trabajas? (ej. Oficina, Casa, Cliente X)")}
                   className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
               </div>
@@ -1715,33 +1686,27 @@ function QuickEventPopover({
                       onClick={copyBookingUrl}
                       className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                     >
-                      {linkCopied ? "¡Copiado!" : "Copiar enlace"}
+                      {linkCopied ? t("¡Copiado!") : t("Copiar enlace")}
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowBookingSettings(true)}
                       className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Editar configuración
-                    </button>
+                    >{t("Editar configuración")}</button>
                   </div>
                   <p className={`pl-[21px] text-[11px] font-semibold ${bookingPage.active ? "text-emerald-600" : "text-slate-400"}`}>
-                    {bookingPage.active ? "✓ Activa — se puede reservar" : "Desactivada"}
+                    {bookingPage.active ? t("✓ Activa — se puede reservar") : t("Desactivada")}
                   </p>
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center gap-2 py-4 text-center">
                   <CalendarClock size={22} className="text-slate-300" />
-                  <p className="max-w-[260px] text-xs text-slate-400">
-                    Crea una página pública donde cualquiera con el enlace puede reservar un hueco en tu calendario.
-                  </p>
+                  <p className="max-w-[260px] text-xs text-slate-400">{t("Crea una página pública donde cualquiera con el enlace puede reservar un hueco en tu calendario.")}</p>
                   <button
                     type="button"
                     onClick={() => setShowBookingSettings(true)}
                     className="mt-1 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
-                  >
-                    Crear página de reservas
-                  </button>
+                  >{t("Crear página de reservas")}</button>
                 </div>
               )}
             </div>
@@ -1751,10 +1716,8 @@ function QuickEventPopover({
             <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
               <otherTab.icon size={22} className="text-slate-300" />
               <p className="text-sm font-semibold text-slate-600">{otherTab.label}</p>
-              <p className="max-w-[240px] text-xs text-slate-400">Esta sección estará disponible próximamente.</p>
-              <span className="mt-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Próximamente
-              </span>
+              <p className="max-w-[240px] text-xs text-slate-400">{t("Esta sección estará disponible próximamente.")}</p>
+              <span className="mt-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("Próximamente")}</span>
             </div>
           )}
 
@@ -1772,9 +1735,7 @@ function QuickEventPopover({
               type="button"
               onClick={() => onExpand(form)}
               className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
-            >
-              Más opciones
-            </button>
+            >{t("Más opciones")}</button>
           ) : <span />}
           <div className="flex items-center gap-2">
             <button
@@ -1782,19 +1743,17 @@ function QuickEventPopover({
               onClick={onClose}
               className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
             >
-              {activeTab === "agenda_citas" ? "Cerrar" : "Cancelar"}
+              {activeTab === "agenda_citas" ? t("Cerrar") : t("Cancelar")}
             </button>
             {activeTab !== "agenda_citas" && (
               <button
                 type="submit"
                 form="quick-event-form"
                 disabled={saving || missingTitle || !!otherTab}
-                title={missingTitle ? "Añade un título para guardar" : ""}
+                title={missingTitle ? t("Añade un título para guardar") : ""}
                 className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
-                {saving && <Loader2 size={11} className="animate-spin" />}
-                Guardar
-              </button>
+                {saving && <Loader2 size={11} className="animate-spin" />}{t("Guardar")}</button>
             )}
           </div>
         </div>
@@ -1873,7 +1832,7 @@ function EventViewPopover({
             <button
               onClick={onEdit}
               className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
-              title="Editar"
+              title={t("Editar")}
             >
               <Edit3 size={13} />
             </button>
@@ -1882,21 +1841,17 @@ function EventViewPopover({
                 <button
                   onClick={() => { onDelete(); onClose(); }}
                   className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-                >
-                  Eliminar
-                </button>
+                >{t("Eliminar")}</button>
                 <button
                   onClick={() => setConfirmDelete(false)}
                   className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
-                >
-                  No
-                </button>
+                >{t("No")}</button>
               </div>
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="peligro rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-                title="Eliminar"
+                title={t("Eliminar")}
               >
                 <Trash2 size={13} />
               </button>
@@ -1922,9 +1877,9 @@ function EventViewPopover({
             <Calendar size={13} className="shrink-0 mt-0.5 text-slate-400" />
             <div>
               <p className="font-medium capitalize">{dateLabel}</p>
-              {endDateLabel && <p className="text-slate-500">hasta {endDateLabel}</p>}
+              {endDateLabel && <p className="text-slate-500">{t("hasta")}{" "}{endDateLabel}</p>}
               {event.all_day
-                ? <p className="text-slate-500 mt-0.5">Todo el día</p>
+                ? <p className="text-slate-500 mt-0.5">{t("Todo el día")}</p>
                 : event.end_at && (
                   <p className="text-slate-500 mt-0.5 flex items-center gap-1">
                     <Clock size={10} />
@@ -1969,7 +1924,7 @@ function EventViewPopover({
               {stConf.label}
             </span>
             {event.external_provider === "google" && (
-              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="Google Calendar" className="w-4 h-4 opacity-60" />
+              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt={t("Google Calendar")} className="w-4 h-4 opacity-60" />
             )}
           </div>
 
@@ -1980,9 +1935,7 @@ function EventViewPopover({
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
             >
-              <Video size={14} />
-              Unirse a Meet
-            </a>
+              <Video size={14} />{t("Unirse a Meet")}</a>
           )}
         </div>
       </div>
@@ -2453,7 +2406,7 @@ function TimeGridView({
                 {d.getDate()}
               </div>
               <div className={`mt-1 h-3.5 text-[10px] font-semibold ${nEventos ? "text-gray-400" : "text-transparent"}`}>
-                {nEventos === 1 ? "1 evento" : `${nEventos} eventos`}
+                {nEventos === 1 ? t("1 evento") : t("{nEventos} eventos", { nEventos: nEventos })}
               </div>
             </div>
           );
@@ -2471,7 +2424,7 @@ function TimeGridView({
           className="border-r border-gray-100 flex items-end justify-end pr-2 pb-1"
           style={{ gridColumn: 1, gridRow: `1 / -1` }}
         >
-          <span className="text-[9px] text-gray-400 select-none">Todo el día</span>
+          <span className="text-[9px] text-gray-400 select-none">{t("Todo el día")}</span>
         </div>
 
         {/* Barras que abarcan varios días, una por "carril" para no solaparse */}
@@ -2923,17 +2876,17 @@ export default function Agenda() {
         setGcalToken(null);
         setGcalEnabled(false);
         try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
-        setGcalError("Sesión de Google expirada. Reconecta.");
+        setGcalError(t("Sesión de Google expirada. Reconecta."));
         return;
       }
       const data = await res.json();
       if (!res.ok) {
-        setGcalError(data?.error?.message || "No se pudieron leer los eventos de Google Calendar.");
+        setGcalError(data?.error?.message || t("No se pudieron leer los eventos de Google Calendar."));
         return;
       }
       setGcalEvents(data.items || []);
     } catch {
-      setGcalError("Error al obtener eventos de Google Calendar.");
+      setGcalError(t("Error al obtener eventos de Google Calendar."));
     } finally {
       setGcalLoading(false);
     }
@@ -2941,11 +2894,11 @@ export default function Agenda() {
 
   const connectGcal = useCallback(() => {
     if (!GCAL_CLIENT_ID || GCAL_CLIENT_ID === "TU_CLIENT_ID.apps.googleusercontent.com") {
-      setGcalError("Configura VITE_GOOGLE_CLIENT_ID en el archivo .env del frontend.");
+      setGcalError(t("Configura VITE_GOOGLE_CLIENT_ID en el archivo .env del frontend."));
       return;
     }
     if (!window.google?.accounts?.oauth2) {
-      setGcalError("El script de Google aún no está cargado. Recarga la página.");
+      setGcalError(t("El script de Google aún no está cargado. Recarga la página."));
       return;
     }
     const client = window.google.accounts.oauth2.initTokenClient({
@@ -2982,7 +2935,7 @@ export default function Agenda() {
     options: RequestInit = {},
   ) => {
     if (!gcalToken) {
-      throw new Error("Conecta Google Calendar para sincronizar este evento.");
+      throw new Error(t("Conecta Google Calendar para sincronizar este evento."));
     }
 
     const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary${path}`, {
@@ -3199,7 +3152,7 @@ export default function Agenda() {
       const data = await safeJson(res);
 
       if (!res.ok) {
-        setGcalError(data?.error || "No se pudieron importar los eventos de Google.");
+        setGcalError(data?.error || t("No se pudieron importar los eventos de Google."));
         return;
       }
 
@@ -3210,15 +3163,15 @@ export default function Agenda() {
       const firstError = data?.data?.errors?.[0]?.error as string | undefined;
 
       if (errors > 0 && firstError) {
-        setGcalError(`Error al importar desde Google: ${firstError}`);
+        setGcalError(t("Error al importar desde Google: {firstError}", { firstError: firstError }));
       }
 
       setGcalNotice(
-        `Sincronizacion completada: ${imported} importados, ${skipped} ya vinculados y ${errors} con error.`
+        t("Sincronización completada: {imported} importados, {skipped} ya vinculados y {errors} con error.", { imported, skipped, errors })
       );
       await fetchEvents(true);
     } catch (_e) {
-      setGcalError("Error de conexion al importar eventos de Google.");
+      setGcalError(t("Error de conexion al importar eventos de Google."));
     } finally {
       setGcalImporting(false);
     }
@@ -3254,7 +3207,7 @@ export default function Agenda() {
       const data = await safeJson(res);
 
       if (!res.ok) {
-        setGcalError(data?.error || "No se pudo sincronizar Google Calendar con el ERP.");
+        setGcalError(data?.error || t("No se pudo sincronizar Google Calendar con el ERP."));
         return;
       }
 
@@ -3262,12 +3215,12 @@ export default function Agenda() {
       const changed = Number(summary?.created || 0) + Number(summary?.updated || 0) + Number(summary?.deleted || 0);
       if (changed > 0) {
         setGcalNotice(
-          `Google sincronizado: ${summary?.created || 0} creados, ${summary?.updated || 0} actualizados y ${summary?.deleted || 0} eliminados en ERP.`
+          t("Google sincronizado: {c} creados, {u} actualizados y {d} eliminados en el ERP.", { c: summary?.created || 0, u: summary?.updated || 0, d: summary?.deleted || 0 })
         );
       }
       await fetchEvents(true);
     } catch (_e) {
-      setGcalError("Error al sincronizar automaticamente Google Calendar con el ERP.");
+      setGcalError(t("Error al sincronizar automaticamente Google Calendar con el ERP."));
     }
   }, [fetchEvents, getToken, gcalEnabled, gcalToken, viewMonth, viewYear]);
 
@@ -3460,7 +3413,7 @@ export default function Agenda() {
         }),
       });
       const json = await safeJson(res);
-      if (!res.ok) { setErrorMsg(json?.error || "Error al guardar"); return; }
+      if (!res.ok) { setErrorMsg(json?.error || t("Error al guardar")); return; }
       const savedEvent = json?.data as AgendaEvent | undefined;
       let syncWarning: string | null = null;
       if (savedEvent && gcalEnabled) {
@@ -3537,7 +3490,7 @@ export default function Agenda() {
       await fetchEvents(true);
       if (syncWarning) setGcalError(syncWarning);
     } catch (_e) {
-      setErrorMsg("Error de conexión");
+      setErrorMsg(t("Error de conexión"));
     } finally {
       setSaving(false);
     }
@@ -3553,18 +3506,18 @@ export default function Agenda() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) { const j = await safeJson(res); setErrorMsg(j?.error || "Error al eliminar"); return; }
+      if (!res.ok) { const j = await safeJson(res); setErrorMsg(j?.error || t("Error al eliminar")); return; }
 
       if (deletingEvent?.external_provider === "google" && deletingEvent.external_id) {
         try {
           if (!gcalEnabled) {
-            setGcalError("El evento se elimino del ERP, pero sigue en Google porque no hay una sesion activa para borrarlo alli.");
+            setGcalError(t("El evento se elimino del ERP, pero sigue en Google porque no hay una sesion activa para borrarlo alli."));
           } else {
             await deleteGoogleCalendarEvent(deletingEvent.external_id);
             setGcalNotice("Evento eliminado en el ERP y en Google Calendar.");
           }
         } catch (syncError: any) {
-          setGcalError(syncError?.message || "El evento se elimino del ERP, pero no se pudo borrar de Google.");
+          setGcalError(syncError?.message || t("El evento se elimino del ERP, pero no se pudo borrar de Google."));
         }
       }
 
@@ -3573,7 +3526,7 @@ export default function Agenda() {
       setDeleteConfirm(null);
       await fetchEvents(true);
     } catch (_e) {
-      setErrorMsg("Error de conexión");
+      setErrorMsg(t("Error de conexión"));
     } finally {
       setSaving(false);
     }
@@ -3620,7 +3573,7 @@ export default function Agenda() {
       const json = await safeJson(res);
       if (!res.ok) {
         setEvents(previousEvents);
-        setErrorMsg(json?.error || "No se pudo mover el evento");
+        setErrorMsg(json?.error || t("No se pudo mover el evento"));
         return;
       }
       const savedEvent = json?.data as AgendaEvent | undefined;
@@ -3693,7 +3646,7 @@ export default function Agenda() {
       if (syncWarning) setGcalError(syncWarning);
     } catch (_e) {
       setEvents(previousEvents);
-      setErrorMsg("Error al mover el evento");
+      setErrorMsg(t("Error al mover el evento"));
     } finally {
       setMovingEventId(null);
       setDraggingEventId(null);
@@ -3780,7 +3733,7 @@ export default function Agenda() {
       const json = await safeJson(res);
       if (!res.ok) {
         setEvents(previousEvents);
-        setErrorMsg(json?.error || "No se pudo mover el evento");
+        setErrorMsg(json?.error || t("No se pudo mover el evento"));
       } else {
         await fetchEvents(true);
       }
@@ -3803,8 +3756,8 @@ export default function Agenda() {
             <Calendar size={19} className="text-red-600" />
           </div>
           <div>
-            <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Agenda</h1>
-            <p className="hidden sm:block text-xs text-slate-400 font-medium mt-0.5">Calendario y eventos del despacho</p>
+            <h1 className="text-lg font-extrabold text-slate-900 leading-tight">{t("Agenda")}</h1>
+            <p className="hidden sm:block text-xs text-slate-400 font-medium mt-0.5">{t("Calendario y eventos del despacho")}</p>
           </div>
         </div>
 
@@ -3825,17 +3778,15 @@ export default function Agenda() {
             <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden h-10">
               {/* Estado */}
               <div className="px-3 flex items-center gap-2 bg-slate-50/60 border-r border-slate-200 h-full">
-                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4 shrink-0" />
+                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt={t("GCal")} className="w-4 h-4 shrink-0" />
                 <div className="leading-none">
-                  <div className="text-[10px] font-bold text-emerald-600 leading-tight">Vinculado</div>
+                  <div className="text-[10px] font-bold text-emerald-600 leading-tight">{t("Vinculado")}</div>
                   <div className="text-[9px] text-slate-500 tabular-nums leading-tight mt-0.5">
                     <span key={`imported-${smoothImportedVisibleGcalCount}`} className="inline-block animate-in fade-in duration-300">
-                      {smoothImportedVisibleGcalCount} en ERP
-                    </span>
+                      {smoothImportedVisibleGcalCount}{" "}{t("en ERP")}</span>
                     <span className="mx-1 text-slate-300">·</span>
                     <span key={`pending-${smoothVisiblePendingGcalCount}`} className="inline-block animate-in fade-in duration-300">
-                      {smoothVisiblePendingGcalCount} pdte.
-                    </span>
+                      {smoothVisiblePendingGcalCount}{" "}{t("pdte.")}</span>
                   </div>
                 </div>
                 <div className={`transition-all duration-300 ${gcalLoading ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
@@ -3846,7 +3797,7 @@ export default function Agenda() {
               <button
                 onClick={() => gcalToken && fetchGcalEvents(gcalToken, viewYear, viewMonth)}
                 disabled={gcalLoading || gcalImporting}
-                title="Refrescar Google Calendar"
+                title={t("Refrescar Google Calendar")}
                 className="px-2.5 h-full border-r border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
               >
                 <RefreshCw size={12} className={gcalLoading ? "animate-spin" : ""} />
@@ -3858,12 +3809,12 @@ export default function Agenda() {
                 className="px-3 h-full flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors border-r border-slate-200 disabled:opacity-40"
               >
                 {gcalImporting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                <span className="hidden sm:inline">Importar a agenda</span><span className="sm:hidden">Importar</span>
+                <span className="hidden sm:inline">{t("Importar a agenda")}</span><span className="sm:hidden">{t("Importar")}</span>
               </button>
               {/* Desconectar */}
               <button
                 onClick={disconnectGcal}
-                title="Desconectar Google Calendar"
+                title={t("Desconectar Google Calendar")}
                 className="peligro px-2.5 h-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Unlink size={12} />
@@ -3874,8 +3825,8 @@ export default function Agenda() {
               onClick={connectGcal}
               className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
             >
-              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
-              <span className="hidden md:inline">Conectar Google Calendar</span><span className="md:hidden">Google</span>
+              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt={t("GCal")} className="w-4 h-4" />
+              <span className="hidden md:inline">{t("Conectar Google Calendar")}</span><span className="md:hidden">{t("Google")}</span>
             </button>
           )}
 
@@ -3884,7 +3835,7 @@ export default function Agenda() {
             onClick={(e) => openNew(undefined, e)}
             className="flex items-center gap-1.5 px-3 sm:px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors"
           >
-            <Plus size={13} /> <span className="hidden sm:inline">Nuevo evento</span><span className="sm:hidden">Nuevo</span>
+            <Plus size={13} /> <span className="hidden sm:inline">{t("Nuevo evento")}</span><span className="sm:hidden">{t("Nuevo")}</span>
           </button>
         </div>
       </div>
@@ -3896,21 +3847,15 @@ export default function Agenda() {
           <button
             onClick={() => setView("month")}
             className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "month" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
-          >
-            Mes
-          </button>
+          >{t("Mes")}</button>
           <button
             onClick={() => setView("week")}
             className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "week" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
-          >
-            Semana
-          </button>
+          >{t("Semana")}</button>
           <button
             onClick={() => setView("day")}
             className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "day" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
-          >
-            Día
-          </button>
+          >{t("Día")}</button>
         </div>
 
         {/* Navegación de fecha */}
@@ -3936,9 +3881,7 @@ export default function Agenda() {
         <button
           onClick={goToday}
           className="px-4 h-8 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-        >
-          Hoy
-        </button>
+        >{t("Hoy")}</button>
       </div>
 
       {/* ── Leyenda de tipos (clic para ocultar/mostrar) ─────── */}
@@ -3951,7 +3894,7 @@ export default function Agenda() {
               <button
                 key={tipo}
                 onClick={() => alternarTipo(tipo)}
-                title={oculto ? `Mostrar ${conf.label.toLowerCase()}` : `Ocultar ${conf.label.toLowerCase()}`}
+                title={oculto ? t("Mostrar {toLowerCase}", { toLowerCase: conf.label.toLowerCase() }) : t("Ocultar {toLowerCase}", { toLowerCase: conf.label.toLowerCase() })}
                 aria-pressed={!oculto}
                 className={`agenda-tipo ${oculto ? "apagado" : ""} shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors`}
                 style={{ "--ev": conf.hex } as React.CSSProperties}
@@ -3966,9 +3909,7 @@ export default function Agenda() {
             <button
               onClick={() => { setTiposOcultos(new Set()); try { localStorage.removeItem("vantia.agenda.tiposOcultos"); } catch { /* sin almacenamiento */ } }}
               className="shrink-0 ml-1 text-[11px] font-semibold text-red-600 hover:underline"
-            >
-              Mostrar todos
-            </button>
+            >{t("Mostrar todos")}</button>
           )}
         </div>
       )}
@@ -4079,7 +4020,7 @@ export default function Agenda() {
                                   setSelectedDay(key);
                                   openNew(key, e);
                                 }}
-                                title="Doble clic para crear un evento"
+                                title={t("Doble clic para crear un evento")}
                                 className={`border-b border-r border-slate-200/70 min-h-[96px] p-1.5 cursor-pointer transition-all ${
                                   dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
                                   : isSel   ? "bg-red-50/60 ring-1 ring-inset ring-red-200"
@@ -4127,7 +4068,7 @@ export default function Agenda() {
                                         movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm" : ""
                                       }`}
                                       style={est.style}
-                                      title="Arrastra para mover a otro día"
+                                      title={t("Arrastra para mover a otro día")}
                                     >
                                       {!ev.all_day && <span className="agenda-ev-sub shrink-0 tabular-nums">{fmtTime(ev.start_at)}</span>}
                                       <span className="agenda-ev-titulo truncate">{ev.title}</span>
@@ -4155,7 +4096,7 @@ export default function Agenda() {
                                   );
                                 })}
                                 {overflow > 0 && (
-                                  <div className="text-[10px] text-slate-400 font-semibold px-1.5">+{overflow} más</div>
+                                  <div className="text-[10px] text-slate-400 font-semibold px-1.5">+{overflow}{" "}{t("más")}</div>
                                 )}
                               </div>
                             </React.Fragment>
@@ -4201,13 +4142,13 @@ export default function Agenda() {
                   })}
                 </p>
                 {selectedDay === todayStr && (
-                  <span className="text-[10px] font-bold text-red-500">Hoy</span>
+                  <span className="text-[10px] font-bold text-red-500">{t("Hoy")}</span>
                 )}
               </div>
               <button
                 onClick={(e) => openNew(selectedDay, e)}
                 className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                title="Añadir evento en este día"
+                title={t("Añadir evento en este día")}
               >
                 <Plus size={12} />
               </button>
@@ -4219,7 +4160,7 @@ export default function Agenda() {
             {dayEvents.length === 0 && (gcalEventsByDay[selectedDay] || []).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                 <Calendar size={24} className="opacity-30" />
-                <p className="text-xs text-slate-400 text-center">Sin eventos<br />en este día</p>
+                <p className="text-xs text-slate-400 text-center">{t("Sin eventos")}<br />{t("en este día")}</p>
               </div>
             ) : (
               <div className="space-y-1 px-3">
@@ -4251,7 +4192,7 @@ export default function Agenda() {
                               </span>
                             )}
                             {ev.all_day && (
-                              <span className="text-[10px] text-slate-400">Todo el día</span>
+                              <span className="text-[10px] text-slate-400">{t("Todo el día")}</span>
                             )}
                           </div>
                           {ev.location && (
@@ -4265,9 +4206,7 @@ export default function Agenda() {
                               {stConf.label}
                             </span>
                             {ev.external_provider === "google" && (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">
-                                Google
-                              </span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">{t("Google")}</span>
                             )}
                           </div>
                         </div>
@@ -4292,13 +4231,13 @@ export default function Agenda() {
                       className="w-full text-left px-3 py-2.5 rounded-xl border border-blue-100 bg-blue-50/50 hover:bg-blue-50 hover:border-blue-200 hover:shadow-sm transition-all group"
                     >
                       <div className="flex items-start gap-2">
-                        <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt={t("GCal")} className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-blue-800 truncate">{ev.summary}</p>
                           {(startTime || !ev.start.dateTime) && (
                             <span className="text-[10px] text-blue-500 flex items-center gap-0.5 mt-0.5">
                               <Clock size={9} />
-                              {startTime ? <>{startTime}{endTime && <> – {endTime}</>}</> : "Todo el día"}
+                              {startTime ? <>{startTime}{endTime && <> – {endTime}</>}</> : t("Todo el día")}
                             </span>
                           )}
                           {ev.location && (
@@ -4306,7 +4245,7 @@ export default function Agenda() {
                               <MapPin size={9} /> {ev.location}
                             </p>
                           )}
-                          <span className="text-[10px] font-semibold text-blue-400 mt-1 block">Google Calendar</span>
+                          <span className="text-[10px] font-semibold text-blue-400 mt-1 block">{t("Google Calendar")}</span>
                         </div>
                         <ExternalLink size={10} className="text-blue-200 group-hover:text-blue-400 shrink-0 mt-0.5 transition-colors" />
                       </div>

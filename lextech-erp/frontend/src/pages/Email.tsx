@@ -34,6 +34,7 @@ import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 import { confirmar } from "../lib/avisos";
 import { confirmarAntesDeEnviar } from "../lib/preferencias";
+import { t } from '../lib/i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -881,7 +882,7 @@ function ComposeWindow({
             dataBase64: result.split(',')[1] || '',
           });
         };
-        reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
+        reader.onerror = () => reject(new Error(t("No se pudo leer {name}", { name: file.name })));
         reader.readAsDataURL(file);
       })),
     );
@@ -890,19 +891,18 @@ function ComposeWindow({
   };
 
   const handleSend = async () => {
-    if (!to.trim())      { setError('Añade al menos un destinatario'); return; }
-    if (!subject.trim()) { setError('El asunto está vacío'); return; }
-    if (!gmail && !accountId) { setError('Selecciona o configura una cuenta IMAP/SMTP para enviar'); return; }
+    if (!to.trim())      { setError(t("Añade al menos un destinatario")); return; }
+    if (!subject.trim()) { setError(t("El asunto está vacío")); return; }
+    if (!gmail && !accountId) { setError(t("Selecciona o configura una cuenta IMAP/SMTP para enviar")); return; }
     if (attachments.reduce((t, a) => t + (a.size || 0), 0) > 25 * 1024 * 1024) {
-      setError('Los adjuntos suman más de 25 MB: compártelos con un enlace o envíalos en varios correos.');
+      setError(t("Los adjuntos suman más de 25 MB: compártelos con un enlace o envíalos en varios correos."));
       return;
     }
     // Ajustes → Preferencias de trabajo → "Confirmar antes de enviar".
     if (confirmarAntesDeEnviar() && !(await confirmar({
-      titulo: '¿Enviar este correo?',
-      mensaje: `Para: ${to.trim()}${attachments.length ? ` · ${attachments.length} adjunto${attachments.length === 1 ? '' : 's'}` : ''}
-Asunto: ${subject.trim()}`,
-      confirmar: 'Enviar',
+      titulo: t("¿Enviar este correo?"),
+      mensaje: t("Para: {trim}{v}\nAsunto: {trim2}", { trim: to.trim(), v: attachments.length ? ` · ${attachments.length} adjunto${attachments.length === 1 ? '' : 's'}` : '', trim2: subject.trim() }),
+      confirmar: t("Enviar"),
     }))) return;
     setSending(true); setError('');
     try {
@@ -943,7 +943,7 @@ Asunto: ${subject.trim()}`,
             attachments: attachments.map((a) => ({ name: a.name, type: a.type, dataBase64: a.dataBase64 })),
           }),
         });
-        if (!res.ok) throw new Error((await res.json()).error || 'Error al enviar');
+        if (!res.ok) throw new Error((await res.json()).error || t("Error al enviar"));
       }
       setSent(true);
       setTimeout(() => onSent(data.draftId), 800);
@@ -955,7 +955,7 @@ Asunto: ${subject.trim()}`,
     return (
       <div className="fixed bottom-6 right-6 z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 flex items-center gap-3">
         <CheckCircle2 className="text-green-500" size={22} />
-        <span className="text-sm font-medium text-gray-700">Mensaje enviado</span>
+        <span className="text-sm font-medium text-gray-700">{t("Mensaje enviado")}</span>
       </div>
     );
   }
@@ -977,17 +977,17 @@ Asunto: ${subject.trim()}`,
         className={`flex items-center justify-between px-4 py-3 select-none flex-shrink-0 ${minimized ? 'bg-gray-800 rounded-t-2xl cursor-pointer' : 'bg-gray-800 rounded-t-2xl'}`}
         onClick={() => minimized && setMinimized(false)}>
         <span className="text-white text-sm font-semibold truncate pr-2">
-          {subject || 'Nuevo mensaje'}
+          {subject || t("Nuevo mensaje")}
         </span>
         <div className="flex items-center gap-2 text-gray-300">
           <button onClick={e => { e.stopPropagation(); setMinimized(m => !m); }}
             className="hover:text-white transition-colors p-0.5 rounded"
-            title={minimized ? 'Expandir' : 'Minimizar'}>
+            title={minimized ? t("Expandir") : t("Minimizar")}>
             {minimized ? <Maximize2 size={14}/> : <Minimize2 size={14}/>}
           </button>
           <button
             onClick={e => { e.stopPropagation(); onClose(buildDraftPayload() || undefined); }}
-            className="hover:text-white transition-colors p-0.5 rounded" title="Cerrar">
+            className="hover:text-white transition-colors p-0.5 rounded" title={t("Cerrar")}>
             <X size={16} />
           </button>
         </div>
@@ -998,7 +998,7 @@ Asunto: ${subject.trim()}`,
           {/* From */}
           <div className="border-b border-gray-100 px-4 py-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400 w-6 flex-shrink-0">De</span>
+              <span className="text-xs text-gray-400 w-6 flex-shrink-0">{t("De")}</span>
               <span className="text-sm text-gray-700 truncate">
                 {fromName ? `${fromName} <${fromEmail}>` : fromEmail}
               </span>
@@ -1007,19 +1007,19 @@ Asunto: ${subject.trim()}`,
           {/* To */}
           <div className="border-b border-gray-100 px-4">
             <div className="flex items-center gap-2 py-1.5">
-              <span className="text-xs text-gray-400 w-6 flex-shrink-0">Para</span>
+              <span className="text-xs text-gray-400 w-6 flex-shrink-0">{t("Para")}</span>
               <input
                 value={to}
                 onFocus={() => setRecipientField('to')}
                 onChange={e => { setTo(e.target.value); setRecipientField('to'); }}
-                placeholder="Destinatarios"
+                placeholder={t("Destinatarios")}
                 className="flex-1 text-sm outline-none placeholder-gray-300 min-w-0" />
               <button
                 onClick={() => setShowCc(s => !s)}
-                className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">Cc</button>
+                className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">{t("Cc")}</button>
               <button
                 onClick={() => setShowBcc(s => !s)}
-                className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">Bcc</button>
+                className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">{t("Bcc")}</button>
             </div>
           </div>
           {recipientField && suggestions.length > 0 && (
@@ -1045,8 +1045,8 @@ Asunto: ${subject.trim()}`,
           {showCc && (
             <div className="border-b border-gray-100 px-4">
               <div className="flex items-center gap-2 py-1.5">
-                <span className="text-xs text-gray-400 w-6 flex-shrink-0">Cc</span>
-                <input value={cc} onFocus={() => setRecipientField('cc')} onChange={e => { setCc(e.target.value); setRecipientField('cc'); }} placeholder="Copias"
+                <span className="text-xs text-gray-400 w-6 flex-shrink-0">{t("Cc")}</span>
+                <input value={cc} onFocus={() => setRecipientField('cc')} onChange={e => { setCc(e.target.value); setRecipientField('cc'); }} placeholder={t("Copias")}
                   className="flex-1 text-sm outline-none placeholder-gray-300" />
               </div>
             </div>
@@ -1054,8 +1054,8 @@ Asunto: ${subject.trim()}`,
           {showBcc && (
             <div className="border-b border-gray-100 px-4">
               <div className="flex items-center gap-2 py-1.5">
-                <span className="text-xs text-gray-400 w-6 flex-shrink-0">Bcc</span>
-                <input value={bcc} onFocus={() => setRecipientField('bcc')} onChange={e => { setBcc(e.target.value); setRecipientField('bcc'); }} placeholder="Copia oculta"
+                <span className="text-xs text-gray-400 w-6 flex-shrink-0">{t("Bcc")}</span>
+                <input value={bcc} onFocus={() => setRecipientField('bcc')} onChange={e => { setBcc(e.target.value); setRecipientField('bcc'); }} placeholder={t("Copia oculta")}
                   className="flex-1 text-sm outline-none placeholder-gray-300" />
               </div>
             </div>
@@ -1065,7 +1065,7 @@ Asunto: ${subject.trim()}`,
           <div className="border-b border-gray-100 px-4">
             <input
               value={subject} onChange={e => setSubject(e.target.value)}
-              placeholder="Asunto"
+              placeholder={t("Asunto")}
               className="w-full text-sm outline-none py-2 placeholder-gray-300" />
           </div>
 
@@ -1089,12 +1089,12 @@ Asunto: ${subject.trim()}`,
                 className="p-1.5 rounded hover:bg-gray-200 text-gray-600 transition-colors">{icon}</button>
             ))}
             <div className="w-px h-4 bg-gray-200 mx-1"/>
-            <button type="button" title="Lista" onMouseDown={e => { e.preventDefault(); document.execCommand('insertUnorderedList'); }}
+            <button type="button" title={t("Lista")} onMouseDown={e => { e.preventDefault(); document.execCommand('insertUnorderedList'); }}
               className="p-1.5 rounded hover:bg-gray-200 text-gray-600 transition-colors"><List size={13}/></button>
             <div className="w-px h-4 bg-gray-200 mx-1"/>
             <select onMouseDown={e => e.stopPropagation()} onChange={e => document.execCommand('fontSize', false, e.target.value)}
               className="text-xs text-gray-600 bg-transparent border-0 outline-none cursor-pointer px-1">
-              {[1,2,3,4,5,6].map(s => <option key={s} value={s}>{[8,10,12,14,16,18][s-1]}pt</option>)}
+              {[1,2,3,4,5,6].map(s => <option key={s} value={s}>{[8,10,12,14,16,18][s-1]}{t("pt")}</option>)}
             </select>
           </div>
 
@@ -1141,16 +1141,14 @@ Asunto: ${subject.trim()}`,
             <button
               onClick={handleSend} disabled={sending}
               className="flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2 rounded-full transition-colors disabled:opacity-60 mr-1">
-              {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-              Enviar
-            </button>
+              {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}{t("Enviar")}</button>
 
             {/* Adjuntar */}
             <input ref={fileInputRef} type="file" multiple className="hidden"
               onChange={(event) => { handleFilesSelected(event.target.files).catch((e: Error) => setError(e.message)); event.target.value = ''; }}
             />
             <button type="button" onClick={() => fileInputRef.current?.click()}
-              title="Adjuntar archivo"
+              title={t("Adjuntar archivo")}
               className="p-2 text-gray-400 hover:text-[#ab0433] hover:bg-red-50 rounded-full transition-colors">
               <Paperclip size={16} />
             </button>
@@ -1159,21 +1157,20 @@ Asunto: ${subject.trim()}`,
             <div className="relative" ref={sigMenuRef}>
               <button
                 type="button"
-                title="Insertar firma"
+                title={t("Insertar firma")}
                 onClick={() => { setShowSigMenu(v => !v); setShowTplMenu(false); }}
                 className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${showSigMenu ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}>
-                <Edit3 size={14} /> Firma
-              </button>
+                <Edit3 size={14} />{" "}{t("Firma")}</button>
               {showSigMenu && (
                 <div className="absolute bottom-full mb-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[180px] overflow-hidden">
                   {signatures.length === 0 ? (
-                    <p className="px-3 py-2.5 text-xs text-gray-400">No hay firmas creadas.<br/>Ve a Configuración → Firmas.</p>
+                    <p className="px-3 py-2.5 text-xs text-gray-400">{t("No hay firmas creadas.")}<br/>{t("Ve a Configuración → Firmas.")}</p>
                   ) : signatures.map(sig => (
                     <button key={sig.id} onClick={() => insertSignature(sig)}
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-indigo-50 transition-colors border-b border-gray-50 last:border-0">
                       <Edit3 size={12} className="text-indigo-400 shrink-0" />
                       <span className="truncate font-medium text-gray-700">{sig.name}</span>
-                      {sig.isDefault && <span className="ml-auto text-[10px] text-indigo-500 shrink-0">★ Por defecto</span>}
+                      {sig.isDefault && <span className="ml-auto text-[10px] text-indigo-500 shrink-0">{t("★ Por defecto")}</span>}
                     </button>
                   ))}
                 </div>
@@ -1184,20 +1181,19 @@ Asunto: ${subject.trim()}`,
             <div className="relative" ref={tplMenuRef}>
               <button
                 type="button"
-                title="Aplicar plantilla de correo"
+                title={t("Aplicar plantilla de correo")}
                 onClick={() => { setShowTplMenu(v => !v); setShowSigMenu(false); }}
                 className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${showTplMenu ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}>
-                <FileText size={14} /> Plantilla
-              </button>
+                <FileText size={14} />{" "}{t("Plantilla")}</button>
               {showTplMenu && (
                 <div className="absolute bottom-full mb-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden">
                   {templates.length === 0 ? (
-                    <p className="px-3 py-2.5 text-xs text-gray-400">No hay plantillas creadas.<br/>Ve a Configuración → Plantillas.</p>
+                    <p className="px-3 py-2.5 text-xs text-gray-400">{t("No hay plantillas creadas.")}<br/>{t("Ve a Configuración → Plantillas.")}</p>
                   ) : templates.map(tpl => (
                     <button key={tpl.id} onClick={() => applyTemplate(tpl)}
                       className="w-full flex flex-col items-start px-3 py-2.5 text-left text-xs hover:bg-indigo-50 transition-colors border-b border-gray-50 last:border-0">
                       <span className="font-medium text-gray-700 truncate w-full">{tpl.name}</span>
-                      {tpl.subject && <span className="text-gray-400 truncate w-full">Asunto: {tpl.subject}</span>}
+                      {tpl.subject && <span className="text-gray-400 truncate w-full">{t("Asunto:")}{" "}{tpl.subject}</span>}
                     </button>
                   ))}
                 </div>
@@ -1206,7 +1202,7 @@ Asunto: ${subject.trim()}`,
 
             <div className="flex-1" />
             <button onClick={() => onClose()}
-              title="Guardar borrador y cerrar"
+              title={t("Guardar borrador y cerrar")}
               className="peligro p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors">
               <Trash2 size={16} />
             </button>
@@ -1287,9 +1283,9 @@ function ConnectAccountModal({
         {/* Header */}
         <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 flex-shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 tracking-tight">Cuentas de correo</h2>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">{t("Cuentas de correo")}</h2>
             <p className="text-sm text-gray-400 mt-0.5">
-              {totalAccounts === 0 ? 'Conecta tu primera cuenta' : `${totalAccounts} cuenta${totalAccounts > 1 ? 's' : ''} configurada${totalAccounts > 1 ? 's' : ''}`}
+              {totalAccounts === 0 ? t("Conecta tu primera cuenta") : t("{totalAccounts} cuenta{v} configurada{v2}", { totalAccounts: totalAccounts, v: totalAccounts > 1 ? 's' : '', v2: totalAccounts > 1 ? 's' : '' })}
             </p>
           </div>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors mt-0.5 flex-shrink-0">
@@ -1301,7 +1297,7 @@ function ConnectAccountModal({
           {/* Connected accounts */}
           {hasExisting && (
             <div className="space-y-2">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">Conectadas</p>
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">{t("Conectadas")}</p>
               <div className="space-y-2">
                 {savedGmailProfiles.map(profile => (
                   <div key={profile.id} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-gray-50/60 group hover:border-red-100 hover:bg-red-50/30 transition-all">
@@ -1313,14 +1309,13 @@ function ConnectAccountModal({
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{profile.display_name || profile.email}</p>
-                      <p className="text-xs text-gray-400 truncate">{profile.email} · Gmail</p>
+                      <p className="text-xs text-gray-400 truncate">{profile.email}{" "}{t("· Gmail")}</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => { onReconnectProfile(profile); onClose(); }}
                       className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#ab0433] px-2.5 py-1.5 rounded-xl hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
-                      <RotateCcw size={12} /> Reconectar
-                    </button>
+                      <RotateCcw size={12} />{" "}{t("Reconectar")}</button>
                   </div>
                 ))}
                 {imapAccounts.map(acc => (
@@ -1333,20 +1328,20 @@ function ConnectAccountModal({
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-800 truncate">{acc.label || acc.email}</p>
-                      <p className="text-xs text-gray-400 truncate">{acc.email} · IMAP</p>
+                      <p className="text-xs text-gray-400 truncate">{acc.email}{" "}{t("· IMAP")}</p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
                         onClick={() => { onEditImap(acc); onClose(); }}
-                        title="Editar"
+                        title={t("Editar")}
                         className="p-1.5 rounded-xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors">
                         <Pencil size={14} />
                       </button>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteImap(acc.id); }}
-                        title="Eliminar"
+                        title={t("Eliminar")}
                         className="p-1.5 rounded-xl text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
                         <Trash2 size={14} />
                       </button>
@@ -1359,7 +1354,7 @@ function ConnectAccountModal({
 
           {/* Add account */}
           <div className="space-y-2">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">Añadir cuenta</p>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">{t("Añadir cuenta")}</p>
             <div className="grid gap-2">
               {GMAIL_CLIENT_ID && (
                 <button
@@ -1370,12 +1365,11 @@ function ConnectAccountModal({
                     <GoogleIcon />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">Google / Gmail</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Conexión OAuth segura · sin contraseñas</p>
+                    <p className="text-sm font-semibold text-gray-800">{t("Google / Gmail")}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t("Conexión OAuth segura · sin contraseñas")}</p>
                   </div>
                   <div className="flex-shrink-0 flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
-                    <Zap size={11} /> Rápido
-                  </div>
+                    <Zap size={11} />{" "}{t("Rápido")}</div>
                 </button>
               )}
               <button
@@ -1386,8 +1380,8 @@ function ConnectAccountModal({
                   <AtSign size={18} className="text-indigo-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800">IMAP / POP3</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Outlook, corporativo, dominio propio...</p>
+                  <p className="text-sm font-semibold text-gray-800">{t("IMAP / POP3")}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{t("Outlook, corporativo, dominio propio...")}</p>
                 </div>
               </button>
             </div>
@@ -1496,7 +1490,7 @@ function ImapFolderTree({
     return buildImapFolderTree(folders, systemLabels);
   }, [folders, systemFolderMap]);
 
-  if (!tree.length) return <div className={`px-4 py-2 text-xs ${emptyCls}`}>No hay carpetas personalizadas en esta cuenta.</div>;
+  if (!tree.length) return <div className={`px-4 py-2 text-xs ${emptyCls}`}>{t("No hay carpetas personalizadas en esta cuenta.")}</div>;
 
   const renderNode = (node: ImapFolderNode, depth: number): React.ReactNode => {
     const hasChildren = node.children.length > 0;
@@ -1512,7 +1506,7 @@ function ImapFolderTree({
             type="button"
             onClick={() => hasChildren && toggle(node.path)}
             className={`shrink-0 flex h-6 w-5 items-center justify-center ${hasChildren ? '' : 'invisible'}`}
-            title={isOpen ? 'Plegar' : 'Desplegar'}
+            title={isOpen ? t("Plegar") : t("Desplegar")}
             tabIndex={hasChildren ? 0 : -1}
           >
             {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -1640,10 +1634,10 @@ function Sidebar({
                 {/* Nunca el correo de inicio de sesión del usuario: no tiene por
                     qué ser una cuenta de esta organización. */}
                 {accountLoading
-                  ? <span className="animate-pulse">Cargando cuenta…</span>
+                  ? <span className="animate-pulse">{t("Cargando cuenta…")}</span>
                   : isImapActive
-                    ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || 'Ninguna cuenta seleccionada')
-                    : (gmailProfile?.emailAddress || 'Ninguna cuenta seleccionada')}
+                    ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || t("Ninguna cuenta seleccionada"))
+                    : (gmailProfile?.emailAddress || t("Ninguna cuenta seleccionada"))}
               </p>
             </div>
           </div>
@@ -1654,7 +1648,7 @@ function Sidebar({
           <>
             <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
             <div className="absolute left-3 right-3 top-[calc(100%-8px)] z-50 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden py-1.5 max-h-[60vh] overflow-y-auto">
-              <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Cuentas conectadas</p>
+              <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{t("Cuentas conectadas")}</p>
 
               {savedGmailProfiles.map(profile => {
                 const isActive = gmailConnected && gmailProfile?.emailAddress === profile.email && !selectedImapAccountId;
@@ -1668,7 +1662,7 @@ function Sidebar({
                         if (isActive) onSelectGmail(); else onReconnectGoogleProfile(profile);
                         setAccountMenuOpen(false);
                       }}
-                      title={needsReauth ? 'Sesión expirada — haz clic para volver a conectar' : undefined}
+                      title={needsReauth ? t("Sesión expirada — haz clic para volver a conectar") : undefined}
                       className="flex flex-1 items-center gap-2 min-w-0 px-1 py-0.5 text-left">
                       <svg width={13} height={13} viewBox="0 0 24 24" className="flex-shrink-0">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -1682,7 +1676,7 @@ function Sidebar({
                       </div>
                       {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                       {needsReauth && (
-                        <span title="Sesión expirada" className="flex-shrink-0">
+                        <span title={t("Sesión expirada")} className="flex-shrink-0">
                           <AlertCircle size={11} className="text-orange-400" />
                         </span>
                       )}
@@ -1693,14 +1687,14 @@ function Sidebar({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onSync(); }}
                           disabled={syncing}
-                          title="Sincronizar"
+                          title={t("Sincronizar")}
                           className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
                           <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
                         </button>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onDisconnectGmail(); setAccountMenuOpen(false); }}
-                          title="Desconectar"
+                          title={t("Desconectar")}
                           className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                           <LogIn size={12} className="rotate-180" />
                         </button>
@@ -1709,7 +1703,7 @@ function Sidebar({
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
-                        title="Borrar cuenta guardada"
+                        title={t("Borrar cuenta guardada")}
                         className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                         <Trash2 size={12} />
                       </button>
@@ -1735,7 +1729,7 @@ function Sidebar({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
-                    title="Borrar cuenta"
+                    title={t("Borrar cuenta")}
                     className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                     <Trash2 size={12} />
                   </button>
@@ -1743,7 +1737,7 @@ function Sidebar({
               ))}
 
               {savedGmailProfiles.length === 0 && imapAccounts.length === 0 && (
-                <p className="px-3 py-2 text-[11.5px] text-gray-400">Solo tienes esta cuenta conectada.</p>
+                <p className="px-3 py-2 text-[11.5px] text-gray-400">{t("Solo tienes esta cuenta conectada.")}</p>
               )}
 
               <div className="mt-1 pt-1 border-t border-gray-100">
@@ -1751,8 +1745,7 @@ function Sidebar({
                   type="button"
                   onClick={() => { onConnectAccount(); setAccountMenuOpen(false); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-[#ab0433] hover:bg-red-50 transition-colors">
-                  <Plus size={13} /> Conectar cuenta
-                </button>
+                  <Plus size={13} />{" "}{t("Conectar cuenta")}</button>
               </div>
             </div>
           </>
@@ -1763,8 +1756,7 @@ function Sidebar({
           onClick={onCompose}
           disabled={!canUseMailbox}
           className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#ab0433] to-[#cc184e] px-3 py-2.5 text-xs font-semibold text-white shadow-lg shadow-red-950/40 transition-all hover:from-[#c01040] hover:to-[#ab0433] disabled:cursor-not-allowed disabled:opacity-40">
-          <Edit3 size={13} /> Redactar
-        </button>
+          <Edit3 size={13} />{" "}{t("Redactar")}</button>
       </div>
 
       {/* Folder list */}
@@ -1806,15 +1798,13 @@ function Sidebar({
         {isGmailActive && userLabels.length > 0 && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1 flex items-center justify-between">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>
-                Carpetas
-              </p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Carpetas")}</p>
               <button
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onCreateLabel()}
                 className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
-                title="Crear carpeta">
+                title={t("Crear carpeta")}>
                 <FolderPlus size={12} />
               </button>
             </div>
@@ -1841,7 +1831,7 @@ function Sidebar({
                   disabled={!canUseMailbox}
                   onClick={() => onDeleteLabel(l.id)}
                   className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all disabled:opacity-30 ${iconBtnCls}`}
-                  title="Borrar carpeta">
+                  title={t("Borrar carpeta")}>
                   <Trash2 size={12} />
                 </button>
               </div>
@@ -1857,16 +1847,14 @@ function Sidebar({
               className={`w-full flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 cx('border-white/15 text-slate-400 hover:border-red-400/40 hover:text-red-300', 'border-slate-300 text-slate-500 hover:border-red-300 hover:text-red-600')
               }`}>
-              <FolderPlus size={13} />
-              Crear primera carpeta
-            </button>
+              <FolderPlus size={13} />{t("Crear primera carpeta")}</button>
           </div>
         )}
 
         {isGmailActive && extraGmailSystemLabels.length > 0 && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>Gmail</p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Gmail")}</p>
             </div>
             {extraGmailSystemLabels.map((label) => (
               <button
@@ -1892,7 +1880,7 @@ function Sidebar({
         {isGmailActive && categoryLabels.length > 0 && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>Categorías</p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Categorías")}</p>
             </div>
             {categoryLabels.map((label) => (
               <button
@@ -1922,46 +1910,38 @@ function Sidebar({
               disabled={!canUseMailbox}
               onClick={() => onSelectFolder('SCHEDULED')}
               className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
-              <Send size={12} />
-              Gestionar suscripciones
-            </button>
+              <Send size={12} />{t("Gestionar suscripciones")}</button>
             <button
               type="button"
               disabled={!canUseMailbox}
               onClick={() => onCreateLabel()}
               className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
-              <Folder size={12} />
-              Gestionar etiquetas
-            </button>
+              <Folder size={12} />{t("Gestionar etiquetas")}</button>
             <button
               type="button"
               onClick={() => onCreateLabel()}
               className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${iconBtnCls}`}>
-              <Plus size={12} />
-              Nueva etiqueta
-            </button>
+              <Plus size={12} />{t("Nueva etiqueta")}</button>
           </div>
         )}
 
         {selectedImapAccountId && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1 flex items-center justify-between">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>
-                Carpetas IMAP
-              </p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Carpetas IMAP")}</p>
               <button
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={onCreateImapFolder}
                 className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
-                title="Crear carpeta IMAP">
+                title={t("Crear carpeta IMAP")}>
                 <FolderPlus size={12} />
               </button>
               <button
                 type="button"
                 onClick={onProbeImap}
                 className={`p-1 rounded-full transition-colors ${iconBtnCls}`}
-                title="Diagnosticar buzón: revisa todas las carpetas del servidor y repara las atrasadas">
+                title={t("Diagnosticar buzón: revisa todas las carpetas del servidor y repara las atrasadas")}>
                 <Stethoscope size={12} />
               </button>
             </div>
@@ -1987,8 +1967,7 @@ function Sidebar({
         <button
           onClick={onConnectAccount}
           className={`w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors ${iconBtnCls}`}>
-          <Plus size={13} /> Conectar cuenta
-        </button>
+          <Plus size={13} />{" "}{t("Conectar cuenta")}</button>
       </div>
     </div>
   );
@@ -2008,7 +1987,7 @@ function EmailItem({
   const [hovered, setHovered] = useState(false);
 
   const displayName = sentFolder
-    ? `Para: ${email.to || '(sin destinatario)'}`
+    ? t("Para: {a}", { a: email.to || t('(sin destinatario)') })
     : (email.fromName || email.from || '(desconocido)');
 
   const unread = !email.isRead;
@@ -2051,7 +2030,7 @@ function EmailItem({
                 salte de sitio al pasar el ratón. */}
             <button
               onClick={onStar}
-              title={email.isStarred ? 'Quitar estrella' : 'Marcar con estrella'}
+              title={email.isStarred ? t("Quitar estrella") : t("Marcar con estrella")}
               className={`p-0.5 -m-0.5 rounded transition-colors ${
                 email.isStarred
                   ? 'text-amber-400'
@@ -2072,22 +2051,22 @@ function EmailItem({
         <div className={`text-[12.5px] truncate leading-snug mb-0.5 ${
           selected ? 'font-semibold text-slate-800' : unread ? 'font-semibold text-slate-700' : 'text-slate-600'
         }`}>
-          {email.subject || <span className="italic opacity-50">(sin asunto)</span>}
+          {email.subject || <span className="italic opacity-50">{t("(sin asunto)")}</span>}
         </div>
 
         {/* Row 3: snippet + badges */}
         <div className="flex items-center gap-1.5">
           <p className="flex-1 text-[11.5px] truncate leading-snug text-slate-400">
-            {email.snippet || <span className="italic">Sin previsualización</span>}
+            {email.snippet || <span className="italic">{t("Sin previsualización")}</span>}
           </p>
           <div className="flex items-center gap-1 flex-shrink-0">
             {email.isPinned && (
-              <span title="Fijado">
+              <span title={t("Fijado")}>
                 <Pin size={10} className="text-amber-500" />
               </span>
             )}
             {email.hasAttachments && (
-              <span title="Tiene adjuntos">
+              <span title={t("Tiene adjuntos")}>
                 <Paperclip size={10} className="text-slate-400" />
               </span>
             )}
@@ -2180,7 +2159,7 @@ function EmailAttachmentCard({
       <button
         type="button"
         onClick={onDownload}
-        title={`Descargar ${att.filename}`}
+        title={t("Descargar {filename}", { filename: att.filename })}
         className="block h-[150px] w-full overflow-hidden bg-slate-50">
         {kind === 'image' && previewUrl ? (
           <img src={previewUrl} alt={att.filename} className="h-full w-full object-cover" />
@@ -2207,7 +2186,7 @@ function EmailAttachmentCard({
         <button
           type="button"
           onClick={onDownload}
-          title="Descargar"
+          title={t("Descargar")}
           className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700">
           <Download size={13} />
         </button>
@@ -2216,7 +2195,7 @@ function EmailAttachmentCard({
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => onSaveToExpediente(e.currentTarget.getBoundingClientRect())}
-            title="Guardar en un expediente"
+            title={t("Guardar en un expediente")}
             className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-[#ab0433]">
             <FolderPlus size={13} />
           </button>
@@ -2356,7 +2335,7 @@ function EmailReader({
     const texto = decodeQP(email.bodyText || '') || limpio.replace(/<[^>]+>/g, ' ').replace(/[ \t]+/g, ' ');
     const usarHtml = Boolean(limpio) && limpio.length <= 30000;
     const cuerpo = usarHtml ? limpio : texto.slice(0, 30000);
-    if (!cuerpo.trim()) { setErrorTraduccion('Este correo no tiene texto que traducir.'); return; }
+    if (!cuerpo.trim()) { setErrorTraduccion(t("Este correo no tiene texto que traducir.")); return; }
     setTraduciendo(true); setErrorTraduccion('');
     try {
       // Cuerpo y asunto en UNA sola petición a la IA (el cupo de Gemini va por peticiones).
@@ -2364,7 +2343,7 @@ function EmailReader({
         getToken: getTokenTraduccion as any, method: 'POST',
         body: JSON.stringify({ texto: cuerpo, asunto: email.subject?.trim() || undefined, idioma, html: usarHtml, recibido: true }),
       });
-      if (!rc?.success) throw new Error(rc?.error || 'No se pudo traducir.');
+      if (!rc?.success) throw new Error(rc?.error || t("No se pudo traducir."));
       setTraducciones((prev) => ({
         ...prev,
         [clave]: {
@@ -2374,7 +2353,7 @@ function EmailReader({
       }));
       setVerTraduccion(true);
     } catch (e: any) {
-      setErrorTraduccion(e?.message || 'No se pudo traducir.');
+      setErrorTraduccion(e?.message || t("No se pudo traducir."));
     } finally {
       setTraduciendo(false);
     }
@@ -2434,19 +2413,19 @@ function EmailReader({
         <button
           onClick={onReply}
           className={`p-2 rounded-full hover:bg-red-50 hover:text-[#ab0433] transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
-          title="Responder">
+          title={t("Responder")}>
           <Reply size={17} />
         </button>
         <button
           onClick={onReplyAll}
           className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
-          title="Responder a todos">
+          title={t("Responder a todos")}>
           <ReplyAll size={17} />
         </button>
         <button
           onClick={onForward}
           className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
-          title="Reenviar">
+          title={t("Reenviar")}>
           <Forward size={17} />
         </button>
         <button
@@ -2456,7 +2435,7 @@ function EmailReader({
               ? headerCx('bg-blue-500/20 text-blue-300 hover:bg-blue-500/30', 'bg-blue-50 text-blue-600 hover:bg-blue-100')
               : `${toolbarHoverCls} ${toolbarIconCls}`
           }`}
-          title={email.isPinned ? 'Despinear' : 'Pinear'}>
+          title={email.isPinned ? t("Despinear") : t("Pinear")}>
           <Pin size={17} />
         </button>
         <div className={`h-6 w-px mx-1 hidden md:block ${dividerCls}`} />
@@ -2485,19 +2464,17 @@ function EmailReader({
                 <button
                   onClick={() => { setShowRaw((r) => !r); setMoreOpen(false); }}
                   className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
-                  {showRaw ? 'Ver HTML renderizado' : 'Ver texto plano'}
+                  {showRaw ? t("Ver HTML renderizado") : t("Ver texto plano")}
                 </button>
                 <button
                   onClick={() => { onPin(); setMoreOpen(false); }}
                   className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
-                  {email.isPinned ? 'Despinear correo' : 'Pinear correo'}
+                  {email.isPinned ? t("Despinear correo") : t("Pinear correo")}
                 </button>
                 {onRestore && (
                   <button
                     onClick={() => { onRestore(); setMoreOpen(false); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
-                    Restaurar desde papelera
-                  </button>
+                    className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>{t("Restaurar desde papelera")}</button>
                 )}
                 {userLabels.length > 0 && (
                   <div className={`border-t mt-1 pt-1 ${headerCx('border-white/10', 'border-slate-100')}`}>
@@ -2505,22 +2482,17 @@ function EmailReader({
                       <button
                         key={label.id}
                         onClick={() => { onAssignLabel(label.id); setMoreOpen(false); }}
-                        className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
-                        Guardar en {label.name}
+                        className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>{t("Guardar en")}{" "}{label.name}
                       </button>
                     ))}
                   </div>
                 )}
                 <button
                   onClick={() => { onCreateLabel(); setMoreOpen(false); }}
-                  className={`w-full text-left px-4 py-2.5 text-sm text-[#ab0433] ${headerCx('hover:bg-red-500/10', 'hover:bg-red-50')}`}>
-                  Crear carpeta nueva
-                </button>
+                  className={`w-full text-left px-4 py-2.5 text-sm text-[#ab0433] ${headerCx('hover:bg-red-500/10', 'hover:bg-red-50')}`}>{t("Crear carpeta nueva")}</button>
                 <button
                   onClick={() => { setMoreOpen(false); window.print(); }}
-                  className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
-                  Imprimir
-                </button>
+                  className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>{t("Imprimir")}</button>
               </div>
             )}
           </div>
@@ -2537,7 +2509,7 @@ function EmailReader({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <h1 className="text-xl font-semibold leading-snug tracking-[-0.01em] text-slate-900 break-words">
-                    {email.subject || '(Sin asunto)'}
+                    {email.subject || t("(Sin asunto)")}
                   </h1>
                   {onLinkExpediente && (
                     <div className="mt-2 inline-block">
@@ -2550,10 +2522,10 @@ function EmailReader({
                           email.expedienteId ? 'border-red-100 bg-red-50 text-[#ab0433] hover:bg-red-100' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                         }`}>
                         <Briefcase size={13} className="shrink-0 opacity-70" />
-                        <span className="max-w-[240px] truncate">{linkedExpedienteLabel || 'Sin vincular a expediente'}</span>
+                        <span className="max-w-[240px] truncate">{linkedExpedienteLabel || t("Sin vincular a expediente")}</span>
                         <ChevronDown size={12} className={`shrink-0 transition-transform ${expLinkOpen ? 'rotate-180' : ''}`} />
                       </button>
-                      {linkingExpediente && <span className="ml-2 text-xs text-slate-400">Guardando…</span>}
+                      {linkingExpediente && <span className="ml-2 text-xs text-slate-400">{t("Guardando…")}</span>}
                       {expLinkOpen && typeof document !== 'undefined' && createPortal(
                         <div
                           ref={expLinkMenuRef}
@@ -2563,7 +2535,7 @@ function EmailReader({
                             type="text"
                             value={expLinkFilter}
                             onChange={(e) => setExpLinkFilter(e.target.value)}
-                            placeholder="Buscar expediente…"
+                            placeholder={t("Buscar expediente…")}
                             autoFocus
                             className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 mb-1.5 text-slate-700 focus:border-red-400 focus:outline-none"
                           />
@@ -2571,9 +2543,7 @@ function EmailReader({
                             <button
                               type="button"
                               onClick={() => { onLinkExpediente(null); setExpLinkOpen(false); }}
-                              className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition-colors">
-                              Sin vincular a expediente
-                            </button>
+                              className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition-colors">{t("Sin vincular a expediente")}</button>
                             {dedupedExpedienteOptions
                               .filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase()))
                               .map((opt) => (
@@ -2588,7 +2558,7 @@ function EmailReader({
                                 </button>
                               ))}
                             {dedupedExpedienteOptions.filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase())).length === 0 && (
-                              <p className="px-3 py-2 text-xs text-slate-400">Sin resultados</p>
+                              <p className="px-3 py-2 text-xs text-slate-400">{t("Sin resultados")}</p>
                             )}
                           </div>
 
@@ -2599,8 +2569,7 @@ function EmailReader({
                                   type="button"
                                   onClick={() => { setNewExpDesc(expLinkFilter.trim() || email.subject || ''); setCreatingExp(true); }}
                                   className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-xs font-semibold text-[#ab0433] hover:bg-red-50 transition-colors">
-                                  <Plus size={13} className="shrink-0" /> Crear expediente nuevo
-                                </button>
+                                  <Plus size={13} className="shrink-0" />{" "}{t("Crear expediente nuevo")}</button>
                               ) : (
                                 <div className="px-2 py-1.5 space-y-1.5">
                                   <input
@@ -2614,7 +2583,7 @@ function EmailReader({
                                       }
                                       if (e.key === 'Escape') { setCreatingExp(false); setNewExpDesc(''); }
                                     }}
-                                    placeholder="Descripción del expediente"
+                                    placeholder={t("Descripción del expediente")}
                                     autoFocus
                                     className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 text-slate-700 focus:border-red-400 focus:outline-none"
                                   />
@@ -2627,16 +2596,14 @@ function EmailReader({
                                         if (ok) { setCreatingExp(false); setNewExpDesc(''); setExpLinkOpen(false); }
                                       }}
                                       className="flex-1 rounded-lg bg-[#ab0433] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#8a0329] disabled:opacity-50 transition-colors">
-                                      {linkingExpediente ? 'Creando…' : 'Crear y vincular'}
+                                      {linkingExpediente ? t("Creando…") : t("Crear y vincular")}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => { setCreatingExp(false); setNewExpDesc(''); }}
-                                      className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors">
-                                      Cancelar
-                                    </button>
+                                      className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
                                   </div>
-                                  <p className="px-1 text-[10px] text-slate-400">Se creará con la numeración automática. Podrás completar los demás datos en Expedientes.</p>
+                                  <p className="px-1 text-[10px] text-slate-400">{t("Se creará con la numeración automática. Podrás completar los demás datos en Expedientes.")}</p>
                                 </div>
                               )}
                             </div>
@@ -2658,7 +2625,7 @@ function EmailReader({
                         {email.fromName || email.from}
                       </span>
                       {email.fromName && (
-                        <span className="text-xs text-slate-400 truncate">&lt;{email.from}&gt;</span>
+                        <span className="text-xs text-slate-400 truncate">{t("<")}{email.from}{t(">")}</span>
                       )}
                     </div>
                     <span className="flex-shrink-0 text-xs text-slate-400 whitespace-nowrap" title={fmtFull(email.date)}>{fmtFull(email.date)}</span>
@@ -2666,19 +2633,19 @@ function EmailReader({
                   <button
                     onClick={() => setDetailsOpen((d) => !d)}
                     className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors">
-                    <span>{email.to ? `para ${email.to.split(',')[0].trim()}${email.to.includes(',') ? ' y otros' : ''}` : 'ver destinatarios'}</span>
+                    <span>{email.to ? t("para {trim}{v}", { trim: email.to.split(',')[0].trim(), v: email.to.includes(',') ? ' y otros' : '' }) : t("ver destinatarios")}</span>
                     <ChevronDown size={12} className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {detailsOpen && (
                     <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600 space-y-1">
-                      <p><span className="font-medium text-slate-500 mr-2">De:</span>{email.fromName ? `${email.fromName} <${email.from}>` : email.from}</p>
+                      <p><span className="font-medium text-slate-500 mr-2">{t("De:")}</span>{email.fromName ? `${email.fromName} <${email.from}>` : email.from}</p>
                       {email.to && (
-                        <p><span className="font-medium text-slate-500 mr-2">Para:</span>{email.to}</p>
+                        <p><span className="font-medium text-slate-500 mr-2">{t("Para:")}</span>{email.to}</p>
                       )}
                       {email.cc && (
-                        <p><span className="font-medium text-slate-500 mr-2">Cc:</span>{email.cc}</p>
+                        <p><span className="font-medium text-slate-500 mr-2">{t("Cc:")}</span>{email.cc}</p>
                       )}
-                      <p><span className="font-medium text-slate-500 mr-2">Fecha:</span>{fmtFull(email.date)}</p>
+                      <p><span className="font-medium text-slate-500 mr-2">{t("Fecha:")}</span>{fmtFull(email.date)}</p>
                     </div>
                   )}
                 </div>
@@ -2690,7 +2657,7 @@ function EmailReader({
                 {email.hasAttachments && !email.attachments?.length && (
                   <div className="flex items-center gap-1.5 px-5 sm:px-7 pt-3 text-xs text-slate-500">
                     <Paperclip size={13} />
-                    {bodyLoading ? 'Cargando adjuntos…' : 'Este correo trae adjuntos'}
+                    {bodyLoading ? t("Cargando adjuntos…") : t("Este correo trae adjuntos")}
                   </div>
                 )}
 
@@ -2714,12 +2681,12 @@ function EmailReader({
                             ref={attachmentMenuRef}
                             style={{ position: 'fixed', top: attachmentMenuPos.top, left: attachmentMenuPos.left, zIndex: 9999 }}
                             className="w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
-                            <p className="text-[11px] font-semibold text-slate-500 mb-2">Guardar adjunto en expediente</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mb-2">{t("Guardar adjunto en expediente")}</p>
                             <select
                               value={attachmentTargetExp}
                               onChange={(e) => setAttachmentTargetExp(e.target.value)}
                               className="w-full text-xs rounded-xl border border-slate-200 px-2 py-2 mb-2 focus:border-red-400 focus:outline-none">
-                              <option value="">Seleccionar expediente…</option>
+                              <option value="">{t("Seleccionar expediente…")}</option>
                               {dedupedExpedienteOptions.map((opt) => (
                                 <option key={opt.id} value={opt.id}>{opt.label}</option>
                               ))}
@@ -2728,9 +2695,7 @@ function EmailReader({
                               <button
                                 type="button"
                                 onClick={() => setAttachmentPickerIdx(null)}
-                                className="text-xs text-slate-500 px-2 py-1.5">
-                                Cancelar
-                              </button>
+                                className="text-xs text-slate-500 px-2 py-1.5">{t("Cancelar")}</button>
                               <button
                                 type="button"
                                 disabled={!attachmentTargetExp || savingAttachmentIndex === idx}
@@ -2739,7 +2704,7 @@ function EmailReader({
                                   if (done) setAttachmentPickerIdx(null);
                                 }}
                                 className="text-xs font-semibold text-white bg-[#ab0433] rounded-lg px-3 py-1.5 disabled:opacity-50">
-                                {savingAttachmentIndex === idx ? 'Guardando…' : 'Guardar'}
+                                {savingAttachmentIndex === idx ? t("Guardando…") : t("Guardar")}
                               </button>
                             </div>
                           </div>,
@@ -2755,24 +2720,24 @@ function EmailReader({
                     {verTraduccion && traduccionActual ? (
                       <>
                         <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">
-                          <Globe2 size={13} /> Traducido al {nombreEspanol(idiomaLectura)}
+                          <Globe2 size={13} />{" "}{t("Traducido al")}{" "}{nombreEspanol(idiomaLectura)}
                         </span>
-                        <select value={idiomaLectura} disabled={traduciendo} title="Traducir a otro idioma"
+                        <select value={idiomaLectura} disabled={traduciendo} title={t("Traducir a otro idioma")}
                           onChange={(e) => { elegirIdiomaLectura(e.target.value); void traducirCorreo(e.target.value); }}
                           className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-600 outline-none">
                           {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{nombreEspanol(i.codigo)}</option>)}
                         </select>
                         {traduciendo && <Loader2 size={13} className="animate-spin text-slate-400" />}
-                        {traduccionActual.asunto && <span className="min-w-0 truncate text-slate-500">Asunto: <strong className="text-slate-700">{traduccionActual.asunto}</strong></span>}
-                        <button type="button" onClick={() => setVerTraduccion(false)} className="ml-auto rounded-lg px-2.5 py-1 font-semibold text-slate-500 hover:bg-slate-100">Ver original</button>
+                        {traduccionActual.asunto && <span className="min-w-0 truncate text-slate-500">{t("Asunto:")}{" "}<strong className="text-slate-700">{traduccionActual.asunto}</strong></span>}
+                        <button type="button" onClick={() => setVerTraduccion(false)} className="ml-auto rounded-lg px-2.5 py-1 font-semibold text-slate-500 hover:bg-slate-100">{t("Ver original")}</button>
                       </>
                     ) : (
                       <div className="inline-flex items-center overflow-hidden rounded-lg border border-slate-200">
                         <button type="button" onClick={() => void traducirCorreo()} disabled={traduciendo}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
-                          {traduciendo ? <><Loader2 size={13} className="animate-spin" /> Traduciendo…</> : <><Globe2 size={13} /> {traduccionActual ? 'Ver traducción' : 'Traducir al'}</>}
+                          {traduciendo ? <><Loader2 size={13} className="animate-spin" />{" "}{t("Traduciendo…")}</> : <><Globe2 size={13} /> {traduccionActual ? t("Ver traducción") : t("Traducir al")}</>}
                         </button>
-                        <select value={idiomaLectura} disabled={traduciendo} title="Idioma de la traducción"
+                        <select value={idiomaLectura} disabled={traduciendo} title={t("Idioma de la traducción")}
                           onChange={(e) => elegirIdiomaLectura(e.target.value)}
                           className="border-l border-slate-200 bg-white py-1 pl-1.5 pr-1 text-xs font-semibold text-slate-600 outline-none">
                           {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{nombreEspanol(i.codigo)}</option>)}
@@ -2799,7 +2764,7 @@ function EmailReader({
                   ) : (
                     <iframe
                       ref={iframeRef}
-                      title="email-body"
+                      title={t("email-body")}
                       srcDoc={srcDoc}
                       onLoad={handleIframeLoad}
                       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
@@ -2817,18 +2782,15 @@ function EmailReader({
               <button
                 onClick={onReply}
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-[#ab0433] hover:bg-[#8a0329] text-sm font-medium text-white rounded-lg transition-colors">
-                <Reply size={15} /> Responder
-              </button>
+                <Reply size={15} />{" "}{t("Responder")}</button>
               <button
                 onClick={onReplyAll}
                 className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-sm text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
-                <ReplyAll size={15} /> Responder a todos
-              </button>
+                <ReplyAll size={15} />{" "}{t("Responder a todos")}</button>
               <button
                 onClick={onForward}
                 className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 text-sm text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
-                <Forward size={15} /> Reenviar
-              </button>
+                <Forward size={15} />{" "}{t("Reenviar")}</button>
             </div>
           </article>
         </div>
@@ -2847,8 +2809,7 @@ function EmailReader({
               'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
               'border-slate-200 bg-white text-slate-400 hover:border-slate-300',
             )
-          }`}>
-          Responder a {email.fromName || email.from}...
+          }`}>{t("Responder a")}{" "}{email.fromName || email.from}...
         </button>
       </div>
     </div>
@@ -2869,10 +2830,8 @@ function ConnectWizard({
       <div className="w-16 h-16 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mb-6">
         <Mail size={32} className="text-red-500" strokeWidth={2.2} />
       </div>
-      <h2 className="text-xl font-bold text-slate-800 mb-2">Conecta tu correo</h2>
-      <p className="text-sm text-slate-500 text-center mb-8 max-w-sm">
-        Conecta tu cuenta con un clic. Sin introducir contraseñas.
-      </p>
+      <h2 className="text-xl font-bold text-slate-800 mb-2">{t("Conecta tu correo")}</h2>
+      <p className="text-sm text-slate-500 text-center mb-8 max-w-sm">{t("Conecta tu cuenta con un clic. Sin introducir contraseñas.")}</p>
 
       <div className="w-full max-w-sm space-y-3">
         {/* Gmail */}
@@ -2886,8 +2845,8 @@ function ConnectWizard({
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
             <div className="text-left flex-1">
-              <p className="text-sm font-semibold text-slate-700">Conectar Gmail</p>
-              <p className="text-xs text-slate-400">OAuth seguro — sin contraseñas</p>
+              <p className="text-sm font-semibold text-slate-700">{t("Conectar Gmail")}</p>
+              <p className="text-xs text-slate-400">{t("OAuth seguro — sin contraseñas")}</p>
             </div>
             <Zap size={16} className="text-yellow-500" />
           </button>
@@ -2898,15 +2857,13 @@ function ConnectWizard({
           className="w-full flex items-center gap-3 px-5 py-3.5 border border-slate-200 hover:border-indigo-300 bg-white hover:bg-indigo-50 rounded-xl transition-all shadow-sm">
           <AtSign size={22} className="text-slate-400" />
           <div className="text-left flex-1">
-            <p className="text-sm font-semibold text-slate-700">Cuenta IMAP / POP3</p>
-            <p className="text-xs text-slate-400">Outlook, corporativo, dominio propio...</p>
+            <p className="text-sm font-semibold text-slate-700">{t("Cuenta IMAP / POP3")}</p>
+            <p className="text-xs text-slate-400">{t("Outlook, corporativo, dominio propio...")}</p>
           </div>
         </button>
       </div>
 
-      <p className="text-xs text-slate-400 text-center mt-6 max-w-xs">
-        Tus credenciales se cifran con AES-256 y nunca se comparten.
-      </p>
+      <p className="text-xs text-slate-400 text-center mt-6 max-w-xs">{t("Tus credenciales se cifran con AES-256 y nunca se comparten.")}</p>
     </div>
   );
 }
@@ -2995,17 +2952,17 @@ function ImapForm({
 
   const handleSave = async () => {
     if (!form.email || !form.imap_host || !form.smtp_host || !form.username) {
-      setError('Completa email, servidores y usuario antes de continuar.');
+      setError(t("Completa email, servidores y usuario antes de continuar."));
       return;
     }
     if (!isEdit && !form.password) {
-      setError('La contraseña es obligatoria.');
+      setError(t("La contraseña es obligatoria."));
       return;
     }
     setSaving(true); setError('');
     try {
       const token = await getToken();
-      if (!token) throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión e inténtalo otra vez.');
+      if (!token) throw new Error(t("Tu sesión ha caducado. Vuelve a iniciar sesión e inténtalo otra vez."));
       const url    = isEdit ? `${API}/email/accounts/${editAccountId}` : `${API}/email/accounts`;
       const method = isEdit ? 'PUT' : 'POST';
       const body   = { ...form, smtp_secure: form.smtp_port === 465, protocol };
@@ -3017,10 +2974,10 @@ function ImapForm({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success || !data?.data) {
-        throw new Error(data?.error || 'No se pudo guardar la cuenta de correo.');
+        throw new Error(data?.error || t("No se pudo guardar la cuenta de correo."));
       }
       if (data.data.smtp_warning) {
-        setError(`Cuenta guardada, pero hay un problema con el envío (SMTP): ${data.data.smtp_warning} Podrás recibir correo, pero revisa la configuración SMTP para poder enviar.`);
+        setError(t("Cuenta guardada, pero hay un problema con el envío (SMTP): {smtp_warning} Podrás recibir correo, pero revisa la configuración SMTP para poder enviar.", { smtp_warning: data.data.smtp_warning }));
       }
       await onSaved(data.data as ImapAccount);
     } catch (e: any) { setError(e.message); }
@@ -3032,8 +2989,8 @@ function ImapForm({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h3 className="font-semibold text-gray-900">{isEdit ? 'Editar cuenta de correo' : 'Añadir cuenta de correo'}</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{isEdit ? 'Actualiza los datos de tu cuenta' : `Paso ${step} de 2`}</p>
+            <h3 className="font-semibold text-gray-900">{isEdit ? t("Editar cuenta de correo") : t("Añadir cuenta de correo")}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{isEdit ? t("Actualiza los datos de tu cuenta") : t("Paso {step} de 2", { step: step })}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
             <X size={18} />
@@ -3044,34 +3001,28 @@ function ImapForm({
           {step === 1 ? (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Nombre de la cuenta
-                </label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t("Nombre de la cuenta")}</label>
                 <input
                   value={form.label} onChange={e => set('label', e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Dirección de correo
-                </label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t("Dirección de correo")}</label>
                 <input
                   value={form.email}
                   onChange={e => { set('email', e.target.value); autoFill(e.target.value); }}
-                  type="email" placeholder="tucorreo@dominio.com"
+                  type="email" placeholder={t("tucorreo@dominio.com")}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               </div>
               {form.email.toLowerCase().includes('gmail') && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-                  <p className="font-semibold mb-1">⚡ Gmail: usa "Contraseña de aplicación"</p>
-                  <p>Cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicación</p>
+                  <p className="font-semibold mb-1">{t("⚡ Gmail: usa \"Contraseña de aplicación\"")}</p>
+                  <p>{t("Cuenta Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicación")}</p>
                 </div>
               )}
               <button
                 onClick={() => setStep(2)} disabled={!form.email}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors">
-                Siguiente
-              </button>
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors">{t("Siguiente")}</button>
             </>
           ) : (
             <>
@@ -3087,7 +3038,7 @@ function ImapForm({
                     }`}>
                     {p.toUpperCase()}
                     <span className="block text-[10px] font-normal opacity-70 mt-0.5">
-                      {p === 'imap' ? 'Recomendado · sincroniza carpetas' : 'Descarga · sin carpetas'}
+                      {p === 'imap' ? t("Recomendado · sincroniza carpetas") : t("Descarga · sin carpetas")}
                     </span>
                   </button>
                 ))}
@@ -3096,30 +3047,28 @@ function ImapForm({
               {/* Nota dominio propio */}
               {form.email && !KNOWN_PROVIDERS[form.email.split('@')[1]?.toLowerCase() || ''] && form.email.includes('@') && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
-                  <p className="font-semibold mb-1">🏢 Dominio corporativo detectado</p>
-                  <p>Los datos del servidor los proporciona tu proveedor de hosting. Comprueba en:</p>
+                  <p className="font-semibold mb-1">{t("🏢 Dominio corporativo detectado")}</p>
+                  <p>{t("Los datos del servidor los proporciona tu proveedor de hosting. Comprueba en:")}</p>
                   <ul className="mt-1 space-y-0.5 pl-3 list-disc">
-                    <li>cPanel / Plesk / DirectAdmin → <strong>Configuración de correo</strong></li>
-                    <li>OVH / Ionos / GoDaddy → panel de control del dominio</li>
-                    <li>Tu administrador de sistemas (si es empresa)</li>
+                    <li>{t("cPanel / Plesk / DirectAdmin →")}{" "}<strong>{t("Configuración de correo")}</strong></li>
+                    <li>{t("OVH / Ionos / GoDaddy → panel de control del dominio")}</li>
+                    <li>{t("Tu administrador de sistemas (si es empresa)")}</li>
                   </ul>
-                  <p className="mt-1">Los servidores sugeridos (<strong>imap.{form.email.split('@')[1]}</strong>, <strong>smtp.{form.email.split('@')[1]}</strong>) son los más habituales pero pueden variar.</p>
+                  <p className="mt-1">{t("Los servidores sugeridos (")}<strong>{t("imap.")}{form.email.split('@')[1]}</strong>, <strong>{t("smtp.")}{form.email.split('@')[1]}</strong>{t(") son los más habituales pero pueden variar.")}</p>
                 </div>
               )}
 
               {/* Servidor entrante */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Servidor {protocol.toUpperCase()}
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t("Servidor")}{" "}{protocol.toUpperCase()}
                   </label>
                   <input value={form.imap_host} onChange={e => set('imap_host', e.target.value)}
-                    placeholder={protocol === 'pop3' ? 'pop3.tudominio.es' : 'imap.tudominio.es'}
+                    placeholder={protocol === 'pop3' ? t("pop3.tudominio.es") : t("imap.tudominio.es")}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Puerto {form.imap_secure ? '(SSL)' : '(sin SSL)'}
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t("Puerto")}{" "}{form.imap_secure ? t("(SSL)") : t("(sin SSL)")}
                   </label>
                   <input value={form.imap_port} onChange={e => set('imap_port', Number(e.target.value))}
                     type="number"
@@ -3129,20 +3078,18 @@ function ImapForm({
                   <input type="checkbox" id="imap_secure"
                     checked={form.imap_secure} onChange={e => set('imap_secure', e.target.checked)}
                     className="w-4 h-4 accent-indigo-600" />
-                  <label htmlFor="imap_secure" className="text-xs text-gray-600 cursor-pointer">
-                    Usar SSL/TLS para conexión entrante
-                  </label>
+                  <label htmlFor="imap_secure" className="text-xs text-gray-600 cursor-pointer">{t("Usar SSL/TLS para conexión entrante")}</label>
                 </div>
 
                 {/* Servidor saliente SMTP */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Servidor SMTP (envío)</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t("Servidor SMTP (envío)")}</label>
                   <input value={form.smtp_host} onChange={e => set('smtp_host', e.target.value)}
-                    placeholder="smtp.tudominio.es"
+                    placeholder={t("smtp.tudominio.es")}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Puerto SMTP</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t("Puerto SMTP")}</label>
                   <input value={form.smtp_port} onChange={e => {
                     const port = Number(e.target.value);
                     setForm(f => ({ ...f, smtp_port: port, smtp_secure: port === 465 }));
@@ -3154,13 +3101,12 @@ function ImapForm({
 
               {/* Credenciales */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Usuario / Email</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t("Usuario / Email")}</label>
                 <input value={form.username} onChange={e => set('username', e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Contraseña{isEdit && <span className="text-gray-400 font-normal"> — dejar vacío para no cambiar</span>}
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t("Contraseña")}{isEdit && <span className="text-gray-400 font-normal">{" "}{t("— dejar vacío para no cambiar")}</span>}
                 </label>
                 <div className="relative">
                   <input value={form.password} onChange={e => set('password', e.target.value)}
@@ -3180,13 +3126,11 @@ function ImapForm({
               )}
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setStep(1)}
-                  className="flex-1 border border-gray-200 text-gray-600 font-medium py-2.5 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                  Atrás
-                </button>
+                  className="flex-1 border border-gray-200 text-gray-600 font-medium py-2.5 rounded-lg text-sm hover:bg-gray-50 transition-colors">{t("Atrás")}</button>
                 <button onClick={handleSave} disabled={saving || (!isEdit && !form.password)}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  {isEdit ? 'Actualizar' : 'Guardar y probar'}
+                  {isEdit ? t("Actualizar") : t("Guardar y probar")}
                 </button>
               </div>
             </>
@@ -3233,19 +3177,19 @@ function MailboxLockedState({
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <Shield size={42} className="mb-4 text-slate-400" />
       <h3 className="text-lg font-semibold text-slate-700">
-        {hasConfiguredAccounts ? 'Selecciona una cuenta de correo' : 'Conecta una cuenta de correo'}
+        {hasConfiguredAccounts ? t("Selecciona una cuenta de correo") : t("Conecta una cuenta de correo")}
       </h3>
       <p className="mt-2 max-w-md text-sm text-slate-500">
         {hasConfiguredAccounts
-          ? 'Hay cuentas guardadas, pero no hay ninguna activa. Hasta seleccionarla o reconectarla no se podrá usar ninguna función del correo.'
-          : 'No hay ninguna cuenta configurada. Conecta Gmail o una cuenta IMAP/POP3 para empezar a usar el módulo de correo.'}
+          ? t("Hay cuentas guardadas, pero no hay ninguna activa. Hasta seleccionarla o reconectarla no se podrá usar ninguna función del correo.")
+          : t("No hay ninguna cuenta configurada. Conecta Gmail o una cuenta IMAP/POP3 para empezar a usar el módulo de correo.")}
       </p>
       <button
         type="button"
         onClick={onConnectAccount}
         className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#ab0433] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#8f022a]">
         <Plus size={16} />
-        {hasConfiguredAccounts ? 'Seleccionar o conectar cuenta' : 'Conectar cuenta'}
+        {hasConfiguredAccounts ? t("Seleccionar o conectar cuenta") : t("Conectar cuenta")}
       </button>
     </div>
   );
@@ -3372,44 +3316,44 @@ function RibbonBar({
       {/* Button toolbar */}
       <div className="flex items-stretch gap-0 overflow-x-auto bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2">
         {activeTab === 'inicio' && (<>
-          <RibbonButton icon={<Edit3 size={17}/>}     label="Nuevo"           onClick={onCompose}  disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Edit3 size={17}/>}     label={t("Nuevo")}           onClick={onCompose}  disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<Trash2 size={17}/>}    label="Eliminar"        onClick={onDelete}   disabled={!hasEmail} danger/>
+          <RibbonButton icon={<Trash2 size={17}/>}    label={t("Eliminar")}        onClick={onDelete}   disabled={!hasEmail} danger/>
           <RibbonSep/>
-          <RibbonButton icon={<Reply size={17}/>}     label="Responder"       onClick={onReply}    disabled={!hasEmail}/>
-          <RibbonButton icon={<ReplyAll size={17}/>}  label="Resp. Todos"     onClick={onReplyAll} disabled={!hasEmail}/>
-          <RibbonButton icon={<Forward size={17}/>}   label="Reenviar"        onClick={onForward}  disabled={!hasEmail}/>
+          <RibbonButton icon={<Reply size={17}/>}     label={t("Responder")}       onClick={onReply}    disabled={!hasEmail}/>
+          <RibbonButton icon={<ReplyAll size={17}/>}  label={t("Resp. Todos")}     onClick={onReplyAll} disabled={!hasEmail}/>
+          <RibbonButton icon={<Forward size={17}/>}   label={t("Reenviar")}        onClick={onForward}  disabled={!hasEmail}/>
           <RibbonSep/>
-          <RibbonButton icon={<RefreshCw size={17}/>} label="Enviar y Recibir" onClick={onSync}   disabled={!hasActiveMailbox} pill/>
+          <RibbonButton icon={<RefreshCw size={17}/>} label={t("Enviar y Recibir")} onClick={onSync}   disabled={!hasActiveMailbox} pill/>
           <RibbonSep/>
-          <RibbonButton icon={<Search size={17}/>}    label="Buscador"        onClick={onSearch}   disabled={!hasActiveMailbox}/>
-          <RibbonButton icon={<Eye size={17}/>}       label="Vista Previa"    onClick={() => {}}   disabled={!hasEmail}/>
+          <RibbonButton icon={<Search size={17}/>}    label={t("Buscador")}        onClick={onSearch}   disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Eye size={17}/>}       label={t("Vista Previa")}    onClick={() => {}}   disabled={!hasEmail}/>
           <RibbonSep/>
-          <RibbonButton icon={<Inbox size={17}/>}     label="Imprimir"        onClick={onPrint}    disabled={!hasEmail}/>
+          <RibbonButton icon={<Inbox size={17}/>}     label={t("Imprimir")}        onClick={onPrint}    disabled={!hasEmail}/>
         </>)}
 
         {activeTab === 'herramientas' && (<>
-          <RibbonButton icon={<Plus size={17}/>}      label="Alta"             onClick={onCompose}     disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Plus size={17}/>}      label={t("Alta@@nuevo")}             onClick={onCompose}     disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<RefreshCw size={17}/>} label="Enviar y Recibir" onClick={onSync}       disabled={!hasActiveMailbox} pill/>
+          <RibbonButton icon={<RefreshCw size={17}/>} label={t("Enviar y Recibir")} onClick={onSync}       disabled={!hasActiveMailbox} pill/>
           <RibbonSep/>
-          <RibbonButton icon={<Trash2 size={17}/>}   label="Vaciar Eliminados" onClick={onEmptyTrash} disabled={!hasActiveMailbox} danger/>
+          <RibbonButton icon={<Trash2 size={17}/>}   label={t("Vaciar Eliminados")} onClick={onEmptyTrash} disabled={!hasActiveMailbox} danger/>
         </>)}
 
         {activeTab === 'configuracion' && (<>
-          <RibbonButton icon={<AtSign size={17}/>}   label="Cuentas"          onClick={onShowAccounts}/>
+          <RibbonButton icon={<AtSign size={17}/>}   label={t("Cuentas")}          onClick={onShowAccounts}/>
           <RibbonSep/>
-          <RibbonButton icon={<FileText size={17}/>} label="Plantillas"       onClick={onShowTemplates}/>
-          <RibbonButton icon={<Edit3 size={17}/>}    label="Firmas"           onClick={onShowSignatures}/>
+          <RibbonButton icon={<FileText size={17}/>} label={t("Plantillas")}       onClick={onShowTemplates}/>
+          <RibbonButton icon={<Edit3 size={17}/>}    label={t("Firmas")}           onClick={onShowSignatures}/>
           <RibbonSep/>
-          <RibbonButton icon={<Filter size={17}/>}   label="Reglas"           onClick={() => {}} disabled/>
+          <RibbonButton icon={<Filter size={17}/>}   label={t("Reglas")}           onClick={() => {}} disabled/>
           <RibbonSep/>
-          <RibbonButton icon={<Tag size={17}/>}      label="Destinatarios"    onClick={() => {}} disabled/>
-          <RibbonButton icon={<Shield size={17}/>}   label="Grupos"           onClick={onShowGroups}/>
+          <RibbonButton icon={<Tag size={17}/>}      label={t("Destinatarios")}    onClick={() => {}} disabled/>
+          <RibbonButton icon={<Shield size={17}/>}   label={t("Grupos")}           onClick={onShowGroups}/>
           <RibbonSep/>
           <RibbonButton
             icon={mailTheme === 'dark' ? <Sun size={17}/> : <Moon size={17}/>}
-            label={mailTheme === 'dark' ? 'Tema claro' : 'Tema oscuro'}
+            label={mailTheme === 'dark' ? t("Tema claro") : t("Tema oscuro")}
             onClick={onToggleTheme}/>
         </>)}
       </div>
@@ -3457,7 +3401,7 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className={`w-full ${editing ? 'max-w-5xl' : 'max-w-2xl'} bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col`} style={{ maxHeight: '90vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Edit3 size={18}/> Firmas</h3>
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Edit3 size={18}/>{" "}{t("Firmas")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
         </div>
 
@@ -3469,18 +3413,18 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
           />
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {loading && <p className="text-sm text-gray-400 text-center py-8">{t("Cargando…")}</p>}
             {!loading && sigs.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No hay firmas. Crea una nueva.</p>
+              <p className="text-sm text-gray-400 text-center py-8">{t("No hay firmas. Crea una nueva.")}</p>
             )}
             {sigs.map(sig => (
               <div key={sig.id} className="border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-sm text-gray-800">{sig.name}</span>
                   <div className="flex items-center gap-2">
-                    {sig.isDefault && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">Predeterminada</span>}
-                    {!sig.isDefault && <button onClick={() => setDefault(sig.id)} className="text-xs text-gray-400 hover:text-indigo-600">Usar por defecto</button>}
-                    {onSelect && <button onClick={() => { onSelect(sig); onClose(); }} className="text-xs text-indigo-600 hover:underline">Insertar</button>}
+                    {sig.isDefault && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{t("Predeterminada")}</span>}
+                    {!sig.isDefault && <button onClick={() => setDefault(sig.id)} className="text-xs text-gray-400 hover:text-indigo-600">{t("Usar por defecto")}</button>}
+                    {onSelect && <button onClick={() => { onSelect(sig); onClose(); }} className="text-xs text-indigo-600 hover:underline">{t("Insertar")}</button>}
                     <button onClick={() => setEditing(sig)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
                     <button onClick={() => del(sig.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
@@ -3497,8 +3441,7 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
               onClick={() => setEditing({ id: crypto.randomUUID(), name: '', html: '' })}
               className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
             >
-              <Plus size={16}/> Nueva firma
-            </button>
+              <Plus size={16}/>{" "}{t("Nueva firma")}</button>
           </div>
         )}
       </div>
@@ -3541,7 +3484,7 @@ function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; o
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText size={18}/> Plantillas de correo</h3>
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText size={18}/>{" "}{t("Plantillas de correo")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
         </div>
 
@@ -3549,9 +3492,9 @@ function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; o
           <TemplateEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {loading && <p className="text-sm text-gray-400 text-center py-8">{t("Cargando…")}</p>}
             {!loading && tpls.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No hay plantillas. Crea una nueva.</p>
+              <p className="text-sm text-gray-400 text-center py-8">{t("No hay plantillas. Crea una nueva.")}</p>
             )}
             {tpls.map(tpl => (
               <div key={tpl.id} className="border border-gray-200 rounded-xl p-4">
@@ -3560,15 +3503,13 @@ function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; o
                   <div className="flex items-center gap-2">
                     {onApply && (
                       <button onClick={() => { onApply(tpl); onClose(); }}
-                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full hover:bg-indigo-100">
-                        Usar plantilla
-                      </button>
+                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full hover:bg-indigo-100">{t("Usar plantilla")}</button>
                     )}
                     <button onClick={() => setEditing(tpl)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
                     <button onClick={() => del(tpl.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">Asunto: {tpl.subject}</p>
+                <p className="text-xs text-gray-400 mb-2">{t("Asunto:")}{" "}{tpl.subject}</p>
                 <div className="text-xs text-gray-500 border border-gray-100 rounded-lg p-2 max-h-16 overflow-hidden" dangerouslySetInnerHTML={{ __html: tpl.html }}/>
               </div>
             ))}
@@ -3581,8 +3522,7 @@ function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; o
               onClick={() => setEditing({ id: crypto.randomUUID(), name: '', subject: '', html: '' })}
               className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
             >
-              <Plus size={16}/> Nueva plantilla
-            </button>
+              <Plus size={16}/>{" "}{t("Nueva plantilla")}</button>
           </div>
         )}
       </div>
@@ -3598,26 +3538,26 @@ function TemplateEditor({ initial, onSave, onCancel }: { initial: EmailTemplate;
     <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de la plantilla</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Primer contacto cliente"
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t("Nombre de la plantilla")}</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder={t("Ej. Primer contacto cliente")}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Asunto predeterminado</label>
-          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ej. Bienvenida al despacho"
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t("Asunto predeterminado")}</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder={t("Ej. Bienvenida al despacho")}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
         </div>
       </div>
       <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Cuerpo del correo (HTML)</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t("Cuerpo del correo (HTML)")}</label>
         <textarea value={html} onChange={e => setHtml(e.target.value)} rows={10}
-          placeholder="<p>Estimado/a cliente,</p><p>...</p>"
+          placeholder={t("<p>Estimado/a cliente,</p><p>...</p>")}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
       </div>
       <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">{t("Cancelar")}</button>
         <button onClick={() => onSave({ ...initial, name, subject, html })} disabled={!name.trim()}
-          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Guardar</button>
+          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">{t("Guardar")}</button>
       </div>
     </div>
   );
@@ -3658,7 +3598,7 @@ function RecipientGroupsPanel({ onClose, getToken }: { onClose: () => void; getT
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Shield size={18}/> Grupos de destinatarios</h3>
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Shield size={18}/>{" "}{t("Grupos de destinatarios")}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
         </div>
 
@@ -3666,16 +3606,16 @@ function RecipientGroupsPanel({ onClose, getToken }: { onClose: () => void; getT
           <GroupEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {loading && <p className="text-sm text-gray-400 text-center py-8">{t("Cargando…")}</p>}
             {!loading && groups.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No hay grupos. Crea uno nuevo.</p>
+              <p className="text-sm text-gray-400 text-center py-8">{t("No hay grupos. Crea uno nuevo.")}</p>
             )}
             {groups.map(grp => (
               <div key={grp.id} className="border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-sm text-gray-800">{grp.name}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{grp.emails.length} destinatario{grp.emails.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-gray-400">{grp.emails.length}{" "}{t("destinatario")}{grp.emails.length !== 1 ? 's' : ''}</span>
                     <button onClick={() => setEditing(grp)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
                     <button onClick={() => del(grp.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
@@ -3692,8 +3632,7 @@ function RecipientGroupsPanel({ onClose, getToken }: { onClose: () => void; getT
               onClick={() => setEditing({ id: crypto.randomUUID(), name: '', emails: [] })}
               className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
             >
-              <Plus size={16}/> Nuevo grupo
-            </button>
+              <Plus size={16}/>{" "}{t("Nuevo grupo")}</button>
           </div>
         )}
       </div>
@@ -3707,24 +3646,24 @@ function GroupEditor({ initial, onSave, onCancel }: { initial: RecipientGroup; o
   return (
     <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Nombre del grupo</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Equipo jurídico"
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t("Nombre del grupo")}</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder={t("Ej. Equipo jurídico")}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
       </div>
       <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Emails (uno por línea)</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t("Emails (uno por línea)")}</label>
         <textarea value={raw} onChange={e => setRaw(e.target.value)} rows={10}
-          placeholder="cliente@empresa.com&#10;socio@despacho.es"
+          placeholder={t("cliente@empresa.com\nsocio@despacho.es")}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
-        <p className="text-xs text-gray-400 mt-1">{raw.split('\n').filter(l => l.trim()).length} dirección(es)</p>
+        <p className="text-xs text-gray-400 mt-1">{raw.split('\n').filter(l => l.trim()).length}{" "}{t("dirección(es)")}</p>
       </div>
       <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">{t("Cancelar")}</button>
         <button
           onClick={() => onSave({ ...initial, name, emails: raw.split('\n').map(l => l.trim()).filter(Boolean) })}
           disabled={!name.trim()}
           className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-        >Guardar</button>
+        >{t("Guardar")}</button>
       </div>
     </div>
   );
@@ -4005,7 +3944,7 @@ export default function Email() {
     if (code === 401 || code === 403) {
       setGmailToken('');
       clearGmailToken();
-      setError('Tu sesión de Gmail expiró. Vuelve a conectar.');
+      setError(t("Tu sesión de Gmail expiró. Vuelve a conectar."));
     }
   }, []);
 
@@ -4099,7 +4038,7 @@ export default function Email() {
           body: JSON.stringify({ code: resp.code, display_name: userName, avatar_url: userAvatar || null }),
         });
         const payload = await res.json().catch(() => null);
-        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo conectar con Google');
+        if (!res.ok || !payload?.success) throw new Error(payload?.error || t("No se pudo conectar con Google"));
         const { access_token, expires_in } = payload.data as { access_token: string; expires_in: number };
         const expiresAt = Date.now() + (expires_in || 3600) * 1000;
         setGmailToken(access_token);
@@ -4108,7 +4047,7 @@ export default function Email() {
         saveGmailToken(access_token, expiresAt);
         await refreshSavedGmailProfiles().catch(() => undefined);
       } catch (e: any) {
-        setError(e.message || 'No se pudo conectar con Google');
+        setError(e.message || t("No se pudo conectar con Google"));
       }
     })();
   }, [authFetch, refreshSavedGmailProfiles, userName, userAvatar]);
@@ -4128,11 +4067,11 @@ export default function Email() {
     }
 
     if (!GMAIL_CLIENT_ID) {
-      setError('VITE_GOOGLE_CLIENT_ID no está configurado en .env');
+      setError(t("VITE_GOOGLE_CLIENT_ID no está configurado en .env"));
       return;
     }
     if (!goog?.accounts?.oauth2) {
-      setError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.');
+      setError(t("Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo."));
       return;
     }
     const clientConfig: any = {
@@ -4157,7 +4096,7 @@ export default function Email() {
     if (!response) return;
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.success) {
-      setError(payload?.error || 'No se pudo borrar la cuenta guardada');
+      setError(payload?.error || t("No se pudo borrar la cuenta guardada"));
       return;
     }
     setSavedGmailProfiles((prev) => prev.filter((profile) => profile.id !== profileId));
@@ -4188,7 +4127,7 @@ export default function Email() {
     if (res && !res.ok) {
       // La cuenta puede pertenecer a otra organización (correo aislado por
       // organización) -- avisar en vez de fallar en silencio.
-      setError(payload?.error || 'No se pudo guardar la cuenta de Gmail');
+      setError(payload?.error || t("No se pudo guardar la cuenta de Gmail"));
       if (res.status === 409) {
         // Ese Gmail es de otra organización: no se muestra su bandeja aquí.
         clearGmailToken();
@@ -4314,7 +4253,7 @@ export default function Email() {
           authFetch(`${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`),
         ]);
         const payload = await res.json();
-        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Error al cargar correos IMAP');
+        if (!res.ok || !payload?.success) throw new Error(payload?.error || t("Error al cargar correos IMAP"));
 
         const nextEmails: ParsedEmail[] = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
         if (isStale()) return;
@@ -4363,7 +4302,7 @@ export default function Email() {
           const dbPayload = await dbRes.json().catch(() => null);
           if (!dbRes.ok || !dbPayload?.success) {
             if (isBackground) return;
-            throw new Error(dbPayload?.error || 'Error al cargar correos');
+            throw new Error(dbPayload?.error || t("Error al cargar correos"));
           }
           const nextEmails: ParsedEmail[] = (dbPayload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
           if (isStale()) return;
@@ -4536,7 +4475,7 @@ export default function Email() {
       else setEmails(prev => [...prev, ...nextEmails]);
     } catch (e: any) {
       handleGmailError(e);
-      setError(e.message || 'Error al cargar correos');
+      setError(e.message || t("Error al cargar correos"));
     } finally {
       if (!silent) setLoading(false);
     }
@@ -4713,7 +4652,7 @@ export default function Email() {
           // ya existía para el token del navegador, en vez de quedarse callado.
           if (res && !cancelled && (res.status === 401 || res.status === 403)) {
             setGmailExpired(true);
-            setError('Tu sesión de Gmail expiró. Vuelve a conectar.');
+            setError(t("Tu sesión de Gmail expiró. Vuelve a conectar."));
           }
         })
         .catch(() => null)
@@ -4836,12 +4775,12 @@ export default function Email() {
       try {
         const res = await authFetch(`${API}/email/messages/${email.id}`);
         const payload = await res.json();
-        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo abrir el correo');
+        if (!res.ok || !payload?.success) throw new Error(payload?.error || t("No se pudo abrir el correo"));
         const parsed = parseImapEmail(payload.data as ImapApiEmail);
         setSelectedEmail(prev => prev?.id === email.id ? parsed : prev);
         setEmails(prev => prev.map(e => e.id === email.id ? parsed : e));
       } catch (e: any) {
-        setError(e.message || 'Error al abrir el correo');
+        setError(e.message || t("Error al abrir el correo"));
       } finally {
         bodyLoadingRef.current = null;
         setBodyLoadingId(null);
@@ -4867,7 +4806,7 @@ export default function Email() {
     const meta = email.attachments?.[index];
     try {
       const res = await authFetch(`${API}/email/messages/${email.id}/attachments/${index}`);
-      if (!res.ok) throw new Error('No se pudo descargar el adjunto');
+      if (!res.ok) throw new Error(t("No se pudo descargar el adjunto"));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -4878,7 +4817,7 @@ export default function Email() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setError(e.message || 'Error al descargar el adjunto');
+      setError(e.message || t("Error al descargar el adjunto"));
     }
   }, [authFetch]);
 
@@ -4947,10 +4886,10 @@ export default function Email() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expediente_id: expedienteId }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || 'No se pudo vincular el expediente');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || t("No se pudo vincular el expediente"));
       updateEmailLocally(email.id, { expedienteId });
     } catch (e: any) {
-      setError(e.message || 'Error al vincular el expediente');
+      setError(e.message || t("Error al vincular el expediente"));
     } finally {
       setLinkingExpediente(false);
     }
@@ -4967,7 +4906,7 @@ export default function Email() {
         body: JSON.stringify({ descripcion: descripcion.trim() }),
       });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.data?.id) throw new Error(json?.error || 'No se pudo crear el expediente');
+      if (!res.ok || !json?.data?.id) throw new Error(json?.error || t("No se pudo crear el expediente"));
       const exp = json.data;
       const ref = exp.ref_expediente || exp.ref_propia
         || (exp.anio && exp.num_exp ? `${exp.anio}/${exp.num_exp}` : null)
@@ -4983,7 +4922,7 @@ export default function Email() {
       updateEmailLocally(email.id, { expedienteId: exp.id });
       return true;
     } catch (e: any) {
-      setError(e.message || 'Error al crear el expediente');
+      setError(e.message || t("Error al crear el expediente"));
       return false;
     } finally {
       setLinkingExpediente(false);
@@ -4999,10 +4938,10 @@ export default function Email() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expediente_id: expedienteId }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || 'No se pudo guardar el adjunto en el expediente');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || t("No se pudo guardar el adjunto en el expediente"));
       return true;
     } catch (e: any) {
-      setError(e.message || 'Error al guardar el adjunto en el expediente');
+      setError(e.message || t("Error al guardar el adjunto en el expediente"));
       return false;
     } finally {
       setSavingAttachmentIndex(null);
@@ -5107,7 +5046,7 @@ export default function Email() {
 
   const emptyTrashAction = useCallback(async () => {
     if (activeProvider === 'none') return;
-    const confirmed = await confirmar({ titulo: "¿Vaciar la papelera?", mensaje: "Se eliminarán para siempre todos los mensajes de la papelera.", confirmar: "Vaciar papelera", peligro: true });
+    const confirmed = await confirmar({ titulo: t("¿Vaciar la papelera?"), mensaje: t("Se eliminarán para siempre todos los mensajes de la papelera."), confirmar: t("Vaciar papelera"), peligro: true });
     if (!confirmed) return;
     if (activeProvider === 'imap' && currentImapAccount) {
       await authFetch(`${API}/email/trash?account_id=${currentImapAccount.id}`, { method: 'DELETE' }).catch(() => {});
@@ -5142,7 +5081,7 @@ export default function Email() {
       setNewLabelName('');
       setLabelModalOpen(false);
     } catch (e: any) {
-      setError(e.message || 'No se pudo crear la carpeta');
+      setError(e.message || t("No se pudo crear la carpeta"));
     } finally {
       setCreatingLabel(false);
     }
@@ -5165,14 +5104,14 @@ export default function Email() {
         });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.success) {
-          throw new Error(payload?.error || 'No se pudo crear la carpeta IMAP');
+          throw new Error(payload?.error || t("No se pudo crear la carpeta IMAP"));
         }
         await refreshImapFolders(currentImapAccount.id);
         setSelectedFolder(name);
         setNewLabelName('');
         setLabelModalOpen(false);
       } catch (e: any) {
-        setError(e.message || 'No se pudo crear la carpeta IMAP');
+        setError(e.message || t("No se pudo crear la carpeta IMAP"));
       } finally {
         setCreatingLabel(false);
       }
@@ -5205,7 +5144,7 @@ export default function Email() {
       }
       setPendingDeleteLabel(null);
     } catch (e: any) {
-      setError(e.message || 'No se pudo borrar la carpeta');
+      setError(e.message || t("No se pudo borrar la carpeta"));
     } finally {
       setDeletingLabel(false);
     }
@@ -5229,7 +5168,7 @@ export default function Email() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error || 'No se pudo borrar la cuenta');
+        throw new Error(payload?.error || t("No se pudo borrar la cuenta"));
       }
 
       const remainingAccounts = imapAccounts.filter((account) => account.id !== pendingDeleteAccount.id);
@@ -5242,7 +5181,7 @@ export default function Email() {
       }
       setPendingDeleteAccount(null);
     } catch (e: any) {
-      setError(e.message || 'No se pudo borrar la cuenta');
+      setError(e.message || t("No se pudo borrar la cuenta"));
     }
   }, [authFetch, imapAccounts, pendingDeleteAccount, selectedImapAccountId]);
 
@@ -5254,14 +5193,14 @@ export default function Email() {
         ? { ...prev, labelIds: Array.from(new Set([...(prev.labelIds || []), labelId])) }
         : prev);
     } catch (e: any) {
-      setError(e.message || 'No se pudo guardar en la carpeta');
+      setError(e.message || t("No se pudo guardar en la carpeta"));
     }
   }, [gmail]);
 
   // ── Compose ───────────────────────────────────────────────────────────────
   const startCompose = (data: Partial<ComposeData> = {}) => {
     if (activeProvider === 'none') {
-      setError('Selecciona o conecta una cuenta de correo para poder redactar mensajes.');
+      setError(t("Selecciona o conecta una cuenta de correo para poder redactar mensajes."));
       setShowConnectModal(true);
       return;
     }
@@ -5393,7 +5332,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       }
     } catch (e: any) {
       if (!currentImapAccount) handleGmailError(e);
-      setError(e.message || 'No se pudo sincronizar');
+      setError(e.message || t("No se pudo sincronizar"));
     }
     finally { setSyncing(false); }
   };
@@ -5581,7 +5520,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               </h2>
               <button
                 onClick={() => void refrescarSinParpadeo()} disabled={loading || bgRefreshing || !hasActiveMailbox}
-                title="Recargar"
+                title={t("Recargar")}
                 className="text-slate-400 hover:text-slate-700 transition-colors">
                 <RefreshCw size={13} className={loading || bgRefreshing ? 'animate-spin' : ''} />
               </button>
@@ -5596,7 +5535,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
                 disabled={!hasActiveMailbox}
-                placeholder="Buscar en correos..."
+                placeholder={t("Buscar en correos...")}
                 className="block w-full pl-8 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all shadow-sm" />
               {searchQ && (
                 <button
@@ -5624,7 +5563,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               en vez de varias cajas amarillas encima de la lista. */}
           {(() => {
             const avisos = [
-              currentImapAccount?.sync_warning ? { clave: 'sync', texto: `Problema al actualizar el correo: ${currentImapAccount.sync_warning}`, diagnosticar: true } : null,
+              currentImapAccount?.sync_warning ? { clave: 'sync', texto: t("Problema al actualizar el correo: {aviso}", { aviso: currentImapAccount.sync_warning }), diagnosticar: true } : null,
               currentImapAccount?.envio_warning ? { clave: 'envio', texto: currentImapAccount.envio_warning, diagnosticar: false } : null,
             ].filter(Boolean) as { clave: string; texto: string; diagnosticar: boolean }[];
             if (!avisos.length) return null;
@@ -5634,7 +5573,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left">
                   <AlertTriangle size={12} className="shrink-0 text-amber-600" />
                   <span className="min-w-0 flex-1 truncate">
-                    {avisos.length === 1 ? avisos[0].texto : `${avisos.length} avisos sobre esta cuenta`}
+                    {avisos.length === 1 ? avisos[0].texto : t("{length} avisos sobre esta cuenta", { length: avisos.length })}
                   </span>
                   <ChevronDown size={12} className={`shrink-0 transition-transform ${avisosCuentaAbiertos ? 'rotate-180' : ''}`} />
                 </button>
@@ -5644,7 +5583,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                       <div key={a.clave} className="flex items-start gap-2">
                         <span className="flex-1 leading-relaxed">{a.texto}</span>
                         {a.diagnosticar && (
-                          <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">Diagnosticar</button>
+                          <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">{t("Diagnosticar")}</button>
                         )}
                       </div>
                     ))}
@@ -5674,14 +5613,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">Sesión de Gmail expirada</p>
-                  <p className="mt-1 text-xs text-slate-500">Tu sesión ha expirado o fue revocada. Vuelve a iniciar sesión para ver tus correos.</p>
+                  <p className="text-sm font-semibold text-slate-700">{t("Sesión de Gmail expirada")}</p>
+                  <p className="mt-1 text-xs text-slate-500">{t("Tu sesión ha expirado o fue revocada. Vuelve a iniciar sesión para ver tus correos.")}</p>
                 </div>
                 <button
                   onClick={() => connectGoogle()}
                   className="inline-flex items-center gap-2 rounded-full bg-[#ab0433] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#8f022a]">
-                  <LogIn size={15} /> Reconectar Gmail
-                </button>
+                  <LogIn size={15} />{" "}{t("Reconectar Gmail")}</button>
               </div>
             ) : !hasActiveMailbox ? (
               <MailboxLockedState
@@ -5691,7 +5629,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             ) : loading && emails.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <Spinner size="lg" />
-                <span className="text-sm text-slate-500">Cargando mensajes...</span>
+                <span className="text-sm text-slate-500">{t("Cargando mensajes...")}</span>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
@@ -5701,8 +5639,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <button
                     onClick={() => connectGoogle()}
                     className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium bg-red-50 border border-red-200 px-4 py-2 rounded-full">
-                    <LogIn size={15} /> Reconectar Gmail
-                  </button>
+                    <LogIn size={15} />{" "}{t("Reconectar Gmail")}</button>
                 )}
               </div>
             ) : emails.length === 0 ? (
@@ -5728,13 +5665,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                         }}
                       >
                         {pendingNewEmails.length === 1
-                          ? '1 mensaje nuevo — mostrar'
-                          : `${pendingNewEmails.length} mensajes nuevos — mostrar`}
+                          ? t("1 mensaje nuevo — mostrar")
+                          : t("{length} mensajes nuevos — mostrar", { length: pendingNewEmails.length })}
                       </button>
                       <button
                         className="p-1 rounded-lg hover:bg-blue-700 text-blue-200 hover:text-white transition-colors flex-shrink-0"
                         onClick={() => setPendingNewEmails([])}
-                        aria-label="Descartar"
+                        aria-label={t("Descartar")}
                       >
                         <X size={13} />
                       </button>
@@ -5760,9 +5697,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                       className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1.5 px-4 py-2 rounded-full hover:bg-red-50 transition-colors">
                       {loading
                         ? <Loader2 size={14} className="animate-spin" />
-                        : <ChevronDown size={14} />}
-                      Cargar más mensajes
-                    </button>
+                        : <ChevronDown size={14} />}{t("Cargar más mensajes")}</button>
                   </div>
                 )}
               </>
@@ -5807,7 +5742,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
                 <MailOpen size={30} className="text-slate-300" />
               </div>
-              <p className="text-slate-400 text-sm font-medium">Selecciona un mensaje para leerlo</p>
+              <p className="text-slate-400 text-sm font-medium">{t("Selecciona un mensaje para leerlo")}</p>
             </div>
           ) : (
             <MailboxLockedState
@@ -5826,7 +5761,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             <button
               onClick={() => setFullscreenEmail(null)}
               className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-800 flex-shrink-0"
-              title="Cerrar pantalla completa">
+              title={t("Cerrar pantalla completa")}>
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -5910,18 +5845,18 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-xl font-semibold text-slate-900">
-                    {currentImapAccount ? 'Crear carpeta IMAP' : 'Crear carpeta personalizada'}
+                    {currentImapAccount ? t("Crear carpeta IMAP") : t("Crear carpeta personalizada")}
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
                     {currentImapAccount
-                      ? `Organiza mejor la cuenta ${currentImapAccount.email} con una carpeta propia.`
-                      : 'Organiza tus correos con una carpeta propia dentro de Gmail y del ERP.'}
+                      ? t("Organiza mejor la cuenta {email} con una carpeta propia.", { email: currentImapAccount.email })
+                      : t("Organiza tus correos con una carpeta propia dentro de Gmail y del ERP.")}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setLabelModalOpen(false)}
-                  aria-label="Cerrar"
+                  aria-label={t("Cerrar")}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
                 >
                   <X size={18} />
@@ -5931,19 +5866,15 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
 
             <div className="px-6 py-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Nombre de la carpeta
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">{t("Nombre de la carpeta")}</label>
                 <input
                   autoFocus
                   value={newLabelName}
                   onChange={(e) => setNewLabelName(e.target.value)}
-                  placeholder="Ej. Clientes VIP, Juicios, Pendientes..."
+                  placeholder={t("Ej. Clientes VIP, Juicios, Pendientes...")}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-200"
                 />
-                <p className="mt-2 text-xs text-slate-500">
-                  Usa un nombre claro y corto. Luego podrás guardar correos directamente dentro de esta carpeta.
-                </p>
+                <p className="mt-2 text-xs text-slate-500">{t("Usa un nombre claro y corto. Luego podrás guardar correos directamente dentro de esta carpeta.")}</p>
               </div>
             </div>
 
@@ -5957,16 +5888,12 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   }
                   setLabelModalOpen(false);
                 }}
-                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                Borrar
-              </button>
+                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">{t("Borrar")}</button>
               <button
                 type="submit"
                 disabled={!normalizedLabelName || creatingLabel}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ab0433] text-white hover:bg-[#8f022a] transition-colors disabled:opacity-60">
-                {creatingLabel ? <Loader2 size={16} className="animate-spin" /> : <FolderPlus size={16} />}
-                Crear
-              </button>
+                {creatingLabel ? <Loader2 size={16} className="animate-spin" /> : <FolderPlus size={16} />}{t("Crear")}</button>
             </div>
           </form>
         </div>
@@ -5981,16 +5908,15 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <Trash2 size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Borrar carpeta</h3>
-                  <p className="text-sm text-slate-500">Confirma si quieres eliminar esta carpeta.</p>
+                  <h3 className="text-lg font-semibold text-slate-900">{t("Borrar carpeta")}</h3>
+                  <p className="text-sm text-slate-500">{t("Confirma si quieres eliminar esta carpeta.")}</p>
                 </div>
               </div>
             </div>
 
             <div className="px-6 py-5">
               <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
-                <p className="text-sm text-slate-700">
-                  ¿Quieres borrar la carpeta <span className="font-semibold text-[#ab0433]">{pendingDeleteLabel.name}</span>?
+                <p className="text-sm text-slate-700">{t("¿Quieres borrar la carpeta")}{" "}<span className="font-semibold text-[#ab0433]">{pendingDeleteLabel.name}</span>?
                 </p>
               </div>
             </div>
@@ -5999,17 +5925,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               <button
                 type="button"
                 onClick={() => setPendingDeleteLabel(null)}
-                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                Cancelar
-              </button>
+                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">{t("Cancelar")}</button>
               <button
                 type="button"
                 disabled={deletingLabel}
                 onClick={() => void deleteUserLabel()}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ab0433] text-white hover:bg-[#8f022a] transition-colors disabled:opacity-60">
-                {deletingLabel ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                Borrar
-              </button>
+                {deletingLabel ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}{t("Borrar")}</button>
             </div>
           </div>
         </div>
@@ -6024,16 +5946,15 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <Trash2 size={20} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">Borrar cuenta de correo</h3>
-                  <p className="text-sm text-slate-500">Confirma si quieres quitar esta cuenta del módulo.</p>
+                  <h3 className="text-lg font-semibold text-slate-900">{t("Borrar cuenta de correo")}</h3>
+                  <p className="text-sm text-slate-500">{t("Confirma si quieres quitar esta cuenta del módulo.")}</p>
                 </div>
               </div>
             </div>
 
             <div className="px-6 py-5">
               <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
-                <p className="text-sm text-slate-700">
-                  ¿Quieres borrar la cuenta <span className="font-semibold text-[#ab0433]">{pendingDeleteAccount.name}</span>?
+                <p className="text-sm text-slate-700">{t("¿Quieres borrar la cuenta")}{" "}<span className="font-semibold text-[#ab0433]">{pendingDeleteAccount.name}</span>?
                 </p>
                 <p className="mt-1 text-xs text-slate-500">{pendingDeleteAccount.email}</p>
               </div>
@@ -6043,16 +5964,12 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               <button
                 type="button"
                 onClick={() => setPendingDeleteAccount(null)}
-                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                Cancelar
-              </button>
+                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">{t("Cancelar")}</button>
               <button
                 type="button"
                 onClick={() => void deleteImapAccount()}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ab0433] text-white hover:bg-[#8f022a] transition-colors">
-                <Trash2 size={16} />
-                Borrar cuenta
-              </button>
+                <Trash2 size={16} />{t("Borrar cuenta")}</button>
             </div>
           </div>
         </div>
@@ -6134,7 +6051,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               setImapPreset(null);
               setEditImapId(undefined);
             } catch (e: any) {
-              setError(`La cuenta se guardó, pero la primera sincronización falló: ${e.message || 'error desconocido'}`);
+              setError(t("La cuenta se guardó, pero la primera sincronización falló: {v}", { v: e.message || 'error desconocido' }));
             }
             finally { setSyncing(false); }
           }}

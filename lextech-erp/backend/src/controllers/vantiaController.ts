@@ -1,6 +1,7 @@
 import { Response, Request } from 'express';
 import path from 'path';
 import pool from '../config/database';
+import { idiomasDe } from '../utils/idiomaAviso';
 import { performDeleteFile, performRenameFile, performMoveFile, ensureFileOnDisk } from './filesController';
 import { logActivityForReq, resolveUserName } from './activityController';
 import { extractTextFromFile, type DocFile } from '../utils/docExtract';
@@ -26,6 +27,15 @@ const GEMINI_FREE_TIER_LIMITS: Record<string, { rpm: number; tpm: number; rpd: n
 // gemini-3.1-pro-preview, da 429 con la cuenta gratuita actual (cuota 0
 // para Pro) -- comprobado a mano contra la API real.
 const ALLOWED_GEMINI_MODELS = new Set(['gemini-2.5-flash']);
+
+/** Con la app en inglés, Vantia contesta en inglés (12/11/2026). Los
+ *  documentos que redacte para juzgados o clientes siguen en español. */
+async function instruccionIdioma(userId: string): Promise<string> {
+  const idioma = (await idiomasDe([userId])).get(userId);
+  return idioma === 'en'
+    ? '\n\nIDIOMA: esta persona usa la app en inglés. Contesta SIEMPRE en inglés (esto manda sobre «responde siempre en español»). Los documentos que redactes para juzgados, organismos o clientes españoles, en español salvo que te pidan otro idioma.'
+    : '';
+}
 
 // ── Prompt base — identidad + capacidades ────────────────────────────────────
 const BASE_PROMPT = `Eres Vantia, la inteligencia artificial integrada en VANTIA Legis ERP. Eres un asistente completo, culto y capaz de ayudar con absolutamente cualquier cosa.
@@ -1569,7 +1579,7 @@ export const chatVantia = async (req: any, res: Response) => {
     ]);
 
     const fullSystemPrompt =
-      BASE_PROMPT +
+      BASE_PROMPT + await instruccionIdioma(userId) +
       '\n\n' + moduleInstructions(moduleId) +
       entityCtx +
       await bloqueSkillsParaChat(req.organizacionId);
@@ -1781,7 +1791,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
   try {
     const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
-    const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx
+    const fullSystemPrompt = BASE_PROMPT + await instruccionIdioma(userId) + '\n\n' + moduleInstructions(moduleId) + entityCtx
       + await bloqueSkillsParaChat(req.organizacionId);
 
     const cleanHistory: any[] = [...history];

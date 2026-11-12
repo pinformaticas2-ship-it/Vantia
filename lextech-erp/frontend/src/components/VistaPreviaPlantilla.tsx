@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Loader2 } from 'lucide-react';
+import { t } from '../lib/i18n';
 
 // ── Vista previa de una plantilla del despacho (15/10/2026) ──────────────────
 // Como en el panel de archivos (FilesTabPanel): primero en PDF (fiel al Word,
@@ -45,11 +46,11 @@ export default function VistaPreviaPlantilla({ path, ext }: { path: string; ext:
       {cargando && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500">
           <Loader2 size={20} className="animate-spin" />
-          <p className="text-xs">Preparando la vista previa…</p>
+          <p className="text-xs">{t("Preparando la vista previa…")}</p>
         </div>
       )}
-      {pdf && <iframe title="Vista previa de la plantilla" src={`${pdf}#toolbar=0&navpanes=0&view=FitH`} className="h-full w-full border-0 bg-white" />}
-      {html && <iframe title="Vista previa de la plantilla" srcDoc={html} sandbox="" className="h-full w-full border-0 bg-white" />}
+      {pdf && <iframe title={t("Vista previa de la plantilla")} src={`${pdf}#toolbar=0&navpanes=0&view=FitH`} className="h-full w-full border-0 bg-white" />}
+      {html && <iframe title={t("Vista previa de la plantilla")} srcDoc={html} sandbox="" className="h-full w-full border-0 bg-white" />}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { X, Loader2, CalendarClock } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { t } from '../lib/i18n';
 
 const WEEKDAYS = [
   { value: 1, label: "Lun" },
@@ -75,10 +76,10 @@ export function BookingPageSettingsModal({
         body: JSON.stringify(form),
       });
       const json = await safeJson(res);
-      if (!res.ok || !json.success) { setError(json?.error || "Error al guardar"); return; }
+      if (!res.ok || !json.success) { setError(json?.error || t("Error al guardar")); return; }
       onSaved(json.data);
     } catch (_e) {
-      setError("Error de conexión");
+      setError(t("Error de conexión"));
     } finally {
       setSaving(false);
     }
@@ -91,7 +92,7 @@ export function BookingPageSettingsModal({
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
           <div className="flex items-center gap-2">
             <CalendarClock size={16} className="text-red-600" />
-            <h2 className="text-sm font-bold text-slate-800">Página de reservas</h2>
+            <h2 className="text-sm font-bold text-slate-800">{t("Página de reservas")}</h2>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors">
             <X size={16} />
@@ -100,7 +101,7 @@ export function BookingPageSettingsModal({
 
         <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-700">Título</label>
+            <label className="mb-1 block text-xs font-bold text-slate-700">{t("Título")}</label>
             <input
               value={form.title}
               onChange={e => set("title", e.target.value)}
@@ -109,42 +110,42 @@ export function BookingPageSettingsModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-700">Descripción (opcional)</label>
+            <label className="mb-1 block text-xs font-bold text-slate-700">{t("Descripción (opcional)")}</label>
             <textarea
               value={form.description}
               onChange={e => set("description", e.target.value)}
               rows={2}
-              placeholder="Qué tipo de cita se puede reservar aquí…"
+              placeholder={t("Qué tipo de cita se puede reservar aquí…")}
               className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Duración</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Duración")}</label>
               <select
                 value={form.duration_minutes}
                 onChange={e => set("duration_minutes", parseInt(e.target.value, 10))}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               >
-                {DURATIONS.map(d => <option key={d} value={d}>{d} min</option>)}
+                {DURATIONS.map(d => <option key={d} value={d}>{d}{" "}{t("min")}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Margen entre citas</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Margen entre citas")}</label>
               <select
                 value={form.buffer_minutes}
                 onChange={e => set("buffer_minutes", parseInt(e.target.value, 10))}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               >
-                {[0, 5, 10, 15, 30].map(d => <option key={d} value={d}>{d === 0 ? "Sin margen" : `${d} min`}</option>)}
+                {[0, 5, 10, 15, 30].map(d => <option key={d} value={d}>{d === 0 ? t("Sin margen") : t("{d} min", { d: d })}</option>)}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Hora inicio</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Hora inicio")}</label>
               <input
                 type="time"
                 value={form.start_time}
@@ -153,7 +154,7 @@ export function BookingPageSettingsModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Hora fin</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Hora fin")}</label>
               <input
                 type="time"
                 value={form.end_time}
@@ -164,7 +165,7 @@ export function BookingPageSettingsModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-700">Días disponibles</label>
+            <label className="mb-1.5 block text-xs font-bold text-slate-700">{t("Días disponibles")}</label>
             <div className="flex flex-wrap gap-1.5">
               {WEEKDAYS.map(d => (
                 <button
@@ -183,7 +184,7 @@ export function BookingPageSettingsModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Antelación máxima</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Antelación máxima")}</label>
               <input
                 type="number"
                 min={1}
@@ -192,10 +193,10 @@ export function BookingPageSettingsModal({
                 onChange={e => set("advance_days", parseInt(e.target.value, 10) || 1)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               />
-              <p className="mt-1 text-[10px] text-slate-400">días vista</p>
+              <p className="mt-1 text-[10px] text-slate-400">{t("días vista")}</p>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700">Aviso mínimo</label>
+              <label className="mb-1 block text-xs font-bold text-slate-700">{t("Aviso mínimo")}</label>
               <input
                 type="number"
                 min={0}
@@ -204,7 +205,7 @@ export function BookingPageSettingsModal({
                 onChange={e => set("min_notice_hours", parseInt(e.target.value, 10) || 0)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               />
-              <p className="mt-1 text-[10px] text-slate-400">horas antes</p>
+              <p className="mt-1 text-[10px] text-slate-400">{t("horas antes")}</p>
             </div>
           </div>
 
@@ -214,9 +215,7 @@ export function BookingPageSettingsModal({
               checked={form.active}
               onChange={e => set("active", e.target.checked)}
               className="rounded border-slate-300 text-red-600 focus:ring-red-300"
-            />
-            Página activa (se puede reservar)
-          </label>
+            />{t("Página activa (se puede reservar)")}</label>
 
           {error && <p className="peligro rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>}
         </div>
@@ -226,18 +225,14 @@ export function BookingPageSettingsModal({
             type="button"
             onClick={onClose}
             className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors"
-          >
-            Cancelar
-          </button>
+          >{t("Cancelar")}</button>
           <button
             type="button"
             onClick={handleSave}
             disabled={saving || form.weekdays.length === 0}
             className="flex items-center gap-1.5 rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
           >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            Guardar
-          </button>
+            {saving && <Loader2 size={14} className="animate-spin" />}{t("Guardar")}</button>
         </div>
       </div>
     </div>,

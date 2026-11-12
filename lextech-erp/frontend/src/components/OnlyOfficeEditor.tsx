@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { X, Loader2, AlertTriangle } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { t } from '../lib/i18n';
 
 // Editor de documentos en el navegador (Word, Excel, PowerPoint) con
 // ONLYOFFICE Docs. El backend firma la configuración y recibe el guardado;
@@ -55,7 +56,7 @@ function loadDocsApi(documentServerUrl: string): Promise<void> {
       s.src = src;
       s.async = true;
       s.onload = () => resolve();
-      s.onerror = () => { scriptPromises.delete(src); reject(new Error("No se pudo conectar con el servidor de documentos.")); };
+      s.onerror = () => { scriptPromises.delete(src); reject(new Error(t("No se pudo conectar con el servidor de documentos."))); };
       document.head.appendChild(s);
     });
     scriptPromises.set(src, p);
@@ -87,7 +88,7 @@ export default function OnlyOfficeEditor({ entityId, file, readOnly = false, onC
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await safeJson(res);
-        if (!res.ok || !data?.config) throw new Error(data?.error || "No se pudo abrir el editor.");
+        if (!res.ok || !data?.config) throw new Error(data?.error || t("No se pudo abrir el editor."));
         await loadDocsApi(data.documentServerUrl);
         if (cancelado || !window.DocsAPI) return;
         setCanEdit(Boolean(data.canEdit));
@@ -99,7 +100,7 @@ export default function OnlyOfficeEditor({ entityId, file, readOnly = false, onC
           events: {
             onError: (e: any) => {
               setEstado("error");
-              setError(e?.data?.errorDescription || "El editor ha devuelto un error.");
+              setError(e?.data?.errorDescription || t("El editor ha devuelto un error."));
             },
           },
         });
@@ -107,7 +108,7 @@ export default function OnlyOfficeEditor({ entityId, file, readOnly = false, onC
       } catch (e: any) {
         if (cancelado) return;
         setEstado("error");
-        setError(e?.message || "No se pudo abrir el editor.");
+        setError(e?.message || t("No se pudo abrir el editor."));
       }
     })();
     return () => {
@@ -125,11 +126,11 @@ export default function OnlyOfficeEditor({ entityId, file, readOnly = false, onC
             <p className="text-[11px] text-slate-500">
               {estado !== "ok" ? " "
                 : canEdit
-                  ? "Los cambios se guardan en el expediente al pulsar Guardar o al cerrar el editor."
-                  : "Solo lectura."}
+                  ? t("Los cambios se guardan en el expediente al pulsar Guardar o al cerrar el editor.")
+                  : t("Solo lectura.")}
             </p>
           </div>
-          <button type="button" onClick={() => onClose(canEdit)} title="Cerrar editor"
+          <button type="button" onClick={() => onClose(canEdit)} title={t("Cerrar editor")}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
             <X size={18} />
           </button>
@@ -138,8 +139,7 @@ export default function OnlyOfficeEditor({ entityId, file, readOnly = false, onC
           <div id={placeholderId} className="absolute inset-0" />
           {estado === "cargando" && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white text-sm text-slate-500">
-              <Loader2 size={16} className="animate-spin" /> Abriendo el editor…
-            </div>
+              <Loader2 size={16} className="animate-spin" />{" "}{t("Abriendo el editor…")}</div>
           )}
           {estado === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white p-6 text-center">

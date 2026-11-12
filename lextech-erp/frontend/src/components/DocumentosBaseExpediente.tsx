@@ -6,6 +6,7 @@ import { apiFetch } from '../lib/api';
 import { aviso } from '../lib/avisos';
 import { FilePreviewModal } from './FilePreviewModal';
 import RellenarPlantilla from './RellenarPlantilla';
+import { t } from '../lib/i18n';
 
 // ── Documentos base del expediente (15/10/2026) ─────────────────────────────
 // LOPD, informe de toma de requisitos y hoja de encargo, rellenos solos con
@@ -65,9 +66,9 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
       });
       if (res?.success === false) throw new Error(res.error);
       setDocs(res.data.docs);
-      aviso.ok(`${d.nombre}: documento generado con los datos actuales`);
+      aviso.ok(t("{nombre}: documento generado con los datos actuales", { nombre: d.nombre }));
     } catch (e: any) {
-      aviso.error(e?.message || 'No se pudo generar el documento.');
+      aviso.error(e?.message || t("No se pudo generar el documento."));
       void cargar();
     } finally { setRehaciendo(null); }
   };
@@ -77,14 +78,14 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/files/${expedienteId}/${d.fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error('No se pudo abrir el documento.');
+      if (!res.ok) throw new Error(t("No se pudo abrir el documento."));
       const blob = new Blob([await res.blob()], { type: MIME_DOCX });
       const url = URL.createObjectURL(blob);
       const nombre = (d.archivo || d.nombre).replace(/\.docx$/i, '') + '.docx';
       if (ver) { setVista({ src: url, nombre }); return; }
       const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (e: any) { aviso.error(e?.message || 'No se pudo abrir el documento.'); }
+    } catch (e: any) { aviso.error(e?.message || t("No se pudo abrir el documento.")); }
   };
 
   if (!activo || !docs) return null;
@@ -93,8 +94,8 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
     <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">Documentos del expediente</h3>
-          <p className="text-xs text-slate-500 mt-0.5">Se generan solos con los datos del expediente. Los datos que falten se quedan marcados «así» para completarlos.</p>
+          <h3 className="text-sm font-bold text-slate-800">{t("Documentos del expediente")}</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{t("Se generan solos con los datos del expediente. Los datos que falten se quedan marcados «así» para completarlos.")}</p>
         </div>
       </div>
       <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
@@ -110,16 +111,16 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800">{d.nombre}</p>
                   <p className="text-xs text-slate-500 truncate" title={d.plantillaNombre}>
-                    {ocupado ? 'Generando…'
-                      : d.estado === 'error' ? <span className="text-amber-700">No se pudo generar: {d.error}</span>
-                      : borrado ? <span className="text-amber-700">Se borró el documento</span>
+                    {ocupado ? t("Generando…")
+                      : d.estado === 'error' ? <span className="text-amber-700">{t("No se pudo generar:")}{" "}{d.error}</span>
+                      : borrado ? <span className="text-amber-700">{t("Se borró el documento")}</span>
                       : d.estado === 'listo' ? (
                         <>
                           {fecha(d.generadoAt)} · {d.pendientes
-                            ? <span className="text-amber-700 font-medium">{d.pendientes} dato{d.pendientes === 1 ? '' : 's'} por completar</span>
-                            : <span className="text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={11} /> completo</span>}
+                            ? <span className="text-amber-700 font-medium">{d.pendientes}{" "}{t("dato")}{d.pendientes === 1 ? '' : 's'}{" "}{t("por completar")}</span>
+                            : <span className="text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle2 size={11} />{" "}{t("completo")}</span>}
                         </>
-                      ) : 'Pendiente'}
+                      ) : t("Pendiente")}
                     <span className="text-slate-400"> · {d.plantillaNombre.replace(/\.docx?$/i, '')}</span>
                   </p>
                 </div>
@@ -127,21 +128,20 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
               <div className="flex items-center gap-1.5 sm:shrink-0 pl-12 sm:pl-0">
                 {d.fileId && !ocupado && (
                   <>
-                    <button type="button" onClick={() => void bajar(d, true)} title="Ver" className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50"><Eye size={14} /></button>
-                    <button type="button" onClick={() => void bajar(d, false)} title="Descargar" className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50"><Download size={14} /></button>
+                    <button type="button" onClick={() => void bajar(d, true)} title={t("Ver")} className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50"><Eye size={14} /></button>
+                    <button type="button" onClick={() => void bajar(d, false)} title={t("Descargar")} className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50"><Download size={14} /></button>
                   </>
                 )}
                 {!bloqueado && !ocupado && (d.pendientes || d.estado !== 'listo' || borrado) ? (
                   <button type="button" onClick={() => setCompletar(d)}
                     className="h-8 px-2.5 rounded-lg bg-red-600 text-xs font-semibold text-white hover:bg-red-700 inline-flex items-center gap-1">
-                    <PencilLine size={13} /> {d.pendientes ? 'Completar datos' : 'Generar'}
+                    <PencilLine size={13} /> {d.pendientes ? t("Completar datos") : t("Generar")}
                   </button>
                 ) : null}
                 {!bloqueado && !ocupado && d.estado === 'listo' && !d.pendientes && !borrado && (
-                  <button type="button" onClick={() => void rehacer(d)} title="Volver a generarlo con los datos actuales del expediente"
+                  <button type="button" onClick={() => void rehacer(d)} title={t("Volver a generarlo con los datos actuales del expediente")}
                     className="h-8 px-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-1">
-                    <RefreshCw size={13} /> Actualizar
-                  </button>
+                    <RefreshCw size={13} />{" "}{t("Actualizar")}</button>
                 )}
               </div>
             </div>
@@ -154,7 +154,7 @@ export default function DocumentosBaseExpediente({ expedienteId, bloqueado = fal
           <div className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <p className="text-base font-bold text-slate-900">{completar.nombre}</p>
-              <button type="button" onClick={() => setCompletar(null)} aria-label="Cerrar" className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center"><X size={16} /></button>
+              <button type="button" onClick={() => setCompletar(null)} aria-label={t("Cerrar")} className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center"><X size={16} /></button>
             </div>
             <RellenarPlantilla
               path={completar.plantilla}

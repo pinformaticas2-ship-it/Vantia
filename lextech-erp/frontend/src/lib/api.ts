@@ -1,3 +1,4 @@
+import { t } from './i18n';
 let _clientIp: string | null = null;
 let _ipPromise: Promise<string | null> | null = null;
 const DEVICE_ID_KEY = 'lextech_device_id';
@@ -224,8 +225,8 @@ export async function safeJson(response: Response, options?: { authRetried?: boo
   if (response.status === 401) {
     throw new Error(
       options?.authRetried
-        ? 'Sesion no valida o expirada. El backend no ha aceptado la autenticacion.'
-        : 'Sesion no valida o expirada; reintentando con un token renovado...',
+        ? t("Sesion no valida o expirada. El backend no ha aceptado la autenticacion.")
+        : t("Sesion no valida o expirada; reintentando con un token renovado..."),
     );
   }
 
@@ -235,12 +236,12 @@ export async function safeJson(response: Response, options?: { authRetried?: boo
     const simplifiedUrl = response.url || 'ruta desconocida';
     const statusMsg =
       response.status === 404
-        ? `Ruta no encontrada (404): ${simplifiedUrl}`
+        ? t("Ruta no encontrada (404): {url}", { url: simplifiedUrl })
         : response.status === 405
-          ? `Metodo no permitido (405): ${simplifiedUrl}`
+          ? t("Método no permitido (405): {url}", { url: simplifiedUrl })
         : response.status === 502 || response.status === 503 || response.status === 0
-          ? `Backend no disponible: ${simplifiedUrl}`
-          : `Error del servidor (${response.status}) en ${simplifiedUrl} [content-type=${contentType || 'desconocido'}]`;
+          ? t("Servidor no disponible: {url}", { url: simplifiedUrl })
+          : t("Error del servidor ({status}) en {url}", { status: response.status, url: simplifiedUrl }) + ` [content-type=${contentType || '?'}]`;
 
     throw new Error(statusMsg);
   }

@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { Modulo, resolveEffectivePermission } from '../config/permissions';
 import { TipoAviso, filtrarPorPreferencias } from './avisoPreferencias';
 import { enviarAvisoPorCorreo } from './avisoCorreo';
+import { idiomasDe, traducirAviso } from './idiomaAviso';
 
 // ── Notificaciones push del navegador ────────────────────────────────────────
 // Envío best-effort: si faltan las claves VAPID en el entorno (no configuradas
@@ -46,7 +47,7 @@ export interface PushPayload {
   tipo?: TipoAviso;
 }
 
-interface SubRow { id: string; endpoint: string; p256dh: string; auth: string; }
+interface SubRow { id: string; endpoint: string; p256dh: string; auth: string; user_id?: string; }
 
 /** Resultado de un envío: a quién se le mandó y a quién se le guardó por
  *  estar en su horario de silencio (los plazos lo reintentan más tarde). */
@@ -94,10 +95,18 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload, e
     if (!enabled || !ids.length) return resultado;
     resultado.enviados += ids.length;
     const { rows } = await pool.query<SubRow>(
-      `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::text[])`,
+      `SELECT id, endpoint, p256dh, auth, user_id FROM push_subscriptions WHERE user_id = ANY($1::text[])`,
       [ids],
     );
-    await deliver(rows, payload);
+    // Cada persona, en su idioma (12/11/2026): quien tiene la app en inglés
+    // recibe las partes fijas del aviso traducidas.
+    const idiomas = await idiomasDe(ids);
+    const enIngles = rows.filter((r) => r.user_id && idiomas.get(r.user_id) === 'en');
+    const enEspanol = rows.filter((r) => !enIngles.includes(r));
+    await Promise.all([
+      deliver(enEspanol, payload),
+      enIngles.length ? deliver(enIngles, { ...payload, title: traducirAviso(payload.title), body: traducirAviso(payload.body) }) : Promise.resolve(),
+    ]);
   } catch (e) { console.error('[push] sendPushToUsers:', e); }
   return resultado;
 }

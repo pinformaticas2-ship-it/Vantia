@@ -83,6 +83,7 @@ import RellenarPlantilla from "../components/RellenarPlantilla";
 import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
 import DocumentosBaseExpediente from "../components/DocumentosBaseExpediente";
 import DatosDocumentosExpediente from "../components/DatosDocumentosExpediente";
+import { t, t as tr } from '../lib/i18n';
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -94,12 +95,12 @@ const GCAL_SCOPES = "https://www.googleapis.com/auth/calendar";
 function requestGoogleCalendarToken(): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!GCAL_CLIENT_ID || GCAL_CLIENT_ID === "TU_CLIENT_ID.apps.googleusercontent.com") {
-      reject(new Error("Configura VITE_GOOGLE_CLIENT_ID en el archivo .env del frontend."));
+      reject(new Error(t("Configura VITE_GOOGLE_CLIENT_ID en el archivo .env del frontend.")));
       return;
     }
     const google = (window as any).google;
     if (!google?.accounts?.oauth2) {
-      reject(new Error("El script de Google aún no está cargado. Recarga la página."));
+      reject(new Error(t("El script de Google aún no está cargado. Recarga la página.")));
       return;
     }
     const client = google.accounts.oauth2.initTokenClient({
@@ -140,7 +141,7 @@ async function createGoogleMeetEvent(token: string, data: { title: string; descr
   const json = await safeJson(res);
   if (!res.ok) {
     if (res.status === 401) throw new Error("GCAL_AUTH_EXPIRED");
-    throw new Error(json?.error?.message || "No se pudo crear el evento en Google Calendar.");
+    throw new Error(json?.error?.message || t("No se pudo crear el evento en Google Calendar."));
   }
   return json;
 }
@@ -413,14 +414,13 @@ function CronologiaTab({
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar notificaciones.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden añadir ni modificar notificaciones.")}</div>
       )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">Línea de tiempo</h3>
-          <p className="text-xs text-slate-400">Cronología de notificaciones judiciales</p>
+          <h3 className="text-sm font-bold text-slate-800">{t("Línea de tiempo")}</h3>
+          <p className="text-xs text-slate-400">{t("Cronología de notificaciones judiciales")}</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Filtro estado */}
@@ -429,18 +429,17 @@ function CronologiaTab({
             onChange={(e) => setFilterEstado(e.target.value)}
             className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
           >
-            <option value="todas">Todas</option>
-            <option value="pendiente">Pendientes</option>
-            <option value="respondida">Respondidas</option>
-            <option value="archivada">Archivadas</option>
+            <option value="todas">{t("Todas")}</option>
+            <option value="pendiente">{t("Pendientes")}</option>
+            <option value="respondida">{t("Respondidas")}</option>
+            <option value="archivada">{t("Archivadas")}</option>
           </select>
           {!locked && (
             <button
               onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
               className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
             >
-              <Plus size={12} /> Nueva
-            </button>
+              <Plus size={12} />{" "}{t("Nueva")}</button>
           )}
         </div>
       </div>
@@ -449,11 +448,11 @@ function CronologiaTab({
       {showForm && (
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            {editId ? "Editar notificación" : "Nueva notificación"}
+            {editId ? t("Editar notificación") : t("Nueva notificación")}
           </h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipo *</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Tipo *")}</label>
               <select
                 value={form.tipo}
                 onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
@@ -465,28 +464,28 @@ function CronologiaTab({
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Estado")}</label>
               <select
                 value={form.estado}
                 onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
               >
-                <option value="pendiente">Pendiente</option>
-                <option value="respondida">Respondida</option>
-                <option value="archivada">Archivada</option>
+                <option value="pendiente">{t("Pendiente")}</option>
+                <option value="respondida">{t("Respondida")}</option>
+                <option value="archivada">{t("Archivada")}</option>
               </select>
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Título *</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Título *")}</label>
               <input
                 value={form.titulo}
                 onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
-                placeholder="Ej. Cédula de emplazamiento — Juicio Ordinario 673/25"
+                placeholder={t("Ej. Cédula de emplazamiento — Juicio Ordinario 673/25")}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha recepción *</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Fecha recepción *")}</label>
               <input
                 type="date"
                 value={form.fecha_recepcion}
@@ -495,7 +494,7 @@ function CronologiaTab({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha límite respuesta</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Fecha límite respuesta")}</label>
               <input
                 type="date"
                 value={form.fecha_limite}
@@ -504,12 +503,12 @@ function CronologiaTab({
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción / observaciones</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Descripción / observaciones")}</label>
               <textarea
                 value={form.descripcion}
                 onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
                 rows={2}
-                placeholder="Detalles adicionales de la notificación..."
+                placeholder={t("Detalles adicionales de la notificación...")}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none"
               />
             </div>
@@ -518,16 +517,14 @@ function CronologiaTab({
             <button
               onClick={() => { setShowForm(false); setEditId(null); }}
               className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              Cancelar
-            </button>
+            >{t("Cancelar")}</button>
             <button
               onClick={handleSave}
               disabled={saving || !form.titulo || !form.fecha_recepcion}
               className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
             >
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-              {editId ? "Guardar cambios" : "Añadir"}
+              {editId ? t("Guardar cambios") : t("Añadir")}
             </button>
           </div>
         </div>
@@ -541,14 +538,12 @@ function CronologiaTab({
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300">
           <Clock size={32} className="opacity-20" />
-          <p className="text-sm font-medium">Sin notificaciones registradas</p>
+          <p className="text-sm font-medium">{t("Sin notificaciones registradas")}</p>
           {!locked && (
             <button
               onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
               className="mt-1 text-xs font-bold text-red-500 hover:underline"
-            >
-              Añadir primera notificación
-            </button>
+            >{t("Añadir primera notificación")}</button>
           )}
         </div>
       ) : (
@@ -600,8 +595,8 @@ function CronologiaTab({
                           <div className={`inline-flex items-center gap-1.5 mt-2 rounded-full border px-2.5 py-1 text-xs font-bold ${isOverdue ? "bg-red-50 border-red-200 text-red-600" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
                             <Calendar size={11} />
                             {new Date(n.fecha_limite).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                            <span className="font-normal opacity-70">(Fecha límite de respuesta)</span>
-                            {isOverdue && <span className="ml-1 font-bold text-red-600">— VENCIDA</span>}
+                            <span className="font-normal opacity-70">{t("(Fecha límite de respuesta)")}</span>
+                            {isOverdue && <span className="ml-1 font-bold text-red-600">{t("— VENCIDA")}</span>}
                           </div>
                         )}
                       </div>
@@ -615,7 +610,7 @@ function CronologiaTab({
                           <button
                             onClick={() => startEdit(n)}
                             className="p-1 rounded text-slate-300 hover:text-slate-600 transition-colors"
-                            title="Editar"
+                            title={t("Editar")}
                           >
                             <Edit3 size={12} />
                           </button>
@@ -628,7 +623,7 @@ function CronologiaTab({
                             <button
                               onClick={() => setConfirmDelete(n.id)}
                               className="peligro p-1 rounded text-slate-300 hover:text-red-500 transition-colors"
-                              title="Eliminar"
+                              title={t("Eliminar")}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -903,35 +898,34 @@ function TabNotas({
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar notas.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden añadir ni modificar notas.")}</div>
       )}
       {!locked && (
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Nueva nota</p>
+        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Nueva nota")}</p>
         <textarea
           value={nueva}
           onChange={(e) => setNueva(e.target.value)}
-          placeholder="Escribe una nota sobre este expediente..."
+          placeholder={t("Escribe una nota sobre este expediente...")}
           rows={3}
           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
         />
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Categoría</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Categoría")}</label>
             <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400">
               {categorias.map((c) => <option key={c.valor} value={c.valor}>{c.nombre}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Prioridad</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Prioridad")}</label>
             <select value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400">
               {prioridades.map((p) => <option key={p.valor} value={p.valor}>{p.nombre}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Color</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{t("Color")}</label>
             <div className="flex gap-1">
               {colores.map((c) => (
                 <button
@@ -954,9 +948,7 @@ function TabNotas({
             disabled={saving || !nueva.trim()}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl active:scale-95 transition-all"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            Guardar nota
-          </button>
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}{t("Guardar nota")}</button>
         </div>
       </div>
       )}
@@ -964,7 +956,7 @@ function TabNotas({
       {visibleNotas.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-3 text-slate-400">
           <StickyNote size={36} className="opacity-20" />
-          <p className="text-sm font-medium">No hay notas todavía</p>
+          <p className="text-sm font-medium">{t("No hay notas todavía")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -997,7 +989,7 @@ function TabNotas({
                 )}
 
                 <p className="text-[10px] text-slate-400">
-                  {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : "Usuario"}{!n.isLegacy ? ` · ${new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
+                  {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : t("Usuario")}{!n.isLegacy ? ` · ${new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
                 </p>
 
                 {!n.isLegacy && !locked && (
@@ -1005,20 +997,15 @@ function TabNotas({
                   {editingId === n.id ? (
                     <>
                       <button type="button" disabled={legacySaving} onClick={() => saveEdit(n.id)} className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg transition-all disabled:opacity-50">
-                        <Check size={12} /> Guardar
-                      </button>
+                        <Check size={12} />{" "}{t("Guardar")}</button>
                       <button type="button" onClick={() => { setEditingId(null); setEditContent(""); }} className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all">
-                        <X size={12} /> Cancelar
-                      </button>
+                        <X size={12} />{" "}{t("Cancelar")}</button>
                     </>
                   ) : (
                     <>
-                      <button type="button" onClick={() => { setEditingId(n.id); setEditContent(n.content); }} className="px-3 py-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all">
-                        Editar
-                      </button>
+                      <button type="button" onClick={() => { setEditingId(n.id); setEditContent(n.content); }} className="px-3 py-1 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all">{t("Editar")}</button>
                       <button type="button" disabled={legacySaving} onClick={() => setConfirmDeleteId(n.id)} className="peligro inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-all disabled:opacity-50">
-                        <Trash2 size={12} /> Eliminar
-                      </button>
+                        <Trash2 size={12} />{" "}{t("Eliminar")}</button>
                     </>
                   )}
                 </div>
@@ -1033,16 +1020,12 @@ function TabNotas({
         <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
             <div className="space-y-1">
-              <h4 className="text-base font-bold text-slate-900">Eliminar nota</h4>
-              <p className="text-sm text-slate-500">Tendrás 15 segundos para deshacer.</p>
+              <h4 className="text-base font-bold text-slate-900">{t("Eliminar nota")}</h4>
+              <p className="text-sm text-slate-500">{t("Tendrás 15 segundos para deshacer.")}</p>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                Cancelar
-              </button>
-              <button type="button" onClick={confirmDeleteNota} className="peligro px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
-                Eliminar
-              </button>
+              <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
+              <button type="button" onClick={confirmDeleteNota} className="peligro px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -1147,7 +1130,7 @@ function TabTareas({
       setGcalToken(token);
       try { sessionStorage.setItem(GCAL_TOKEN_KEY, token); } catch {}
     } catch (e: any) {
-      setGcalError(e.message || "No se pudo conectar con Google Calendar.");
+      setGcalError(e.message || t("No se pudo conectar con Google Calendar."));
     }
   };
 
@@ -1202,10 +1185,10 @@ function TabTareas({
       if (res.ok) {
         setTareas((data.data || []).filter((t: any) => t.expediente_id === expedienteId));
       } else {
-        setFetchError(data.error || "Error al cargar tareas");
+        setFetchError(data.error || t("Error al cargar tareas"));
       }
     } catch (e: any) {
-      setFetchError(e.message || "Error de conexión con el servidor");
+      setFetchError(e.message || t("Error de conexión con el servidor"));
     } finally {
       setLoading(false);
     }
@@ -1239,7 +1222,7 @@ function TabTareas({
         if (withMeet && gcalToken && form.plazo) {
           const linkedAgendaId = createdTask.agenda_event_id;
           if (!linkedAgendaId) {
-            setGcalError("La tarea se guardó, pero no se pudo enlazar con un evento de agenda para añadirle la videollamada.");
+            setGcalError(t("La tarea se guardó, pero no se pudo enlazar con un evento de agenda para añadirle la videollamada."));
           } else {
             try {
               // Google Calendar exige RFC3339 completo (con zona horaria) en
@@ -1274,9 +1257,9 @@ function TabTareas({
               if (meetErr.message === "GCAL_AUTH_EXPIRED") {
                 setGcalToken(null);
                 try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
-                setGcalError("La tarea se guardó, pero tu sesión de Google había caducado y no se pudo crear la videollamada. Conecta de nuevo e inténtalo otra vez.");
+                setGcalError(t("La tarea se guardó, pero tu sesión de Google había caducado y no se pudo crear la videollamada. Conecta de nuevo e inténtalo otra vez."));
               } else {
-                setGcalError(`La tarea se guardó, pero no se pudo crear la videollamada: ${meetErr.message || "error desconocido"}.`);
+                setGcalError(t("La tarea se guardó, pero no se pudo crear la videollamada: {v}.", { v: meetErr.message || "error desconocido" }));
               }
             }
           }
@@ -1294,7 +1277,7 @@ function TabTareas({
         setShowForm(false);
         window.dispatchEvent(new CustomEvent("historial-changed"));
       } else {
-        setFetchError(data.error || "No se pudo crear la tarea");
+        setFetchError(data.error || t("No se pudo crear la tarea"));
       }
     } finally {
       setSaving(false);
@@ -1401,12 +1384,10 @@ function TabTareas({
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center gap-3 text-center">
         <AlertCircle size={28} className="text-red-400" />
         <div>
-          <p className="text-sm font-semibold text-red-700">No se pudieron cargar las tareas</p>
+          <p className="text-sm font-semibold text-red-700">{t("No se pudieron cargar las tareas")}</p>
           <p className="text-xs text-red-500 mt-1">{fetchError}</p>
         </div>
-        <button onClick={fetchTareas} className="mt-1 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
-          Reintentar
-        </button>
+        <button onClick={fetchTareas} className="mt-1 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">{t("Reintentar")}</button>
       </div>
     );
   }
@@ -1415,8 +1396,7 @@ function TabTareas({
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar tareas.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden añadir ni modificar tareas.")}</div>
       )}
       {/* Persiste aunque el formulario de creación ya se haya cerrado --
           si solo viviera dentro del formulario, se perdía de vista en
@@ -1433,7 +1413,7 @@ function TabTareas({
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1 text-xs">
             {(["todas","pendiente","urgente","completada"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-colors ${filter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                {f === "todas" ? `Todas (${tareas.length})` : f === "pendiente" ? `Pendientes (${tareas.filter((x) => x.estado === "pendiente").length})` : f === "urgente" ? `Urgentes (${tareas.filter((x) => x.estado === "urgente").length})` : `Completadas (${tareas.filter((x) => x.estado === "completada").length})`}
+                {f === "todas" ? t("Todas ({length})", { length: tareas.length }) : f === "pendiente" ? t("Pendientes ({length})", { length: tareas.filter((x) => x.estado === "pendiente").length }) : f === "urgente" ? t("Urgentes ({length})", { length: tareas.filter((x) => x.estado === "urgente").length }) : t("Completadas ({length})", { length: tareas.filter((x) => x.estado === "completada").length })}
               </button>
             ))}
           </div>
@@ -1443,25 +1423,22 @@ function TabTareas({
               disabled={!clienteId}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm active:scale-95 transition-all disabled:opacity-50"
             >
-              <Plus size={15} /> Nueva tarea
-            </button>
+              <Plus size={15} />{" "}{t("Nueva tarea")}</button>
           )}
         </div>
 
         {!clienteId && !locked && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Para crear tareas desde el expediente, primero debe haber un cliente vinculado.
-          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("Para crear tareas desde el expediente, primero debe haber un cliente vinculado.")}</div>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[160px]">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar tarea..." className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-red-400 bg-white" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Buscar tarea...")} className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-red-400 bg-white" />
             {search && <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={11} /></button>}
           </div>
           <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 bg-white text-slate-600">
-            <option value="">Todos los tipos</option>
+            <option value="">{t("Todos los tipos")}</option>
             {Object.entries(TIPO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
           <div className="flex gap-1">
@@ -1474,42 +1451,41 @@ function TabTareas({
             ))}
           </div>
           <button onClick={() => setFilterVencidas((v) => !v)} className={`peligro flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${filterVencidas ? "bg-red-100 text-red-700 border border-red-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
-            <AlertTriangle size={11} /> Vencidas
-          </button>
+            <AlertTriangle size={11} />{" "}{t("Vencidas")}</button>
         </div>
       </div>
 
       {showForm && (
         <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4 shadow-sm">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nueva tarea / plazo</p>
-          <input value={form.titulo} onChange={(e) => setForm((p) => ({ ...p, titulo: e.target.value }))} placeholder="Título de la tarea *" autoFocus className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
-          <textarea value={form.descripcion} onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))} placeholder="Descripción / instrucciones (opcional)" rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Nueva tarea / plazo")}</p>
+          <input value={form.titulo} onChange={(e) => setForm((p) => ({ ...p, titulo: e.target.value }))} placeholder={t("Título de la tarea *")} autoFocus className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
+          <textarea value={form.descripcion} onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))} placeholder={t("Descripción / instrucciones (opcional)")} rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de tarea</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo de tarea")}</label>
               <select value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
                 {Object.entries(TIPO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha límite</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha límite")}</label>
               <input type="date" value={form.plazo} onChange={(e) => setForm((p) => ({ ...p, plazo: e.target.value }))} min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
               <PlazoCalculator onCalculate={(d) => setForm((p) => ({ ...p, plazo: d }))} />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</label>
               <select value={form.estado} onChange={(e) => setForm((p) => ({ ...p, estado: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
-                <option value="pendiente">Pendiente</option>
-                <option value="urgente">Urgente</option>
-                <option value="completada">Completada</option>
+                <option value="pendiente">{t("Pendiente")}</option>
+                <option value="urgente">{t("Urgente")}</option>
+                <option value="completada">{t("Completada")}</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridad</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Prioridad")}</label>
               <select value={form.prioridad} onChange={(e) => setForm((p) => ({ ...p, prioridad: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
+                <option value="alta">{t("Alta@@prioridad")}</option>
+                <option value="media">{t("Media@@prioridad")}</option>
+                <option value="baja">{t("Baja@@prioridad")}</option>
               </select>
             </div>
           </div>
@@ -1519,26 +1495,24 @@ function TabTareas({
               {gcalToken ? (
                 <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
                   <input type="checkbox" checked={withMeet} onChange={(e) => setWithMeet(e.target.checked)} className="rounded" disabled={!form.plazo} />
-                  <Video size={12} className="text-emerald-600" /> Añadir videollamada (Google Meet)
-                </label>
+                  <Video size={12} className="text-emerald-600" />{" "}{t("Añadir videollamada (Google Meet)")}</label>
               ) : (
                 <button type="button" onClick={connectGcal} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors">
-                  <Video size={12} /> Conectar Google Meet
-                </button>
+                  <Video size={12} />{" "}{t("Conectar Google Meet")}</button>
               )}
               {gcalToken && !form.plazo && (
-                <span className="text-[11px] text-slate-400">Indica la fecha límite para poder añadir la videollamada ahí.</span>
+                <span className="text-[11px] text-slate-400">{t("Indica la fecha límite para poder añadir la videollamada ahí.")}</span>
               )}
             </div>
             {withMeet && form.plazo && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hora de la videollamada</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Hora de la videollamada")}</label>
                   <input type="time" value={meetHora} onChange={(e) => setMeetHora(e.target.value)} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Invitar por correo (opcional)</label>
-                  <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Invitar por correo (opcional)")}</label>
+                  <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder={t("correo@ejemplo.com")} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
                 </div>
               </div>
             )}
@@ -1546,43 +1520,42 @@ function TabTareas({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Expediente")}</label>
               <input value={form.expediente} onChange={(e) => setForm((p) => ({ ...p, expediente: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Juzgado / Tribunal</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Juzgado / Tribunal")}</label>
               <input value={form.juzgado} onChange={(e) => setForm((p) => ({ ...p, juzgado: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nº Procedimiento</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Nº Procedimiento")}</label>
               <input value={form.num_proc} onChange={(e) => setForm((p) => ({ ...p, num_proc: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de aviso</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha de aviso")}</label>
               <input type="date" value={form.fecha_aviso} onChange={(e) => setForm((p) => ({ ...p, fecha_aviso: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Importe (€)</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Importe (€)")}</label>
               <input type="number" step="0.01" min="0" value={form.importe} onChange={(e) => setForm((p) => ({ ...p, importe: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Etapa</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Etapa")}</label>
               <EtapaSelect value={form.etapa} onChange={(v) => setForm((p) => ({ ...p, etapa: v }))} getToken={getToken} />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notas internas</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Notas internas")}</label>
               <textarea value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))} rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 mt-0.5" />
             </div>
           </div>
           <div className="flex gap-2 justify-end pt-1">
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">Cancelar</button>
+            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">{t("Cancelar")}</button>
             <button type="button" onClick={handleCreate} disabled={saving || !form.titulo.trim() || !clienteId} className="flex items-center gap-2 px-5 py-1.5 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95 transition-all">
-              {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Guardar tarea
-            </button>
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}{" "}{t("Guardar tarea")}</button>
           </div>
         </div>
       )}
@@ -1590,7 +1563,7 @@ function TabTareas({
       {visible.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-14 flex flex-col items-center gap-3 text-slate-400">
           <CheckCircle2 size={36} className="opacity-20" />
-          <p className="font-medium text-sm">{(search || filterTipo || filterPrio || filterVencidas) ? "No hay tareas con esos filtros" : filter !== "todas" ? `Sin tareas en estado "${filter}"` : "Sin tareas"}</p>
+          <p className="font-medium text-sm">{(search || filterTipo || filterPrio || filterVencidas) ? t("No hay tareas con esos filtros") : filter !== "todas" ? t("Sin tareas en estado \"{filter}\"", { filter: filter }) : t("Sin tareas")}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -1602,74 +1575,74 @@ function TabTareas({
 
               {editId === t.id ? (
                 <div className="flex-1 space-y-3">
-                  <input value={editForm.titulo} onChange={(e) => setEditForm((p) => ({ ...p, titulo: e.target.value }))} placeholder="Título *" className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-red-400" />
-                  <textarea value={editForm.descripcion} onChange={(e) => setEditForm((p) => ({ ...p, descripcion: e.target.value }))} rows={2} placeholder="Descripción" className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-400" />
+                  <input value={editForm.titulo} onChange={(e) => setEditForm((p) => ({ ...p, titulo: e.target.value }))} placeholder={tr("Título *")} className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-red-400" />
+                  <textarea value={editForm.descripcion} onChange={(e) => setEditForm((p) => ({ ...p, descripcion: e.target.value }))} rows={2} placeholder={tr("Descripción")} className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-400" />
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Tipo</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Tipo")}</p>
                       <select value={editForm.tipo} onChange={(e) => setEditForm((p) => ({ ...p, tipo: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
                         {Object.entries(TIPO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Fecha límite</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Fecha límite")}</p>
                       <input type="date" value={editForm.plazo} onChange={(e) => setEditForm((p) => ({ ...p, plazo: e.target.value }))} min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Estado</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Estado")}</p>
                       <select value={editForm.estado} onChange={(e) => setEditForm((p) => ({ ...p, estado: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
-                        <option value="pendiente">Pendiente</option>
-                        <option value="urgente">Urgente</option>
-                        <option value="completada">Completada</option>
+                        <option value="pendiente">{tr("Pendiente")}</option>
+                        <option value="urgente">{tr("Urgente")}</option>
+                        <option value="completada">{tr("Completada")}</option>
                       </select>
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Prioridad</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Prioridad")}</p>
                       <select value={editForm.prioridad} onChange={(e) => setEditForm((p) => ({ ...p, prioridad: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
-                        <option value="alta">Alta</option>
-                        <option value="media">Media</option>
-                        <option value="baja">Baja</option>
+                        <option value="alta">{tr("Alta@@prioridad")}</option>
+                        <option value="media">{tr("Media@@prioridad")}</option>
+                        <option value="baja">{tr("Baja@@prioridad")}</option>
                       </select>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Expediente</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Expediente")}</p>
                       <input value={editForm.expediente} onChange={(e) => setEditForm((p) => ({ ...p, expediente: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Juzgado / Tribunal</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Juzgado / Tribunal")}</p>
                       <input value={editForm.juzgado} onChange={(e) => setEditForm((p) => ({ ...p, juzgado: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Nº Procedimiento</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Nº Procedimiento")}</p>
                       <input value={editForm.num_proc} onChange={(e) => setEditForm((p) => ({ ...p, num_proc: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Fecha de aviso</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Fecha de aviso")}</p>
                       <input type="date" value={editForm.fecha_aviso} onChange={(e) => setEditForm((p) => ({ ...p, fecha_aviso: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Importe (€)</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Importe (€)")}</p>
                       <input type="number" step="0.01" min="0" value={editForm.importe} onChange={(e) => setEditForm((p) => ({ ...p, importe: e.target.value }))} className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Etapa</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Etapa")}</p>
                       <EtapaSelect value={editForm.etapa} onChange={(v) => setEditForm((p) => ({ ...p, etapa: v }))} getToken={getToken} />
                     </div>
                     <div>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Notas internas</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">{tr("Notas internas")}</p>
                       <textarea value={editForm.notas} onChange={(e) => setEditForm((p) => ({ ...p, notas: e.target.value }))} rows={2} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-red-400" />
                     </div>
                   </div>
                   <div className="flex gap-2 justify-end">
-                    <button type="button" onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
+                    <button type="button" onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">{tr("Cancelar")}</button>
                     <button type="button" onClick={saveEdit} disabled={saving} className="px-4 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg disabled:opacity-50">
-                      {saving ? "Guardando..." : "Guardar"}
+                      {saving ? tr("Guardando...") : tr("Guardar")}
                     </button>
                   </div>
                 </div>
@@ -1678,42 +1651,39 @@ function TabTareas({
                   <p className={`text-sm font-semibold mb-1.5 ${t.estado === "completada" ? "line-through text-slate-400" : "text-slate-800"}`}>{t.titulo}</p>
                   {t.descripcion && <p className="text-xs text-slate-500 mb-2 line-clamp-2 leading-relaxed">{t.descripcion}</p>}
                   <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${TIPO_CONFIG[t.tipo]?.color || "bg-slate-100 text-slate-500 border-slate-200"}`}>{TIPO_CONFIG[t.tipo]?.label || "Otro"}</span>
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${TIPO_CONFIG[t.tipo]?.color || "bg-slate-100 text-slate-500 border-slate-200"}`}>{TIPO_CONFIG[t.tipo]?.label || tr("Otro")}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoStyle[t.estado]}`}>{estadoLabel[t.estado]}</span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${t.prioridad === "alta" ? "bg-red-50 text-red-600 border-red-200" : t.prioridad === "media" ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-400 border-slate-200"}`}>↑ {t.prioridad}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
                     <span className={`flex items-center gap-1 font-medium ${isVencida(t) ? "text-red-600" : t.plazo ? "text-slate-400" : "text-slate-300"}`}>
                       <Calendar size={10} />
-                      {t.plazo ? <>{fmtPlazo(t.plazo)}{isVencida(t) && <span className="font-bold text-red-600 ml-1">VENCIDA</span>}</> : "Sin fecha límite"}
+                      {t.plazo ? <>{fmtPlazo(t.plazo)}{isVencida(t) && <span className="font-bold text-red-600 ml-1">{tr("VENCIDA")}</span>}</> : tr("Sin fecha límite")}
                     </span>
-                    <span className="flex items-center gap-1 text-slate-300"><Clock size={10} /> Creada {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    <span className="flex items-center gap-1 text-slate-300"><Clock size={10} />{" "}{tr("Creada")}{" "}{new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}</span>
                     {t.expediente && <span className="flex items-center gap-1 text-slate-400"><Briefcase size={10} /> {t.expediente}</span>}
                     {t.num_proc && <span className="flex items-center gap-1 text-slate-400"><Hash size={10} /> {t.num_proc}</span>}
                     {t.juzgado && <span className="flex items-center gap-1 text-slate-400"><Gavel size={10} /> {t.juzgado}</span>}
-                    {t.fecha_aviso && <span className={`flex items-center gap-1 font-medium ${new Date(t.fecha_aviso) < new Date() && t.estado !== "completada" ? "text-amber-600" : "text-slate-400"}`}>Aviso: {fmtPlazo(t.fecha_aviso)}</span>}
+                    {t.fecha_aviso && <span className={`flex items-center gap-1 font-medium ${new Date(t.fecha_aviso) < new Date() && t.estado !== "completada" ? "text-amber-600" : "text-slate-400"}`}>{tr("Aviso:")}{" "}{fmtPlazo(t.fecha_aviso)}</span>}
                     {t.importe != null && Number(t.importe) > 0 && <span className="flex items-center gap-1 text-emerald-600 font-semibold">{Number(t.importe).toLocaleString("es-ES", { minimumFractionDigits: 2 })} €</span>}
                     {t.etapa && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">{t.etapa}</span>}
-                    {t.created_by && <span className="flex items-center gap-1 text-slate-400"><User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? "Usuario" : t.created_by}</span>}
+                    {t.created_by && <span className="flex items-center gap-1 text-slate-400"><User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? tr("Usuario") : t.created_by}</span>}
                     {t.meet_url && (
                       <a href={t.meet_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
-                        <Video size={10} /> Unirse a videollamada
-                      </a>
+                        <Video size={10} />{" "}{tr("Unirse a videollamada")}</a>
                     )}
                   </div>
-                  {t.notas && <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed"><span className="font-bold">Nota: </span>{t.notas}</div>}
+                  {t.notas && <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed"><span className="font-bold">{tr("Nota:")}{" "}</span>{t.notas}</div>}
                 </div>
               )}
 
               {editId !== t.id && (
                 <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
                   <button type="button" onClick={() => startEdit(t)} className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-                    <Edit3 size={12} /> Editar
-                  </button>
+                    <Edit3 size={12} />{" "}{tr("Editar")}</button>
                   <button type="button" onClick={() => setConfirmDeleteTareaId(t.id)} className="peligro flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
-                    <Trash2 size={12} /> Borrar
-                  </button>
+                    <Trash2 size={12} />{" "}{tr("Borrar")}</button>
                 </div>
               )}
             </div>
@@ -1730,18 +1700,14 @@ function TabTareas({
                   <Trash2 size={18} className="peligro text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Eliminar tarea</h3>
-                  <p className="text-sm text-slate-500">Tendrás 15 segundos para deshacer.</p>
+                  <h3 className="font-bold text-slate-900">{t("Eliminar tarea")}</h3>
+                  <p className="text-sm text-slate-500">{t("Tendrás 15 segundos para deshacer.")}</p>
                 </div>
               </div>
             </div>
             <div className="flex gap-2 px-6 pb-6">
-              <button type="button" onClick={() => setConfirmDeleteTareaId(null)} className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                Cancelar
-              </button>
-              <button type="button" onClick={confirmDeleteTarea} className="peligro flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
-                Eliminar
-              </button>
+              <button type="button" onClick={() => setConfirmDeleteTareaId(null)} className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">{t("Cancelar")}</button>
+              <button type="button" onClick={confirmDeleteTarea} className="peligro flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -1770,8 +1736,7 @@ function TabAdjuntosExpediente({
     <div className="space-y-3">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — solo lectura. No se pueden subir ni eliminar adjuntos.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — solo lectura. No se pueden subir ni eliminar adjuntos.")}</div>
       )}
       <FilesTabPanel entityId={expedienteId} entityType="expediente" alwaysShowPreview locked={locked} />
     </div>
@@ -1883,21 +1848,17 @@ function MailDropdownBtn({
         <div className="absolute right-0 top-full z-[9999] mt-1.5 min-w-[210px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40">
           <button type="button" onClick={() => send()}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
-            <Mail size={12} className="shrink-0 text-slate-400" /> Enviar correo
-          </button>
+            <Mail size={12} className="shrink-0 text-slate-400" />{" "}{t("Enviar correo")}</button>
           <div className="my-1 h-px bg-slate-100" />
           <button type="button" onClick={() => send({ open_templates: true })}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
-            <Sparkles size={12} className="shrink-0 text-slate-400" /> Con Plantilla
-          </button>
+            <Sparkles size={12} className="shrink-0 text-slate-400" />{" "}{t("Con Plantilla")}</button>
           <button type="button" onClick={() => send({ open_attachments: true })}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
-            <Paperclip size={12} className="shrink-0 text-slate-400" /> Con Adjuntos
-          </button>
+            <Paperclip size={12} className="shrink-0 text-slate-400" />{" "}{t("Con Adjuntos")}</button>
           <button type="button" onClick={() => send({ open_templates: true, open_attachments: true })}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
-            <Mail size={12} className="shrink-0 text-slate-400" /> Con Plantilla y Adjuntos
-          </button>
+            <Mail size={12} className="shrink-0 text-slate-400" />{" "}{t("Con Plantilla y Adjuntos")}</button>
         </div>
       )}
     </div>
@@ -2035,7 +1996,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
           openUrlCache.current.set(file.id, absoluteUrl);
         });
       }
-      else if (!silent) setError(data?.error || "No se pudieron cargar los adjuntos.");
+      else if (!silent) setError(data?.error || t("No se pudieron cargar los adjuntos."));
     } finally { if (!silent) setLoading(false); }
   }, [getToken, taskId]);
 
@@ -2050,7 +2011,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       Array.from(fileList).forEach((file) => fd.append("files", file));
       const res = await fetch(`/api/tasks/${taskId}/files`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
       const data = await safeJson(res);
-      if (!res.ok) { setError(data?.error || "No se pudieron subir los adjuntos."); return; }
+      if (!res.ok) { setError(data?.error || t("No se pudieron subir los adjuntos.")); return; }
       if (metadata && Array.isArray(data?.data)) {
         await Promise.all(data.data.map((item: any) =>
           fetch(`/api/tasks/${taskId}/files/${item.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(metadata) })
@@ -2120,7 +2081,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
     });
     const data = await safeJson(res);
     if (!res.ok || !data?.token) {
-      throw new Error(data?.error || "No se pudo generar el acceso temporal.");
+      throw new Error(data?.error || t("No se pudo generar el acceso temporal."));
     }
 
     const resolved = resolveApiUrl(`/api/tasks/files/dl/${data.token}`);
@@ -2136,7 +2097,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        setError(err?.error || "No se pudo abrir el PDF en el navegador.");
+        setError(err?.error || t("No se pudo abrir el PDF en el navegador."));
         return;
       }
       const blob = await res.blob();
@@ -2145,7 +2106,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_) {
       setOpeningMessage(null);
-      setError("No se pudo abrir el PDF en el navegador.");
+      setError(t("No se pudo abrir el PDF en el navegador."));
     }
   }, [getToken, taskId, showOpeningMessage]);
 
@@ -2162,7 +2123,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
       setOpeningMessage(null);
-      setError(error?.message || "No se pudo abrir el PDF en PDF Studio.");
+      setError(error?.message || t("No se pudo abrir el PDF en PDF Studio."));
     }
   }, [getTempOpenUrl, showOpeningMessage]);
 
@@ -2188,7 +2149,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
             ? `/api/tasks/${taskId}/files/${file.id}/download`
             : null;
       if (!previewEndpoint) {
-        setError("Este tipo de archivo no tiene vista previa en la actuación. Usa el botón de descarga si lo necesitas.");
+        setError(t("Este tipo de archivo no tiene vista previa en la actuación. Usa el botón de descarga si lo necesitas."));
         return;
       }
       let res = await fetch(previewEndpoint, { headers: { Authorization: `Bearer ${token}` } });
@@ -2196,7 +2157,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
         res = await fetch(`/api/tasks/${taskId}/files/${file.id}/preview-html`, { headers: { Authorization: `Bearer ${token}` } });
       }
       if (!res.ok) {
-        setError("No se pudo generar la vista previa de este adjunto.");
+        setError(t("No se pudo generar la vista previa de este adjunto."));
         return;
       }
       const blob = await res.blob();
@@ -2304,7 +2265,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
     if (res.ok) {
       setFiles((prev) => prev.map((item) => item.id === editingFile.id ? data.data : item));
       setEditingFile(null);
-    } else { setError(data?.error || "No se pudo actualizar el adjunto."); }
+    } else { setError(data?.error || t("No se pudo actualizar el adjunto.")); }
   };
 
   const handleDelete = (fileId: string) => {
@@ -2328,7 +2289,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       const res = await fetch("/api/files/templates", { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) setDocPlantFolders(data.data || []);
-      else setError(data?.error || "No se pudieron cargar las plantillas.");
+      else setError(data?.error || t("No se pudieron cargar las plantillas."));
     } finally { setDocPlantLoading(false); }
   }, [getToken]);
 
@@ -2401,13 +2362,13 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-slate-400">{uploading ? "Subiendo..." : `${files.length} archivo${files.length !== 1 ? "s" : ""}`}</span>
+          <span className="text-xs text-slate-400">{uploading ? t("Subiendo...") : t("{length} archivo{v}", { length: files.length, v: files.length !== 1 ? "s" : "" })}</span>
           <div className="relative min-w-[250px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar adjuntos..."
+              placeholder={t("Buscar adjuntos...")}
               className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-red-400"
             />
           </div>
@@ -2425,21 +2386,17 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
             <>
               <button type="button" onClick={() => folderInputRef.current?.click()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
-                <FolderOpen size={12} /> Importar carpeta
-              </button>
+                <FolderOpen size={12} />{" "}{t("Importar carpeta")}</button>
               <button type="button" onClick={() => fileInputRef.current?.click()}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
-                <Upload size={12} /> Subir archivo
-              </button>
+                <Upload size={12} />{" "}{t("Subir archivo")}</button>
               <button type="button" onClick={createBlankDocument} disabled={uploading}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors disabled:opacity-50">
-                <FilePlus2 size={12} /> Nuevo documento
-              </button>
+                <FilePlus2 size={12} />{" "}{t("Nuevo documento")}</button>
               <button type="button"
                 onClick={() => { setShowTemplates(true); if (!docPlantFolders.length) void loadTemplates(); }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
-                <Sparkles size={12} /> Usar plantilla
-              </button>
+                <Sparkles size={12} />{" "}{t("Usar plantilla")}</button>
             </>
           )}
         </div>
@@ -2460,24 +2417,24 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
         >
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Spinner size="sm" muted label="Cargando adjuntos..." />
+              <Spinner size="sm" muted label={t("Cargando adjuntos...")} />
             </div>
           ) : files.length === 0 ? (
             <div className={`m-4 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors ${isDragOver ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50/60"}`}>
               <Upload size={22} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-semibold text-slate-700">Arrastra archivos aqui</p>
-              <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imagenes — max. 50 MB</p>
-              {!locked && <p className="mt-1 text-[10px] text-slate-300 flex items-center justify-center gap-1"><ClipboardPaste size={10} /> Ctrl+V para pegar</p>}
+              <p className="text-sm font-semibold text-slate-700">{t("Arrastra archivos aqui")}</p>
+              <p className="mt-1 text-xs text-slate-400">{t("PDF, Word, Excel, imagenes — max. 50 MB")}</p>
+              {!locked && <p className="mt-1 text-[10px] text-slate-300 flex items-center justify-center gap-1"><ClipboardPaste size={10} />{" "}{t("Ctrl+V para pegar")}</p>}
             </div>
           ) : (
             <table className={`w-full text-left transition-colors ${isDragOver ? "ring-2 ring-inset ring-red-300" : ""}`}>
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documento</th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tam.</th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Archivo")}</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Documento")}</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Tipo")}</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Tam.")}</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Fecha")}</th>
                   <th className="px-4 py-2.5" />
                 </tr>
               </thead>
@@ -2527,7 +2484,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold ${file.attachment_type === "Sin clasificar" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-600"}`}>
-                          {file.attachment_type || "Sin clasificar"}
+                          {file.attachment_type || t("Sin clasificar")}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-xs text-slate-400">{fmtSizeAct(Number(file.size_bytes))}</td>
@@ -2535,27 +2492,27 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           {(canPrev || canWord || canExcel) && (
-                              <button type="button" onClick={() => openPreview(file)} title="Vista previa"
+                              <button type="button" onClick={() => openPreview(file)} title={t("Vista previa")}
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                               <Eye size={13} />
                             </button>
                           )}
-                          <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title="Descargar"
+                          <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title={t("Descargar")}
                             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                             <Download size={13} />
                           </button>
-                          <button type="button" onClick={() => copyActFileToClipboard(file)} title="Copiar al portapapeles"
+                          <button type="button" onClick={() => copyActFileToClipboard(file)} title={t("Copiar al portapapeles")}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                             <Copy size={13} />
                           </button>
                           {!locked && (<>
                           <button type="button"
                             onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }}
-                            title="Editar"
+                            title={t("Editar")}
                             className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
                             <Edit3 size={13} />
                           </button>
-                          <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title="Eliminar"
+                          <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title={t("Eliminar")}
                             className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={13} />
                           </button>
@@ -2581,11 +2538,11 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <p className="text-xs font-semibold text-slate-700 truncate" title={preview.name}>{preview.name}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)} title={isPreviewSourcePdf(preview.fileId) ? "Opciones de apertura" : "Abrir"}
+                <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)} title={isPreviewSourcePdf(preview.fileId) ? t("Opciones de apertura") : t("Abrir")}
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
                   <span className="flex items-center gap-1"><ExternalLink size={13} />{isPreviewSourcePdf(preview.fileId) && <ChevronDown size={11} />}</span>
                 </button>
-                <button type="button" onClick={() => setPreview(null)} title="Cerrar"
+                <button type="button" onClick={() => setPreview(null)} title={t("Cerrar")}
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
                   <X size={13} />
                 </button>
@@ -2604,11 +2561,10 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <div className="flex flex-col items-center justify-center h-full text-center px-6">
                   <span className="text-5xl mb-4">📎</span>
                   <p className="text-sm font-semibold text-slate-700">{preview.name}</p>
-                  <p className="mt-1 text-xs text-slate-400">Vista previa no disponible para este tipo de archivo</p>
+                  <p className="mt-1 text-xs text-slate-400">{t("Vista previa no disponible para este tipo de archivo")}</p>
                   <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)}
                     className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">
-                    <ExternalLink size={12} /> Abrir
-                  </button>
+                    <ExternalLink size={12} />{" "}{t("Abrir")}</button>
                 </div>
               )}
             </div>
@@ -2624,21 +2580,21 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
         onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFolderImport(e.dataTransfer.files); }}
       >
         <Upload size={24} className="mx-auto mb-3 text-slate-300" />
-        <p className="text-sm font-semibold text-slate-700">Arrastra archivos o carpetas aquí</p>
-        <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imágenes. Máx. 50 MB por archivo.</p>
+        <p className="text-sm font-semibold text-slate-700">{t("Arrastra archivos o carpetas aquí")}</p>
+        <p className="mt-1 text-xs text-slate-400">{t("PDF, Word, Excel, imágenes. Máx. 50 MB por archivo.")}</p>
       </div>
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Spinner size="sm" muted label="Cargando adjuntos..." />
+            <Spinner size="sm" muted label={t("Cargando adjuntos...")} />
           </div>
         ) : files.length === 0 ? (
           <div className="px-6 py-14 text-center">
             <Paperclip size={26} className="mx-auto mb-3 text-slate-300" />
-            <p className="text-sm font-semibold text-slate-700">No hay adjuntos en esta actuación</p>
-            <p className="mt-1 text-xs text-slate-400">Sube archivos, importa una carpeta o usa una plantilla para completar la actuación.</p>
+            <p className="text-sm font-semibold text-slate-700">{t("No hay adjuntos en esta actuación")}</p>
+            <p className="mt-1 text-xs text-slate-400">{t("Sube archivos, importa una carpeta o usa una plantilla para completar la actuación.")}</p>
           </div>
         ) : (
           <>
@@ -2646,12 +2602,12 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
               <table className="w-full min-w-[960px] text-left">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documento</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tam.</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
-                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Acciones</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Archivo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Documento")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Tipo")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Tam.")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Fecha")}</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Acciones")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -2693,7 +2649,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${file.attachment_type === "Sin clasificar" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-600"}`}>
-                            {file.attachment_type || "Sin clasificar"}
+                            {file.attachment_type || t("Sin clasificar")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500">{fmtSizeAct(Number(file.size_bytes))}</td>
@@ -2701,17 +2657,17 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
                             {(canPrev || canWord || canExcel) && (
-                              <button type="button" onClick={() => openPreview(file)} title="Vista previa" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                              <button type="button" onClick={() => openPreview(file)} title={t("Vista previa")} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                                 <Eye size={14} />
                               </button>
                             )}
-                            <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title="Descargar" className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                            <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title={t("Descargar")} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
                               <Download size={14} />
                             </button>
-                            <button type="button" onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }} title="Editar" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                            <button type="button" onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }} title={t("Editar")} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
                               <Edit3 size={14} />
                             </button>
-                            <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title="Eliminar" className="peligro p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                            <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title={t("Eliminar")} className="peligro p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -2727,16 +2683,15 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
               <div className="border-t border-slate-100 bg-slate-50/60">
                 <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vista previa</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Vista previa")}</p>
                     <p className="mt-1 text-sm font-semibold text-slate-800 truncate" title={preview.name}>{preview.name}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
-                      <ExternalLink size={12} /> Abrir {isPreviewSourcePdf(preview.fileId) && <ChevronDown size={11} />}
+                      <ExternalLink size={12} />{" "}{t("Abrir")}{" "}{isPreviewSourcePdf(preview.fileId) && <ChevronDown size={11} />}
                     </button>
                     <button type="button" onClick={() => setPreview(null)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
-                      <X size={12} /> Cerrar
-                    </button>
+                      <X size={12} />{" "}{t("Cerrar")}</button>
                   </div>
                 </div>
                 <div className="h-[560px] overflow-hidden bg-slate-100">
@@ -2752,7 +2707,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                     <div className="flex flex-col items-center justify-center h-full text-center px-6">
                       <span className="text-5xl mb-4">📎</span>
                       <p className="text-sm font-semibold text-slate-700">{preview.name}</p>
-                      <p className="mt-1 text-xs text-slate-400">Vista previa no disponible para este tipo de archivo</p>
+                      <p className="mt-1 text-xs text-slate-400">{t("Vista previa no disponible para este tipo de archivo")}</p>
                     </div>
                   )}
                 </div>
@@ -2780,18 +2735,14 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir en navegador
-          </button>
+          >{t("Abrir en navegador")}</button>
           <button
             onClick={() => {
               void openPdfWithPdfStudio(pdfOpenMenu.file);
               setPdfOpenMenu(null);
             }}
             className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-          >
-            Abrir con PDF Studio
-          </button>
+          >{t("Abrir con PDF Studio")}</button>
         </div>,
         document.body
       )}
@@ -2801,28 +2752,28 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-transparent p-4" onClick={() => setEditingFile(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-100">
-              <h4 className="text-base font-bold text-slate-900">{editingFile.id === "PENDING_UPLOAD" ? "Preparar adjunto" : "Editar adjunto"}</h4>
+              <h4 className="text-base font-bold text-slate-900">{editingFile.id === "PENDING_UPLOAD" ? t("Preparar adjunto") : t("Editar adjunto")}</h4>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre del documento</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Nombre del documento")}</label>
                 <input value={editDocName} onChange={(e) => setEditDocName(e.target.value)} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de adjunto</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo de adjunto")}</label>
                 <select value={editAttachmentType} onChange={(e) => setEditAttachmentType(e.target.value)} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                  <option value="Sin clasificar">Sin clasificar</option>
-                  <option value="AUTO">AUTO</option>
-                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
-                  <option value="FACTURAS">FACTURAS</option>
-                  <option value="PODER">PODER</option>
-                  <option value="EVIDENCIA">EVIDENCIA</option>
+                  <option value="Sin clasificar">{t("Sin clasificar")}</option>
+                  <option value="AUTO">{t("AUTO")}</option>
+                  <option value="ESCRITO PROCESAL">{t("ESCRITO PROCESAL")}</option>
+                  <option value="FACTURAS">{t("FACTURAS")}</option>
+                  <option value="PODER">{t("PODER")}</option>
+                  <option value="EVIDENCIA">{t("EVIDENCIA")}</option>
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-2 px-5 pb-5">
-              <button type="button" onClick={() => setEditingFile(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
-              <button type="button" onClick={handleSaveMetadata} className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">Guardar</button>
+              <button type="button" onClick={() => setEditingFile(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">{t("Cancelar")}</button>
+              <button type="button" onClick={handleSaveMetadata} className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">{t("Guardar")}</button>
             </div>
           </div>
         </div>,
@@ -2835,8 +2786,8 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
           <div className="w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">Plantillas del despacho</p>
-                <h4 className="mt-1 text-lg font-bold text-slate-900">Usar plantilla en esta actuacion</h4>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">{t("Plantillas del despacho")}</p>
+                <h4 className="mt-1 text-lg font-bold text-slate-900">{t("Usar plantilla en esta actuacion")}</h4>
               </div>
               <button type="button" onClick={() => setShowTemplates(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
                 <X size={16} />
@@ -2846,13 +2797,13 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
               <div className="border-r border-slate-100 p-4 space-y-3">
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} placeholder="Buscar plantilla..." className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                  <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} placeholder={t("Buscar plantilla...")} className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
                 <div className="max-h-[calc(min(78vh,720px)-100px)] overflow-y-auto rounded-2xl border border-slate-200">
                   {docPlantLoading ? (
-                    <div className="p-6 text-sm text-slate-400">Cargando plantillas...</div>
+                    <div className="p-6 text-sm text-slate-400">{t("Cargando plantillas...")}</div>
                   ) : filteredFolders.length === 0 ? (
-                    <div className="p-6 text-sm text-slate-400">No se encontraron plantillas.</div>
+                    <div className="p-6 text-sm text-slate-400">{t("No se encontraron plantillas.")}</div>
                   ) : filteredFolders.map((folder) => (
                     <div key={folder.name} className="border-b border-slate-100 last:border-b-0">
                       <div className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50">{folder.name}</div>
@@ -2860,7 +2811,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                         {folder.files.map((file) => (
                           <button key={file.path} type="button" onClick={() => { setSelectedTpl(file); setRellenando(false); }}
                             className={`w-full px-4 py-3 text-left text-sm transition-colors ${selectedTpl?.path === file.path ? "bg-red-50 text-red-700" : "hover:bg-slate-50 text-slate-700"}`}>
-                            <span className="block">{file.name}</span>{file.sub && <span className="block text-[11px] text-slate-400 truncate">en {file.sub}</span>}
+                            <span className="block">{file.name}</span>{file.sub && <span className="block text-[11px] text-slate-400 truncate">{t("en")}{" "}{file.sub}</span>}
                           </button>
                         ))}
                       </div>
@@ -2893,20 +2844,19 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <div className="flex-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-8">
                     <div>
                       <Sparkles size={22} className="mx-auto mb-3 text-slate-300" />
-                      <p className="text-sm font-semibold text-slate-700">Selecciona una plantilla</p>
-                      <p className="mt-1 text-xs text-slate-400">Eligela en el panel izquierdo para adjuntarla a la actuacion.</p>
+                      <p className="text-sm font-semibold text-slate-700">{t("Selecciona una plantilla")}</p>
+                      <p className="mt-1 text-xs text-slate-400">{t("Eligela en el panel izquierdo para adjuntarla a la actuacion.")}</p>
                     </div>
                 </div>
                 )}
                 <div className="flex justify-end gap-2 pt-4">
-                  <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
-                  <button type="button" onClick={() => attachTemplate(false)} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl">Usar tal cual</button>
+                  <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">{t("Cancelar")}</button>
+                  <button type="button" onClick={() => attachTemplate(false)} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl">{t("Usar tal cual")}</button>
                   {!!expedienteId && /\.docx?$/i.test(selectedTpl?.name || "") && (
                     <button type="button" onClick={() => setRellenando(true)} disabled={uploading}
-                      title="Rellena el cliente, la otra parte, el juzgado, los autos... con los datos de este expediente y te deja revisar y completar el resto"
+                      title={t("Rellena el cliente, la otra parte, el juzgado, los autos... con los datos de este expediente y te deja revisar y completar el resto")}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">
-                      <Sparkles size={13} /> Usar y autorrellenar
-                    </button>
+                      <Sparkles size={13} />{" "}{t("Usar y autorrellenar")}</button>
                   )}
                 </div>
                 </>)}
@@ -2925,13 +2875,13 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
                 <AlertTriangle size={18} className="peligro text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">¿Eliminar archivo adjunto?</h3>
-                <p className="text-xs text-slate-500 mt-1">Tendrás 15 segundos para deshacer.</p>
+                <h3 className="font-bold text-slate-900 text-sm">{t("¿Eliminar archivo adjunto?")}</h3>
+                <p className="text-xs text-slate-500 mt-1">{t("Tendrás 15 segundos para deshacer.")}</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDelete(confirmDeleteFileId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+              <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
+              <button onClick={() => handleDelete(confirmDeleteFileId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -3006,9 +2956,9 @@ function ActuacionModal({
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">Actuacion del expediente</p>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">{t("Actuacion del expediente")}</p>
             <h3 className="mt-0.5 text-xl font-bold text-slate-900">
-              {selectedActuacion ? "Editar actuacion" : "Nueva actuacion"}
+              {selectedActuacion ? t("Editar actuacion") : t("Nueva actuacion")}
             </h3>
           </div>
           <div className="flex items-center gap-2">
@@ -3022,9 +2972,7 @@ function ActuacionModal({
               expedienteId={expedienteId ?? undefined}
             />
             <button type="button" onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">
-              Cancelar
-            </button>
+              className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">{t("Cancelar")}</button>
             <button
               type="button"
               onClick={onSave}
@@ -3032,7 +2980,7 @@ function ActuacionModal({
               className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-xl shadow-sm"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-              {selectedActuacion ? "Guardar cambios" : "Guardar actuacion"}
+              {selectedActuacion ? t("Guardar cambios") : t("Guardar actuacion")}
             </button>
           </div>
         </div>
@@ -3040,70 +2988,70 @@ function ActuacionModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{form.expediente || "Sin referencia"}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Expediente")}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{form.expediente || t("Sin referencia")}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Usuario</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.created_by || "Usuario actual"}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Usuario")}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.created_by || t("Usuario actual")}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Referencia</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.id ? `ACT-${String(selectedActuacion.id).slice(0, 8)}` : "Se generará al guardar"}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Referencia")}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.id ? t("ACT-{slice}", { slice: String(selectedActuacion.id).slice(0, 8) }) : t("Se generará al guardar")}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado actual</p>
-              <p className="mt-1 text-sm font-semibold text-slate-800">{form.estado === "completada" ? "Realizada" : form.estado || "Pendiente"}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado actual")}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{form.estado === "completada" ? t("Realizada") : form.estado || t("Pendiente")}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 2xl:grid-cols-[1.15fr_0.85fr] gap-5">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Título de la actuación</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Título de la actuación")}</label>
                 <input
                   value={form.titulo}
                   onChange={(e) => setForm((prev) => ({ ...prev, titulo: e.target.value }))}
-                  placeholder="Ej: Preparación de contestación, llamada con cliente..."
+                  placeholder={t("Ej: Preparación de contestación, llamada con cliente...")}
                   className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Descripción</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Descripción")}</label>
                 <textarea
                   value={form.descripcion}
                   onChange={(e) => setForm((prev) => ({ ...prev, descripcion: e.target.value }))}
                   rows={3}
-                  placeholder="Resume qué se ha hecho, qué se ha recibido o qué toca preparar..."
+                  placeholder={t("Resume qué se ha hecho, qué se ha recibido o qué toca preparar...")}
                   className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de actuación</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha de actuación")}</label>
                   <input type="date" value={form.plazo} onChange={(e) => setForm((prev) => ({ ...prev, plazo: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de aviso</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha de aviso")}</label>
                   <input type="date" value={form.fecha_aviso} onChange={(e) => setForm((prev) => ({ ...prev, fecha_aviso: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</label>
                   <select value={form.estado} onChange={(e) => setForm((prev) => ({ ...prev, estado: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                    <option value="pendiente">Pendiente</option>
-                    <option value="urgente">Urgente</option>
-                    <option value="completada">Realizada</option>
+                    <option value="pendiente">{t("Pendiente")}</option>
+                    <option value="urgente">{t("Urgente")}</option>
+                    <option value="completada">{t("Realizada")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridad</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Prioridad")}</label>
                   <select value={form.prioridad} onChange={(e) => setForm((prev) => ({ ...prev, prioridad: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                    <option value="alta">Alta</option>
-                    <option value="media">Media</option>
-                    <option value="baja">Baja</option>
+                    <option value="alta">{t("Alta@@prioridad")}</option>
+                    <option value="media">{t("Media@@prioridad")}</option>
+                    <option value="baja">{t("Baja@@prioridad")}</option>
                   </select>
                 </div>
               </div>
@@ -3111,42 +3059,42 @@ function ActuacionModal({
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de actuación</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo de actuación")}</label>
                 <select value={form.tipo} onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                  <option value="actuacion">Actuación general</option>
-                  <option value="diligencia">Diligencia</option>
-                  <option value="escrito">Escrito</option>
-                  <option value="reunion">Reunión</option>
-                  <option value="llamada">Llamada</option>
-                  <option value="gestion">Gestión</option>
+                  <option value="actuacion">{t("Actuación general")}</option>
+                  <option value="diligencia">{t("Diligencia")}</option>
+                  <option value="escrito">{t("Escrito")}</option>
+                  <option value="reunion">{t("Reunión")}</option>
+                  <option value="llamada">{t("Llamada")}</option>
+                  <option value="gestion">{t("Gestión")}</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Juzgado / Tribunal</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Juzgado / Tribunal")}</label>
                   <input value={form.juzgado} onChange={(e) => setForm((prev) => ({ ...prev, juzgado: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">N.º procedimiento</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("N.º procedimiento")}</label>
                   <input value={form.num_proc} onChange={(e) => setForm((prev) => ({ ...prev, num_proc: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Etapa</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Etapa")}</label>
                 <div className="mt-1">
                   <EtapaSelect value={form.etapa} onChange={(v) => setForm((prev) => ({ ...prev, etapa: v }))} getToken={getToken} />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Importe vinculado</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Importe vinculado")}</label>
                 <input type="number" step="0.01" min="0" value={form.importe} onChange={(e) => setForm((prev) => ({ ...prev, importe: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notas internas</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Notas internas")}</label>
                 <textarea value={form.notas} onChange={(e) => setForm((prev) => ({ ...prev, notas: e.target.value }))} rows={4} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
               </div>
             </div>
@@ -3154,8 +3102,8 @@ function ActuacionModal({
 
           <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Adjuntos de la actuación</p>
-              <p className="text-xs text-slate-400 mt-0.5">Archivos asociados únicamente a esta actuación.</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Adjuntos de la actuación")}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{t("Archivos asociados únicamente a esta actuación.")}</p>
             </div>
             {selectedActuacion ? (
               <div className="p-5">
@@ -3164,8 +3112,8 @@ function ActuacionModal({
             ) : (
               <div className="flex flex-col items-center justify-center text-center px-8 py-14">
                 <Paperclip size={32} className="mb-3 text-slate-200" />
-                <p className="text-sm font-semibold text-slate-700">Sin adjuntos todavía</p>
-                <p className="mt-1 text-xs text-slate-400">Guarda primero la actuación para poder añadirle sus propios archivos.</p>
+                <p className="text-sm font-semibold text-slate-700">{t("Sin adjuntos todavía")}</p>
+                <p className="mt-1 text-xs text-slate-400">{t("Guarda primero la actuación para poder añadirle sus propios archivos.")}</p>
               </div>
             )}
           </div>
@@ -3247,12 +3195,12 @@ function TabActuacion({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron cargar las actuaciones");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron cargar las actuaciones"));
       const rows = (data.data || []).filter((item: any) => item.expediente_id === expedienteId && item.tipo === "actuacion");
       setActuaciones(rows);
       setSelectedId((prev) => prev && rows.some((item: any) => item.id === prev) ? prev : rows[0]?.id || null);
     } catch (e: any) {
-      setError(e?.message || "No se pudieron cargar las actuaciones");
+      setError(e?.message || t("No se pudieron cargar las actuaciones"));
     } finally {
       setLoading(false);
     }
@@ -3282,7 +3230,7 @@ function TabActuacion({
         }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo crear la actuación");
+      if (!res.ok) throw new Error(data.error || t("No se pudo crear la actuación"));
       const created = data.data;
       setActuaciones((prev) => [created, ...prev]);
       setSelectedId(created.id);
@@ -3298,7 +3246,7 @@ function TabActuacion({
       });
       window.dispatchEvent(new CustomEvent("historial-changed"));
     } catch (e: any) {
-      setError(e?.message || "No se pudo crear la actuación");
+      setError(e?.message || t("No se pudo crear la actuación"));
     } finally {
       setSaving(false);
     }
@@ -3339,7 +3287,7 @@ function TabActuacion({
         }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo guardar la actuación");
+      if (!res.ok) throw new Error(data.error || t("No se pudo guardar la actuación"));
       const saved = data.data;
       setActuaciones((prev) => {
         if (editingId) return prev.map((item) => (item.id === editingId ? saved : item));
@@ -3349,7 +3297,7 @@ function TabActuacion({
       setForm(mapActuacionToForm(saved));
       window.dispatchEvent(new CustomEvent("historial-changed"));
     } catch (e: any) {
-      setError(e?.message || "No se pudo guardar la actuación");
+      setError(e?.message || t("No se pudo guardar la actuación"));
     } finally {
       setSaving(false);
     }
@@ -3361,13 +3309,10 @@ function TabActuacion({
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden crear ni modificar actuaciones.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden crear ni modificar actuaciones.")}</div>
       )}
       {!clienteId && !locked && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Para crear actuaciones desde este expediente, primero debe haber un cliente vinculado.
-        </div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{t("Para crear actuaciones desde este expediente, primero debe haber un cliente vinculado.")}</div>
       )}
 
       {error && (
@@ -3380,7 +3325,7 @@ function TabActuacion({
         <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actuaciones registradas</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Actuaciones registradas")}</h3>
           </div>
           {!locked && (
             <button
@@ -3389,30 +3334,28 @@ function TabActuacion({
               disabled={!clienteId}
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
             >
-              <Plus size={12} />
-              Crear actuación
-            </button>
+              <Plus size={12} />{t("Crear actuación")}</button>
           )}
         </div>
         <div className="p-5">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Spinner size="sm" muted label="Cargando actuaciones..." />
+              <Spinner size="sm" muted label={t("Cargando actuaciones...")} />
             </div>
           ) : actuaciones.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
               <ClipboardList size={20} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-semibold text-slate-700">Todavía no hay actuaciones</p>
-              <p className="mt-1 text-xs text-slate-400">Crea una actuación arriba y después podrás añadirle adjuntos propios.</p>
+              <p className="text-sm font-semibold text-slate-700">{t("Todavía no hay actuaciones")}</p>
+              <p className="mt-1 text-xs text-slate-400">{t("Crea una actuación arriba y después podrás añadirle adjuntos propios.")}</p>
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 overflow-hidden">
               <div className="grid grid-cols-[140px_1.8fr_1.1fr_140px_140px] gap-0 bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <div className="px-4 py-3">Fecha</div>
-                <div className="px-4 py-3">Descripción</div>
-                <div className="px-4 py-3">Usuario</div>
-                <div className="px-4 py-3">Estado</div>
-                <div className="px-4 py-3">Tipo</div>
+                <div className="px-4 py-3">{t("Fecha")}</div>
+                <div className="px-4 py-3">{t("Descripción")}</div>
+                <div className="px-4 py-3">{t("Usuario")}</div>
+                <div className="px-4 py-3">{t("Estado")}</div>
+                <div className="px-4 py-3">{t("Tipo")}</div>
               </div>
               <div className="divide-y divide-slate-200">
               {actuaciones.map((item) => (
@@ -3429,17 +3372,17 @@ function TabActuacion({
                   <div className="px-4 py-3 text-sm text-slate-700">{item.plazo ? fmtDate(item.plazo) : "—"}</div>
                   <div className="px-4 py-3">
                     <p className="text-sm font-semibold text-slate-800 truncate">{item.titulo}</p>
-                    <p className="mt-0.5 text-xs text-slate-500 truncate">{item.descripcion || "Sin descripción"}</p>
+                    <p className="mt-0.5 text-xs text-slate-500 truncate">{item.descripcion || t("Sin descripción")}</p>
                   </div>
-                  <div className="px-4 py-3 text-sm text-slate-600 truncate">{item.created_by || "Usuario"}</div>
+                  <div className="px-4 py-3 text-sm text-slate-600 truncate">{item.created_by || t("Usuario")}</div>
                   <div className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
-                      {item.estado === "completada" ? "Realizada" : item.estado}
+                      {item.estado === "completada" ? t("Realizada") : item.estado}
                     </span>
                   </div>
                   <div className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TIPO_CONFIG[item.tipo]?.color || "bg-slate-100 text-slate-500"}`}>
-                      {TIPO_CONFIG[item.tipo]?.label || "Actuación"}
+                      {TIPO_CONFIG[item.tipo]?.label || t("Actuación")}
                     </span>
                   </div>
                 </button>
@@ -3584,13 +3527,12 @@ function TabCorreoExpediente({
 
   const handleSend = async () => {
     if (!composeForm.to.trim() || !composeForm.subject.trim() || !composeForm.body.trim()) {
-      setComposeError("Para, asunto y cuerpo son obligatorios."); return;
+      setComposeError(t("Para, asunto y cuerpo son obligatorios.")); return;
     }
     if (confirmarAntesDeEnviar() && !(await confirmar({
-      titulo: "¿Enviar este correo?",
-      mensaje: `Para: ${composeForm.to.trim()}
-Asunto: ${composeForm.subject.trim()}`,
-      confirmar: "Enviar",
+      titulo: t("¿Enviar este correo?"),
+      mensaje: t("Para: {trim}\nAsunto: {trim2}", { trim: composeForm.to.trim(), trim2: composeForm.subject.trim() }),
+      confirmar: t("Enviar"),
     }))) return;
     setSending(true); setComposeError("");
     try {
@@ -3611,7 +3553,7 @@ Asunto: ${composeForm.subject.trim()}`,
         }),
       });
       const d = await safeJson(res);
-      if (!res.ok) { setComposeError(d.error || "Error al enviar"); return; }
+      if (!res.ok) { setComposeError(d.error || t("Error al enviar")); return; }
       setShowCompose(false);
       setComposeForm(f => ({ ...f, to: "", cc: "", subject: "", body: "" }));
       setComposeAttachments([]);
@@ -3688,7 +3630,7 @@ Asunto: ${composeForm.subject.trim()}`,
       const res = await fetch(`/api/email/messages/${emailId}/attachments/${index}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error("No se pudo descargar el adjunto");
+      if (!res.ok) throw new Error(t("No se pudo descargar el adjunto"));
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -3696,7 +3638,7 @@ Asunto: ${composeForm.subject.trim()}`,
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setAttachmentError(e.message || "No se pudo descargar el adjunto.");
+      setAttachmentError(e.message || t("No se pudo descargar el adjunto."));
     } finally {
       setDownloadingAttachment(null);
     }
@@ -3727,22 +3669,20 @@ Asunto: ${composeForm.subject.trim()}`,
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — solo lectura.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — solo lectura.")}</div>
       )}
 
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-slate-800">Correos del expediente</h3>
-          <p className="text-xs text-slate-400 mt-0.5">{emails.length} correo{emails.length !== 1 ? "s" : ""} asociado{emails.length !== 1 ? "s" : ""}</p>
+          <h3 className="text-sm font-bold text-slate-800">{t("Correos del expediente")}</h3>
+          <p className="text-xs text-slate-400 mt-0.5">{emails.length}{" "}{t("correo")}{emails.length !== 1 ? "s" : ""}{" "}{t("asociado")}{emails.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <button type="button"
             onClick={() => { setShowAssociate(true); if (!allEmails.length) loadAllEmails(); }}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl transition-all">
-            <Link2 size={12} /> Asociar correo existente
-          </button>
+            <Link2 size={12} />{" "}{t("Asociar correo existente")}</button>
           {!locked && (
             <MailDropdownBtn
               mainLabel="Redactar"
@@ -3760,7 +3700,7 @@ Asunto: ${composeForm.subject.trim()}`,
       {noAccounts && (
         <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
           <Mail size={14} className="shrink-0 text-blue-400" />
-          <span>No hay ninguna cuenta de correo configurada. <Link to="/dashboard/correo" className="font-bold underline">Configurar en el módulo de Correo</Link></span>
+          <span>{t("No hay ninguna cuenta de correo configurada.")}{" "}<Link to="/dashboard/correo" className="font-bold underline">{t("Configurar en el módulo de Correo")}</Link></span>
         </div>
       )}
 
@@ -3770,14 +3710,14 @@ Asunto: ${composeForm.subject.trim()}`,
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 bg-slate-800 rounded-t-2xl">
-              <p className="text-sm font-bold text-white">Nuevo correo · {expedienteRef}</p>
+              <p className="text-sm font-bold text-white">{t("Nuevo correo ·")}{" "}{expedienteRef}</p>
               <button type="button" onClick={() => { setShowCompose(false); setComposeAttachments([]); setShowFilePicker(false); }} className="text-slate-400 hover:text-white"><X size={16} /></button>
             </div>
             {/* Form */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {accounts.length > 1 && (
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Desde</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Desde")}</label>
                   <select value={composeForm.account_id} onChange={e => setComposeForm(f => ({ ...f, account_id: e.target.value }))}
                     className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400">
                     {accounts.map(a => <option key={a.id} value={a.id}>{a.label} ({a.email})</option>)}
@@ -3785,29 +3725,29 @@ Asunto: ${composeForm.subject.trim()}`,
                 </div>
               )}
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Para *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Para *")}</label>
                 <input value={composeForm.to} onChange={e => setComposeForm(f => ({ ...f, to: e.target.value }))}
-                  placeholder="correo@ejemplo.com, otro@ejemplo.com"
+                  placeholder={t("correo@ejemplo.com, otro@ejemplo.com")}
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               {showCc && (
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">CC</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("CC")}</label>
                   <input value={composeForm.cc} onChange={e => setComposeForm(f => ({ ...f, cc: e.target.value }))}
-                    placeholder="cc@ejemplo.com"
+                    placeholder={t("cc@ejemplo.com")}
                     className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
                 </div>
               )}
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Asunto *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Asunto *")}</label>
                 <input value={composeForm.subject} onChange={e => setComposeForm(f => ({ ...f, subject: e.target.value }))}
-                  placeholder={`RE: Expediente ${expedienteRef}`}
+                  placeholder={t("RE: Expediente {expedienteRef}", { expedienteRef: expedienteRef })}
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mensaje *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Mensaje *")}</label>
                 <textarea value={composeForm.body} onChange={e => setComposeForm(f => ({ ...f, body: e.target.value }))}
-                  rows={8} placeholder="Escribe tu mensaje aquí..."
+                  rows={8} placeholder={t("Escribe tu mensaje aquí...")}
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none" />
               </div>
               {/* Adjuntos seleccionados */}
@@ -3828,19 +3768,17 @@ Asunto: ${composeForm.subject.trim()}`,
             <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setShowCc(v => !v)} className="text-xs text-slate-400 hover:text-slate-600">
-                  {showCc ? "Ocultar CC" : "Añadir CC"}
+                  {showCc ? t("Ocultar CC") : t("Añadir CC")}
                 </button>
                 <button type="button" onClick={openFilePicker}
                   className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors">
-                  <Paperclip size={11} /> Adjuntar del expediente
-                </button>
+                  <Paperclip size={11} />{" "}{t("Adjuntar del expediente")}</button>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => { setShowCompose(false); setComposeAttachments([]); setShowFilePicker(false); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="button" onClick={() => { setShowCompose(false); setComposeAttachments([]); setShowFilePicker(false); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
                 <button type="button" onClick={handleSend} disabled={sending || composeAttachments.some(a => a.loading)}
                   className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
-                  {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar
-                </button>
+                  {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}{" "}{t("Enviar")}</button>
               </div>
             </div>
           </div>
@@ -3854,18 +3792,18 @@ Asunto: ${composeForm.subject.trim()}`,
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md flex flex-col" style={{ maxHeight: "70vh" }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Adjuntar archivos del expediente</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">Selecciona los archivos a incluir en el correo</p>
+                <h3 className="text-sm font-bold text-slate-900">{t("Adjuntar archivos del expediente")}</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{t("Selecciona los archivos a incluir en el correo")}</p>
               </div>
               <button type="button" onClick={() => setShowFilePicker(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {pickerLoading ? (
-                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando archivos..." /></div>
+                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label={t("Cargando archivos...")} /></div>
               ) : pickerFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                   <Paperclip size={24} className="opacity-30" />
-                  <p className="text-sm">No hay archivos en este expediente</p>
+                  <p className="text-sm">{t("No hay archivos en este expediente")}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
@@ -3881,7 +3819,7 @@ Asunto: ${composeForm.subject.trim()}`,
                         <Paperclip size={13} className="shrink-0 text-slate-400" />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-slate-800 truncate">{name}</p>
-                          <p className="text-[10px] text-slate-400">{file.attachment_type || "Sin clasificar"}{file.size ? ` · ${(file.size / 1024).toFixed(0)} KB` : ""}</p>
+                          <p className="text-[10px] text-slate-400">{file.attachment_type || t("Sin clasificar")}{file.size ? t(" · {toFixed} KB", { toFixed: (file.size / 1024).toFixed(0) }) : ""}</p>
                         </div>
                       </button>
                     );
@@ -3890,11 +3828,9 @@ Asunto: ${composeForm.subject.trim()}`,
               )}
             </div>
             <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-xs text-slate-400">{composeAttachments.length} archivo{composeAttachments.length !== 1 ? "s" : ""} seleccionado{composeAttachments.length !== 1 ? "s" : ""}</span>
+              <span className="text-xs text-slate-400">{composeAttachments.length}{" "}{t("archivo")}{composeAttachments.length !== 1 ? "s" : ""}{" "}{t("seleccionado")}{composeAttachments.length !== 1 ? "s" : ""}</span>
               <button type="button" onClick={() => setShowFilePicker(false)}
-                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700">
-                Listo
-              </button>
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700">{t("Listo")}</button>
             </div>
           </div>
         </div>,
@@ -3906,24 +3842,24 @@ Asunto: ${composeForm.subject.trim()}`,
         <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl flex flex-col" style={{ maxHeight: "80vh" }}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">Asociar correo al expediente</h3>
+              <h3 className="text-base font-bold text-slate-900">{t("Asociar correo al expediente")}</h3>
               <button type="button" onClick={() => setShowAssociate(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
             </div>
             <div className="p-4 border-b border-slate-100">
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={assocSearch} onChange={e => setAssocSearch(e.target.value)}
-                  placeholder="Buscar por asunto, remitente o extracto..."
+                  placeholder={t("Buscar por asunto, remitente o extracto...")}
                   className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {allEmailsLoading ? (
-                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando correos..." /></div>
+                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label={t("Cargando correos...")} /></div>
               ) : filteredAllEmails.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                   <Mail size={24} className="opacity-30" />
-                  <p className="text-sm font-medium">{assocSearch ? "Sin resultados" : "No hay correos disponibles"}</p>
+                  <p className="text-sm font-medium">{assocSearch ? t("Sin resultados") : t("No hay correos disponibles")}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-50">
@@ -3934,10 +3870,10 @@ Asunto: ${composeForm.subject.trim()}`,
                           <span className="text-xs font-semibold text-slate-700 truncate">{e.from_name || e.from_email}</span>
                           <span className="text-[10px] text-slate-400">{fmtEmailDate(e.sent_at)}</span>
                           {e.expediente_id && e.expediente_id !== expedienteId && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">Vinculado a otro exp.</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">{t("Vinculado a otro exp.")}</span>
                           )}
                         </div>
-                        <p className="text-sm text-slate-800 truncate mt-0.5">{e.subject || "(Sin asunto)"}</p>
+                        <p className="text-sm text-slate-800 truncate mt-0.5">{e.subject || t("(Sin asunto)")}</p>
                         {e.snippet && <p className="text-xs text-slate-400 truncate mt-0.5">{e.snippet}</p>}
                       </div>
                       <button type="button"
@@ -3945,7 +3881,7 @@ Asunto: ${composeForm.subject.trim()}`,
                         disabled={linking === e.id || e.expediente_id === expedienteId}
                         className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all disabled:opacity-50">
                         {linking === e.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                        {e.expediente_id === expedienteId ? "Ya asociado" : "Asociar"}
+                        {e.expediente_id === expedienteId ? t("Ya asociado") : t("Asociar")}
                       </button>
                     </div>
                   ))}
@@ -3953,7 +3889,7 @@ Asunto: ${composeForm.subject.trim()}`,
               )}
             </div>
             <div className="px-5 py-3 border-t border-slate-100 flex justify-end">
-              <button type="button" onClick={() => setShowAssociate(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+              <button type="button" onClick={() => setShowAssociate(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cerrar")}</button>
             </div>
           </div>
         </div>,
@@ -3962,12 +3898,12 @@ Asunto: ${composeForm.subject.trim()}`,
 
       {/* Lista de correos */}
       {loading ? (
-        <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label="Cargando correos..." /></div>
+        <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label={t("Cargando correos...")} /></div>
       ) : emails.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14 gap-3 text-slate-300">
           <Mail size={32} className="opacity-20" />
-          <p className="text-sm font-medium">No hay correos asociados a este expediente</p>
-          <p className="text-xs">Redacta uno nuevo o asocia correos existentes con los botones de arriba</p>
+          <p className="text-sm font-medium">{t("No hay correos asociados a este expediente")}</p>
+          <p className="text-xs">{t("Redacta uno nuevo o asocia correos existentes con los botones de arriba")}</p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -3986,12 +3922,12 @@ Asunto: ${composeForm.subject.trim()}`,
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 justify-between">
                         <span className={`text-sm truncate ${!email.is_read && !isSent ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
-                          {isSent ? `Para: ${email.to_emails}` : (email.from_name || email.from_email)}
+                          {isSent ? t("Para: {to_emails}", { to_emails: email.to_emails }) : (email.from_name || email.from_email)}
                         </span>
                         <span className="text-[10px] text-slate-400 shrink-0">{fmtEmailDate(email.sent_at)}</span>
                       </div>
                       <p className={`text-sm truncate mt-0.5 ${!email.is_read && !isSent ? "font-semibold text-slate-800" : "text-slate-600"}`}>
-                        {email.subject || "(Sin asunto)"}
+                        {email.subject || t("(Sin asunto)")}
                       </p>
                       {!isOpen && email.snippet && <p className="text-xs text-slate-400 truncate mt-0.5">{email.snippet}</p>}
                     </div>
@@ -4006,17 +3942,16 @@ Asunto: ${composeForm.subject.trim()}`,
                     <div className="px-5 pb-4 border-t border-slate-50 bg-slate-50/40">
                       <div className="flex items-center justify-between py-2 mb-2">
                         <div className="text-[10px] text-slate-400 space-y-0.5">
-                          <p><span className="font-semibold">De:</span> {email.from_name ? `${email.from_name} <${email.from_email}>` : email.from_email}</p>
-                          <p><span className="font-semibold">Para:</span> {email.to_emails}</p>
-                          {email.cc_emails && <p><span className="font-semibold">CC:</span> {email.cc_emails}</p>}
+                          <p><span className="font-semibold">{t("De:")}</span> {email.from_name ? `${email.from_name} <${email.from_email}>` : email.from_email}</p>
+                          <p><span className="font-semibold">{t("Para:")}</span> {email.to_emails}</p>
+                          {email.cc_emails && <p><span className="font-semibold">{t("CC:")}</span> {email.cc_emails}</p>}
                         </div>
                         <button type="button" onClick={() => handleUnlink(email.id)} disabled={linking === email.id}
                           className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 disabled:opacity-50">
-                          {linking === email.id ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Desasociar
-                        </button>
+                          {linking === email.id ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}{" "}{t("Desasociar")}</button>
                       </div>
                       {viewLoading && viewEmail === email.id ? (
-                        <div className="flex items-center justify-center py-6"><Spinner size="sm" muted label="Cargando..." /></div>
+                        <div className="flex items-center justify-center py-6"><Spinner size="sm" muted label={t("Cargando...")} /></div>
                       ) : (
                         <>
                           {!!viewAttachments.length && (
@@ -4027,7 +3962,7 @@ Asunto: ${composeForm.subject.trim()}`,
                                   type="button"
                                   onClick={() => downloadEmailAttachment(email.id, idx, att.filename)}
                                   disabled={downloadingAttachment === idx}
-                                  title={`Descargar ${att.filename}`}
+                                  title={t("Descargar {filename}", { filename: att.filename })}
                                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50">
                                   {downloadingAttachment === idx ? <Loader2 size={12} className="animate-spin shrink-0" /> : <Paperclip size={12} className="shrink-0 text-slate-400" />}
                                   <span className="max-w-[160px] truncate">{att.filename}</span>
@@ -4101,12 +4036,12 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Cliente")}</h3>
           </div>
           {!isClosed && exp.cliente_id && !showPicker && (
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setShowPicker(true)} className="text-xs font-bold text-red-600 hover:underline">Cambiar</button>
-              <button type="button" onClick={unlinkCliente} disabled={linkSaving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">Desasignar</button>
+              <button type="button" onClick={() => setShowPicker(true)} className="text-xs font-bold text-red-600 hover:underline">{t("Cambiar")}</button>
+              <button type="button" onClick={unlinkCliente} disabled={linkSaving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">{t("Desasignar")}</button>
             </div>
           )}
         </div>
@@ -4115,14 +4050,14 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
             <Link to={`/dashboard/clientes/${exp.cliente_id}`}
               className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40">
               {linkedClient?.photo_url ? (
-                <img src={linkedClient.photo_url} alt={linkedClientDisplayName || "Cliente"} className="h-14 w-14 rounded-2xl object-cover border border-slate-200 bg-white" />
+                <img src={linkedClient.photo_url} alt={linkedClientDisplayName || t("Cliente")} className="h-14 w-14 rounded-2xl object-cover border border-slate-200 bg-white" />
               ) : (
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">{initialsFromName(linkedClientDisplayName)}</div>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-blue-600 hover:underline">{linkedClientDisplayName || "Sin asignar"}</p>
+                <p className="text-sm font-semibold text-blue-600 hover:underline">{linkedClientDisplayName || t("Sin asignar")}</p>
                 {linkedClientSummary.length > 0 && <p className="mt-1 text-xs text-slate-500 break-words">{linkedClientSummary.join(" · ")}</p>}
-                {exp.persona_contacto && <p className="mt-2 text-xs text-slate-500">Contacto: {exp.persona_contacto}</p>}
+                {exp.persona_contacto && <p className="mt-2 text-xs text-slate-500">{t("Contacto:")}{" "}{exp.persona_contacto}</p>}
               </div>
               <ExternalLink size={13} className="text-slate-300 shrink-0 mt-1" />
             </Link>
@@ -4131,12 +4066,12 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">{initialsFromName(fallbackClientName)}</div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-800">{fallbackClientName}</p>
-                <p className="mt-1 text-xs text-amber-700">Nombre detectado pero sin cliente vinculado en el ERP.</p>
+                <p className="mt-1 text-xs text-amber-700">{t("Nombre detectado pero sin cliente vinculado en el ERP.")}</p>
               </div>
             </div>
           ) : !showPicker ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
-              <Users size={28} className="opacity-30" /><p className="text-sm font-medium">Sin cliente asignado</p>
+              <Users size={28} className="opacity-30" /><p className="text-sm font-medium">{t("Sin cliente asignado")}</p>
             </div>
           ) : null}
 
@@ -4145,12 +4080,12 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
               <div className="relative">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)}
-                  placeholder="Buscar por nombre o NIF..."
+                  placeholder={t("Buscar por nombre o NIF...")}
                   className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               <div className="max-h-52 overflow-y-auto space-y-1">
                 {filtered.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4">Sin resultados</p>
+                  <p className="text-xs text-slate-400 text-center py-4">{t("Sin resultados")}</p>
                 ) : filtered.map(c => {
                   const name = c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
                   return (
@@ -4159,13 +4094,13 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200 text-[10px] font-bold text-slate-600 shrink-0">{initialsFromName(name)}</div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-                        <p className="text-[10px] text-slate-400">{c.nif_cif || "Sin NIF"}{c.address_town ? ` · ${c.address_town}` : ""}</p>
+                        <p className="text-[10px] text-slate-400">{c.nif_cif || t("Sin NIF")}{c.address_town ? ` · ${c.address_town}` : ""}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
-              <button type="button" onClick={() => { setShowPicker(false); setClientSearch(""); }} className="text-xs text-slate-400 hover:text-slate-600">Cancelar</button>
+              <button type="button" onClick={() => { setShowPicker(false); setClientSearch(""); }} className="text-xs text-slate-400 hover:text-slate-600">{t("Cancelar")}</button>
             </div>
           )}
 
@@ -4174,14 +4109,13 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
               {!showPicker && (
                 <button type="button" onClick={() => setShowPicker(true)}
                   className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl transition-all">
-                  <Search size={12} /> {exp.cliente_id ? "Cambiar cliente" : "Buscar cliente existente"}
+                  <Search size={12} /> {exp.cliente_id ? t("Cambiar cliente") : t("Buscar cliente existente")}
                 </button>
               )}
               <Link
                 to={`/dashboard/clientes/new?mode=manual&expediente_id=${encodeURIComponent(expedienteId)}${fallbackClientName ? `&first_name=${encodeURIComponent(draftClientName.first_name)}&last_name=${encodeURIComponent(draftClientName.last_name)}&commercial_name=${encodeURIComponent(fallbackClientName)}` : ""}`}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all">
-                <Plus size={12} /> Crear nuevo cliente
-              </Link>
+                <Plus size={12} />{" "}{t("Crear nuevo cliente")}</Link>
             </div>
           )}
         </div>
@@ -4192,10 +4126,10 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <User size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Abogado</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Abogado")}</h3>
           </div>
           {!isClosed && !abogadoEdit && (
-            <button type="button" onClick={() => setAbogadoEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+            <button type="button" onClick={() => setAbogadoEdit(true)} className="text-xs font-bold text-red-600 hover:underline">{t("Editar")}</button>
           )}
         </div>
         <div className="px-5 py-4">
@@ -4203,7 +4137,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <ProfesionalInput tipo="ABOGADO" value={abogadoVal} onChange={setAbogadoVal}
-                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder="Nombre del abogado propio…" />
+                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder={t("Nombre del abogado propio…")} />
               </div>
               <button
                 type="button"
@@ -4225,7 +4159,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
           ) : exp.abogado_propio ? (
             <p className="text-sm font-medium text-slate-800">{exp.abogado_propio}</p>
           ) : (
-            <p className="text-sm text-slate-400 italic">Sin abogado asignado</p>
+            <p className="text-sm text-slate-400 italic">{t("Sin abogado asignado")}</p>
           )}
         </div>
       </div>
@@ -4235,10 +4169,10 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Briefcase size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Procurador</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Procurador")}</h3>
           </div>
           {!isClosed && !procuradorEdit && (
-            <button type="button" onClick={() => setProcuradorEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+            <button type="button" onClick={() => setProcuradorEdit(true)} className="text-xs font-bold text-red-600 hover:underline">{t("Editar")}</button>
           )}
         </div>
         <div className="px-5 py-4">
@@ -4246,7 +4180,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
             <div className="flex items-center gap-2">
               <div className="flex-1">
                 <ProfesionalInput tipo="PROCURADOR" value={procuradorVal} onChange={setProcuradorVal}
-                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder="Nombre del procurador propio…" />
+                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder={t("Nombre del procurador propio…")} />
               </div>
               <button
                 type="button"
@@ -4268,7 +4202,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
           ) : exp.procurador ? (
             <p className="text-sm font-medium text-slate-800">{exp.procurador}</p>
           ) : (
-            <p className="text-sm text-slate-400 italic">Sin procurador asignado</p>
+            <p className="text-sm text-slate-400 italic">{t("Sin procurador asignado")}</p>
           )}
         </div>
       </div>
@@ -4313,16 +4247,16 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
       <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users size={14} className="text-slate-400" />
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Parte contraria</h3>
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Parte contraria")}</h3>
         </div>
         {!isClosed && !editing && (
           <div className="flex items-center gap-2">
             <button type="button"
               onClick={() => { setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" }); setEditing(true); }}
               className="text-xs font-bold text-red-600 hover:underline">
-              {hasData ? "Editar" : "Añadir parte contraria"}
+              {hasData ? t("Editar") : t("Añadir parte contraria")}
             </button>
-            {hasData && <button type="button" onClick={handleClear} disabled={saving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">Limpiar</button>}
+            {hasData && <button type="button" onClick={handleClear} disabled={saving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">{t("Limpiar")}</button>}
           </div>
         )}
       </div>
@@ -4331,51 +4265,50 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
           <div className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre parte contraria</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Nombre parte contraria")}</label>
                 <input autoFocus value={cForm.contrario} onChange={e => setCForm(f => ({ ...f, contrario: e.target.value }))}
-                  placeholder="Nombre o razón social..."
+                  placeholder={t("Nombre o razón social...")}
                   className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Abogado contrario</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Abogado contrario")}</label>
                 <ProfesionalInput tipo="ABOGADO" value={cForm.abogado_contrario} onChange={v => setCForm(f => ({ ...f, abogado_contrario: v }))}
-                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder="Nombre del abogado..." />
+                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder={t("Nombre del abogado...")} />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procurador contrario</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Procurador contrario")}</label>
                 <ProfesionalInput tipo="PROCURADOR" value={cForm.procurador_contrario} onChange={v => setCForm(f => ({ ...f, procurador_contrario: v }))}
-                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder="Nombre del procurador..." />
+                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder={t("Nombre del procurador...")} />
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
               <button type="button" onClick={handleSaveContrario} disabled={saving}
                 className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
-                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Guardar
-              </button>
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}{" "}{t("Guardar")}</button>
             </div>
           </div>
         ) : hasData ? (
           <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-xl overflow-hidden border border-slate-100">
             <div className="bg-white px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Parte contraria</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Parte contraria")}</p>
               <p className="text-sm text-slate-800">{exp.contrario || <span className="text-slate-300">—</span>}</p>
             </div>
             <div className="bg-white px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Abogado contrario</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Abogado contrario")}</p>
               <p className="text-sm text-slate-800">{exp.abogado_contrario || <span className="text-slate-300">—</span>}</p>
             </div>
             <div className="bg-white px-4 py-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procurador contrario</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Procurador contrario")}</p>
               <p className="text-sm text-slate-800">{exp.procurador_contrario || <span className="text-slate-300">—</span>}</p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
             <Users size={28} className="opacity-30" />
-            <p className="text-sm font-medium">Sin parte contraria registrada</p>
+            <p className="text-sm font-medium">{t("Sin parte contraria registrada")}</p>
             {!isClosed && (
-              <button type="button" onClick={() => setEditing(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">Añadir parte contraria</button>
+              <button type="button" onClick={() => setEditing(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("Añadir parte contraria")}</button>
             )}
           </div>
         )}
@@ -4430,7 +4363,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
       const method = editId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body: JSON.stringify(form) });
       const data = await safeJson(res);
-      if (!res.ok) { aviso(data.error || "Error al guardar"); return; }
+      if (!res.ok) { aviso(data.error || t("Error al guardar")); return; }
       if (editId) setApuntes(prev => prev.map(a => a.id === editId ? data.data : a));
       else setApuntes(prev => [data.data, ...prev]);
       setShowForm(false); setEditId(null); resetForm();
@@ -4461,26 +4394,25 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
     <div className="space-y-4">
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar apuntes.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden añadir ni modificar apuntes.")}</div>
       )}
 
       {/* Resumen */}
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-2xl border border-red-100 bg-white p-5">
-          <div className="flex items-center gap-2 mb-2"><TrendingDown size={14} className="text-red-400" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total cargos</p></div>
+          <div className="flex items-center gap-2 mb-2"><TrendingDown size={14} className="text-red-400" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Total cargos")}</p></div>
           <p className="text-2xl font-bold text-red-600">{fmtMoney(totalCargos)}</p>
-          <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "cargo").length} apunte{apuntes.filter(a => a.tipo === "cargo").length !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "cargo").length}{" "}{t("apunte")}{apuntes.filter(a => a.tipo === "cargo").length !== 1 ? "s" : ""}</p>
         </div>
         <div className="rounded-2xl border border-emerald-100 bg-white p-5">
-          <div className="flex items-center gap-2 mb-2"><TrendingUp size={14} className="text-emerald-500" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total abonos</p></div>
+          <div className="flex items-center gap-2 mb-2"><TrendingUp size={14} className="text-emerald-500" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Total abonos")}</p></div>
           <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalAbonos)}</p>
-          <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "abono").length} apunte{apuntes.filter(a => a.tipo === "abono").length !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "abono").length}{" "}{t("apunte")}{apuntes.filter(a => a.tipo === "abono").length !== 1 ? "s" : ""}</p>
         </div>
         <div className={`rounded-2xl border p-5 ${saldo > 0 ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
-          <div className="flex items-center gap-2 mb-2"><Banknote size={14} className={saldo > 0 ? "text-amber-500" : "text-slate-400"} /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Saldo pendiente</p></div>
+          <div className="flex items-center gap-2 mb-2"><Banknote size={14} className={saldo > 0 ? "text-amber-500" : "text-slate-400"} /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Saldo pendiente")}</p></div>
           <p className={`text-2xl font-bold ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</p>
-          <p className="text-xs text-slate-400 mt-1">{saldo > 0 ? "pendiente de cobro" : saldo < 0 ? "saldo a favor del cliente" : "al día"}</p>
+          <p className="text-xs text-slate-400 mt-1">{saldo > 0 ? t("pendiente de cobro") : saldo < 0 ? t("saldo a favor del cliente") : t("al día")}</p>
         </div>
       </div>
 
@@ -4489,7 +4421,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Banknote size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Libro de apuntes</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Libro de apuntes")}</h3>
           </div>
           {!locked && (
             <button
@@ -4497,34 +4429,33 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
               onClick={() => { resetForm(); setEditId(null); setShowForm(v => !v); }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
             >
-              <Plus size={12} /> Nuevo apunte
-            </button>
+              <Plus size={12} />{" "}{t("Nuevo apunte")}</button>
           )}
         </div>
 
         {/* Formulario */}
         {showForm && !locked && (
           <div className="border-b border-slate-100 p-5 space-y-4 bg-slate-50">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{editId ? "Editar apunte" : "Nuevo apunte"}</h4>
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{editId ? t("Editar apunte") : t("Nuevo apunte")}</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Concepto *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Concepto *")}</label>
                 <input
                   value={form.concepto}
                   onChange={e => setForm(f => ({ ...f, concepto: e.target.value }))}
-                  placeholder="Ej: Minuta honorarios, Pago a cuenta..."
+                  placeholder={t("Ej: Minuta honorarios, Pago a cuenta...")}
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipo *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Tipo *")}</label>
                 <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as any }))} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400">
-                  <option value="cargo">Cargo (debe)</option>
-                  <option value="abono">Abono (ha pagado)</option>
+                  <option value="cargo">{t("Cargo (debe)")}</option>
+                  <option value="abono">{t("Abono (ha pagado)")}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Importe (€) *</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Importe (€) *")}</label>
                 <input
                   type="number" min="0" step="0.01"
                   value={form.importe}
@@ -4534,19 +4465,19 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Fecha")}</label>
                 <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Notas</label>
-                <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Opcional..." className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Notas")}</label>
+                <input value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder={t("Opcional...")} className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => { setShowForm(false); setEditId(null); resetForm(); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={() => { setShowForm(false); setEditId(null); resetForm(); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
               <button type="button" onClick={handleSave} disabled={saving || !form.concepto.trim() || !form.importe} className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                {editId ? "Guardar cambios" : "Añadir apunte"}
+                {editId ? t("Guardar cambios") : t("Añadir apunte")}
               </button>
             </div>
           </div>
@@ -4555,22 +4486,22 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
         {/* Lista */}
         <div className="p-5">
           {loading ? (
-            <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando apuntes..." /></div>
+            <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label={t("Cargando apuntes...")} /></div>
           ) : apuntes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
               <Banknote size={28} className="opacity-30" />
-              <p className="text-sm font-medium">Sin apuntes todavía</p>
-              {!locked && <button type="button" onClick={() => setShowForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">Añadir primer apunte</button>}
+              <p className="text-sm font-medium">{t("Sin apuntes todavía")}</p>
+              {!locked && <button type="button" onClick={() => setShowForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("Añadir primer apunte")}</button>}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">Fecha</th>
-                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">Concepto</th>
-                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">Tipo</th>
-                    <th className="pb-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider">Importe</th>
+                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">{t("Fecha")}</th>
+                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">{t("Concepto")}</th>
+                    <th className="pb-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider pr-4">{t("Tipo")}</th>
+                    <th className="pb-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t("Importe")}</th>
                     {!locked && <th className="pb-2" />}
                   </tr>
                 </thead>
@@ -4607,7 +4538,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-slate-200">
-                    <td colSpan={2} className="pt-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Saldo pendiente</td>
+                    <td colSpan={2} className="pt-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Saldo pendiente")}</td>
                     <td />
                     <td className={`pt-3 text-right text-base font-bold ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</td>
                     {!locked && <td />}
@@ -4622,11 +4553,11 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
       {confirmDeleteId && (
         <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
-            <h4 className="text-base font-bold text-slate-900">Eliminar apunte</h4>
-            <p className="text-sm text-slate-500">¿Seguro que quieres eliminar este apunte? Esta acción no se puede deshacer.</p>
+            <h4 className="text-base font-bold text-slate-900">{t("Eliminar apunte")}</h4>
+            <p className="text-sm text-slate-500">{t("¿Seguro que quieres eliminar este apunte? Esta acción no se puede deshacer.")}</p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button type="button" onClick={handleDelete} className="peligro px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">Eliminar</button>
+              <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
+              <button type="button" onClick={handleDelete} className="peligro px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700">{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -4669,7 +4600,7 @@ function TabExpedientesRelacionados({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los expedientes relacionados");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron cargar los expedientes relacionados"));
       setRelated(data.data || []);
     } catch (_e) {
       if (!silent) setRelated([]);
@@ -4735,11 +4666,11 @@ function TabExpedientesRelacionados({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron buscar expedientes"));
       setSearchResults((data.data || []).filter((item: any) => item.id !== expedienteId && !relatedIds.has(item.id)));
     } catch (e: any) {
       setSearchResults([]);
-      setSearchError(e?.message || "No se pudieron buscar expedientes");
+      setSearchError(e?.message || t("No se pudieron buscar expedientes"));
     } finally {
       setSearching(false);
     }
@@ -4818,9 +4749,7 @@ function TabExpedientesRelacionados({
           disabled={savingId === item.id}
           className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
         >
-          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-          Asociar
-        </button>
+          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}{t("Asociar")}</button>
       </div>
     );
   };
@@ -4839,14 +4768,14 @@ function TabExpedientesRelacionados({
         body: JSON.stringify({ related_expediente_id: relatedId }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo asociar el expediente");
+      if (!res.ok) throw new Error(data.error || t("No se pudo asociar el expediente"));
       await loadRelated(true);
       setShowModal(false);
       setQuery("");
       setHasSearched(false);
       setSearchResults([]);
     } catch (e: any) {
-      setAssociateError(e?.message || "No se pudo asociar el expediente");
+      setAssociateError(e?.message || t("No se pudo asociar el expediente"));
     } finally {
       setSavingId(null);
     }
@@ -4856,14 +4785,13 @@ function TabExpedientesRelacionados({
     <>
       {locked && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
-          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden asociar expedientes relacionados.
-        </div>
+          <AlertTriangle size={13} className="shrink-0" />{" "}{t("Expediente cerrado — no se pueden asociar expedientes relacionados.")}</div>
       )}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Link2 size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Expedientes relacionados</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Expedientes relacionados")}</h3>
           </div>
           {!locked && (
             <button
@@ -4879,24 +4807,22 @@ function TabExpedientesRelacionados({
               }}
               className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all"
             >
-              <Plus size={12} />
-              Asociar expedientes
-            </button>
+              <Plus size={12} />{t("Asociar expedientes")}</button>
           )}
         </div>
 
         <div className="p-5">
           {loading ? (
             <div className="flex items-center justify-center py-4">
-              <Spinner size="sm" muted label="Cargando expedientes relacionados..." />
+              <Spinner size="sm" muted label={t("Cargando expedientes relacionados...")} />
             </div>
           ) : related.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white border border-slate-200 text-slate-300">
                 <Link2 size={20} />
               </div>
-              <p className="text-sm font-semibold text-slate-700">Todavía no hay expedientes relacionados</p>
-              <p className="mt-1 text-xs text-slate-400">Puedes asociar otros expedientes del sistema para tenerlos agrupados aquí.</p>
+              <p className="text-sm font-semibold text-slate-700">{t("Todavía no hay expedientes relacionados")}</p>
+              <p className="mt-1 text-xs text-slate-400">{t("Puedes asociar otros expedientes del sistema para tenerlos agrupados aquí.")}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -4916,7 +4842,7 @@ function TabExpedientesRelacionados({
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-blue-600 hover:underline break-words">
-                        {item.descripcion || `Expediente ${ref}`}
+                        {item.descripcion || t("Expediente {ref}", { ref: ref })}
                       </p>
                       <p className="mt-1 text-xs text-slate-500 break-words">
                         {ref}
@@ -4929,10 +4855,10 @@ function TabExpedientesRelacionados({
                     </div>
                     <div className="shrink-0 flex flex-col items-end gap-2">
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase text-slate-500">
-                        {item.estado || "abierto"}
+                        {item.estado || t("abierto")}
                       </span>
                       <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-600">
-                        {TIPOS[item.tipo]?.label || "Expediente"}
+                        {TIPOS[item.tipo]?.label || t("Expediente")}
                       </span>
                     </div>
                   </Link>
@@ -4954,8 +4880,8 @@ function TabExpedientesRelacionados({
           >
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Relacionar expediente</p>
-                <h3 className="text-lg font-bold text-slate-900">Asociar expedientes a {currentRef}</h3>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t("Relacionar expediente")}</p>
+                <h3 className="text-lg font-bold text-slate-900">{t("Asociar expedientes a")}{" "}{currentRef}</h3>
               </div>
               <button
                 type="button"
@@ -4973,7 +4899,7 @@ function TabExpedientesRelacionados({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Buscar por referencia, descripción, NIG, juzgado..."
+                    placeholder={t("Buscar por referencia, descripción, NIG, juzgado...")}
                     autoFocus
                     spellCheck={false}
                     autoComplete="off"
@@ -4985,9 +4911,7 @@ function TabExpedientesRelacionados({
                   disabled={!query.trim() || searching}
                   className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {searching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                  Buscar
-                </button>
+                  {searching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}{t("Buscar")}</button>
               </form>
 
               {searchError && (
@@ -5006,14 +4930,12 @@ function TabExpedientesRelacionados({
                 {!hasSearched ? (
                   loadingSuggested ? (
                     <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
-                      <Spinner size="sm" muted label="Buscando sugerencias..." />
+                      <Spinner size="sm" muted label={t("Buscando sugerencias...")} />
                     </div>
                   ) : suggested.length > 0 ? (
                     <>
                       <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                          Sugeridos · mismo cliente o contrario
-                        </span>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{t("Sugeridos · mismo cliente o contrario")}</span>
                       </div>
                       <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
                         {suggested.map(renderExpItem)}
@@ -5025,14 +4947,14 @@ function TabExpedientesRelacionados({
                         <Search size={20} />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
-                        <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                        <p className="text-sm font-semibold text-slate-600">{t("Busca un expediente")}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">{t("Escribe la referencia, descripción, NIG o juzgado")}</p>
                       </div>
                     </div>
                   )
                 ) : searching ? (
                   <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
-                    <Spinner size="sm" muted label="Buscando expedientes..." />
+                    <Spinner size="sm" muted label={t("Buscando expedientes...")} />
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
@@ -5040,15 +4962,15 @@ function TabExpedientesRelacionados({
                       <AlertCircle size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
-                      <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                      <p className="text-sm font-semibold text-slate-600">{t("Sin resultados")}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{t("Prueba con otra búsqueda o revisa si ya están relacionados.")}</p>
                     </div>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                        {searchResults.length} {searchResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                        {searchResults.length} {searchResults.length === 1 ? t("expediente encontrado") : t("expedientes encontrados")}
                       </span>
                     </div>
                     <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
@@ -5087,9 +5009,7 @@ function TabExpedientesRelacionados({
                               disabled={savingId === item.id}
                               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
                             >
-                              {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                              Asociar
-                            </button>
+                              {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}{t("Asociar")}</button>
                           </div>
                         );
                       })}
@@ -5145,8 +5065,8 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
         });
         const data = await safeJson(res);
         if (res.ok) setInd(data.data);
-        else setError(data.error || 'Error');
-      } catch { setError('Error de conexión'); }
+        else setError(data.error || t("Error"));
+      } catch { setError(t("Error de conexión")); }
     })();
   }, [expedienteId, getToken]);
 
@@ -5161,7 +5081,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
         <button
           type="button"
           onClick={onToggleCollapsed}
-          title="Mostrar indicadores"
+          title={t("Mostrar indicadores")}
           className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
         >
           <ChevronLeft size={12} />
@@ -5175,14 +5095,14 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
       <button
         type="button"
         onClick={onToggleCollapsed}
-        title="Ocultar indicadores"
+        title={t("Ocultar indicadores")}
         className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
       >
         <ChevronRight size={12} />
       </button>
       <div className="bg-white border border-slate-200 rounded-xl overflow-y-auto flex-1 min-h-0">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Indicadores")}</h3>
         </div>
         {error ? (
           <p className="px-4 py-3 text-xs text-red-400">{error}</p>
@@ -5192,34 +5112,34 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
           </div>
         ) : (
           <div className="px-4 py-3 space-y-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tareas</p>
-            <Indicador label="Total tareas"    value={fmt(ind.total_tareas)} />
-            <Indicador label="Pendientes"      value={fmt(ind.tareas_pendientes)}
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{t("Tareas")}</p>
+            <Indicador label={t("Total tareas")}    value={fmt(ind.total_tareas)} />
+            <Indicador label={t("Pendientes")}      value={fmt(ind.tareas_pendientes)}
               color={ind.tareas_pendientes > 0 ? 'text-amber-600' : 'text-slate-700'} />
-            <Indicador label="Urgentes"        value={fmt(ind.tareas_urgentes)}
+            <Indicador label={t("Urgentes")}        value={fmt(ind.tareas_urgentes)}
               color={ind.tareas_urgentes > 0 ? 'text-rose-600' : 'text-slate-700'} />
-            <Indicador label="Vencidas"        value={fmt(ind.tareas_vencidas)}
+            <Indicador label={t("Vencidas")}        value={fmt(ind.tareas_vencidas)}
               color={ind.tareas_vencidas > 0 ? 'text-rose-600' : 'text-slate-700'} />
-            <Indicador label="Completadas"     value={fmt(ind.tareas_completadas)}
+            <Indicador label={t("Completadas")}     value={fmt(ind.tareas_completadas)}
               color={ind.tareas_completadas > 0 ? 'text-emerald-600' : 'text-slate-700'} />
 
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Documentación</p>
-            <Indicador label="Archivos" value={fmt(ind.total_archivos)} />
-            <Indicador label="Notas"    value={fmt(ind.total_notas)} />
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{t("Documentación")}</p>
+            <Indicador label={t("Archivos")} value={fmt(ind.total_archivos)} />
+            <Indicador label={t("Notas")}    value={fmt(ind.total_notas)} />
 
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Actividad</p>
-            <Indicador label="Actuaciones"      value={fmt(ind.total_actuaciones)}
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{t("Actividad")}</p>
+            <Indicador label={t("Actuaciones")}      value={fmt(ind.total_actuaciones)}
               color={ind.total_actuaciones > 0 ? 'text-blue-600' : 'text-slate-700'} />
-            <Indicador label="Días sin actuac." value={fmt(ind.dias_sin_actuacion, ' días')}
+            <Indicador label={t("Días sin actuac.")} value={fmt(ind.dias_sin_actuacion, ' días')}
               color={ind.dias_sin_actuacion != null && ind.dias_sin_actuacion > 30 ? 'text-amber-600' : 'text-slate-700'} />
-            <Indicador label="Días abierto"     value={fmt(ind.dias_desde_apertura, ' días')} />
+            <Indicador label={t("Días abierto")}     value={fmt(ind.dias_desde_apertura, ' días')} />
 
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Expediente</p>
-            <Indicador label="Estado"   value={ind.estado || '—'}
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{t("Expediente")}</p>
+            <Indicador label={t("Estado")}   value={ind.estado || '—'}
               color={ind.estado === 'Activo' ? 'text-emerald-600' : ind.estado === 'Cerrado' ? 'text-slate-400' : 'text-slate-700'} />
-            <Indicador label="Etapa"    value={ind.etapa || '—'} />
-            <Indicador label="Cobrado"  value={fmtMoney(ind.total_cobrado)} color="text-emerald-600" />
-            <Indicador label="Saldo"    value={fmtMoney(ind.saldo)}
+            <Indicador label={t("Etapa")}    value={ind.etapa || '—'} />
+            <Indicador label={t("Cobrado")}  value={fmtMoney(ind.total_cobrado)} color="text-emerald-600" />
+            <Indicador label={t("Saldo")}    value={fmtMoney(ind.saldo)}
               color={ind.saldo > 0 ? 'text-amber-600' : ind.saldo < 0 ? 'text-emerald-600' : 'text-slate-700'} />
           </div>
         )}
@@ -5293,7 +5213,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
     });
 
   const handleDeleteMessage = async (messageId: string) => {
-    const confirmed = await confirmar({ titulo: "¿Borrar este mensaje?", mensaje: "Se eliminará de la conversación asociada al expediente.", confirmar: "Borrar mensaje", peligro: true });
+    const confirmed = await confirmar({ titulo: t("¿Borrar este mensaje?"), mensaje: t("Se eliminará de la conversación asociada al expediente."), confirmar: t("Borrar mensaje"), peligro: true });
     if (!confirmed) return;
     setDeletingMessageId(messageId);
     setActionError("");
@@ -5305,7 +5225,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
       });
       const data = await safeJson(res);
       if (!res.ok) {
-        throw new Error(data?.error || "No se pudo borrar el mensaje");
+        throw new Error(data?.error || t("No se pudo borrar el mensaje"));
       }
       setSesiones(prev =>
         prev.map(sesion => ({
@@ -5315,7 +5235,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
         }))
       );
     } catch (e: any) {
-      setActionError(e?.message || "No se pudo borrar el mensaje");
+      setActionError(e?.message || t("No se pudo borrar el mensaje"));
     } finally {
       setDeletingMessageId(null);
     }
@@ -5323,9 +5243,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
-        Cargando conversaciones…
-      </div>
+      <div className="flex items-center justify-center py-16 text-slate-400 text-sm">{t("Cargando conversaciones…")}</div>
     );
   }
 
@@ -5333,8 +5251,8 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400">
         <MessageSquare size={40} className="mb-3 opacity-30" />
-        <p className="text-sm font-medium">Sin conversaciones registradas</p>
-        <p className="text-xs mt-1">Asocia este expediente desde el chat para registrar conversaciones.</p>
+        <p className="text-sm font-medium">{t("Sin conversaciones registradas")}</p>
+        <p className="text-xs mt-1">{t("Asocia este expediente desde el chat para registrar conversaciones.")}</p>
       </div>
     );
   }
@@ -5363,14 +5281,12 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
                     <span className="text-[11px] text-slate-400 shrink-0">→ {fmt(s.cerrado_at)}</span>
                   )}
                   {!s.cerrado_at && (
-                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                      En curso
-                    </span>
+                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">{t("En curso")}</span>
                   )}
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">
-                  {s.iniciado_por_nombre ? `Asociado por ${s.iniciado_por_nombre} · ` : ""}
-                  {(s.total_mensajes ?? s.mensajes.length)} mensaje{(s.total_mensajes ?? s.mensajes.length) !== 1 ? 's' : ''}
+                  {s.iniciado_por_nombre ? t("Asociado por {iniciado_por_nombre} · ", { iniciado_por_nombre: s.iniciado_por_nombre }) : ""}
+                  {(s.total_mensajes ?? s.mensajes.length)}{" "}{t("mensaje")}{(s.total_mensajes ?? s.mensajes.length) !== 1 ? 's' : ''}
                 </div>
               </div>
               <svg
@@ -5384,7 +5300,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
             {expanded && (
               <div className="border-t border-slate-100 bg-slate-50/50 divide-y divide-slate-100">
                 {s.mensajes.length === 0 ? (
-                  <div className="px-4 py-3 text-xs text-slate-400 italic">Sin mensajes en este período.</div>
+                  <div className="px-4 py-3 text-xs text-slate-400 italic">{t("Sin mensajes en este período.")}</div>
                 ) : (
                   s.mensajes.map(m => (
                     <div key={m.id} className="flex gap-3 px-4 py-2.5">
@@ -5393,13 +5309,13 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 mb-0.5">
-                          <span className="font-semibold text-[13px] text-slate-800">{m.autor_nombre || m.user_name || 'Desconocido'}</span>
+                          <span className="font-semibold text-[13px] text-slate-800">{m.autor_nombre || m.user_name || t("Desconocido")}</span>
                           <span className="text-[11px] text-slate-400">
                             {new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         {m.tipo === 'archivo' ? (
-                          <span className="text-xs text-slate-500 italic">📎 {m.file_name || 'Archivo adjunto'}</span>
+                          <span className="text-xs text-slate-500 italic">📎 {m.file_name || t("Archivo adjunto")}</span>
                         ) : (
                           <p className="text-sm text-slate-700 break-words">{m.contenido}</p>
                         )}
@@ -5409,11 +5325,9 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
                         onClick={() => handleDeleteMessage(m.id)}
                         disabled={deletingMessageId === m.id}
                         className="peligro self-start inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                        title="Borrar mensaje"
+                        title={t("Borrar mensaje")}
                       >
-                        {deletingMessageId === m.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                        Borrar
-                      </button>
+                        {deletingMessageId === m.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}{t("Borrar")}</button>
                     </div>
                   ))
                 )}
@@ -5554,7 +5468,7 @@ export default function ExpedienteDetail() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo cargar el expediente");
+      if (!res.ok) throw new Error(d.error || t("No se pudo cargar el expediente"));
       setExp(d.data);
     } catch (e: any) {
       setError(e.message);
@@ -5618,7 +5532,7 @@ export default function ExpedienteDetail() {
   // conflict:true en vez de sobreescribir en silencio -- se ofrece recargar
   // en vez de un simple "error al guardar" que no explica qué pasó.
   const handleConflict = async (d: any): Promise<boolean> => {
-    if (await confirmar({ titulo: "Alguien ha cambiado este expediente mientras lo editabas", mensaje: `${d.error}\n\n¿Recargar el expediente ahora? Perderás los cambios que no hayas guardado.`, confirmar: "Recargar" })) {
+    if (await confirmar({ titulo: t("Alguien ha cambiado este expediente mientras lo editabas"), mensaje: t("{error}\n\n¿Recargar el expediente ahora? Perderás los cambios que no hayas guardado.", { error: d.error }), confirmar: t("Recargar") })) {
       setEditing(false);
       await fetchExp();
     }
@@ -5637,7 +5551,7 @@ export default function ExpedienteDetail() {
       const d = await safeJson(res);
       if (!res.ok) {
         if (res.status === 409 && d.conflict) { await handleConflict(d); return; }
-        aviso(d.error || "Error al guardar");
+        aviso(d.error || t("Error al guardar"));
         return;
       }
       setEditing(false);
@@ -5659,7 +5573,7 @@ export default function ExpedienteDetail() {
     const d = await safeJson(res);
     if (!res.ok) {
       if (res.status === 409 && d.conflict) return await handleConflict(d);
-      aviso(d.error || "Error al guardar");
+      aviso(d.error || t("Error al guardar"));
       return false;
     }
     await fetchExp();
@@ -5681,7 +5595,7 @@ export default function ExpedienteDetail() {
         body: JSON.stringify(patch),
       });
       const d = await safeJson(res);
-      if (!res.ok) { aviso(d.error || "Error al cambiar el estado"); return; }
+      if (!res.ok) { aviso(d.error || t("Error al cambiar el estado")); return; }
       await fetchExp();
       setHistorial(null);
     } catch (e: any) {
@@ -5705,7 +5619,7 @@ export default function ExpedienteDetail() {
         body: JSON.stringify({ estado: "abierto" }),
       });
       const d = await safeJson(res);
-      if (!res.ok) { aviso(d.error || "Error al desarchivar"); return; }
+      if (!res.ok) { aviso(d.error || t("Error al desarchivar")); return; }
       await fetchExp();
       setHistorial(null);
     } catch (e: any) {
@@ -5718,7 +5632,7 @@ export default function ExpedienteDetail() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Spinner size="xl" label="Cargando expediente..." />
+        <Spinner size="xl" label={t("Cargando expediente...")} />
       </div>
     );
   }
@@ -5727,20 +5641,19 @@ export default function ExpedienteDetail() {
     return (
       <div className="space-y-4">
         <Link to="/dashboard/expedientes">
-          <BackButton label="Volver a expedientes" />
+          <BackButton label={t("Volver a expedientes")} />
         </Link>
         <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
           <AlertCircle size={20} className="shrink-0" />
           <div className="flex-1">
-            <p className="font-bold text-sm">Error al cargar</p>
+            <p className="font-bold text-sm">{t("Error al cargar")}</p>
             <p className="text-xs mt-0.5">{error}</p>
           </div>
           <button
             onClick={fetchExp}
             className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
-            <RefreshCw size={12} /> Reintentar
-          </button>
+            <RefreshCw size={12} />{" "}{t("Reintentar")}</button>
         </div>
       </div>
     );
@@ -5864,7 +5777,7 @@ export default function ExpedienteDetail() {
           <div className="flex flex-col justify-center min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight truncate">
-                {exp.descripcion || "Sin descripción"}
+                {exp.descripcion || t("Sin descripción")}
               </h1>
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${estadoConf.color}`}>
                 {estadoConf.label}
@@ -5876,7 +5789,7 @@ export default function ExpedienteDetail() {
             <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500 flex-wrap">
               {exp.tipos_asunto && <span className="font-bold text-slate-700 tracking-wide uppercase">{exp.tipos_asunto}</span>}
               <span className="flex items-center gap-1.5"><Hash size={11} className="text-slate-400" /> {exp.anio}/{exp.num_exp}</span>
-              {exp.fecha_inicio && <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" /> Alta: {fmtDate(exp.fecha_inicio)}</span>}
+              {exp.fecha_inicio && <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" />{" "}{t("Alta:")}{" "}{fmtDate(exp.fecha_inicio)}</span>}
             </div>
           </div>
         </div>
@@ -5888,49 +5801,40 @@ export default function ExpedienteDetail() {
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
             >
-              <ExternalLink size={14} className="text-slate-400" /> Ir a carpeta
-            </a>
+              <ExternalLink size={14} className="text-slate-400" />{" "}{t("Ir a carpeta")}</a>
           )}
           <button
             onClick={() => navigate(`/dashboard/calculadora?expediente=${exp.id}`)}
-            title="Tasación de costas y jura de cuentas con los datos de este expediente"
+            title={t("Tasación de costas y jura de cuentas con los datos de este expediente")}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Calculator size={14} className="text-slate-400" /> Costas
-          </button>
+            <Calculator size={14} className="text-slate-400" />{" "}{t("Costas")}</button>
           <button
             onClick={openPlaudModal}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
           >
-            <Mic size={14} className="text-slate-400" /> Plaud
-          </button>
+            <Mic size={14} className="text-slate-400" />{" "}{t("Plaud")}</button>
           <ClaudeExpediente expedienteId={exp.id} referencia={`${exp.anio}/${exp.num_exp}`} />
           <BackButton onClick={() => navigate("/dashboard/expedientes")} />
           {editing ? (
             <>
               <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all">
-                <X size={14} /> Cancelar
-              </button>
+                <X size={14} />{" "}{t("Cancelar")}</button>
               <button onClick={() => handleSave(editForm)} disabled={saving || !editForm?.descripcion?.trim()} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
-              </button>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{" "}{t("Guardar cambios")}</button>
             </>
           ) : exp?.estado === "archivado" ? (
             <button onClick={handleUnarchive} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Quitar de archivado
-            </button>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Quitar de archivado")}</button>
           ) : exp?.estado === "cerrado" ? (
             <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Reabrir expediente
-            </button>
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Reabrir expediente")}</button>
           ) : (
             <>
               <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="text-slate-400" />} Cerrar exp.
-              </button>
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="text-slate-400" />}{" "}{t("Cerrar exp.")}</button>
               <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
-                <Edit3 size={14} /> Editar
-              </button>
+                <Edit3 size={14} />{" "}{t("Editar")}</button>
             </>
           )}
         </div>
@@ -5942,7 +5846,7 @@ export default function ExpedienteDetail() {
 
           {/* Columna 1: Nav vertical */}
           <div className="anim-fade-up w-full flex-shrink-0 lg:w-56 lg:sticky lg:top-6" style={{ animationDelay: '60ms' }}>
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">{t("Secciones del Expediente")}</h3>
             <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
               {DETAIL_TABS.slice(0, 8).map((tabItem) => {
                 const Icon = tabItem.icon;
@@ -5980,55 +5884,55 @@ export default function ExpedienteDetail() {
             {exp.estado === "archivado" && !editing && (
               <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
                 <X size={15} className="shrink-0 text-slate-400" />
-                <span>Este expediente está <strong className="text-slate-700">archivado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Quitar de archivado</strong> para editarlo.</span>
+                <span>{t("Este expediente está")}{" "}<strong className="text-slate-700">{t("archivado")}</strong>{t(". No se pueden realizar modificaciones. Pulsa")}{" "}<strong className="text-emerald-700">{t("Quitar de archivado")}</strong>{" "}{t("para editarlo.")}</span>
               </div>
             )}
             {exp.estado === "cerrado" && !editing && (
               <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
                 <X size={15} className="shrink-0 text-slate-400" />
-                <span>Este expediente está <strong className="text-slate-700">cerrado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Reabrir expediente</strong> para editarlo.</span>
+                <span>{t("Este expediente está")}{" "}<strong className="text-slate-700">{t("cerrado")}</strong>{t(". No se pueden realizar modificaciones. Pulsa")}{" "}<strong className="text-emerald-700">{t("Reabrir expediente")}</strong>{" "}{t("para editarlo.")}</span>
               </div>
             )}
             <div>
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
-                <Section title="Identificación" icon={FolderOpen} cols={4}>
-                  <Field label="Núm. expediente" value={`${exp.anio}/${exp.num_exp}`} mono />
-                  <Field label="Fecha alta" value={fmtDate(exp.fecha_inicio)} />
-                  <Field label="Fecha cierre" value={fmtDate(exp.fecha_cierre)} />
-                  <Field label="Descripción" value={exp.descripcion} wide />
-                  <Field label="Tipo" value={tipoConf.label} />
-                  <Field label="Tipos de asunto" value={exp.tipos_asunto} />
-                  <Field label="Etapa" value={exp.etapa} />
+                <Section title={t("Identificación")} icon={FolderOpen} cols={4}>
+                  <Field label={t("Núm. expediente")} value={`${exp.anio}/${exp.num_exp}`} mono />
+                  <Field label={t("Fecha alta")} value={fmtDate(exp.fecha_inicio)} />
+                  <Field label={t("Fecha cierre")} value={fmtDate(exp.fecha_cierre)} />
+                  <Field label={t("Descripción")} value={exp.descripcion} wide />
+                  <Field label={t("Tipo")} value={tipoConf.label} />
+                  <Field label={t("Tipos de asunto")} value={exp.tipos_asunto} />
+                  <Field label={t("Etapa")} value={exp.etapa} />
                 </Section>
                 <DocumentosBaseExpediente expedienteId={exp.id} bloqueado={exp.estado === "cerrado"} />
 
-                <Section title="Procedimiento judicial" icon={Scale} cols={3}>
-                  <Field label="Tipo de procedimiento" value={exp.tipo_proc} />
-                  <Field label="Juzgado / Tribunal" value={exp.juzgado} />
-                  <Field label="Procurador propio" value={exp.procurador} />
+                <Section title={t("Procedimiento judicial")} icon={Scale} cols={3}>
+                  <Field label={t("Tipo de procedimiento")} value={exp.tipo_proc} />
+                  <Field label={t("Juzgado / Tribunal")} value={exp.juzgado} />
+                  <Field label={t("Procurador propio")} value={exp.procurador} />
                   <Field label="N.I.G." value={exp.nig} mono />
-                  <Field label="Núm. autos" value={exp.num_autos} mono />
+                  <Field label={t("Núm. autos")} value={exp.num_autos} mono />
                 </Section>
 
-                <Section title="Cuantías económicas" icon={ClipboardList} cols={4}>
-                  <Field label="Cuantía principal" value={fmtMoney(exp.cuantia_principal)} />
-                  <Field label="Intereses" value={fmtMoney(exp.intereses)} />
-                  <Field label="Costas" value={fmtMoney(exp.costas)} />
-                  <Field label="Cuantía total" value={fmtMoney(exp.cuantia_total)} />
-                  <Field label="Importe" value={fmtMoney(exp.importe)} />
-                  <Field label="Indeterminada" value={exp.indeterminado ? "Sí" : "No"} />
+                <Section title={t("Cuantías económicas")} icon={ClipboardList} cols={4}>
+                  <Field label={t("Cuantía principal")} value={fmtMoney(exp.cuantia_principal)} />
+                  <Field label={t("Intereses")} value={fmtMoney(exp.intereses)} />
+                  <Field label={t("Costas")} value={fmtMoney(exp.costas)} />
+                  <Field label={t("Cuantía total")} value={fmtMoney(exp.cuantia_total)} />
+                  <Field label={t("Importe")} value={fmtMoney(exp.importe)} />
+                  <Field label={t("Indeterminada")} value={exp.indeterminado ? "Sí" : "No"} />
                 </Section>
 
-                <Section title="Partes y referencias" icon={MoreHorizontal} cols={4}>
-                  <Field label="Cliente" value={exp.cliente_nombre} />
-                  <Field label="Parte contraria" value={exp.contrario} />
-                  <Field label="Persona contacto" value={exp.persona_contacto} />
-                  <Field label="Contacto" value={exp.contacto} />
-                  <Field label="Ref. propia" value={exp.ref_propia} mono />
-                  <Field label="Ref. expediente" value={exp.ref_expediente} mono />
-                  <Field label="Centro" value={exp.centro} />
-                  <Field label="Color" value={exp.color !== "ninguno" ? exp.color : "—"} />
+                <Section title={t("Partes y referencias")} icon={MoreHorizontal} cols={4}>
+                  <Field label={t("Cliente")} value={exp.cliente_nombre} />
+                  <Field label={t("Parte contraria")} value={exp.contrario} />
+                  <Field label={t("Persona contacto")} value={exp.persona_contacto} />
+                  <Field label={t("Contacto")} value={exp.contacto} />
+                  <Field label={t("Ref. propia")} value={exp.ref_propia} mono />
+                  <Field label={t("Ref. expediente")} value={exp.ref_expediente} mono />
+                  <Field label={t("Centro")} value={exp.centro} />
+                  <Field label={t("Color")} value={exp.color !== "ninguno" ? exp.color : "—"} />
                 </Section>
               </div>
             )}
@@ -6039,23 +5943,23 @@ export default function ExpedienteDetail() {
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                     <FolderOpen size={14} className="text-slate-400" />
-                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Identificación")}</h3>
                   </div>
                   <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <EF label="Núm. expediente" mono><span className="text-sm font-mono text-slate-600">{editForm.anio}/{editForm.num_exp}</span></EF>
-                    <EF label="Fecha alta"><input type="date" value={editForm.fecha_inicio} onChange={e => setEF("fecha_inicio", e.target.value)} className={EI} /></EF>
-                    <EF label="Fecha cierre"><input type="date" value={editForm.fecha_cierre} onChange={e => setEF("fecha_cierre", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Núm. expediente")} mono><span className="text-sm font-mono text-slate-600">{editForm.anio}/{editForm.num_exp}</span></EF>
+                    <EF label={t("Fecha alta")}><input type="date" value={editForm.fecha_inicio} onChange={e => setEF("fecha_inicio", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Fecha cierre")}><input type="date" value={editForm.fecha_cierre} onChange={e => setEF("fecha_cierre", e.target.value)} className={EI} /></EF>
                     <div className="col-span-2 md:col-span-4">
-                      <EF label="Descripción *"><input value={editForm.descripcion} onChange={e => setEF("descripcion", e.target.value)} className={EI} placeholder="Descripción del expediente" /></EF>
+                      <EF label={t("Descripción *")}><input value={editForm.descripcion} onChange={e => setEF("descripcion", e.target.value)} className={EI} placeholder={t("Descripción del expediente")} /></EF>
                     </div>
-                    <EF label="Tipo">
+                    <EF label={t("Tipo")}>
                       <select value={editForm.tipo} onChange={e => setEF("tipo", e.target.value)} className={EI}>
                         {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select>
                     </EF>
-                    <EF label="Tipos de asunto"><input value={editForm.tipos_asunto} onChange={e => setEF("tipos_asunto", e.target.value)} className={EI} placeholder="Ej. Civil, Penal…" /></EF>
-                    <EF label="Etapa"><input value={editForm.etapa} onChange={e => setEF("etapa", e.target.value)} className={EI} placeholder="Ej. Instrucción" /></EF>
-                    <EF label="Color">
+                    <EF label={t("Tipos de asunto")}><input value={editForm.tipos_asunto} onChange={e => setEF("tipos_asunto", e.target.value)} className={EI} placeholder={t("Ej. Civil, Penal…")} /></EF>
+                    <EF label={t("Etapa")}><input value={editForm.etapa} onChange={e => setEF("etapa", e.target.value)} className={EI} placeholder={t("Ej. Instrucción")} /></EF>
+                    <EF label={t("Color")}>
                       <select value={editForm.color} onChange={e => setEF("color", e.target.value)} className={EI}>
                         {["ninguno","rojo","azul","verde","amarillo","naranja","morado"].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                       </select>
@@ -6067,16 +5971,16 @@ export default function ExpedienteDetail() {
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                     <Scale size={14} className="text-slate-400" />
-                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Procedimiento judicial</h3>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Procedimiento judicial")}</h3>
                   </div>
                   <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <EF label="Tipo de procedimiento"><input value={editForm.tipo_proc} onChange={e => setEF("tipo_proc", e.target.value)} className={EI} placeholder="Ej. Juicio Ordinario" /></EF>
+                    <EF label={t("Tipo de procedimiento")}><input value={editForm.tipo_proc} onChange={e => setEF("tipo_proc", e.target.value)} className={EI} placeholder={t("Ej. Juicio Ordinario")} /></EF>
                     <div className="col-span-2">
-                      <EF label="Juzgado / Tribunal"><input value={editForm.juzgado} onChange={e => setEF("juzgado", e.target.value)} className={EI} placeholder="Nombre del juzgado" /></EF>
+                      <EF label={t("Juzgado / Tribunal")}><input value={editForm.juzgado} onChange={e => setEF("juzgado", e.target.value)} className={EI} placeholder={t("Nombre del juzgado")} /></EF>
                     </div>
-                    <EF label="Procurador propio"><input value={editForm.procurador} onChange={e => setEF("procurador", e.target.value)} className={EI} /></EF>
-                    <EF label="N.I.G." mono><input value={editForm.nig} onChange={e => setEF("nig", e.target.value)} className={EI + " font-mono"} placeholder="NIG del procedimiento" /></EF>
-                    <EF label="Núm. autos" mono><input value={editForm.num_autos} onChange={e => setEF("num_autos", e.target.value)} className={EI + " font-mono"} placeholder="0000/0000" /></EF>
+                    <EF label={t("Procurador propio")}><input value={editForm.procurador} onChange={e => setEF("procurador", e.target.value)} className={EI} /></EF>
+                    <EF label="N.I.G." mono><input value={editForm.nig} onChange={e => setEF("nig", e.target.value)} className={EI + " font-mono"} placeholder={t("NIG del procedimiento")} /></EF>
+                    <EF label={t("Núm. autos")} mono><input value={editForm.num_autos} onChange={e => setEF("num_autos", e.target.value)} className={EI + " font-mono"} placeholder="0000/0000" /></EF>
                   </div>
                 </div>
 
@@ -6084,18 +5988,18 @@ export default function ExpedienteDetail() {
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                     <ClipboardList size={14} className="text-slate-400" />
-                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cuantías económicas</h3>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Cuantías económicas")}</h3>
                   </div>
                   <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <EF label="Cuantía principal (€)"><input type="number" step="0.01" value={editForm.cuantia_principal} onChange={e => setEF("cuantia_principal", e.target.value)} className={EI} placeholder="0.00" /></EF>
-                    <EF label="Intereses (€)"><input type="number" step="0.01" value={editForm.intereses} onChange={e => setEF("intereses", e.target.value)} className={EI} placeholder="0.00" /></EF>
-                    <EF label="Costas (€)"><input type="number" step="0.01" value={editForm.costas} onChange={e => setEF("costas", e.target.value)} className={EI} placeholder="0.00" /></EF>
-                    <EF label="Cuantía total (€)"><input type="number" step="0.01" value={editForm.cuantia_total} onChange={e => setEF("cuantia_total", e.target.value)} className={EI} placeholder="0.00" /></EF>
-                    <EF label="Importe (€)"><input type="number" step="0.01" value={editForm.importe} onChange={e => setEF("importe", e.target.value)} className={EI} placeholder="0.00" /></EF>
-                    <EF label="Indeterminada">
+                    <EF label={t("Cuantía principal (€)")}><input type="number" step="0.01" value={editForm.cuantia_principal} onChange={e => setEF("cuantia_principal", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label={t("Intereses (€)")}><input type="number" step="0.01" value={editForm.intereses} onChange={e => setEF("intereses", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label={t("Costas (€)")}><input type="number" step="0.01" value={editForm.costas} onChange={e => setEF("costas", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label={t("Cuantía total (€)")}><input type="number" step="0.01" value={editForm.cuantia_total} onChange={e => setEF("cuantia_total", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label={t("Importe (€)")}><input type="number" step="0.01" value={editForm.importe} onChange={e => setEF("importe", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label={t("Indeterminada")}>
                       <label className="flex items-center gap-2 mt-1 cursor-pointer">
                         <input type="checkbox" checked={Boolean(editForm.indeterminado)} onChange={e => setEF("indeterminado", e.target.checked)} className="w-4 h-4 accent-red-600" />
-                        <span className="text-sm text-slate-600">{editForm.indeterminado ? "Sí" : "No"}</span>
+                        <span className="text-sm text-slate-600">{editForm.indeterminado ? t("Sí") : t("No")}</span>
                       </label>
                     </EF>
                   </div>
@@ -6105,27 +6009,27 @@ export default function ExpedienteDetail() {
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                     <MoreHorizontal size={14} className="text-slate-400" />
-                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Partes y referencias</h3>
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Partes y referencias")}</h3>
                   </div>
                   <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <EF label="Cliente *">
+                    <EF label={t("Cliente *")}>
                       <select value={editForm.cliente_id} onChange={e => {
                         const c = clientes.find((x: any) => x.id === e.target.value);
                         setEF("cliente_id", e.target.value);
                         setEF("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || "" : "");
                       }} className={EI}>
-                        <option value="">— Sin cliente —</option>
+                        <option value="">{t("— Sin cliente —")}</option>
                         {clientes.map((c: any) => (
-                          <option key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}</option>
+                          <option key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || t("Cliente sin nombre")}</option>
                         ))}
                       </select>
                     </EF>
-                    <EF label="Parte contraria"><input value={editForm.contrario} onChange={e => setEF("contrario", e.target.value)} className={EI} /></EF>
-                    <EF label="Persona contacto"><input value={editForm.persona_contacto} onChange={e => setEF("persona_contacto", e.target.value)} className={EI} /></EF>
-                    <EF label="Contacto"><input value={editForm.contacto} onChange={e => setEF("contacto", e.target.value)} className={EI} /></EF>
-                    <EF label="Ref. propia" mono><input value={editForm.ref_propia} onChange={e => setEF("ref_propia", e.target.value)} className={EI + " font-mono"} /></EF>
-                    <EF label="Ref. expediente" mono><input value={editForm.ref_expediente} onChange={e => setEF("ref_expediente", e.target.value)} className={EI + " font-mono"} /></EF>
-                    <EF label="Centro"><input value={editForm.centro} onChange={e => setEF("centro", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Parte contraria")}><input value={editForm.contrario} onChange={e => setEF("contrario", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Persona contacto")}><input value={editForm.persona_contacto} onChange={e => setEF("persona_contacto", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Contacto")}><input value={editForm.contacto} onChange={e => setEF("contacto", e.target.value)} className={EI} /></EF>
+                    <EF label={t("Ref. propia")} mono><input value={editForm.ref_propia} onChange={e => setEF("ref_propia", e.target.value)} className={EI + " font-mono"} /></EF>
+                    <EF label={t("Ref. expediente")} mono><input value={editForm.ref_expediente} onChange={e => setEF("ref_expediente", e.target.value)} className={EI + " font-mono"} /></EF>
+                    <EF label={t("Centro")}><input value={editForm.centro} onChange={e => setEF("centro", e.target.value)} className={EI} /></EF>
                   </div>
                 </div>
               </div>
@@ -6172,12 +6076,12 @@ export default function ExpedienteDetail() {
             )}
 
             {tab === "juzgados" && (
-              <Section title="Juzgado y procedimiento" icon={Scale} cols={3}>
-                <Field label="Juzgado / Tribunal" value={exp.juzgado} />
-                <Field label="Tipo de procedimiento" value={exp.tipo_proc} />
+              <Section title={t("Juzgado y procedimiento")} icon={Scale} cols={3}>
+                <Field label={t("Juzgado / Tribunal")} value={exp.juzgado} />
+                <Field label={t("Tipo de procedimiento")} value={exp.tipo_proc} />
                 <Field label="N.I.G." value={exp.nig} mono />
-                <Field label="Núm. autos" value={exp.num_autos} mono />
-                <Field label="Procurador propio" value={exp.procurador} />
+                <Field label={t("Núm. autos")} value={exp.num_autos} mono />
+                <Field label={t("Procurador propio")} value={exp.procurador} />
               </Section>
             )}
 
@@ -6244,12 +6148,12 @@ export default function ExpedienteDetail() {
               const thead = (
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
-                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
-                    <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
-                    <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Núm.")}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Cliente")}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha")}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Vencimiento")}</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Total")}</th>
+                    <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</th>
                   </tr>
                 </thead>
               );
@@ -6261,7 +6165,7 @@ export default function ExpedienteDetail() {
                   {/* Divisor */}
                   <div className="flex items-center gap-3 pt-2">
                     <div className="flex-1 border-t border-slate-200" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturación vinculada</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Facturación vinculada")}</span>
                     <div className="flex-1 border-t border-slate-200" />
                   </div>
 
@@ -6270,26 +6174,26 @@ export default function ExpedienteDetail() {
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <BadgeEuro size={15} className="text-slate-400" />
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado (cliente)</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Facturado (cliente)")}</p>
                       </div>
                       <p className="text-2xl font-bold text-slate-800">{fmtMoney(totalFacturado)}</p>
-                      <p className="text-xs text-slate-400 mt-1">{allVisible.length} factura{allVisible.length !== 1 ? "s" : ""}</p>
+                      <p className="text-xs text-slate-400 mt-1">{allVisible.length}{" "}{t("factura")}{allVisible.length !== 1 ? "s" : ""}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp size={15} className="text-emerald-500" />
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Cobrado")}</p>
                       </div>
                       <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalCobrado)}</p>
-                      <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
+                      <p className="text-xs text-slate-400 mt-1">{t("facturas cobradas")}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingDown size={15} className="text-amber-500" />
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{t("Pendiente")}</p>
                       </div>
                       <p className="text-2xl font-bold text-amber-600">{fmtMoney(totalPendiente)}</p>
-                      <p className="text-xs text-slate-400 mt-1">por cobrar</p>
+                      <p className="text-xs text-slate-400 mt-1">{t("por cobrar")}</p>
                     </div>
                   </div>
 
@@ -6298,10 +6202,9 @@ export default function ExpedienteDetail() {
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Banknote size={14} className="text-slate-400" />
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas de este expediente</h3>
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Facturas de este expediente")}</h3>
                       </div>
-                      <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
-                        Ir a facturación <ChevronRight size={11} />
+                      <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">{t("Ir a facturación")}{" "}<ChevronRight size={11} />
                       </Link>
                     </div>
                     {billingLoading ? (
@@ -6309,8 +6212,8 @@ export default function ExpedienteDetail() {
                     ) : expFacturas.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                         <Banknote size={24} className="opacity-30" />
-                        <p className="text-sm font-medium">Sin facturas vinculadas a este expediente</p>
-                        <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear factura</Link>
+                        <p className="text-sm font-medium">{t("Sin facturas vinculadas a este expediente")}</p>
+                        <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("Crear factura")}</Link>
                       </div>
                     ) : (
                       <table className="w-full text-sm">
@@ -6327,8 +6230,8 @@ export default function ExpedienteDetail() {
                     <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                       <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                         <BadgeEuro size={14} className="text-slate-400" />
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Otras facturas del cliente</h3>
-                        <span className="ml-1 text-[10px] text-slate-400">(de otros expedientes o sin expediente)</span>
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Otras facturas del cliente")}</h3>
+                        <span className="ml-1 text-[10px] text-slate-400">{t("(de otros expedientes o sin expediente)")}</span>
                       </div>
                       <table className="w-full text-sm">
                         {thead}
@@ -6369,7 +6272,7 @@ export default function ExpedienteDetail() {
             {tab === "historial" && (() => {
               type HistIcon = React.FC<{ size?: number; className?: string }>;
               const TYPE_CFG: Record<string, { label: string; Icon: HistIcon; iconBg: string; iconColor: string; badge: string }> = {
-                alta:                    { label: "Alta",                Icon: FolderPlus   as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
+                alta:                    { label: "Alta@@historial",                Icon: FolderPlus   as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
                 cierre:                  { label: "Cierre",              Icon: Lock         as HistIcon, iconBg: "bg-red-100",      iconColor: "text-red-600",      badge: "bg-red-50 text-red-700 border-red-200"              },
                 reapertura:              { label: "Reapertura",          Icon: Unlock       as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
                 cambio:                  { label: "Cambio",              Icon: Edit3        as HistIcon, iconBg: "bg-slate-100",    iconColor: "text-slate-500",    badge: "bg-slate-50 text-slate-600 border-slate-200"        },
@@ -6400,10 +6303,10 @@ export default function ExpedienteDetail() {
 
               if (historialLoading) return (
                 <div className="flex items-center justify-center py-16">
-                  <Spinner size="sm" muted label="Cargando historial…" />
+                  <Spinner size="sm" muted label={t("Cargando historial…")} />
                 </div>
               );
-              if (!historial || historial.length === 0) return <EmptyTab icon={Activity} label="Sin historial por ahora" />;
+              if (!historial || historial.length === 0) return <EmptyTab icon={Activity} label={t("Sin historial por ahora")} />;
 
               // Group by day
               const groups: { day: string; label: string; events: any[] }[] = [];
@@ -6419,15 +6322,14 @@ export default function ExpedienteDetail() {
                   {/* Summary bar */}
                   <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 font-medium flex-wrap">
                     <Activity size={11} className="text-slate-400 shrink-0" />
-                    <span className="font-bold text-slate-700">{historial.length}</span> eventos registrados
-                    <span className="text-slate-300">·</span>
+                    <span className="font-bold text-slate-700">{historial.length}</span>{" "}{t("eventos registrados")}<span className="text-slate-300">·</span>
                     {Object.entries(
                       historial.reduce((acc: Record<string, number>, ev) => { acc[ev.type] = (acc[ev.type] || 0) + 1; return acc; }, {})
                     ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([type, count]) => {
                       const cfg = TYPE_CFG[type] || TYPE_CFG.cambio;
                       return (
                         <span key={type} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold ${cfg.badge}`}>
-                          {count} {cfg.label}
+                          {count} {tr(cfg.label)}
                         </span>
                       );
                     })}
@@ -6465,7 +6367,7 @@ export default function ExpedienteDetail() {
                               <div className={`flex-1 min-w-0 pb-2 ${isLast ? "" : ""}`}>
                                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
                                   <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border ${cfg.badge}`}>
-                                    {cfg.label}
+                                    {tr(cfg.label)}
                                   </span>
                                   {timeStr && (
                                     <time className="text-[11px] font-mono font-bold text-slate-400" title={fmtFull(ev.timestamp)}>
@@ -6499,8 +6401,7 @@ export default function ExpedienteDetail() {
                                         ev.meta.priority === 'urgente' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                                         ev.meta.priority === 'alta'    ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                         'bg-slate-50 text-slate-600 border-slate-200'
-                                      }`}>
-                                        Prioridad {ev.meta.priority}
+                                      }`}>{t("Prioridad")}{" "}{ev.meta.priority}
                                       </span>
                                     )}
                                     {ev.meta.estado && (
@@ -6534,13 +6435,11 @@ export default function ExpedienteDetail() {
                                       </span>
                                     )}
                                     {ev.meta.from && (
-                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">
-                                        De: {ev.meta.from}
+                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">{t("De:")}{" "}{ev.meta.from}
                                       </span>
                                     )}
                                     {ev.meta.to && (
-                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">
-                                        Para: {ev.meta.to}
+                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">{t("Para:")}{" "}{ev.meta.to}
                                       </span>
                                     )}
                                     {ev.meta.type && (
@@ -6549,8 +6448,7 @@ export default function ExpedienteDetail() {
                                       </span>
                                     )}
                                     {ev.meta.end_at && (
-                                      <span className="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-md font-medium">
-                                        hasta {fmtTime(ev.meta.end_at)}
+                                      <span className="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-md font-medium">{t("hasta")}{" "}{fmtTime(ev.meta.end_at)}
                                       </span>
                                     )}
                                     {ev.meta.snippet && (
@@ -6593,7 +6491,7 @@ export default function ExpedienteDetail() {
                   setGcalToken(token);
                   try { sessionStorage.setItem(GCAL_TOKEN_KEY, token); } catch {}
                 } catch (e: any) {
-                  setGcalError(e.message || "No se pudo conectar con Google Calendar.");
+                  setGcalError(e.message || t("No se pudo conectar con Google Calendar."));
                 }
               };
 
@@ -6624,7 +6522,7 @@ export default function ExpedienteDetail() {
                     body: JSON.stringify(body),
                   });
                   const d = await safeJson(res);
-                  if (!res.ok) { aviso(d.error || "Error al crear el evento"); return; }
+                  if (!res.ok) { aviso(d.error || t("Error al crear el evento")); return; }
                   let savedEvent = d.data;
 
                   // Si se pidió Meet y hay sesión de Google, se crea el evento allí
@@ -6664,7 +6562,7 @@ export default function ExpedienteDetail() {
                       if (syncRes.ok) {
                         savedEvent = syncJson.data;
                       } else {
-                        setGcalError(`El evento se guardó, pero no se pudo enlazar el Meet: ${syncJson?.error || "error desconocido"}.`);
+                        setGcalError(t("El evento se guardó, pero no se pudo enlazar el Meet: {v}.", { v: syncJson?.error || "error desconocido" }));
                       }
                     } catch (meetErr: any) {
                       if (meetErr.message === "GCAL_AUTH_EXPIRED") {
@@ -6674,9 +6572,9 @@ export default function ExpedienteDetail() {
                         // fallando en silencio con un token que ya no sirve.
                         setGcalToken(null);
                         try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
-                        setGcalError("El evento se guardó, pero tu sesión de Google había caducado. Conecta Google Meet de nuevo y añádelo editando el evento.");
+                        setGcalError(t("El evento se guardó, pero tu sesión de Google había caducado. Conecta Google Meet de nuevo y añádelo editando el evento."));
                       } else {
-                        setGcalError(`El evento se guardó, pero no se pudo generar el enlace de Meet: ${meetErr.message || "error desconocido"}.`);
+                        setGcalError(t("El evento se guardó, pero no se pudo generar el enlace de Meet: {v}.", { v: meetErr.message || "error desconocido" }));
                       }
                     }
                   }
@@ -6695,7 +6593,7 @@ export default function ExpedienteDetail() {
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Calendar size={14} className="text-slate-400" />
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{t("Eventos de agenda")}</h3>
                       </div>
                       <div className="flex items-center gap-2">
                         {exp?.estado !== "cerrado" && exp?.estado !== "archivado" && (
@@ -6709,11 +6607,9 @@ export default function ExpedienteDetail() {
                             }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                           >
-                            <Plus size={11} /> Nuevo evento
-                          </button>
+                            <Plus size={11} />{" "}{t("Nuevo evento")}</button>
                         )}
-                        <Link to="/dashboard/agenda" className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
-                          Ver agenda <ChevronRight size={11} />
+                        <Link to="/dashboard/agenda" className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">{t("Ver agenda")}{" "}<ChevronRight size={11} />
                         </Link>
                       </div>
                     </div>
@@ -6740,7 +6636,7 @@ export default function ExpedienteDetail() {
                               required
                               value={agendaForm.title}
                               onChange={e => setAgendaForm(f => ({ ...f, title: e.target.value }))}
-                              placeholder="Título del evento *"
+                              placeholder={t("Título del evento *")}
                               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
                             />
                           </div>
@@ -6750,20 +6646,20 @@ export default function ExpedienteDetail() {
                               onChange={e => setAgendaForm(f => ({ ...f, type: e.target.value }))}
                               className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
                             >
-                              <option value="cita">Cita</option>
-                              <option value="plazo">Plazo</option>
-                              <option value="reunion">Reunión</option>
-                              <option value="juicio">Juicio</option>
-                              <option value="otro">Otro</option>
+                              <option value="cita">{t("Cita")}</option>
+                              <option value="plazo">{t("Plazo")}</option>
+                              <option value="reunion">{t("Reunión")}</option>
+                              <option value="juicio">{t("Juicio")}</option>
+                              <option value="otro">{t("Otro")}</option>
                             </select>
                             <select
                               value={agendaForm.status}
                               onChange={e => setAgendaForm(f => ({ ...f, status: e.target.value }))}
                               className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
                             >
-                              <option value="pendiente">Pendiente</option>
-                              <option value="completado">Completado</option>
-                              <option value="cancelado">Cancelado</option>
+                              <option value="pendiente">{t("Pendiente")}</option>
+                              <option value="completado">{t("Completado")}</option>
+                              <option value="cancelado">{t("Cancelado")}</option>
                             </select>
                           </div>
                           <div className="flex items-center gap-4">
@@ -6773,9 +6669,7 @@ export default function ExpedienteDetail() {
                                 checked={agendaForm.all_day}
                                 onChange={e => setAgendaForm(f => ({ ...f, all_day: e.target.checked, with_meet: e.target.checked ? false : f.with_meet }))}
                                 className="rounded"
-                              />
-                              Todo el día
-                            </label>
+                              />{t("Todo el día")}</label>
                             {!agendaForm.all_day && (
                               gcalToken ? (
                                 <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
@@ -6785,30 +6679,28 @@ export default function ExpedienteDetail() {
                                     onChange={e => setAgendaForm(f => ({ ...f, with_meet: e.target.checked }))}
                                     className="rounded"
                                   />
-                                  <Video size={12} className="text-emerald-600" /> Añadir Google Meet
-                                </label>
+                                  <Video size={12} className="text-emerald-600" />{" "}{t("Añadir Google Meet")}</label>
                               ) : (
                                 <button type="button" onClick={connectGcal}
                                   className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors">
-                                  <Video size={12} /> Conectar Google Meet
-                                </button>
+                                  <Video size={12} />{" "}{t("Conectar Google Meet")}</button>
                               )
                             )}
                           </div>
                           {agendaForm.with_meet && (
                             <div className="sm:col-span-2">
-                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Invitar por correo (opcional)</label>
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t("Invitar por correo (opcional)")}</label>
                               <input
                                 type="email"
                                 value={agendaForm.guest_email}
                                 onChange={e => setAgendaForm(f => ({ ...f, guest_email: e.target.value }))}
-                                placeholder="correo@ejemplo.com"
+                                placeholder={t("correo@ejemplo.com")}
                                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
                               />
                             </div>
                           )}
                           <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t("Inicio *")}</label>
                             <input
                               required
                               type={agendaForm.all_day ? "date" : "datetime-local"}
@@ -6818,7 +6710,7 @@ export default function ExpedienteDetail() {
                             />
                           </div>
                           <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Fin</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{t("Fin")}</label>
                             <input
                               type={agendaForm.all_day ? "date" : "datetime-local"}
                               value={agendaForm.all_day ? agendaForm.end_at.slice(0, 10) : agendaForm.end_at}
@@ -6830,7 +6722,7 @@ export default function ExpedienteDetail() {
                             <input
                               value={agendaForm.description}
                               onChange={e => setAgendaForm(f => ({ ...f, description: e.target.value }))}
-                              placeholder="Descripción (opcional)"
+                              placeholder={t("Descripción (opcional)")}
                               className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
                             />
                           </div>
@@ -6838,13 +6730,9 @@ export default function ExpedienteDetail() {
                         <div className="flex items-center gap-2 pt-1">
                           <button type="submit" disabled={agendaSaving || !agendaForm.title.trim() || !agendaForm.start_at}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl transition-colors">
-                            {agendaSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            Guardar evento
-                          </button>
+                            {agendaSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}{t("Guardar evento")}</button>
                           <button type="button" onClick={() => setShowAgendaForm(false)}
-                            className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
-                            Cancelar
-                          </button>
+                            className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">{t("Cancelar")}</button>
                         </div>
                       </form>
                     )}
@@ -6856,22 +6744,20 @@ export default function ExpedienteDetail() {
                     ) : expEvents.length === 0 && !showAgendaForm ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
                         <Calendar size={28} className="opacity-30" />
-                        <p className="text-sm font-medium text-slate-400">Sin eventos vinculados a este expediente</p>
+                        <p className="text-sm font-medium text-slate-400">{t("Sin eventos vinculados a este expediente")}</p>
                         {exp?.estado !== "cerrado" && exp?.estado !== "archivado" && (
-                          <button onClick={() => setShowAgendaForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">
-                            + Crear primer evento
-                          </button>
+                          <button onClick={() => setShowAgendaForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">{t("+ Crear primer evento")}</button>
                         )}
                       </div>
                     ) : expEvents.length > 0 ? (
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-slate-100">
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
-                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Título")}</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Tipo")}</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha inicio")}</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Fecha fin")}</th>
+                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t("Estado")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -6882,10 +6768,9 @@ export default function ExpedienteDetail() {
                                   {e.title}
                                   {e.meet_url && (
                                     <a href={e.meet_url} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()}
-                                      title="Unirse a Google Meet"
+                                      title={t("Unirse a Google Meet")}
                                       className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">
-                                      <Video size={10} /> Meet
-                                    </a>
+                                      <Video size={10} />{" "}{t("Meet")}</a>
                                   )}
                                 </div>
                               </td>
@@ -6939,7 +6824,7 @@ export default function ExpedienteDetail() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
                   <Mic size={15} className="text-violet-600" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-800">Conectar con Plaud</h3>
+                <h3 className="text-sm font-bold text-slate-800">{t("Conectar con Plaud")}</h3>
               </div>
               <button onClick={() => setPlaudModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
@@ -6951,12 +6836,8 @@ export default function ExpedienteDetail() {
               ) : plaudStatus?.connected ? (
                 <>
                   <p className="mb-3 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
-                    <Check size={13} /> Este expediente está conectado
-                  </p>
-                  <p className="mb-2 text-xs text-slate-500">
-                    Pega este enlace en Zapier, como la URL de la acción <strong>"Webhooks by Zapier &rarr; POST"</strong>,
-                    cuando Plaud termine una transcripción nueva:
-                  </p>
+                    <Check size={13} />{" "}{t("Este expediente está conectado")}</p>
+                  <p className="mb-2 text-xs text-slate-500">{t("Pega este enlace en Zapier, como la URL de la acción")}{" "}<strong>{t("\"Webhooks by Zapier → POST\"")}</strong>{t(", cuando Plaud termine una transcripción nueva:")}</p>
                   <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                     <code className="flex-1 truncate text-[11px] text-slate-600">{plaudStatus.webhookUrl}</code>
                     <button
@@ -6966,37 +6847,28 @@ export default function ExpedienteDetail() {
                         setTimeout(() => setPlaudCopied(false), 1500);
                       }}
                       className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-200"
-                      title="Copiar"
+                      title={t("Copiar")}
                     >
                       {plaudCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
                     </button>
                   </div>
-                  <p className="mt-3 text-[11px] leading-5 text-slate-400">
-                    En el título de la grabación en Plaud pon lo que quieras — la transcripción y el resumen se guardan
-                    como nota en este expediente, y el audio se adjunta como documento.
-                  </p>
+                  <p className="mt-3 text-[11px] leading-5 text-slate-400">{t("En el título de la grabación en Plaud pon lo que quieras — la transcripción y el resumen se guardan como nota en este expediente, y el audio se adjunta como documento.")}</p>
                   <button
                     onClick={disconnectPlaud}
                     disabled={plaudLoading}
                     className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
                   >
-                    {plaudLoading ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Desconectar
-                  </button>
+                    {plaudLoading ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}{" "}{t("Desconectar")}</button>
                 </>
               ) : (
                 <>
-                  <p className="mb-4 text-xs leading-5 text-slate-500">
-                    Genera un enlace único para este expediente. Al configurarlo en Zapier junto con tu cuenta de Plaud,
-                    cada grabación nueva se guardará aquí automáticamente: la transcripción como nota, y el audio como
-                    documento adjunto.
-                  </p>
+                  <p className="mb-4 text-xs leading-5 text-slate-500">{t("Genera un enlace único para este expediente. Al configurarlo en Zapier junto con tu cuenta de Plaud, cada grabación nueva se guardará aquí automáticamente: la transcripción como nota, y el audio como documento adjunto.")}</p>
                   <button
                     onClick={connectPlaud}
                     disabled={plaudLoading}
                     className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
                   >
-                    {plaudLoading ? <Loader2 size={14} className="animate-spin" /> : <Mic size={14} />} Generar enlace de conexión
-                  </button>
+                    {plaudLoading ? <Loader2 size={14} className="animate-spin" /> : <Mic size={14} />}{" "}{t("Generar enlace de conexión")}</button>
                 </>
               )}
             </div>

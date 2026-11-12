@@ -23,13 +23,25 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { t } from '../lib/i18n';
 
 // ── Saludo por hora ───────────────────────────────────────────────────────────
+/** El registro de actividad llega del servidor en español: se traducen las
+ *  frases conocidas (con su dato variable) y el resto sale tal cual. */
+function textoActividad(s?: string | null): string {
+  if (!s) return "";
+  const m = s.match(/^Inicio de sesión desde (.+)$/);
+  if (m) return t("Inicio de sesión desde {ip}", { ip: m[1] });
+  const c = s.match(/^Cierre de sesión desde (.+)$/);
+  if (c) return t("Cierre de sesión desde {ip}", { ip: c[1] });
+  return t(s);
+}
+
 function getGreeting(): string {
   const h = new Date().getHours();
-  if (h >= 6 && h < 12) return "Buenos días";
-  if (h >= 12 && h < 20) return "Buenas tardes";
-  return "Buenas noches";
+  if (h >= 6 && h < 12) return t("Buenos días");
+  if (h >= 12 && h < 20) return t("Buenas tardes");
+  return t("Buenas noches");
 }
 
 // ── Clima ─────────────────────────────────────────────────────────────────────
@@ -218,8 +230,8 @@ function WidgetPickerModal({ visible, isAdmin, onClose, onSave }: { visible: str
       <div className="flex max-h-[76vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Dashboard</p>
-            <h3 className="mt-1 text-xl font-bold text-slate-900">Elegir elementos</h3>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">{t("Dashboard")}</p>
+            <h3 className="mt-1 text-xl font-bold text-slate-900">{t("Elegir elementos")}</h3>
           </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
@@ -239,8 +251,8 @@ function WidgetPickerModal({ visible, isAdmin, onClose, onSave }: { visible: str
           ))}
         </div>
         <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
-          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-          <button onClick={() => { onSave(sel); onClose(); }} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700">Guardar</button>
+          <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
+          <button onClick={() => { onSave(sel); onClose(); }} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700">{t("Guardar")}</button>
         </div>
       </div>
     </div>
@@ -303,12 +315,12 @@ function EmailPreviewModal({
       >
         <div className="shrink-0 flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
           {loading || !data ? (
-            <div className="flex items-center gap-2 text-sm text-slate-400"><Spinner size="sm" muted /> Cargando…</div>
+            <div className="flex items-center gap-2 text-sm text-slate-400"><Spinner size="sm" muted />{" "}{t("Cargando…")}</div>
           ) : (
             <div className="min-w-0">
-              <h3 className="text-base font-bold text-slate-900 truncate">{data.subject || "(Sin asunto)"}</h3>
+              <h3 className="text-base font-bold text-slate-900 truncate">{data.subject || t("(Sin asunto)")}</h3>
               <p className="mt-1 text-xs text-slate-500 truncate">
-                <span className="font-semibold text-slate-700">{data.from_name || data.from_email || "Desconocido"}</span>
+                <span className="font-semibold text-slate-700">{data.from_name || data.from_email || t("Desconocido")}</span>
                 {data.from_name && data.from_email ? ` · ${data.from_email}` : ""}
                 {data.sent_at ? ` · ${new Date(data.sent_at).toLocaleString("es-ES")}` : ""}
               </p>
@@ -322,7 +334,7 @@ function EmailPreviewModal({
           ) : (
             <iframe
               srcDoc={buildEmailPreviewDoc(data.body_html, data.body_text)}
-              title="Vista previa del correo"
+              title={t("Vista previa del correo")}
               sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
               className="block w-full border-0"
               style={{ height: "50vh" }}
@@ -335,22 +347,19 @@ function EmailPreviewModal({
             disabled={deleting || loading}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
           >
-            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Eliminar
-          </button>
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}{" "}{t("Eliminar")}</button>
           <button
             onClick={onReply}
             disabled={loading}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            <Reply size={13} /> Responder
-          </button>
+            <Reply size={13} />{" "}{t("Responder")}</button>
           <button
             onClick={onOpenFull}
             disabled={loading}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
           >
-            <ExternalLink size={13} /> Abrir completo
-          </button>
+            <ExternalLink size={13} />{" "}{t("Abrir completo")}</button>
         </div>
       </div>
     </div>,
@@ -374,7 +383,7 @@ function SortableWidget({ id, children, className, animDelay = 0 }: { id: string
     <button
       {...listeners} {...attributes}
       className="p-1 rounded text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
-      title="Arrastrar para reordenar"
+      title={t("Arrastrar para reordenar")}
     >
       <GripVertical size={14} />
     </button>
@@ -534,7 +543,7 @@ export default function DashboardHome() {
   const [expStats,      setExpStats]      = useState({ total: 0, abiertos: 0, este_anio: 0, archivados: 0 });
   const [clientStats,   setClientStats]   = useState({ total: 0, activos: 0, conEmail: 0, conTelefono: 0 });
   const [chatStats,     setChatStats]     = useState({ canales: 0, noLeidos: 0, directos: 0, conActividad: 0 });
-  const [waStats,       setWaStats]       = useState({ configurado: false, webhook: false, programados: 0, origen: "Sin configurar" });
+  const [waStats,       setWaStats]       = useState({ configurado: false, webhook: false, programados: 0, origen: t("Sin configurar") });
   const [emailStats,    setEmailStats]    = useState({ cuentas: 0, inbox: 0, unread: 0, drafts: 0 });
   // Cuentas IMAP y perfiles de Gmail se guardan por separado y se combinan
   // con useMemo -- antes se mezclaban a mano dentro de fetchData(), así que
@@ -686,7 +695,7 @@ export default function DashboardHome() {
           configurado: Boolean(status.configured),
           webhook: Boolean(status.webhookBaseUrlConfigured),
           programados: schedules.length,
-          origen: status.configSource === "database" ? "Configurado" : status.configSource === "environment" ? "Entorno" : "Sin configurar",
+          origen: status.configSource === "database" ? t("Configurado") : status.configSource === "environment" ? t("Entorno") : t("Sin configurar"),
         });
       }
       if (emailStatsRes.ok || emailAccountsRes.ok) {
@@ -819,12 +828,12 @@ export default function DashboardHome() {
         if (res.ok) {
           setGmailProfilesRaw(Array.isArray(d.data) ? d.data : []);
           setGmailProfilesFetchFailed(false);
-          setGmailProfilesDebug(Array.isArray(d.data) && d.data.length === 0 ? 'La cuenta respondió pero sin ninguna cuenta de Gmail para esta organización.' : null);
+          setGmailProfilesDebug(Array.isArray(d.data) && d.data.length === 0 ? t('La cuenta respondió pero sin ninguna cuenta de Gmail para esta organización.') : null);
         } else {
           // Visible directamente en el widget -- así se ve el motivo real sin
           // tener que abrir herramientas de desarrollador.
           setGmailProfilesFetchFailed(true);
-          setGmailProfilesDebug(`No se pudo cargar Gmail (HTTP ${res.status}): ${d?.error || 'sin detalle'}`);
+          setGmailProfilesDebug(t('No se pudo cargar Gmail (HTTP {status}): {detalle}', { status: res.status, detalle: d?.error || t('sin detalle') }));
         }
       } catch (e: any) {
         // "Failed to fetch" suele ser un hiccup puntual de red -- se
@@ -832,7 +841,7 @@ export default function DashboardHome() {
         if (cancelled) return;
         if (retry) { setTimeout(() => void attempt(false), 2000); return; }
         setGmailProfilesFetchFailed(true);
-        setGmailProfilesDebug(`No se pudo cargar Gmail: ${e?.message || 'error de red'}`);
+        setGmailProfilesDebug(t('No se pudo cargar Gmail: {detalle}', { detalle: e?.message || t('error de red') }));
       }
     };
 
@@ -1066,10 +1075,9 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Calendar size={15} className="text-[#ab0433]" />
               </div>
-              <h2 className="font-semibold text-slate-800 text-base">Próximas citas</h2>
+              <h2 className="font-semibold text-slate-800 text-base">{t("Próximas citas")}</h2>
             </div>
-            <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5">
-              Ver agenda <ChevronRight size={11} />
+            <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5">{t("Ver agenda")}{" "}<ChevronRight size={11} />
             </Link>
           </div>
           {agendaLoading ? (
@@ -1077,8 +1085,8 @@ export default function DashboardHome() {
           ) : agendaEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
               <Calendar size={28} className="opacity-30" />
-              <p className="text-sm font-medium text-slate-500">Sin próximas citas</p>
-              <Link to="/dashboard/agenda" className="text-xs font-bold text-indigo-500 hover:underline">+ Crear evento</Link>
+              <p className="text-sm font-medium text-slate-500">{t("Sin próximas citas")}</p>
+              <Link to="/dashboard/agenda" className="text-xs font-bold text-indigo-500 hover:underline">{t("+ Crear evento")}</Link>
             </div>
           ) : (
             <div className="p-4 space-y-2">
@@ -1088,7 +1096,7 @@ export default function DashboardHome() {
                 const month = d.toLocaleDateString("es-ES", { month: "short" }).toUpperCase().replace(".", "");
                 const day = d.getDate();
                 const timeStr = ev.all_day
-                  ? "Todo el día"
+                  ? t("Todo el día")
                   : ev.end_at
                     ? `${fmtTime(ev.start_at)} - ${fmtTime(ev.end_at)}`
                     : fmtTime(ev.start_at);
@@ -1123,34 +1131,34 @@ export default function DashboardHome() {
                 <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                   <CheckCircle2 size={14} className="text-[#ab0433]" />
                 </div>
-                <h3 className="font-semibold text-slate-800 text-base">Tareas</h3>
+                <h3 className="font-semibold text-slate-800 text-base">{t("Tareas")}</h3>
               </div>
               <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
             <div className="p-4 grid grid-cols-2 gap-3 mb-1">
               <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-2">Vencidas</p>
+                <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-2">{t("Vencidas")}</p>
                 <p className={`text-4xl font-black leading-none ${taskStats.vencidas>0?"text-rose-600":"text-slate-200"}`}>{taskStats.vencidas}</p>
-                <p className="text-[10px] text-rose-300 mt-2">revisar hoy</p>
+                <p className="text-[10px] text-rose-300 mt-2">{t("revisar hoy")}</p>
               </div>
               <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">Próximas</p>
+                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">{t("Próximas")}</p>
                 <p className={`text-4xl font-black leading-none ${taskStats.proximas>0?"text-amber-500":"text-slate-200"}`}>{taskStats.proximas}</p>
-                <p className="text-[10px] text-amber-300 mt-2">esta semana</p>
+                <p className="text-[10px] text-amber-300 mt-2">{t("esta semana")}</p>
               </div>
             </div>
             <div className="grid grid-cols-3 border-t border-slate-100">
               <div className="p-4 text-center border-r border-slate-100 hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-slate-700">{taskStats.urgentes}</p>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Urgentes</p>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{t("Urgentes")}</p>
               </div>
               <div className="p-4 text-center border-r border-slate-100 hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-slate-700">{taskStats.pendientes}</p>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Pendientes</p>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{t("Pendientes")}</p>
               </div>
               <div className="p-4 text-center hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-emerald-500">{taskStats.completadas}</p>
-                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Hechas</p>
+                <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{t("Hechas")}</p>
               </div>
             </div>
           </div>
@@ -1165,7 +1173,7 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <RefreshCw size={13} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Actividad reciente</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Actividad reciente")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
@@ -1177,24 +1185,22 @@ export default function DashboardHome() {
                 <History size={24} className="text-slate-300" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700">No hay actividad reciente</p>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm">Los movimientos de tus expedientes, tareas completadas y nuevos documentos aparecerán aquí.</p>
+                <p className="text-sm font-semibold text-slate-700">{t("No hay actividad reciente")}</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm">{t("Los movimientos de tus expedientes, tareas completadas y nuevos documentos aparecerán aquí.")}</p>
               </div>
-              <button onClick={() => goTo("/dashboard/trazabilidad")} className="mt-1 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                Ver historial completo
-              </button>
+              <button onClick={() => goTo("/dashboard/trazabilidad")} className="mt-1 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">{t("Ver historial completo")}</button>
             </div>
           ) : (
             <>
             <div className="grid grid-cols-2 border-b border-slate-100">
               <div className="px-5 py-4 border-r border-slate-100">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Movimientos</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Movimientos")}</p>
                 <p className="mt-1 text-xl font-bold text-slate-800">{activityTotal}</p>
               </div>
               <div className="px-5 py-4">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ultimo registro</p>
-                <p className="mt-1 text-sm font-bold text-slate-800">{activity[0]?.created_at ? timeAgo(activity[0].created_at) : "Sin datos"}</p>
-                <p className="mt-1 text-[10px] text-slate-400 truncate">{activity[0]?.action_type || "Actividad"}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Ultimo registro")}</p>
+                <p className="mt-1 text-sm font-bold text-slate-800">{activity[0]?.created_at ? timeAgo(activity[0].created_at) : t("Sin datos")}</p>
+                <p className="mt-1 text-[10px] text-slate-400 truncate">{activity[0]?.action_type ? textoActividad(activity[0].action_type) : t("Actividad")}</p>
               </div>
             </div>
             <ul className="divide-y divide-slate-50 max-h-44 overflow-y-auto">
@@ -1202,7 +1208,7 @@ export default function DashboardHome() {
                 <li key={i} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
                   <span className="text-base mt-0.5 shrink-0">{actionIcon(item.action_type||"")}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-700 leading-snug line-clamp-2">{item.description||item.action_type}</p>
+                    <p className="text-xs text-slate-700 leading-snug line-clamp-2">{textoActividad(item.description || item.action_type)}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(item.created_at)}</p>
                   </div>
                 </li>
@@ -1221,12 +1227,12 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Briefcase size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Expedientes</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Expedientes")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
-            <p className="text-xs text-slate-500">Accede a todos tus expedientes abiertos y activos desde aquí.</p>
+            <p className="text-xs text-slate-500">{t("Accede a todos tus expedientes abiertos y activos desde aquí.")}</p>
           </div>
         </div>
       );
@@ -1239,25 +1245,25 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Users size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Clientes</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Clientes")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="grid grid-cols-2 gap-px bg-slate-100">
             <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fichas</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Fichas")}</p>
               <p className="mt-1 text-xl font-bold text-slate-800">{clientStats.total}</p>
             </div>
             <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Activos</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">{t("Activos")}</p>
               <p className="mt-1 text-xl font-bold text-emerald-600">{clientStats.activos}</p>
             </div>
             <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con email</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Con email")}</p>
               <p className="mt-1 text-lg font-bold text-slate-700">{clientStats.conEmail}</p>
             </div>
             <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con teléfono</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Con teléfono")}</p>
               <p className="mt-1 text-lg font-bold text-slate-700">{clientStats.conTelefono}</p>
             </div>
           </div>
@@ -1272,21 +1278,21 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <MessageSquare size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Chat interno</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Chat interno")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="grid grid-cols-3">
             <div className="px-5 py-4 border-r border-slate-100">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Canales</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Canales")}</p>
               <p className="mt-1 text-xl font-bold text-slate-800">{chatStats.canales}</p>
             </div>
             <div className="px-5 py-4 border-r border-slate-100 bg-violet-50/50">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">No leídos</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">{t("No leídos")}</p>
               <p className="mt-1 text-xl font-bold text-violet-700">{chatStats.noLeidos}</p>
             </div>
             <div className="px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">DM</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("DM")}</p>
               <p className="mt-1 text-xl font-bold text-slate-700">{chatStats.directos}</p>
             </div>
           </div>
@@ -1301,29 +1307,29 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <MessageCircle size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">WhatsApp</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("WhatsApp")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Estado")}</p>
                 <p className={`mt-1 text-sm font-bold ${waStats.configurado ? "text-emerald-600" : "text-slate-500"}`}>
-                  {waStats.configurado ? "Configurado" : "Pendiente"}
+                  {waStats.configurado ? t("Configurado") : t("Pendiente")}
                 </p>
               </div>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${waStats.webhook ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                {waStats.webhook ? "Webhook listo" : "Webhook pendiente"}
+                {waStats.webhook ? t("Webhook listo") : t("Webhook pendiente")}
               </span>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Programados</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Programados")}</p>
                 <p className="mt-1 text-lg font-bold text-slate-800">{waStats.programados}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Origen</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Origen")}</p>
                 <p className="mt-1 text-sm font-bold text-slate-700">{waStats.origen}</p>
               </div>
             </div>
@@ -1339,7 +1345,7 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Mail size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base shrink-0">Correo</h3>
+              <h3 className="font-semibold text-slate-800 text-base shrink-0">{t("Correo")}</h3>
               {emailStats.unread > 0 && (
                 <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
                   {emailStats.unread}
@@ -1355,7 +1361,7 @@ export default function DashboardHome() {
                     className="bg-white border border-slate-200 hover:border-slate-300 rounded-full px-3 py-1 flex items-center gap-1.5 transition-colors"
                   >
                     <span className="text-[10px] font-medium text-slate-600 truncate max-w-[130px]">
-                      {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.label || "Cuenta"}
+                      {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.label || t("Cuenta")}
                     </span>
                     <ChevronDown size={9} className={`text-slate-400 transition-transform ${emailAccountMenuOpen ? "rotate-180" : ""}`} />
                   </button>
@@ -1394,9 +1400,7 @@ export default function DashboardHome() {
                   type="button"
                   onClick={(e) => { e.stopPropagation(); goTo("/dashboard/correo"); }}
                   className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-100"
-                >
-                  Conectar cuenta
-                </button>
+                >{t("Conectar cuenta")}</button>
               ) : null}
               <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
@@ -1409,7 +1413,7 @@ export default function DashboardHome() {
           {emailMsgLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : emailMessages.length === 0 ? (
-            <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
+            <p className="py-8 text-center text-xs text-slate-400">{t("Sin mensajes recientes")}</p>
           ) : (
             <div className="flex flex-col divide-y divide-slate-100/80">
               {emailMessages.slice(0, 5).map((msg: any, i: number) => (
@@ -1423,7 +1427,7 @@ export default function DashboardHome() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2 mb-0.5">
                       <h4 className={`truncate text-[13px] pr-2 ${!msg.is_read ? "font-bold text-slate-900" : "font-semibold text-slate-700"}`}>
-                        {msg.from_name || msg.from_email || "Desconocido"}
+                        {msg.from_name || msg.from_email || t("Desconocido")}
                       </h4>
                       {/* Iconos de acción directos al pasar el ratón -- antes había
                           que abrir un menú de "···" para marcar leído o eliminar. */}
@@ -1435,7 +1439,7 @@ export default function DashboardHome() {
                           {!msg.is_read && (
                             <button
                               type="button"
-                              title="Marcar como leído"
+                              title={t("Marcar como leído")}
                               onClick={(e) => { e.stopPropagation(); markEmailRead(msg.id); }}
                               className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                             >
@@ -1444,7 +1448,7 @@ export default function DashboardHome() {
                           )}
                           <button
                             type="button"
-                            title="Eliminar"
+                            title={t("Eliminar")}
                             onClick={(e) => { e.stopPropagation(); deleteEmailMsg(msg); }}
                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                           >
@@ -1454,7 +1458,7 @@ export default function DashboardHome() {
                       </span>
                     </div>
                     <p className={`truncate text-xs ${!msg.is_read ? "font-medium text-slate-800" : "text-slate-500"}`}>
-                      {msg.subject || "(Sin asunto)"}
+                      {msg.subject || t("(Sin asunto)")}
                     </p>
                   </div>
                 </div>
@@ -1464,8 +1468,7 @@ export default function DashboardHome() {
           <button
             onClick={() => goTo("/dashboard/correo")}
             className="mt-auto px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-blue-600 uppercase tracking-wider transition-colors"
-          >
-            Abrir bandeja de entrada <ArrowRight size={11} />
+          >{t("Abrir bandeja de entrada")}{" "}<ArrowRight size={11} />
           </button>
         </div>
       );
@@ -1478,23 +1481,22 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Library size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Documental</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Documental")}</h3>
             </div>
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fuentes</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Fuentes")}</p>
                 <p className="mt-1 text-xl font-bold text-slate-800">{docStats.providers}</p>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Activas</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Activas")}</p>
                 <p className="mt-1 text-xl font-bold text-emerald-600">{docStats.activos}</p>
               </div>
             </div>
-            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
-              LexNET: <span className={`font-bold ${docStats.lexnet ? "text-emerald-600" : "text-amber-600"}`}>{docStats.lexnet ? "preparado" : "pendiente"}</span>
+            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("LexNET:")}{" "}<span className={`font-bold ${docStats.lexnet ? "text-emerald-600" : "text-amber-600"}`}>{docStats.lexnet ? t("preparado") : t("pendiente")}</span>
             </div>
           </div>
         </div>
@@ -1509,7 +1511,7 @@ export default function DashboardHome() {
               <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                 <Receipt size={14} className="text-[#ab0433]" />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base">Facturación</h3>
+              <h3 className="font-semibold text-slate-800 text-base">{t("Facturación")}</h3>
             </div>
             <div className="flex items-center gap-1.5 justify-end">
               <StyledDropdown
@@ -1520,30 +1522,27 @@ export default function DashboardHome() {
               />
               <StyledDropdown
                 selected={billingQtr}
-                label={PERIODS.find(p => p.id === billingQtr)?.label ?? "Todo el año"}
+                label={PERIODS.find(p => p.id === billingQtr)?.label ?? t("Todo el año")}
                 options={PERIODS}
                 onSelect={setBillingQtr}
               />
               <button
                 onClick={() => goTo("/dashboard/facturacion")}
                 className="flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors"
-              >
-                Ver <ChevronRight size={11} />
+              >{t("Ver")}{" "}<ChevronRight size={11} />
               </button>
             </div>
           </div>
           {/* Body */}
           {billingError ? (
             <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-              <p className="text-xs text-slate-500">No se pudieron cargar los datos de facturación.</p>
+              <p className="text-xs text-slate-500">{t("No se pudieron cargar los datos de facturación.")}</p>
               <button
                 onClick={retryBilling}
                 disabled={billingRetrying}
                 className="flex items-center gap-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-colors disabled:opacity-50"
               >
-                {billingRetrying ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-                Reintentar
-              </button>
+                {billingRetrying ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}{t("Reintentar")}</button>
             </div>
           ) : !billingCalc ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
@@ -1552,43 +1551,43 @@ export default function DashboardHome() {
               {/* Total destacado */}
               <div className={`flex items-center justify-between rounded-2xl px-4 py-3 mb-3 ${billingCalc.total>=0 ? "bg-emerald-50" : "bg-red-50"}`}>
                 <div>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider ${billingCalc.total>=0 ? "text-emerald-600" : "text-red-500"}`}>Total del periodo</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${billingCalc.total>=0 ? "text-emerald-600" : "text-red-500"}`}>{t("Total del periodo")}</p>
                   <p className={`text-2xl font-extrabold leading-tight ${billingCalc.total>=0 ? "text-emerald-700" : "text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
                 </div>
                 {billingCalc.facturasVencidas > 0 && (
                   <div className="peligro flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-red-600 shadow-sm">
                     <AlertTriangle size={11} />
-                    {billingCalc.facturasVencidas} vencida{billingCalc.facturasVencidas === 1 ? "" : "s"}
+                    {billingCalc.facturasVencidas}{" "}{t("vencida")}{billingCalc.facturasVencidas === 1 ? "" : "s"}
                   </div>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Ingresos <span className="text-slate-400 font-normal">({billingCalc.numFacturas})</span></p>
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{t("Ingresos")}{" "}<span className="text-slate-400 font-normal">({billingCalc.numFacturas})</span></p>
                   <p className="text-sm font-bold text-emerald-600 leading-tight">{fmtEur(billingCalc.ingresos)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Gastos <span className="text-slate-400 font-normal">({billingCalc.numGastos})</span></p>
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{t("Gastos")}{" "}<span className="text-slate-400 font-normal">({billingCalc.numGastos})</span></p>
                   <p className="text-sm font-bold text-red-500 leading-tight">{fmtEur(billingCalc.gastosTot)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Cobrado</p>
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{t("Cobrado")}</p>
                   <p className="text-sm font-bold text-emerald-600 leading-tight">{fmtEur(billingCalc.cobrado)}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Pendiente de cobro</p>
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{t("Pendiente de cobro")}</p>
                   <p className="text-sm font-bold text-amber-600 leading-tight">{fmtEur(billingCalc.pendienteCobro)}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 -mx-4 -mb-4 px-4 pb-4 bg-slate-50 rounded-b-2xl">
                 <div>
-                  <p className="text-[10px] text-slate-400">IVA a liquidar</p>
+                  <p className="text-[10px] text-slate-400">{t("IVA a liquidar")}</p>
                   <p className="text-sm font-bold text-slate-700">{fmtEur(billingCalc.ivaLiq)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-400">IRPF a liquidar</p>
+                  <p className="text-[10px] text-slate-400">{t("IRPF a liquidar")}</p>
                   <p className="text-sm font-bold text-slate-700">0,00 €</p>
                 </div>
               </div>
@@ -1609,7 +1608,7 @@ export default function DashboardHome() {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-slate-900">
-              {greeting}, <span className="text-red-600">{user?.firstName || "usuario"}</span>
+              {greeting}, <span className="text-red-600">{user?.firstName || t("usuario")}</span>
             </h1>
             {weather && (
               <div className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
@@ -1628,13 +1627,13 @@ export default function DashboardHome() {
           {/* Nuevo Cliente */}
           <div className="relative" ref={clienteMenuRef}>
             <button onClick={() => setShowClienteMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-sm shadow-sm border transition-all select-none ${showClienteMenu?"bg-slate-100 text-slate-800 border-slate-300":"bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
-              <Plus size={15} /> Nuevo Cliente <ChevronDown size={13} className={`transition-transform ${showClienteMenu?"rotate-180":""}`} />
+              <Plus size={15} />{" "}{t("Nuevo Cliente")}{" "}<ChevronDown size={13} className={`transition-transform ${showClienteMenu?"rotate-180":""}`} />
             </button>
             {showClienteMenu && (
               <div className="absolute left-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
                 <div className="border-b border-slate-100 px-5 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de clientes</p>
-                  <h3 className="mt-1 text-sm font-semibold text-slate-900">Elige cómo quieres agregar clientes</h3>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">{t("Alta de clientes")}</p>
+                  <h3 className="mt-1 text-sm font-semibold text-slate-900">{t("Elige cómo quieres agregar clientes")}</h3>
                 </div>
                 <div className="px-3 py-3">
                   {[
@@ -1656,13 +1655,13 @@ export default function DashboardHome() {
           {/* Nuevo Expediente */}
           <div className="relative -mr-1" ref={altaMenuRef}>
             <button onClick={() => setShowAltaMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-sm shadow-md shadow-red-200 transition-all select-none ${showAltaMenu?"bg-red-800 text-white":"bg-red-600 hover:bg-red-700 text-white"}`}>
-              <Plus size={15} /> Nuevo Expediente <ChevronDown size={13} className={`transition-transform ${showAltaMenu?"rotate-180":""}`} />
+              <Plus size={15} />{" "}{t("Nuevo Expediente")}{" "}<ChevronDown size={13} className={`transition-transform ${showAltaMenu?"rotate-180":""}`} />
             </button>
             {showAltaMenu && (
               <div className="absolute right-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
                 <div className="border-b border-slate-100 px-5 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de expedientes</p>
-                  <h3 className="mt-1 text-sm font-semibold text-slate-900">Elige cómo quieres agregar expedientes</h3>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">{t("Alta de expedientes")}</p>
+                  <h3 className="mt-1 text-sm font-semibold text-slate-900">{t("Elige cómo quieres agregar expedientes")}</h3>
                 </div>
                 <div className="px-3 py-3">
                   {[
@@ -1682,14 +1681,13 @@ export default function DashboardHome() {
 
           {/* Dots */}
           <div className="relative" ref={dotsMenuRef}>
-            <button onClick={() => setShowDotsMenu(v => !v)} title="Más opciones" className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-all ${showDotsMenu?"bg-slate-100 border-slate-300 text-slate-800":"bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+            <button onClick={() => setShowDotsMenu(v => !v)} title={t("Más opciones")} className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-all ${showDotsMenu?"bg-slate-100 border-slate-300 text-slate-800":"bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
               <MoreHorizontal size={16} />
             </button>
             {showDotsMenu && (
               <div className="absolute right-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                 <button onClick={() => { setShowDotsMenu(false); setShowWidgetPicker(true); }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                  <LayoutGrid size={14} className="text-slate-400" /> Elegir elementos
-                </button>
+                  <LayoutGrid size={14} className="text-slate-400" />{" "}{t("Elegir elementos")}</button>
               </div>
             )}
           </div>
@@ -1700,7 +1698,7 @@ export default function DashboardHome() {
       {orderedVisible.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-3">
           <LayoutGrid size={32} className="opacity-20" />
-          <p className="text-sm">Sin elementos visibles. Pulsa <strong>···</strong> para elegir qué mostrar.</p>
+          <p className="text-sm">{t("Sin elementos visibles. Pulsa")}{" "}<strong>···</strong>{" "}{t("para elegir qué mostrar.")}</p>
         </div>
       ) : !isDesktopMasonry ? (
         // < 768px: un solo carril, sin drag-and-drop (con una única columna
@@ -1738,10 +1736,10 @@ export default function DashboardHome() {
       {false && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Mapa del ERP</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">Todos los módulos disponibles</h2>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">{t("Mapa del ERP")}</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">{t("Todos los módulos disponibles")}</h2>
           </div>
-          <p className="text-sm text-slate-400">Accesos directos a todos los módulos del sistema.</p>
+          <p className="text-sm text-slate-400">{t("Accesos directos a todos los módulos del sistema.")}</p>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">

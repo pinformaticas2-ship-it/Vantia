@@ -11,6 +11,7 @@ import { Landmark,
 import { safeJson } from "../lib/api";
 import BackButton from "../components/BackButton";
 import { useBorrador, AvisoBorrador } from "../lib/borradores";
+import { t } from '../lib/i18n';
 
 // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ UI helpers ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 const F = ({ label, required, invalid, children }: { label: string; required?: boolean; invalid?: boolean; children: React.ReactNode }) => (
@@ -72,7 +73,7 @@ const Indicador = ({ label, value, color = "text-slate-700" }: any) => (
 const SummaryCard = ({ label, value, highlight = false }: { label: string; value?: string | null; highlight?: boolean }) => (
   <div className={`rounded-2xl border px-4 py-3 ${highlight ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
     <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">{label}</p>
-    <p className={`mt-2 text-sm font-semibold ${value ? "text-slate-800" : "text-slate-400"}`}>{value || "Pendiente de detectar"}</p>
+    <p className={`mt-2 text-sm font-semibold ${value ? "text-slate-800" : "text-slate-400"}`}>{value || t("Pendiente de detectar")}</p>
   </div>
 );
 
@@ -138,7 +139,7 @@ function resizeImageToBase64(file: File, maxPx = 200): Promise<string> {
       URL.revokeObjectURL(url);
       resolve(canvas.toDataURL("image/jpeg", 0.82));
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t("No se pudo leer la imagen"))); };
     img.src = url;
   });
 }
@@ -168,7 +169,7 @@ function transformImageForOcr(file: File, rotateDegrees = 0): Promise<{ file: Fi
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         URL.revokeObjectURL(url);
-        reject(new Error("No se pudo preparar la imagen"));
+        reject(new Error(t("No se pudo preparar la imagen")));
         return;
       }
 
@@ -181,7 +182,7 @@ function transformImageForOcr(file: File, rotateDegrees = 0): Promise<{ file: Fi
       canvas.toBlob((blob) => {
         URL.revokeObjectURL(url);
         if (!blob) {
-          reject(new Error("No se pudo convertir la imagen"));
+          reject(new Error(t("No se pudo convertir la imagen")));
           return;
         }
         const processedFile = new File(
@@ -196,7 +197,7 @@ function transformImageForOcr(file: File, rotateDegrees = 0): Promise<{ file: Fi
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("No se pudo leer la imagen"));
+      reject(new Error(t("No se pudo leer la imagen")));
     };
 
     img.src = url;
@@ -353,7 +354,7 @@ export default function ClientForm() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const result = await safeJson(res);
-        if (!res.ok) throw new Error(result.error || "No se pudo cargar el cliente");
+        if (!res.ok) throw new Error(result.error || t("No se pudo cargar el cliente"));
 
         const d = result.data;
         // Normalizar fechas: la API devuelve ISO, el input[date] necesita YYYY-MM-DD
@@ -422,7 +423,7 @@ export default function ClientForm() {
 
     if (missing.size) {
       const labels = Array.from(missing).map((key) => CLIENT_ERROR_LABELS[key] || key);
-      return `Completa los campos obligatorios marcados en rojo: ${labels.join(", ")}.`;
+      return t("Completa los campos obligatorios marcados en rojo: {campos}.", { campos: labels.map((l) => t(l)).join(", ") });
     }
 
     return "";
@@ -470,7 +471,7 @@ export default function ClientForm() {
         .map((key) => CLIENT_ERROR_LABELS[key]);
 
       if (likelyFields.length) {
-        return `No se pudo guardar el cliente porque uno de estos campos no tiene un formato válido o está llegando vacío a la base de datos: ${likelyFields.join(", ")}.`;
+        return t("No se pudo guardar el cliente porque uno de estos campos no tiene un formato válido o está llegando vacío a la base de datos: {campos}.", { campos: likelyFields.map((l) => t(l)).join(", ") });
       }
 
       return "No se pudo guardar el cliente porque algún campo numérico no tiene un formato válido. Revisa código postal y teléfonos.";
@@ -491,7 +492,7 @@ export default function ClientForm() {
     });
     const expJson = await safeJson(expRes);
     if (!expRes.ok || !expJson?.data) {
-      throw new Error(expJson?.error || "No se pudo cargar el expediente para vincularlo al cliente.");
+      throw new Error(expJson?.error || t("No se pudo cargar el expediente para vincularlo al cliente."));
     }
 
     const current = expJson.data;
@@ -533,7 +534,7 @@ export default function ClientForm() {
     });
     const updateJson = await safeJson(updateRes);
     if (!updateRes.ok) {
-      throw new Error(updateJson?.error || "No se pudo vincular el cliente al expediente.");
+      throw new Error(updateJson?.error || t("No se pudo vincular el cliente al expediente."));
     }
   }, [getToken, linkedExpedienteId]);
 
@@ -601,7 +602,7 @@ export default function ClientForm() {
       setDniBackFile(processed.file);
       setDniBackImage(processed.previewUrl);
     } catch (err: any) {
-      setScanError(err.message || "No se pudo preparar la imagen");
+      setScanError(err.message || t("No se pudo preparar la imagen"));
     }
   };
 
@@ -756,7 +757,7 @@ export default function ClientForm() {
         body: JSON.stringify(payload),
         });
         const data = await safeJson(response);
-        if (!response.ok) throw new Error(data.error || "Error al guardar");
+        if (!response.ok) throw new Error(data.error || t("Error al guardar"));
 
         if (!isEdit && linkedExpedienteId && data.data?.id) {
           const fullName = [payload.first_name, payload.last_name].filter(Boolean).join(" ").trim() || String(payload.commercial_name || "").trim();
@@ -765,8 +766,8 @@ export default function ClientForm() {
           } catch (linkErr: any) {
             throw new Error(
               linkErr?.message
-                ? `El cliente se ha creado, pero no se ha podido vincular al expediente: ${linkErr.message}`
-                : "El cliente se ha creado, pero no se ha podido vincular al expediente."
+                ? t("El cliente se ha creado, pero no se ha podido vincular al expediente: {message}", { message: linkErr.message })
+                : t("El cliente se ha creado, pero no se ha podido vincular al expediente.")
             );
           }
         }
@@ -792,7 +793,7 @@ export default function ClientForm() {
   // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Loading skeleton al cargar datos de ediciÃƒÆ’Ã‚Â³n ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   if (loadingData) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Spinner size="xl" label="Cargando datos del cliente..." />
+      <Spinner size="xl" label={t("Cargando datos del cliente...")} />
     </div>
   );
 
@@ -823,12 +824,12 @@ export default function ClientForm() {
                   <ScanLine size={18} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Alta de clientes</p>
-                  <h1 className="mt-1 text-base font-semibold leading-tight text-slate-900">Dar de alta clientes con DNI</h1>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">{t("Alta de clientes")}</p>
+                  <h1 className="mt-1 text-base font-semibold leading-tight text-slate-900">{t("Dar de alta clientes con DNI")}</h1>
                   <p className="mt-1 text-sm text-slate-500">
                     {dniStep === "scan"
-                      ? "Sube anverso y reverso del DNI, revisa la identidad detectada y continúa al alta asistida."
-                      : "Completa los datos de contacto y administración. La identidad personal ya viene preparada desde el escaneo."}
+                      ? t("Sube anverso y reverso del DNI, revisa la identidad detectada y continúa al alta asistida.")
+                      : t("Completa los datos de contacto y administración. La identidad personal ya viene preparada desde el escaneo.")}
                   </p>
                 </div>
               </div>
@@ -836,8 +837,7 @@ export default function ClientForm() {
             <div className="flex items-center gap-2">
               <Link to="/dashboard/clientes">
                 <button type="button" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-100">
-                  <X size={14} /> Cancelar
-                </button>
+                  <X size={14} />{" "}{t("Cancelar")}</button>
               </Link>
               {dniStep === "scan" ? (
                 <button
@@ -846,8 +846,7 @@ export default function ClientForm() {
                   disabled={!scanDone || !!scanError || !form.first_name || !form.nif_cif}
                   className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60"
                 >
-                  <Save size={13} /> Continuar
-                </button>
+                  <Save size={13} />{" "}{t("Continuar")}</button>
               ) : (
                 <>
                   <button
@@ -855,16 +854,15 @@ export default function ClientForm() {
                     onClick={() => setDniStep("scan")}
                     className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                   >
-                    <Edit3 size={13} /> Volver a revisión
-                  </button>
+                    <Edit3 size={13} />{" "}{t("Volver a revisión")}</button>
                   <button
                     type="submit"
                     disabled={loading || showSuccess || !form.first_name || !form.nif_cif}
                     className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60"
                   >
                     {loading
-                      ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
-                      : <><Save size={13} /> Guardar cliente</>}
+                      ? <><Loader2 size={13} className="animate-spin" />{" "}{t("Guardando...")}</>
+                      : <><Save size={13} />{" "}{t("Guardar cliente")}</>}
                   </button>
                 </>
               )}
@@ -874,9 +872,7 @@ export default function ClientForm() {
 
         {showSuccess && (
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
-            <CheckCircle2 size={18} className="shrink-0" />
-            ¡Cliente registrado! Redirigiendo...
-          </div>
+            <CheckCircle2 size={18} className="shrink-0" />{t("¡Cliente registrado! Redirigiendo...")}</div>
         )}
         {error && (
           <div className="peligro flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -886,12 +882,12 @@ export default function ClientForm() {
 
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-900">
-            {dniStep === "scan" ? "Paso 1 · Lectura inteligente del DNI" : "Paso 2 · Completar alta del cliente"}
+            {dniStep === "scan" ? t("Paso 1 · Lectura inteligente del DNI") : t("Paso 2 · Completar alta del cliente")}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {dniStep === "scan"
-              ? "Primero importa el DNI y verifica los datos personales detectados. Cuando estén bien, pulsa Continuar."
-              : "Ahora completa solo los datos que faltan para el alta. La identidad personal detectada se conserva arriba."}
+              ? t("Primero importa el DNI y verifica los datos personales detectados. Cuando estén bien, pulsa Continuar.")
+              : t("Ahora completa solo los datos que faltan para el alta. La identidad personal detectada se conserva arriba.")}
           </p>
         </section>
 
@@ -914,13 +910,11 @@ export default function ClientForm() {
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Importar DNI</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Carga anverso y reverso para detectar identidad, fecha de nacimiento y datos de domicilio.
-              </p>
+              <h2 className="text-sm font-semibold text-slate-900">{t("Importar DNI")}</h2>
+              <p className="mt-1 text-sm text-slate-500">{t("Carga anverso y reverso para detectar identidad, fecha de nacimiento y datos de domicilio.")}</p>
             </div>
             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600">
-              {scanMeta?.source || "OpenAI / Gemini + Tesseract"}
+              {scanMeta?.source || t("OpenAI / Gemini + Tesseract")}
             </span>
           </div>
 
@@ -942,16 +936,14 @@ export default function ClientForm() {
               >
                 {dniFrontImage ? (
                   <>
-                    <img src={dniFrontImage} alt="DNI anverso" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={dniFrontImage} alt={t("DNI anverso")} className="absolute inset-0 h-full w-full object-cover" />
                     <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
-                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Anverso</span>
+                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">{t("Anverso")}</span>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); void rotateDniSide("front"); }}
                         className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                      >
-                        Girar
-                      </button>
+                      >{t("Girar")}</button>
                     </div>
                   </>
                 ) : (
@@ -960,10 +952,8 @@ export default function ClientForm() {
                       <ImageIcon size={28} />
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-slate-800">Subir anverso del DNI</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Foto frontal, completa, sin reflejos y con buena luz.
-                      </p>
+                      <p className="text-xl font-bold text-slate-800">{t("Subir anverso del DNI")}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">{t("Foto frontal, completa, sin reflejos y con buena luz.")}</p>
                     </div>
                   </div>
                 )}
@@ -980,16 +970,14 @@ export default function ClientForm() {
               >
                 {dniBackImage ? (
                   <>
-                    <img src={dniBackImage} alt="DNI reverso" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={dniBackImage} alt={t("DNI reverso")} className="absolute inset-0 h-full w-full object-cover" />
                     <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
-                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Reverso</span>
+                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">{t("Reverso")}</span>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); void rotateDniSide("back"); }}
                         className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                      >
-                        Girar
-                      </button>
+                      >{t("Girar")}</button>
                     </div>
                   </>
                 ) : (
@@ -998,10 +986,8 @@ export default function ClientForm() {
                       <ImageIcon size={28} />
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-slate-800">Subir reverso del DNI</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Recomendado para domicilio, código postal y provincia.
-                      </p>
+                      <p className="text-xl font-bold text-slate-800">{t("Subir reverso del DNI")}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">{t("Recomendado para domicilio, código postal y provincia.")}</p>
                     </div>
                   </div>
                 )}
@@ -1010,11 +996,9 @@ export default function ClientForm() {
 
             <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-5">
               <p className="text-base font-bold text-slate-900">
-                {dniFrontImage || dniBackImage ? "Fotos listas para procesar" : "Añade las fotos para comenzar"}
+                {dniFrontImage || dniBackImage ? t("Fotos listas para procesar") : t("Añade las fotos para comenzar")}
               </p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                El anverso aporta la identidad básica. El reverso ayuda con domicilio, población, código postal y provincia.
-              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{t("El anverso aporta la identidad básica. El reverso ayuda con domicilio, población, código postal y provincia.")}</p>
 
               {scanError && (
                 <div className="peligro mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
@@ -1027,16 +1011,16 @@ export default function ClientForm() {
                 <div className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-800">
                   <div className="flex flex-wrap items-center gap-2">
                     <Sparkles size={13} />
-                    <span className="font-semibold">{filledFields.size} campos aplicados al alta.</span>
+                    <span className="font-semibold">{filledFields.size}{" "}{t("campos aplicados al alta.")}</span>
                     {typeof scanMeta?.fieldCount === "number" && scanMeta.fieldCount > filledFields.size && (
-                      <span className="text-emerald-700/90">Detectados {scanMeta.fieldCount}, pero algunos ya tenían valor.</span>
+                      <span className="text-emerald-700/90">{t("Detectados")}{" "}{scanMeta.fieldCount}{t(", pero algunos ya tenían valor.")}</span>
                     )}
                     {typeof scanMeta?.confidence === "number" && (
-                      <span className="text-emerald-700/90">Confianza OCR {scanMeta.confidence}%</span>
+                      <span className="text-emerald-700/90">{t("Confianza OCR")}{" "}{scanMeta.confidence}%</span>
                     )}
                   </div>
                   {scanMeta?.model && (
-                    <div className="text-[11px] text-emerald-700/90">Modelo usado: {scanMeta.model}</div>
+                    <div className="text-[11px] text-emerald-700/90">{t("Modelo usado:")}{" "}{scanMeta.model}</div>
                   )}
                   {Array.isArray(scanMeta?.detectedFields) && scanMeta.detectedFields.length > 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -1059,9 +1043,9 @@ export default function ClientForm() {
               )}
 
               <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Anverso + reverso recomendado</span>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Sin reflejos</span>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Documento recto y completo</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{t("Anverso + reverso recomendado")}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{t("Sin reflejos")}</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{t("Documento recto y completo")}</span>
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
@@ -1071,9 +1055,7 @@ export default function ClientForm() {
                     onClick={() => frontInputRef.current?.click()}
                     className="inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-4 py-2 text-sm font-bold text-white shadow-lg shadow-red-200 transition-colors hover:bg-[#92042c]"
                   >
-                    <Upload size={15} />
-                    Subir anverso
-                  </button>
+                    <Upload size={15} />{t("Subir anverso")}</button>
                 ) : (
                   <>
                     <button
@@ -1086,7 +1068,7 @@ export default function ClientForm() {
                           : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
                       }`}
                     >
-                      {scanning ? <><Loader2 size={15} className="animate-spin" /> Leyendo...</> : scanDone ? <><CheckCircle2 size={15} /> Completado</> : <><ScanLine size={15} /> Escanear DNI</>}
+                      {scanning ? <><Loader2 size={15} className="animate-spin" />{" "}{t("Leyendo...")}</> : scanDone ? <><CheckCircle2 size={15} />{" "}{t("Completado")}</> : <><ScanLine size={15} />{" "}{t("Escanear DNI")}</>}
                     </button>
                     {!dniBackImage && (
                       <button
@@ -1094,9 +1076,7 @@ export default function ClientForm() {
                         onClick={() => backInputRef.current?.click()}
                         className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                       >
-                        <Upload size={15} />
-                        Añadir reverso
-                      </button>
+                        <Upload size={15} />{t("Añadir reverso")}</button>
                     )}
                     {scanDone && (
                       <button
@@ -1104,18 +1084,14 @@ export default function ClientForm() {
                         onClick={handleScanDNI}
                         className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                       >
-                        <RotateCcw size={15} />
-                        Re-escanear
-                      </button>
+                        <RotateCcw size={15} />{t("Re-escanear")}</button>
                     )}
                     <button
                       type="button"
                       onClick={clearDni}
                       className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100"
                     >
-                      <X size={15} />
-                      Limpiar
-                    </button>
+                      <X size={15} />{t("Limpiar")}</button>
                   </>
                 )}
               </div>
@@ -1127,19 +1103,19 @@ export default function ClientForm() {
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Datos detectados</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">{t("Datos detectados")}</p>
               <h2 className="mt-1 text-sm font-semibold text-slate-900">
                 {dniStep === "scan"
-                  ? dniReviewEditable ? "Verificación editable del cliente" : "Resumen del cliente"
-                  : "Identidad personal detectada"}
+                  ? dniReviewEditable ? t("Verificación editable del cliente") : t("Resumen del cliente")
+                  : t("Identidad personal detectada")}
               </h2>
             </div>
             {dniStep === "scan" ? (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-400">
                   {dniReviewEditable
-                    ? "Corrige o completa cualquier campo antes de continuar."
-                    : "Si algo no está bien, abre la verificación editable."}
+                    ? t("Corrige o completa cualquier campo antes de continuar.")
+                    : t("Si algo no está bien, abre la verificación editable.")}
                 </span>
                 {scanDone && !scanError && (
                   <button
@@ -1152,14 +1128,12 @@ export default function ClientForm() {
                     }`}
                   >
                     <Edit3 size={15} />
-                    {dniReviewEditable ? "Cerrar verificación" : "Editar y verificar"}
+                    {dniReviewEditable ? t("Cerrar verificación") : t("Editar y verificar")}
                   </button>
                 )}
               </div>
             ) : (
-              <div className="text-xs text-slate-400">
-                Los datos personales vienen del escáner y aquí ya no necesitas volver a rellenarlos.
-              </div>
+              <div className="text-xs text-slate-400">{t("Los datos personales vienen del escáner y aquí ya no necesitas volver a rellenarlos.")}</div>
             )}
           </div>
 
@@ -1167,61 +1141,60 @@ export default function ClientForm() {
             !dniReviewEditable ? (
               <>
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <SummaryCard label="Tipo documento" value={form.document_type} highlight={h("document_type")} />
-                  <SummaryCard label="NIF / CIF" value={form.nif_cif} highlight={h("nif_cif")} />
-                  <SummaryCard label="Nombre" value={form.first_name} highlight={h("first_name")} />
-                  <SummaryCard label="Apellidos" value={form.last_name} highlight={h("last_name")} />
-                  <SummaryCard label="Fecha nacimiento" value={form.birth_date} highlight={h("birth_date")} />
-                  <SummaryCard label="Sexo" value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
-                  <SummaryCard label="Nacionalidad" value={form.nationality} highlight={h("nationality")} />
-                  <SummaryCard label="País expedición" value={form.expedition_country} highlight={h("expedition_country")} />
-                  <SummaryCard label="Dirección" value={form.address_street} highlight={h("address_street")} />
-                  <SummaryCard label="Población" value={form.address_town} highlight={h("address_town")} />
-                  <SummaryCard label="Código postal" value={form.address_cp} highlight={h("address_cp")} />
-                  <SummaryCard label="Provincia" value={form.address_province} highlight={h("address_province")} />
+                  <SummaryCard label={t("Tipo documento")} value={form.document_type} highlight={h("document_type")} />
+                  <SummaryCard label={t("NIF / CIF")} value={form.nif_cif} highlight={h("nif_cif")} />
+                  <SummaryCard label={t("Nombre")} value={form.first_name} highlight={h("first_name")} />
+                  <SummaryCard label={t("Apellidos")} value={form.last_name} highlight={h("last_name")} />
+                  <SummaryCard label={t("Fecha nacimiento")} value={form.birth_date} highlight={h("birth_date")} />
+                  <SummaryCard label={t("Sexo")} value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
+                  <SummaryCard label={t("Nacionalidad")} value={form.nationality} highlight={h("nationality")} />
+                  <SummaryCard label={t("País expedición")} value={form.expedition_country} highlight={h("expedition_country")} />
+                  <SummaryCard label={t("Dirección")} value={form.address_street} highlight={h("address_street")} />
+                  <SummaryCard label={t("Población")} value={form.address_town} highlight={h("address_town")} />
+                  <SummaryCard label={t("Código postal")} value={form.address_cp} highlight={h("address_cp")} />
+                  <SummaryCard label={t("Provincia")} value={form.address_province} highlight={h("address_province")} />
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  El siguiente paso no te pedirá de nuevo los datos personales. Si necesitas corregirlos antes, pulsa <span className="font-semibold text-slate-700">Editar y verificar</span>.
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("El siguiente paso no te pedirá de nuevo los datos personales. Si necesitas corregirlos antes, pulsa")}{" "}<span className="font-semibold text-slate-700">{t("Editar y verificar")}</span>.
                 </div>
               </>
             ) : (
               <>
                 <div className="mt-5 grid gap-4">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <F label="Tipo documento" required invalid={isInvalid("document_type")}>
+                    <F label={t("Tipo documento")} required invalid={isInvalid("document_type")}>
                       <S name="document_type" value={form.document_type} onChange={handleChange} highlight={h("document_type")} invalid={isInvalid("document_type")}>
-                        <option>DNI</option><option>NIE</option><option>TIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                        <option>{t("DNI")}</option><option>{t("NIE")}</option><option>{t("TIE")}</option><option>{t("Pasaporte")}</option><option>{t("CIF")}</option><option>{t("Otro")}</option>
                       </S>
                     </F>
-                    <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
+                    <F label={t("NIF / CIF")} required invalid={isInvalid("nif_cif")}>
                       <I name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" highlight={h("nif_cif")} invalid={isInvalid("nif_cif")} required />
                       {nifDupEntity && (
                         <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
                           <AlertTriangle size={12} className="shrink-0 text-amber-500" />
-                          <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
+                          <span>{t("Ya existe:")}{" "}<span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span>{" "}{t("· Ver ficha →")}</span>
                         </Link>
                       )}
                     </F>
-                    <F label="Nombre" required invalid={isInvalid("first_name")}>
-                      <I name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" highlight={h("first_name")} invalid={isInvalid("first_name")} required />
+                    <F label={t("Nombre")} required invalid={isInvalid("first_name")}>
+                      <I name="first_name" value={form.first_name} onChange={handleChange} placeholder={t("Nombre")} highlight={h("first_name")} invalid={isInvalid("first_name")} required />
                     </F>
-                    <F label="Apellidos" required invalid={isInvalid("last_name")}>
-                      <I name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" highlight={h("last_name")} invalid={isInvalid("last_name")} required />
+                    <F label={t("Apellidos")} required invalid={isInvalid("last_name")}>
+                      <I name="last_name" value={form.last_name} onChange={handleChange} placeholder={t("Apellidos")} highlight={h("last_name")} invalid={isInvalid("last_name")} required />
                     </F>
 
-                    <F label="Fecha nacimiento">
+                    <F label={t("Fecha nacimiento")}>
                       <I type="date" name="birth_date" value={form.birth_date} onChange={handleChange} highlight={h("birth_date")} />
                     </F>
-                    <F label="Sexo">
+                    <F label={t("Sexo")}>
                       <S name="gender" value={form.gender} onChange={handleChange} highlight={h("gender")}>
-                        <option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
+                        <option value="">—</option><option value="M">{t("Masculino")}</option><option value="F">{t("Femenino")}</option><option value="O">{t("Otro")}</option>
                       </S>
                     </F>
-                    <F label="Nacionalidad">
+                    <F label={t("Nacionalidad")}>
                       <I name="nationality" value={form.nationality} onChange={handleChange} highlight={h("nationality")} />
                     </F>
-                    <F label="País expedición">
+                    <F label={t("País expedición")}>
                       <S name="expedition_country" value={form.expedition_country} onChange={handleChange} highlight={h("expedition_country")}>
                         {PAISES.map((p) => <option key={p}>{p}</option>)}
                       </S>
@@ -1229,41 +1202,37 @@ export default function ClientForm() {
                   </div>
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  Revisa solo la identidad personal antes de continuar. Los campos con <span className="font-semibold text-slate-700">*</span> son obligatorios. El resto del alta se completará en el siguiente paso.
-                </div>
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("Revisa solo la identidad personal antes de continuar. Los campos con")}{" "}<span className="font-semibold text-slate-700">*</span>{" "}{t("son obligatorios. El resto del alta se completará en el siguiente paso.")}</div>
               </>
             )
           ) : (
             <>
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Tipo documento" value={form.document_type} highlight={h("document_type")} />
-                <SummaryCard label="NIF / CIF" value={form.nif_cif} highlight={h("nif_cif")} />
-                <SummaryCard label="Nombre" value={form.first_name} highlight={h("first_name")} />
-                <SummaryCard label="Apellidos" value={form.last_name} highlight={h("last_name")} />
-                <SummaryCard label="Fecha nacimiento" value={form.birth_date} highlight={h("birth_date")} />
-                <SummaryCard label="Sexo" value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
-                <SummaryCard label="Nacionalidad" value={form.nationality} highlight={h("nationality")} />
-                <SummaryCard label="País expedición" value={form.expedition_country} highlight={h("expedition_country")} />
+                <SummaryCard label={t("Tipo documento")} value={form.document_type} highlight={h("document_type")} />
+                <SummaryCard label={t("NIF / CIF")} value={form.nif_cif} highlight={h("nif_cif")} />
+                <SummaryCard label={t("Nombre")} value={form.first_name} highlight={h("first_name")} />
+                <SummaryCard label={t("Apellidos")} value={form.last_name} highlight={h("last_name")} />
+                <SummaryCard label={t("Fecha nacimiento")} value={form.birth_date} highlight={h("birth_date")} />
+                <SummaryCard label={t("Sexo")} value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
+                <SummaryCard label={t("Nacionalidad")} value={form.nationality} highlight={h("nationality")} />
+                <SummaryCard label={t("País expedición")} value={form.expedition_country} highlight={h("expedition_country")} />
               </div>
 
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                Estos datos personales vienen del lector y ya se mantendrán al guardar el cliente.
-              </div>
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("Estos datos personales vienen del lector y ya se mantendrán al guardar el cliente.")}</div>
             </>
           )}
         </section>
 
         {dniStep === "complete" && (
           <>
-            <Section title="Dirección" icon={MapPin}>
+            <Section title={t("Dirección")} icon={MapPin}>
               <div className="col-span-2 md:col-span-2">
-                <F label="Dirección"><I name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso..." highlight={h("address_street")} /></F>
+                <F label={t("Dirección")}><I name="address_street" value={form.address_street} onChange={handleChange} placeholder={t("Calle, número, piso...")} highlight={h("address_street")} /></F>
               </div>
-              <F label="Población">
-                <I name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" highlight={h("address_town")} />
+              <F label={t("Población")}>
+                <I name="address_town" value={form.address_town} onChange={handleChange} placeholder={t("Ciudad")} highlight={h("address_town")} />
               </F>
-              <F label="Código postal">
+              <F label={t("Código postal")}>
                 <>
                   <I
                     name="address_cp"
@@ -1279,84 +1248,82 @@ export default function ClientForm() {
                     </datalist>
                   )}
                   {cpSuggestions.length > 1 && !form.address_cp && (
-                    <p className="mt-1 text-[11px] text-slate-500">Selecciona el CP de la lista o escríbelo manualmente</p>
+                    <p className="mt-1 text-[11px] text-slate-500">{t("Selecciona el CP de la lista o escríbelo manualmente")}</p>
                   )}
                 </>
               </F>
-              <F label="Provincia">
+              <F label={t("Provincia")}>
                 <S name="address_province" value={form.address_province} onChange={handleChange} highlight={h("address_province")}>
-                  <option value="">— Selecciona —</option>
+                  <option value="">{t("— Selecciona —")}</option>
                   {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
                 </S>
               </F>
-              <F label="País">
+              <F label={t("País")}>
                 <S name="address_country" value={form.address_country} onChange={handleChange} highlight={h("address_country")}>
                   {PAISES.map((p) => <option key={p}>{p}</option>)}
                 </S>
               </F>
             </Section>
 
-            <Section title="Contacto" icon={Phone}>
-              <div className="col-span-2 md:col-span-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                Debes indicar al menos <span className="font-semibold text-slate-700">un móvil, teléfono o correo electrónico</span> para poder guardar el cliente.
-              </div>
+            <Section title={t("Contacto")} icon={Phone}>
+              <div className="col-span-2 md:col-span-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">{t("Debes indicar al menos")}{" "}<span className="font-semibold text-slate-700">{t("un móvil, teléfono o correo electrónico")}</span>{" "}{t("para poder guardar el cliente.")}</div>
               <div className="col-span-2">
-                <F label="Correo electrónico"><I type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" /></F>
+                <F label={t("Correo electrónico")}><I type="email" name="email" value={form.email} onChange={handleChange} placeholder={t("cliente@email.com")} /></F>
               </div>
-              <F label="Teléfono"><I name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" /></F>
-              <F label="Móvil"><I name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" /></F>
-              <F label="Teléfono 2"><I name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" /></F>
-              <F label="Teléfono 3"><I name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" /></F>
-              <F label="Fax"><I name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" /></F>
+              <F label={t("Teléfono")}><I name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" /></F>
+              <F label={t("Móvil")}><I name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" /></F>
+              <F label={t("Teléfono 2")}><I name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" /></F>
+              <F label={t("Teléfono 3")}><I name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" /></F>
+              <F label={t("Fax")}><I name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" /></F>
               <div className="col-span-2 md:col-span-3">
-                <F label="Página web"><I name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" /></F>
+                <F label={t("Página web")}><I name="website" value={form.website} onChange={handleChange} placeholder={t("https://www.empresa.com")} /></F>
               </div>
             </Section>
 
-            <Section title="Administración" icon={Briefcase}>
-              <F label="Tipo cliente">
+            <Section title={t("Administración")} icon={Briefcase}>
+              <F label={t("Tipo cliente")}>
                 <S name="type" value={form.type} onChange={handleChange}>
-                  <option value="CLIENTE">Cliente</option>
-                  <option value="CONTRARIO">Contrario</option>
-                  <option value="JUZGADO">Juzgado</option>
-                  <option value="PERITO">Perito</option>
-                  <option value="PROVEEDOR">Proveedor</option>
+                  <option value="CLIENTE">{t("Cliente")}</option>
+                  <option value="CONTRARIO">{t("Contrario")}</option>
+                  <option value="JUZGADO">{t("Juzgado")}</option>
+                  <option value="PERITO">{t("Perito")}</option>
+                  <option value="PROVEEDOR">{t("Proveedor")}</option>
                 </S>
               </F>
-              <F label="Naturaleza jurídica">
+              <F label={t("Naturaleza jurídica")}>
                 <S name="legal_nature" value={form.legal_nature} onChange={handleChange}>
                   <option value="">—</option>
-                  <option>Física</option><option>Jurídica</option><option>Autónomo</option>
+                  <option>{t("Física")}</option><option>{t("Jurídica")}</option><option>{t("Autónomo")}</option>
                 </S>
               </F>
-              <F label="Nombre comercial">
-                <I name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." />
+              <F label={t("Nombre comercial")}>
+                <I name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder={t("Ej: Transportes S.L.")} />
               </F>
-              <F label="Estado">
+              <F label={t("Estado")}>
                 <S name="client_status" value={form.client_status} onChange={handleChange}>
-                  <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
+                  <option>{t("Alta")}</option><option>{t("Baja")}</option><option>{t("Suspendido")}</option><option>{t("Potencial")}</option>
                 </S>
               </F>
-              <F label="Fecha alta">
+              <F label={t("Fecha alta")}>
                 <I type="date" name="date_alta" value={form.date_alta} onChange={handleChange} />
               </F>
-              <F label="Fecha baja">
+              <F label={t("Fecha baja")}>
                 <I type="date" name="date_baja" value={form.date_baja} onChange={handleChange} />
               </F>
-              <F label="Centro">
+              <F label={t("Centro")}>
                 <I name="center" value={form.center} onChange={handleChange} placeholder="—" />
               </F>
-              <F label="LOPD">
+              <F label={t("LOPD")}>
                 <S name="lopd" value={form.lopd} onChange={handleChange}>
-                  <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
+                  <option>{t("Pendiente")}</option><option>{t("Firmado")}</option><option>{t("Rechazado")}</option><option>{t("No aplica")}</option>
                 </S>
               </F>
-              <F label="Comunicaciones comerciales">
+              <F label={t("Comunicaciones comerciales")}>
                 <S name="commercial_communications" value={form.commercial_communications} onChange={handleChange}>
-                  <option>No</option><option>Sí</option>
+                  <option>{t("No")}</option><option>{t("Sí")}</option>
                 </S>
               </F>
-              <F label="Idioma de comunicación">
+              <F label={t("Idioma de comunicación")}>
                 <S name="idioma" value={form.idioma} onChange={handleChange}>
                   {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
                 </S>
@@ -1365,9 +1332,7 @@ export default function ClientForm() {
 
             {filledFields.size > 0 && (
               <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-700">
-                <Sparkles size={14} className="shrink-0 text-emerald-500" />
-                Los campos resaltados en verde vienen del escáner del DNI. Aquí solo completas o corriges el resto antes de guardar.
-              </div>
+                <Sparkles size={14} className="shrink-0 text-emerald-500" />{t("Los campos resaltados en verde vienen del escáner del DNI. Aquí solo completas o corriges el resto antes de guardar.")}</div>
             )}
           </>
         )}
@@ -1390,8 +1355,7 @@ export default function ClientForm() {
         <div className="flex items-center gap-4">
           <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"} className="shrink-0">
             <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
-              <ChevronLeft size={13} /> Volver
-            </button>
+              <ChevronLeft size={13} />{" "}{t("Volver")}</button>
           </Link>
           <div className="h-8 w-px bg-slate-200 hidden sm:block" />
           <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
@@ -1399,17 +1363,17 @@ export default function ClientForm() {
           </div>
           <div className="flex flex-col justify-center">
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-0.5">
-              {isEdit ? "Editar cliente" : "Nuevo cliente"}
+              {isEdit ? t("Editar cliente") : t("Nuevo cliente")}
             </h1>
             <p className="text-[11px] font-medium text-slate-500">
-              {isEdit ? "Modifica los datos y pulsa Guardar cambios" : "Rellena la ficha de alta del cliente"}
+              {isEdit ? t("Modifica los datos y pulsa Guardar cambios") : t("Rellena la ficha de alta del cliente")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {showSuccess && (
             <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
-              <CheckCircle2 size={14} /> {isEdit ? "¡Cambios guardados!" : "¡Cliente registrado!"}
+              <CheckCircle2 size={14} /> {isEdit ? t("¡Cambios guardados!") : t("¡Cliente registrado!")}
             </span>
           )}
           {error && (
@@ -1419,14 +1383,13 @@ export default function ClientForm() {
           )}
           <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}>
             <button type="button" className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors">
-              <X size={14} className="text-slate-400" /> Cancelar
-            </button>
+              <X size={14} className="text-slate-400" />{" "}{t("Cancelar")}</button>
           </Link>
           <button type="submit" disabled={loading || showSuccess}
             className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 border border-red-700 rounded-md shadow-sm transition-all active:scale-[0.98]">
             {loading
-              ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
-              : <><Save size={13} /> {isEdit ? "Guardar cambios" : "Guardar"}</>}
+              ? <><Loader2 size={13} className="animate-spin" />{" "}{t("Guardando...")}</>
+              : <><Save size={13} /> {isEdit ? t("Guardar cambios") : t("Guardar")}</>}
           </button>
         </div>
       </div>
@@ -1441,8 +1404,7 @@ export default function ClientForm() {
             {/* IDENTIFICACION */}
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Users size={16} className="text-slate-400" /> Identificación
-              </h3>
+                <Users size={16} className="text-slate-400" />{" "}{t("Identificación")}</h3>
 
               <div className="flex flex-col md:flex-row gap-6 lg:gap-8 mb-6">
                 <div className="flex-shrink-0">
@@ -1451,10 +1413,10 @@ export default function ClientForm() {
                     className="w-24 h-24 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 hover:border-slate-400 cursor-pointer transition-all group overflow-hidden"
                   >
                     {photoPreview
-                      ? <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+                      ? <img src={photoPreview} alt={t("Foto")} className="w-full h-full object-cover" />
                       : <>
                           <Camera size={22} className="text-slate-300 group-hover:text-slate-500 mb-1.5 transition-colors" />
-                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-wide">Foto</span>
+                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-wide">{t("Foto")}</span>
                         </>
                     }
                   </div>
@@ -1463,28 +1425,27 @@ export default function ClientForm() {
                 </div>
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                   <div className="flex flex-col gap-2">
-                    <label className={`${lbl}${isInvalid("document_type") ? " text-red-500" : ""}`}>Tipo Documento <span className="text-red-500">*</span></label>
+                    <label className={`${lbl}${isInvalid("document_type") ? " text-red-500" : ""}`}>{t("Tipo Documento")}{" "}<span className="text-red-500">*</span></label>
                     <select name="document_type" value={form.document_type} onChange={handleChange} className={inputCls("document_type")}>
-                      <option>DNI</option><option>NIE</option><option>TIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                      <option>{t("DNI")}</option><option>{t("NIE")}</option><option>{t("TIE")}</option><option>{t("Pasaporte")}</option><option>{t("CIF")}</option><option>{t("Otro")}</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className={`${lbl}${isInvalid("nif_cif") ? " text-red-500" : ""}`}>NIF / CIF</label>
+                    <label className={`${lbl}${isInvalid("nif_cif") ? " text-red-500" : ""}`}>{t("NIF / CIF")}</label>
                     <input name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" className={`${inputCls("nif_cif")} font-mono`} />
                     {nifDupEntity && (
                       <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
-                        <AlertTriangle size={11} className="shrink-0 text-amber-500" /> Ya existe · Ver ficha →
-                      </Link>
+                        <AlertTriangle size={11} className="shrink-0 text-amber-500" />{" "}{t("Ya existe · Ver ficha →")}</Link>
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className={`${lbl}${isInvalid("type") ? " text-red-500" : ""}`}>Tipo Cliente <span className="text-red-500">*</span></label>
+                    <label className={`${lbl}${isInvalid("type") ? " text-red-500" : ""}`}>{t("Tipo Cliente")}{" "}<span className="text-red-500">*</span></label>
                     <select name="type" value={form.type} onChange={handleChange} className={inputCls("type")}>
-                      <option value="CLIENTE">Cliente</option>
-                      <option value="CONTRARIO">Contrario</option>
-                      <option value="JUZGADO">Juzgado</option>
-                      <option value="PERITO">Perito</option>
-                      <option value="PROVEEDOR">Proveedor</option>
+                      <option value="CLIENTE">{t("Cliente")}</option>
+                      <option value="CONTRARIO">{t("Contrario")}</option>
+                      <option value="JUZGADO">{t("Juzgado")}</option>
+                      <option value="PERITO">{t("Perito")}</option>
+                      <option value="PROVEEDOR">{t("Proveedor")}</option>
                     </select>
                   </div>
                 </div>
@@ -1492,45 +1453,45 @@ export default function ClientForm() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                 <div className="flex flex-col gap-2">
-                  <label className={`${lbl}${isInvalid("first_name") ? " text-red-500" : ""}`}>Nombre / Razón Social <span className="text-red-500">*</span></label>
-                  <input name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" className={inputCls("first_name")} />
+                  <label className={`${lbl}${isInvalid("first_name") ? " text-red-500" : ""}`}>{t("Nombre / Razón Social")}{" "}<span className="text-red-500">*</span></label>
+                  <input name="first_name" value={form.first_name} onChange={handleChange} placeholder={t("Nombre")} className={inputCls("first_name")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={`${lbl}${isInvalid("last_name") ? " text-red-500" : ""}`}>Apellidos <span className="text-red-500">*</span></label>
-                  <input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" className={inputCls("last_name")} />
+                  <label className={`${lbl}${isInvalid("last_name") ? " text-red-500" : ""}`}>{t("Apellidos")}{" "}<span className="text-red-500">*</span></label>
+                  <input name="last_name" value={form.last_name} onChange={handleChange} placeholder={t("Apellidos")} className={inputCls("last_name")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Nombre Comercial</label>
-                  <input name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." className={inputCls("commercial_name")} />
+                  <label className={lbl}>{t("Nombre Comercial")}</label>
+                  <input name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder={t("Ej: Transportes S.L.")} className={inputCls("commercial_name")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Naturaleza Jurídica</label>
+                  <label className={lbl}>{t("Naturaleza Jurídica")}</label>
                   <select name="legal_nature" value={form.legal_nature} onChange={handleChange} className={inputCls("legal_nature")}>
-                    <option value="">— Seleccionar —</option>
-                    <option>Física</option><option>Jurídica</option><option>Autónomo</option>
+                    <option value="">{t("— Seleccionar —")}</option>
+                    <option>{t("Física")}</option><option>{t("Jurídica")}</option><option>{t("Autónomo")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Sexo</label>
+                  <label className={lbl}>{t("Sexo")}</label>
                   <select name="gender" value={form.gender} onChange={handleChange} className={inputCls("gender")}>
-                    <option value="">— Seleccionar —</option>
-                    <option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
+                    <option value="">{t("— Seleccionar —")}</option>
+                    <option value="M">{t("Masculino")}</option><option value="F">{t("Femenino")}</option><option value="O">{t("Otro")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha Nacimiento</label>
+                  <label className={lbl}>{t("Fecha Nacimiento")}</label>
                   <input type="date" name="birth_date" value={form.birth_date} onChange={handleChange} className={inputCls("birth_date")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Edad</label>
-                  <input value={age !== null ? `${age} años` : ""} readOnly className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed" />
+                  <label className={lbl}>{t("Edad")}</label>
+                  <input value={age !== null ? t("{n} años", { n: age }) : ""} readOnly className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed" />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Nacionalidad</label>
+                  <label className={lbl}>{t("Nacionalidad")}</label>
                   <input name="nationality" value={form.nationality} onChange={handleChange} className={inputCls("nationality")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>País de Expedición</label>
+                  <label className={lbl}>{t("País de Expedición")}</label>
                   <select name="expedition_country" value={form.expedition_country} onChange={handleChange} className={inputCls("expedition_country")}>
                     {PAISES.map(p => <option key={p}>{p}</option>)}
                   </select>
@@ -1541,30 +1502,29 @@ export default function ClientForm() {
             {/* DIRECCION */}
             <div className="pt-8 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <MapPin size={16} className="text-slate-400" /> Dirección Principal
-              </h3>
+                <MapPin size={16} className="text-slate-400" />{" "}{t("Dirección Principal")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                 <div className="flex flex-col gap-2 md:col-span-3">
-                  <label className={lbl}>Dirección</label>
-                  <input name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso, puerta..." className={inputCls("address_street")} />
+                  <label className={lbl}>{t("Dirección")}</label>
+                  <input name="address_street" value={form.address_street} onChange={handleChange} placeholder={t("Calle, número, piso, puerta...")} className={inputCls("address_street")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Población</label>
-                  <input name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" className={inputCls("address_town")} />
+                  <label className={lbl}>{t("Población")}</label>
+                  <input name="address_town" value={form.address_town} onChange={handleChange} placeholder={t("Ciudad")} className={inputCls("address_town")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Código Postal</label>
+                  <label className={lbl}>{t("Código Postal")}</label>
                   <input name="address_cp" value={form.address_cp} onChange={handleChange} placeholder="28000" className={`${inputCls("address_cp")} font-mono`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Provincia</label>
+                  <label className={lbl}>{t("Provincia")}</label>
                   <select name="address_province" value={form.address_province} onChange={handleChange} className={inputCls("address_province")}>
-                    <option value="">— Selecciona —</option>
+                    <option value="">{t("— Selecciona —")}</option>
                     {PROVINCIAS.map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-3">
-                  <label className={lbl}>País</label>
+                  <label className={lbl}>{t("País")}</label>
                   <select name="address_country" value={form.address_country} onChange={handleChange} className={inputCls("address_country")}>
                     {PAISES.map(p => <option key={p}>{p}</option>)}
                   </select>
@@ -1575,39 +1535,36 @@ export default function ClientForm() {
             {/* CONTACTO */}
             <div className="pt-8 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Phone size={16} className="text-slate-400" /> Contacto
-              </h3>
-              <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">
-                Indica al menos <span className="font-semibold text-slate-700">un móvil, teléfono o correo electrónico</span> para guardar el cliente.
-              </div>
+                <Phone size={16} className="text-slate-400" />{" "}{t("Contacto")}</h3>
+              <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">{t("Indica al menos")}{" "}<span className="font-semibold text-slate-700">{t("un móvil, teléfono o correo electrónico")}</span>{" "}{t("para guardar el cliente.")}</div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                 <div className="flex flex-col gap-2 md:col-span-3">
-                  <label className={lbl}>Correo Electrónico</label>
-                  <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" className={inputCls("email")} />
+                  <label className={lbl}>{t("Correo Electrónico")}</label>
+                  <input type="email" name="email" value={form.email} onChange={handleChange} placeholder={t("cliente@email.com")} className={inputCls("email")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Teléfono</label>
+                  <label className={lbl}>{t("Teléfono")}</label>
                   <input name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" className={inputCls("phone_1")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Móvil</label>
+                  <label className={lbl}>{t("Móvil")}</label>
                   <input name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" className={inputCls("phone_mobile")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fax</label>
+                  <label className={lbl}>{t("Fax")}</label>
                   <input name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" className={inputCls("phone_fax")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Teléfono 2</label>
+                  <label className={lbl}>{t("Teléfono 2")}</label>
                   <input name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" className={inputCls("phone_2")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Teléfono 3</label>
+                  <label className={lbl}>{t("Teléfono 3")}</label>
                   <input name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" className={inputCls("phone_3")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Página Web</label>
-                  <input name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" className={inputCls("website")} />
+                  <label className={lbl}>{t("Página Web")}</label>
+                  <input name="website" value={form.website} onChange={handleChange} placeholder={t("https://www.empresa.com")} className={inputCls("website")} />
                 </div>
               </div>
             </div>
@@ -1615,28 +1572,27 @@ export default function ClientForm() {
             {/* DATOS BANCARIOS Y REFERENCIA (15/10/2026): salen solos en las plantillas */}
             <div className="pt-8 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <Landmark size={16} className="text-slate-400" /> Datos bancarios y referencia
-              </h3>
-              <p className="text-xs text-slate-500 mb-6">Se usan en los documentos (domiciliaciones, mandatos SEPA, hojas de encargo...) sin tener que escribirlos cada vez.</p>
+                <Landmark size={16} className="text-slate-400" />{" "}{t("Datos bancarios y referencia")}</h3>
+              <p className="text-xs text-slate-500 mb-6">{t("Se usan en los documentos (domiciliaciones, mandatos SEPA, hojas de encargo...) sin tener que escribirlos cada vez.")}</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className={lbl}>IBAN</label>
-                  <input name="iban" value={form.iban} onChange={handleChange} placeholder="ES00 0000 0000 0000 0000 0000" className={inputCls("iban")} />
+                  <label className={lbl}>{t("IBAN")}</label>
+                  <input name="iban" value={form.iban} onChange={handleChange} placeholder={t("ES00 0000 0000 0000 0000 0000")} className={inputCls("iban")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>BIC / SWIFT</label>
-                  <input name="bic" value={form.bic} onChange={handleChange} placeholder="CAIXESBBXXX" className={inputCls("bic")} />
+                  <label className={lbl}>{t("BIC / SWIFT")}</label>
+                  <input name="bic" value={form.bic} onChange={handleChange} placeholder={t("CAIXESBBXXX")} className={inputCls("bic")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Nº mandato SEPA</label>
+                  <label className={lbl}>{t("Nº mandato SEPA")}</label>
                   <input name="mandato_numero" value={form.mandato_numero} onChange={handleChange} placeholder="—" className={inputCls("mandato_numero")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha mandato</label>
+                  <label className={lbl}>{t("Fecha mandato")}</label>
                   <input type="date" name="mandato_fecha" value={form.mandato_fecha} onChange={handleChange} className={inputCls("mandato_fecha")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Referencia del cliente</label>
+                  <label className={lbl}>{t("Referencia del cliente")}</label>
                   <input name="referencia_cliente" value={form.referencia_cliente} onChange={handleChange} placeholder="—" className={inputCls("referencia_cliente")} />
                 </div>
               </div>
@@ -1645,45 +1601,44 @@ export default function ClientForm() {
             {/* ADMINISTRACION */}
             <div className="pt-8 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Briefcase size={16} className="text-slate-400" /> Administración
-              </h3>
+                <Briefcase size={16} className="text-slate-400" />{" "}{t("Administración")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Estado</label>
+                  <label className={lbl}>{t("Estado")}</label>
                   <select name="client_status" value={form.client_status} onChange={handleChange} className={inputCls("client_status")}>
-                    <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
+                    <option>{t("Alta")}</option><option>{t("Baja")}</option><option>{t("Suspendido")}</option><option>{t("Potencial")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha Alta</label>
+                  <label className={lbl}>{t("Fecha Alta")}</label>
                   <input type="date" name="date_alta" value={form.date_alta} onChange={handleChange} className={inputCls("date_alta")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha Baja</label>
+                  <label className={lbl}>{t("Fecha Baja")}</label>
                   <input type="date" name="date_baja" value={form.date_baja} onChange={handleChange} className={inputCls("date_baja")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Centro</label>
+                  <label className={lbl}>{t("Centro")}</label>
                   <input name="center" value={form.center} onChange={handleChange} placeholder="—" className={inputCls("center")} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>LOPD</label>
+                  <label className={lbl}>{t("LOPD")}</label>
                   <select name="lopd" value={form.lopd} onChange={handleChange} className={inputCls("lopd")}>
-                    <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
+                    <option>{t("Pendiente")}</option><option>{t("Firmado")}</option><option>{t("Rechazado")}</option><option>{t("No aplica")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Comunicaciones Comerciales</label>
+                  <label className={lbl}>{t("Comunicaciones Comerciales")}</label>
                   <select name="commercial_communications" value={form.commercial_communications} onChange={handleChange} className={inputCls("commercial_communications")}>
-                    <option>No</option><option>Sí</option>
+                    <option>{t("No")}</option><option>{t("Sí")}</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Idioma de comunicación</label>
+                  <label className={lbl}>{t("Idioma de comunicación")}</label>
                   <select name="idioma" value={form.idioma} onChange={handleChange} className={inputCls("idioma")}>
                     {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.nombre}</option>)}
                   </select>
-                  {form.idioma !== "es" && <span className="text-xs text-slate-500">Los correos que le escribáis se podrán mandar en español y en su idioma.</span>}
+                  {form.idioma !== "es" && <span className="text-xs text-slate-500">{t("Los correos que le escribáis se podrán mandar en español y en su idioma.")}</span>}
                 </div>
               </div>
             </div>
@@ -1695,24 +1650,23 @@ export default function ClientForm() {
 
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-                <MessageSquare size={16} className="text-slate-400" /> Observaciones / Notas
-              </h3>
+                <MessageSquare size={16} className="text-slate-400" />{" "}{t("Observaciones / Notas")}</h3>
               <div className="flex flex-col gap-2">
                 <textarea
                   name="observaciones"
                   value={(form as any).observaciones || ""}
                   onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))}
                   rows={14}
-                  placeholder="Añade notas internas o información relevante sobre este cliente..."
+                  placeholder={t("Añade notas internas o información relevante sobre este cliente...")}
                   className="w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors resize-none"
                 />
-                <p className="text-[10px] text-slate-400 text-right">Estas notas son privadas y solo visibles internamente.</p>
+                <p className="text-[10px] text-slate-400 text-right">{t("Estas notas son privadas y solo visibles internamente.")}</p>
               </div>
             </div>
 
             {invalidFields.size > 0 && (
               <div className="rounded-md border border-red-100 bg-red-50 p-3.5 text-xs text-red-600">
-                <p className="font-bold mb-1">{invalidFields.size} campo{invalidFields.size !== 1 ? "s" : ""} requerido{invalidFields.size !== 1 ? "s" : ""}</p>
+                <p className="font-bold mb-1">{invalidFields.size}{" "}{t("campo")}{invalidFields.size !== 1 ? "s" : ""}{" "}{t("requerido")}{invalidFields.size !== 1 ? "s" : ""}</p>
                 {Array.from(invalidFields).slice(0, 4).map(f => (
                   <p key={f} className="text-red-500">· {CLIENT_ERROR_LABELS[f] || f}</p>
                 ))}
@@ -1721,8 +1675,7 @@ export default function ClientForm() {
             {filledFields.size > 0 && (
               <div className="flex items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 p-3.5 text-xs text-emerald-700">
                 <Sparkles size={11} className="text-emerald-500 shrink-0" />
-                {filledFields.size} campos detectados por el escáner OCR
-              </div>
+                {filledFields.size}{" "}{t("campos detectados por el escáner OCR")}</div>
             )}
 
           </div>

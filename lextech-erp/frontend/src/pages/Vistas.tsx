@@ -10,6 +10,7 @@ import { FilePreviewModal } from "../components/FilePreviewModal";
 import ComoFunciona from "../components/ComoFunciona";
 import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 import { usePushNotifications } from "../lib/usePushNotifications";
+import { t, tn } from '../lib/i18n';
 
 // ── Vistas recibidas por correo ──────────────────────────────────────────────
 // Página de la automatización de vistas (Configuración → Automatizaciones):
@@ -199,15 +200,14 @@ function AvisoNotificaciones() {
   if (hecho) {
     return (
       <div className="px-6 lg:px-8 py-2 bg-emerald-50 border-b border-emerald-100 text-xs font-semibold text-emerald-800 flex items-center gap-2">
-        <CheckCircle2 size={14} /> Notificaciones activadas: te avisaremos de cada vista nueva, cambio o cancelación.
-      </div>
+        <CheckCircle2 size={14} />{" "}{t("Notificaciones activadas: te avisaremos de cada vista nueva, cambio o cancelación.")}</div>
     );
   }
   if (push.supported && push.serverEnabled && push.permission === "denied") {
     return (
       <div className="px-6 lg:px-8 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-900 flex items-center gap-2">
         <BellOff size={14} className="shrink-0" />
-        <span>Las notificaciones están <b>bloqueadas</b> en este navegador, así que no te llegarán avisos de vistas. Pulsa el candado junto a la dirección → <b>Notificaciones</b> → <b>Permitir</b>, y recarga la página.</span>
+        <span>{t("Las notificaciones están")}{" "}<b>{t("bloqueadas")}</b>{" "}{t("en este navegador, así que no te llegarán avisos de vistas. Pulsa el candado junto a la dirección →")}{" "}<b>{t("Notificaciones")}</b> → <b>{t("Permitir")}</b>{t(", y recarga la página.")}</span>
       </div>
     );
   }
@@ -215,13 +215,12 @@ function AvisoNotificaciones() {
   return (
     <div className="px-6 lg:px-8 py-2 bg-red-50 border-b border-red-100 text-xs text-red-900 flex flex-wrap items-center gap-x-3 gap-y-1">
       <Bell size={14} className="shrink-0" />
-      <span className="flex-1 min-w-[200px]">Activa las notificaciones para enterarte <b>al momento</b> de cada vista nueva, cambio o cancelación, aunque no tengas Vantia abierta.</span>
-      {fallo && <span className="peligro text-red-700">No se pudo activar. Revisa el permiso del navegador.</span>}
+      <span className="flex-1 min-w-[200px]">{t("Activa las notificaciones para enterarte")}{" "}<b>{t("al momento")}</b>{" "}{t("de cada vista nueva, cambio o cancelación, aunque no tengas Vantia abierta.")}</span>
+      {fallo && <span className="peligro text-red-700">{t("No se pudo activar. Revisa el permiso del navegador.")}</span>}
       <button type="button" disabled={push.busy}
         onClick={async () => { const ok = await push.subscribe(); setHecho(ok); setFallo(!ok); }}
         className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 disabled:opacity-50">
-        {push.busy ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />} Activar notificaciones
-      </button>
+        {push.busy ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />}{" "}{t("Activar notificaciones")}</button>
     </div>
   );
 }
@@ -280,7 +279,7 @@ function VistasModulo() {
       setItems((prev) => (mismo(prev, nuevos) ? prev : nuevos));
       setListError("");
     } catch (e: any) {
-      if (!silencioso) setListError(e.message || "No se pudieron cargar las vistas");
+      if (!silencioso) setListError(e.message || t("No se pudieron cargar las vistas"));
     } finally {
       if (tabActual.current === clave) { setLoading(false); setPrimeraCarga(false); }
     }
@@ -325,16 +324,16 @@ function VistasModulo() {
               <CalendarCheck size={18} className="text-red-600" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Vistas por correo</h1>
-              <p className="text-xs text-slate-500 mt-0.5 truncate">Señalamientos detectados automáticamente en el buzón de la organización <ComoFunciona capitulo="16" className="ml-1 align-middle" /></p>
+              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">{t("Vistas por correo")}</h1>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">{t("Señalamientos detectados automáticamente en el buzón de la organización")}{" "}<ComoFunciona capitulo="16" className="ml-1 align-middle" /></p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Link to="/dashboard/config?section=automatizaciones" title="Configurar automatización"
+            <Link to="/dashboard/config?section=automatizaciones" title={t("Configurar automatización")}
               className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
               <Settings size={15} />
             </Link>
-            <button onClick={() => void loadList()} title="Actualizar"
+            <button onClick={() => void loadList()} title={t("Actualizar")}
               className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
               <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             </button>
@@ -354,16 +353,16 @@ function VistasModulo() {
               <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input ref={buscadorRef} value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Escape") setBusqueda(""); }}
-                placeholder="Buscar autos, cliente…"
-                title="Busca por autos, NIG, juzgado, localidad, remitente, cliente, expediente o fecha. Atajo: tecla /"
+                placeholder={t("Buscar autos, cliente…")}
+                title={t("Busca por autos, NIG, juzgado, localidad, remitente, cliente, expediente o fecha. Atajo: tecla /")}
                 className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-100" />
               {busqueda && (
-                <button type="button" onClick={() => { setBusqueda(""); buscadorRef.current?.focus(); }} title="Borrar búsqueda"
+                <button type="button" onClick={() => { setBusqueda(""); buscadorRef.current?.focus(); }} title={t("Borrar búsqueda")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={13} /></button>
               )}
             </div>
             {/* Filtro por fecha: desplegable compacto (antes, chips con barra de scroll). */}
-            <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Filtrar por fecha de la vista"
+            <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} title={t("Filtrar por fecha de la vista")}
               className={`shrink-0 rounded-lg border py-2 pl-2 pr-6 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-red-100 ${periodo ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600"}`}>
               {PERIODOS.map((p) => <option key={p.key || "todas"} value={p.key}>{p.label}</option>)}
             </select>
@@ -371,8 +370,8 @@ function VistasModulo() {
           </div>
           {q ? (
             <div className="px-4 py-2 border-b border-slate-200 bg-white text-[11px] text-slate-500 flex items-center justify-between gap-2">
-              <span>Buscando «<b className="text-slate-700">{q}</b>» en todas las listas{!primeraCarga ? ` · ${items.length}${items.length === 200 ? "+" : ""} resultado${items.length === 1 ? "" : "s"}` : ""}</span>
-              <button type="button" onClick={() => setBusqueda("")} className="font-semibold text-red-600 hover:underline">Quitar</button>
+              <span>{t("Buscando «")}<b className="text-slate-700">{q}</b>{t("» en todas las listas")}{!primeraCarga ? t(" · {length}{v} resultado{v2}", { length: items.length, v: items.length === 200 ? "+" : "", v2: items.length === 1 ? "" : "s" }) : ""}</span>
+              <button type="button" onClick={() => setBusqueda("")} className="font-semibold text-red-600 hover:underline">{t("Quitar")}</button>
             </div>
           ) : (
             <div className="px-2 py-1.5 border-b border-slate-200 bg-slate-50 grid grid-cols-5 gap-0.5">
@@ -390,8 +389,8 @@ function VistasModulo() {
             {!primeraCarga && !listError && items.length === 0 && (
               <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
                 <Gavel size={36} className="opacity-15" />
-                <p className="font-medium text-sm">{q ? `Nada coincide con «${q}»` : periodo ? "No hay vistas en ese periodo" : tab === "pendiente" ? "No hay vistas pendientes de confirmar" : "No hay vistas en esta lista"}</p>
-                {(q || periodo) && <p className="text-xs">Prueba con los autos (p. ej. 945/23), el juzgado, el cliente o la fecha.</p>}
+                <p className="font-medium text-sm">{q ? t("Nada coincide con «{q}»", { q: q }) : periodo ? t("No hay vistas en ese periodo") : tab === "pendiente" ? t("No hay vistas pendientes de confirmar") : t("No hay vistas en esta lista")}</p>
+                {(q || periodo) && <p className="text-xs">{t("Prueba con los autos (p. ej. 945/23), el juzgado, el cliente o la fecha.")}</p>}
               </div>
             )}
             {items.map((s) => {
@@ -406,22 +405,21 @@ function VistasModulo() {
                   </div>
                   <p className="text-xs text-slate-600 truncate mt-0.5">
                     {s.tipo && s.tipo !== "vista" && <span className={`mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${TIPO_BADGE[s.tipo].cls}`}>{TIPO_BADGE[s.tipo].label}</span>}
-                    {s.datos?.juzgado || s.subject || "(sin asunto)"}
+                    {s.datos?.juzgado || s.subject || t("(sin asunto)")}
                   </p>
                   <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                     <span className="truncate">{s.from_name || s.from_email}</span>
-                    {s.datos?.num_autos && <span className="shrink-0">· autos {s.datos.num_autos}</span>}
-                    {s.expediente_ref && <span className="shrink-0">· exp. {s.expediente_ref}</span>}
+                    {s.datos?.num_autos && <span className="shrink-0">{t("· autos")}{" "}{s.datos.num_autos}</span>}
+                    {s.expediente_ref && <span className="shrink-0">{t("· exp.")}{" "}{s.expediente_ref}</span>}
                     {(s.received_at || s.created_at) && (
-                      <span className="ml-auto shrink-0 inline-flex items-center gap-1" title={`Correo recibido: ${fmtFecha(s.received_at || s.created_at)}`}>
+                      <span className="ml-auto shrink-0 inline-flex items-center gap-1" title={t("Correo recibido: {v}", { v: fmtFecha(s.received_at || s.created_at) })}>
                         <Mail size={10} /> {fmtCorto(s.received_at || s.created_at)}
                       </span>
                     )}
                   </div>
                   {conflict && (
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
-                      <AlertTriangle size={11} /> Choca con {s.conflictos.length} evento{s.conflictos.length === 1 ? "" : "s"} de la agenda
-                    </p>
+                      <AlertTriangle size={11} />{" "}{t("Choca con")}{" "}{s.conflictos.length}{" "}{t("evento")}{s.conflictos.length === 1 ? "" : "s"}{" "}{t("de la agenda")}</p>
                   )}
                 </button>
               );
@@ -436,7 +434,7 @@ function VistasModulo() {
             : (
               <div className="h-full flex flex-col items-center justify-center text-center p-10 text-slate-400">
                 <CalendarCheck size={40} className="opacity-15 mb-3" />
-                <p className="text-sm font-medium">Elige una vista de la lista para revisarla</p>
+                <p className="text-sm font-medium">{t("Elige una vista de la lista para revisarla")}</p>
               </div>
             )}
         </div>
@@ -523,7 +521,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       if (!silencioso || !previo || !mismo(previo, v)) aplicar(v);
       setLoadError("");
     } catch (e: any) {
-      if (!detalleCache.has(id)) setLoadError(e.message || "No se pudo cargar la vista");
+      if (!detalleCache.has(id)) setLoadError(e.message || t("No se pudo cargar la vista"));
     }
   }, [getToken, id, aplicar]);
 
@@ -569,7 +567,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       if (data?.success === false) throw new Error(data.error);
       setAsunto(data.data.asunto); setCuerpo(data.data.texto); setFirmaRegistrada(data.data.firmaRegistrada || null); setModoRespuesta(tipo);
     } catch (e: any) {
-      setActionError(e.message || "No se pudo preparar el correo");
+      setActionError(e.message || t("No se pudo preparar el correo"));
     } finally {
       setPreviewLoading(false);
     }
@@ -580,8 +578,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     try {
       let body: any = {};
       if (accion === "aceptar") {
-        if (!fromLocalInput(fecha)) throw new Error("Indica la fecha y hora de la vista.");
-        if (expModo === "existente" && !expId) throw new Error("Elige el expediente al que vincular la vista.");
+        if (!fromLocalInput(fecha)) throw new Error(t("Indica la fecha y hora de la vista."));
+        if (expModo === "existente" && !expId) throw new Error(t("Elige el expediente al que vincular la vista."));
         body = {
           ...formBody(),
           expediente: expModo === "existente" ? { modo: "existente", id: expId } : { modo: "nuevo" },
@@ -594,7 +592,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       } else if (accion === "documentar") {
         body = { expediente_id: d?.relacion?.expediente?.id, guardar_adjuntos: guardarAdjuntos };
       } else if (accion === "modificar") {
-        if (!fromLocalInput(fecha)) throw new Error("Indica la nueva fecha y hora de la vista.");
+        if (!fromLocalInput(fecha)) throw new Error(t("Indica la nueva fecha y hora de la vista."));
         body = {
           vista_id: d?.relacion?.vista?.id, fecha: fromLocalInput(fecha), duracion_min: duracion,
           guardar_adjuntos: guardarAdjuntos, enviar_correo: enviarCorreo, mensaje,
@@ -614,7 +612,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       await load();
       onChanged();
     } catch (e: any) {
-      setActionError(e.message || "No se pudo completar la acción");
+      setActionError(e.message || t("No se pudo completar la acción"));
     } finally {
       setBusy("");
     }
@@ -630,11 +628,11 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     try {
       const token = await getToken();
       const res = await fetch(resolveApiUrl(`/api/vistas/${id}/adjuntos/${index}`), { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("No disponible");
+      if (!res.ok) throw new Error(t("No disponible"));
       const blob = await res.blob();
       setAdjuntoAbierto({ src: URL.createObjectURL(blob), fileName: a?.filename || "adjunto", mime: a?.contentType || blob.type });
     } catch {
-      setActionError("No se pudo abrir el adjunto (puede que el correo ya no esté en el buzón).");
+      setActionError(t("No se pudo abrir el adjunto (puede que el correo ya no esté en el buzón)."));
     } finally {
       setAbriendoAdjunto(null);
     }
@@ -674,7 +672,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     if (!d) return "";
     const dias = d.defaults.recordatorioDias;
     const base = d.datos?.fecha_preparacion ? "la fecha de preparación indicada en el correo" : "la vista";
-    return `${dias === 0 ? "El mismo día de" : `${dias} día${dias === 1 ? "" : "s"} antes de`} ${base}, a las ${d.defaults.recordatorioHora}`;
+    return `${dias === 0 ? "El mismo día de" : tn(dias, "{n} día antes de", "{n} días antes de")} ${base}, a las ${d.defaults.recordatorioHora}`;
   }, [d]);
 
   if (loadError) return <div className="p-8 text-sm text-red-600">{loadError}</div>;
@@ -688,12 +686,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
         <div className="flex items-start gap-3">
           <Mail size={16} className="text-slate-400 mt-0.5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-slate-800 break-words">{d.subject || "(sin asunto)"}</p>
+            <p className="text-sm font-bold text-slate-800 break-words">{d.subject || t("(sin asunto)")}</p>
             <p className="text-xs text-slate-500">{d.from_name ? `${d.from_name} · ` : ""}{d.from_email} · {fmtFecha(d.received_at)}</p>
             {d.datos?.resumen && <p className="text-sm text-slate-700 mt-2">{d.datos.resumen}</p>}
             {d.body_text && (
               <button onClick={() => setShowBody((v) => !v)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline">
-                <ChevronDown size={12} className={showBody ? "rotate-180" : ""} /> {showBody ? "Ocultar correo" : "Ver correo completo"}
+                <ChevronDown size={12} className={showBody ? "rotate-180" : ""} /> {showBody ? t("Ocultar correo") : t("Ver correo completo")}
               </button>
             )}
             {showBody && <pre className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-3 font-sans">{d.body_text}</pre>}
@@ -711,7 +709,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               <FilePreviewModal src={adjuntoAbierto.src} fileName={adjuntoAbierto.fileName} mime={adjuntoAbierto.mime}
                 subtitle={d.subject || null} onDownload={descargarAdjunto} onClose={cerrarAdjunto} />
             )}
-            {!d.emailDisponible && <p className="mt-2 text-xs text-amber-700">El correo original ya no está en el buzón; se conserva su texto.</p>}
+            {!d.emailDisponible && <p className="mt-2 text-xs text-amber-700">{t("El correo original ya no está en el buzón; se conserva su texto.")}</p>}
           </div>
         </div>
       </section>
@@ -725,30 +723,30 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <button onClick={onClose} className="lg:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
+          <button onClick={onClose} className="lg:hidden text-xs font-semibold text-slate-500 mb-2">{t("← Volver")}</button>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-extrabold text-slate-900">
               {editable && mostrarFormulario
-                ? (d.tipo === "cambio" ? "¿Es otra vista distinta?" : "¿Confirmas esta vista?")
+                ? (d.tipo === "cambio" ? t("¿Es otra vista distinta?") : t("¿Confirmas esta vista?"))
                 : fmtFecha(d.fecha_vista)}
             </h2>
             <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
             {d.extraccion_origen && (
               <span className="text-[10px] font-semibold text-slate-400">
-                {d.extraccion_origen === "ia" ? "Datos leídos con IA" : d.extraccion_origen === "patrones" ? "Datos leídos sin IA — revísalos" : ""}
+                {d.extraccion_origen === "ia" ? t("Datos leídos con IA") : d.extraccion_origen === "patrones" ? t("Datos leídos sin IA — revísalos") : ""}
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 mt-1 inline-flex flex-wrap items-center gap-x-1.5">
             <Mail size={12} className="text-slate-400" />
-            <span>Correo recibido el <strong className="font-semibold text-slate-700">{fmtFecha(d.received_at || d.created_at)}</strong></span>
+            <span>{t("Correo recibido el")}{" "}<strong className="font-semibold text-slate-700">{fmtFecha(d.received_at || d.created_at)}</strong></span>
             {/* Solo si Vantia lo procesó bastante después (p. ej. el buzón estuvo sin sincronizar) */}
             {d.received_at && new Date(d.created_at).getTime() - new Date(d.received_at).getTime() > 10 * 60000 && (
-              <span className="text-slate-400">· procesado {fmtCorto(d.created_at)}</span>
+              <span className="text-slate-400">{t("· procesado")}{" "}{fmtCorto(d.created_at)}</span>
             )}
           </p>
           {d.decidido_por_nombre && (
-            <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
+            <p className="text-xs text-slate-500 mt-1">{t("Decidido por")}{" "}{d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
           )}
         </div>
         <button onClick={onClose} className="hidden lg:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
@@ -760,7 +758,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       {/* Resultado de la última acción / pasos */}
       {pasos.length > 0 && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Qué se ha hecho</h3>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{t("Qué se ha hecho")}</h3>
           <ul className="space-y-1.5">
             {pasos.map((p) => (
               <li key={p.paso} className="flex items-start gap-2 text-sm">
@@ -771,12 +769,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           </ul>
           {d.expediente && (
             <Link to={`/dashboard/expedientes/${d.expediente.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-red-600 hover:underline">
-              <FileText size={13} /> Abrir expediente {d.expediente.anio}/{d.expediente.num_exp}
+              <FileText size={13} />{" "}{t("Abrir expediente")}{" "}{d.expediente.anio}/{d.expediente.num_exp}
             </Link>
           )}
           {d.recordatorio_at && d.estado === "aceptada" && (
             <p className="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
-              <Clock size={12} /> Recordatorio {d.recordatorio_enviado_at ? "enviado" : "programado"}: {fmtFecha(d.recordatorio_at)}
+              <Clock size={12} />{" "}{t("Recordatorio")}{" "}{d.recordatorio_enviado_at ? t("enviado") : t("programado")}: {fmtFecha(d.recordatorio_at)}
             </p>
           )}
           {d.estado === "aceptada" && (
@@ -784,25 +782,22 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               {!confirmarCancelar ? (
                 <button type="button" onClick={() => setConfirmarCancelar(true)}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
-                  <X size={13} /> Cancelar esta vista
-                </button>
+                  <X size={13} />{" "}{t("Cancelar esta vista")}</button>
               ) : (
                 <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/60 p-3">
-                  <p className="text-sm font-semibold text-slate-800">¿Cancelar la vista?</p>
-                  <p className="text-xs text-slate-600">Queda tachada como cancelada en la agenda (con su recordatorio) y se anota en el expediente; su documentación se conserva. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.</p>
-                  <input value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} placeholder="Motivo (opcional): suspendida, desistimiento…" className={inputCls} />
+                  <p className="text-sm font-semibold text-slate-800">{t("¿Cancelar la vista?")}</p>
+                  <p className="text-xs text-slate-600">{t("Queda tachada como cancelada en la agenda (con su recordatorio) y se anota en el expediente; su documentación se conserva. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.")}</p>
+                  <input value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} placeholder={t("Motivo (opcional): suspendida, desistimiento…")} className={inputCls} />
                   {d.expediente && (
                     <label className="flex items-center gap-2 text-sm text-slate-700">
-                      <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />
-                      Cerrar también el expediente {d.expediente.anio}/{d.expediente.num_exp}
+                      <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />{t("Cerrar también el expediente")}{" "}{d.expediente.anio}/{d.expediente.num_exp}
                     </label>
                   )}
                   <div className="flex gap-2">
                     <button type="button" onClick={() => void run("cancelar").then(() => setConfirmarCancelar(false))} disabled={!!busy}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
-                      {busy === "cancelar" ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Sí, cancelar vista
-                    </button>
-                    <button type="button" onClick={() => setConfirmarCancelar(false)} disabled={!!busy} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white">No</button>
+                      {busy === "cancelar" ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}{" "}{t("Sí, cancelar vista")}</button>
+                    <button type="button" onClick={() => setConfirmarCancelar(false)} disabled={!!busy} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white">{t("No")}</button>
                   </div>
                 </div>
               )}
@@ -817,14 +812,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             {d.tipo === "cancelacion" ? <XCircle size={16} className="mt-0.5 shrink-0 text-rose-600" /> : <FileText size={16} className="mt-0.5 shrink-0 text-sky-600" />}
             <div className="text-sm text-slate-700">
               <p className="font-bold text-slate-800">
-                {d.tipo === "cancelacion" ? "Este correo cancela o suspende una vista ya aceptada"
-                  : d.tipo === "cambio" ? "Cambio en una vista ya aceptada" : "Mismo procedimiento que un expediente existente"}
+                {d.tipo === "cancelacion" ? t("Este correo cancela o suspende una vista ya aceptada")
+                  : d.tipo === "cambio" ? t("Cambio en una vista ya aceptada") : t("Mismo procedimiento que un expediente existente")}
               </p>
               {d.relacion.expediente && (
-                <p>
-                  Expediente <b>{d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}</b>
+                <p>{t("Expediente")}{" "}<b>{d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}</b>
                   {d.relacion.expediente.descripcion ? ` · ${d.relacion.expediente.descripcion}` : ""}
-                  {d.relacion.expediente.num_autos ? ` · autos ${d.relacion.expediente.num_autos}` : ""}
+                  {d.relacion.expediente.num_autos ? t(" · autos {num_autos}", { num_autos: d.relacion.expediente.num_autos }) : ""}
                 </p>
               )}
               {d.relacion.vista && d.vistaActual && (d.vistaActual.estado !== "aceptada"
@@ -832,18 +826,17 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                 <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
                   <AlertTriangle size={12} className="mt-0.5 shrink-0" />
                   {d.vistaActual.estado === "cancelada"
-                    ? "Esa vista ya está cancelada: este correo puede ser antiguo."
+                    ? t("Esa vista ya está cancelada: este correo puede ser antiguo.")
                     : d.vistaActual.estado !== "aceptada"
-                      ? "Esa vista ya no está activa: este correo puede ser antiguo."
-                      : `Ojo: esa vista ahora es el ${fmtFecha(d.vistaActual.fecha_vista)} (cambió después de este correo).`}
+                      ? t("Esa vista ya no está activa: este correo puede ser antiguo.")
+                      : t("Ojo: esa vista ahora es el {v} (cambió después de este correo).", { v: fmtFecha(d.vistaActual.fecha_vista) })}
                 </p>
               )}
               {d.relacion.vista && (
-                <p>
-                  Vista aceptada: <b>{fmtFecha(d.vistaActual?.estado === "aceptada" && d.vistaActual.fecha_vista ? d.vistaActual.fecha_vista : d.relacion.vista.fecha_vista)}</b>
-                  {d.tipo === "cambio" && d.fecha_vista ? <> → este correo indica <b>{fmtFecha(d.fecha_vista)}</b></> : null}
-                  {d.tipo === "cambio" && !d.fecha_vista ? <> → <b>cambia de fecha</b>, pero el correo no dice la nueva: indícala abajo</> : null}
-                  {d.tipo === "cancelacion" ? <> → <b className="text-rose-700">se cancela</b>{d.relacion.vista.juzgado ? ` · ${d.relacion.vista.juzgado}` : ""}</> : null}
+                <p>{t("Vista aceptada:")}{" "}<b>{fmtFecha(d.vistaActual?.estado === "aceptada" && d.vistaActual.fecha_vista ? d.vistaActual.fecha_vista : d.relacion.vista.fecha_vista)}</b>
+                  {d.tipo === "cambio" && d.fecha_vista ? <>{" "}{t("→ este correo indica")}{" "}<b>{fmtFecha(d.fecha_vista)}</b></> : null}
+                  {d.tipo === "cambio" && !d.fecha_vista ? <> → <b>{t("cambia de fecha")}</b>{t(", pero el correo no dice la nueva: indícala abajo")}</> : null}
+                  {d.tipo === "cancelacion" ? <> → <b className="text-rose-700">{t("se cancela")}</b>{d.relacion.vista.juzgado ? ` · ${d.relacion.vista.juzgado}` : ""}</> : null}
                 </p>
               )}
             </div>
@@ -851,33 +844,28 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
 
           {d.tipo === "cambio" && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Nueva fecha y hora" className="sm:col-span-2">
+              <Field label={t("Nueva fecha y hora")} className="sm:col-span-2">
                 <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Duración (min)">
+              <Field label={t("Duración (min)")}>
                 <input type="number" min={15} max={600} step={15} value={duracion} onChange={(e) => setDuracion(Number(e.target.value) || 120)} className={inputCls} />
               </Field>
               {conflictos.length > 0 && (
                 <p className="sm:col-span-3 flex items-center gap-1.5 text-xs font-semibold text-amber-800">
-                  <AlertTriangle size={13} /> La nueva fecha choca con {conflictos.length} evento{conflictos.length === 1 ? "" : "s"} de la agenda
-                </p>
+                  <AlertTriangle size={13} />{" "}{t("La nueva fecha choca con")}{" "}{conflictos.length}{" "}{t("evento")}{conflictos.length === 1 ? "" : "s"}{" "}{t("de la agenda")}</p>
               )}
               <label className="sm:col-span-3 flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" />
-                Avisar de la nueva fecha por correo a {d.from_email} <span className="text-slate-400">(opcional)</span>
+                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" />{t("Avisar de la nueva fecha por correo a")}{" "}{d.from_email} <span className="text-slate-400">{t("(opcional)")}</span>
               </label>
             </div>
           )}
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />
-            Guardar los {d.adjuntos.length || ""} adjunto{d.adjuntos.length === 1 ? "" : "s"} y el correo en el expediente
-          </label>
+            <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />{t("Guardar los")}{" "}{d.adjuntos.length || ""}{" "}{t("adjunto")}{d.adjuntos.length === 1 ? "" : "s"}{" "}{t("y el correo en el expediente")}</label>
 
           {d.tipo === "cancelacion" && d.relacion.expediente && (
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />
-              Al cancelar, cerrar también el expediente {d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}
+              <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />{t("Al cancelar, cerrar también el expediente")}{" "}{d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}
             </label>
           )}
 
@@ -886,34 +874,32 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           <div className="flex flex-wrap items-center gap-2">
             {d.tipo === "cancelacion" && d.relacion.vista && (
               <button onClick={() => void run("aplicar-cancelacion")} disabled={!!busy}
-                title="La deja tachada como cancelada en la agenda, lo anota en el expediente y guarda este correo"
+                title={t("La deja tachada como cancelada en la agenda, lo anota en el expediente y guarda este correo")}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 disabled:opacity-50">
-                {busy === "aplicar-cancelacion" ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />} Cancelar la vista en Vantia
-              </button>
+                {busy === "aplicar-cancelacion" ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}{" "}{t("Cancelar la vista en Vantia")}</button>
             )}
             {d.tipo === "cambio" && d.relacion.vista && (
               <button onClick={() => void run("modificar")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50">
-                {busy === "modificar" ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Modificar la vista existente
-              </button>
+                {busy === "modificar" ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}{" "}{t("Modificar la vista existente")}</button>
             )}
             {d.relacion.expediente && (
               <button onClick={() => void run("documentar")} disabled={!!busy}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50 ${d.tipo === "cambio" || d.tipo === "cancelacion" ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
                 {busy === "documentar" ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-                {d.tipo === "cancelacion" ? "No cancelar, solo guardar el correo" : d.tipo === "cambio" ? "Solo añadir documentación" : "Añadir documentación al expediente"}
+                {d.tipo === "cancelacion" ? t("No cancelar, solo guardar el correo") : d.tipo === "cambio" ? t("Solo añadir documentación") : t("Añadir documentación al expediente")}
               </button>
             )}
             {!mostrarFormulario && d.tipo !== "cancelacion" && (
               <button onClick={() => setMostrarFormulario(true)} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white">
-                <CalendarCheck size={13} /> {d.tipo === "cambio" ? "Es otra vista distinta" : "Es una vista nueva"}
+                <CalendarCheck size={13} /> {d.tipo === "cambio" ? t("Es otra vista distinta") : t("Es una vista nueva")}
               </button>
             )}
             {d.estado === "pendiente" && !mostrarFormulario && (
               <button onClick={() => void run("descartar")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-white">
-                <Undo2 size={13} /> {d.tipo === "cancelacion" ? "No es una cancelación" : "No es relevante"}
+                <Undo2 size={13} /> {d.tipo === "cancelacion" ? t("No es una cancelación") : t("No es relevante")}
               </button>
             )}
           </div>
@@ -925,48 +911,46 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           {/* 1 · Ficha de la vista */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5">
             <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
-              {(tipoActo || "Vista")}{d.tipo === "cambio" ? " · cambio de fecha" : ""}
+              {(tipoActo || t("Vista"))}{d.tipo === "cambio" ? t(" · cambio de fecha") : ""}
             </p>
             <p className="mt-1 text-2xl font-extrabold leading-tight text-slate-900">
-              {fromLocalInput(fecha) ? fmtFecha(fromLocalInput(fecha)) : "Sin fecha — indícala en «Revisar o cambiar detalles»"}
+              {fromLocalInput(fecha) ? fmtFecha(fromLocalInput(fecha)) : t("Sin fecha — indícala en «Revisar o cambiar detalles»")}
             </p>
             <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
-              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Juzgado</dt><dd className="font-medium text-slate-800">{juzgado || "—"}{sala ? ` · ${sala}` : ""}</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">{t("Juzgado")}</dt><dd className="font-medium text-slate-800">{juzgado || "—"}{sala ? ` · ${sala}` : ""}</dd></div>
               {(direccion || localidad) && (
-                <div className="flex gap-2 sm:col-span-2"><dt className="w-20 shrink-0 text-slate-400">Dónde</dt>
+                <div className="flex gap-2 sm:col-span-2"><dt className="w-20 shrink-0 text-slate-400">{t("Dónde")}</dt>
                   <dd className="font-medium text-slate-800">
                     {[direccion, localidad].filter(Boolean).join(" · ")}{" "}
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([juzgado, direccion, localidad?.replace(/\s*\(según el NIG\)/, "")].filter(Boolean).join(", "))}`}
-                      target="_blank" rel="noreferrer" className="ml-1 text-xs font-semibold text-red-600 hover:underline">Ver en el mapa</a>
+                      target="_blank" rel="noreferrer" className="ml-1 text-xs font-semibold text-red-600 hover:underline">{t("Ver en el mapa")}</a>
                   </dd>
                 </div>
               )}
-              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Autos</dt><dd className="font-medium text-slate-800">{autos || "—"}{nig ? ` · NIG ${nig}` : ""}</dd></div>
-              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Duración</dt><dd className="font-medium text-slate-800">{duracion} min</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">{t("Autos")}</dt><dd className="font-medium text-slate-800">{autos || "—"}{nig ? t(" · NIG {nig}", { nig: nig }) : ""}</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">{t("Duración")}</dt><dd className="font-medium text-slate-800">{duracion}{" "}{t("min")}</dd></div>
             </dl>
             <div className={`mt-4 flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${conflictos.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>
               {checking ? <Loader2 size={15} className="mt-0.5 animate-spin" /> : conflictos.length ? <AlertTriangle size={15} className="mt-0.5" /> : <Check size={15} className="mt-0.5" />}
               <span>
                 {conflictos.length
-                  ? `Choca con tu agenda: ${conflictos.map((c) => c.title).join(", ")}`
-                  : "Agenda libre a esa hora"}
+                  ? t("Choca con tu agenda: {join}", { join: conflictos.map((c) => c.title).join(", ") })
+                  : t("Agenda libre a esa hora")}
               </span>
             </div>
           </section>
 
           {/* 2 · Qué pasará */}
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
-            <h3 className="text-sm font-bold text-slate-800">Si aceptas, Vantia hará esto:</h3>
+            <h3 className="text-sm font-bold text-slate-800">{t("Si aceptas, Vantia hará esto:")}</h3>
             <ol className="mt-2 space-y-1.5 text-sm text-slate-700">
-              <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{enviarCorreo ? <>Responder a <b>{d.from_email}</b> confirmando la asistencia</> : <span className="text-slate-500">No se enviará ninguna respuesta</span>}</span></li>
-              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{expModo === "existente" && expedienteElegido ? <>Vincularla al expediente <b>{expedienteElegido}</b></> : <>Crear un <b>expediente nuevo</b> con estos datos</>}</span></li>
-              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">Apuntarla en <b>tu agenda</b></span></li>
-              <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{guardarAdjuntos && d.adjuntos.length ? <>Guardar <b>{d.adjuntos.length} adjunto{d.adjuntos.length === 1 ? "" : "s"}</b> y el correo en el expediente</> : <>Guardar el correo como nota en el expediente</>}</span></li>
-              <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{conRecordatorio && recordatorioCalculado ? <>Recordarte prepararla el <b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">Sin recordatorio</span>}</span></li>
+              <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{enviarCorreo ? <>{t("Responder a")}{" "}<b>{d.from_email}</b>{" "}{t("confirmando la asistencia")}</> : <span className="text-slate-500">{t("No se enviará ninguna respuesta")}</span>}</span></li>
+              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{expModo === "existente" && expedienteElegido ? <>{t("Vincularla al expediente")}{" "}<b>{expedienteElegido}</b></> : <>{t("Crear un")}{" "}<b>{t("expediente nuevo")}</b>{" "}{t("con estos datos")}</>}</span></li>
+              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{t("Apuntarla en")}{" "}<b>{t("tu agenda")}</b></span></li>
+              <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{guardarAdjuntos && d.adjuntos.length ? <>{t("Guardar")}{" "}<b>{d.adjuntos.length}{" "}{t("adjunto")}{d.adjuntos.length === 1 ? "" : "s"}</b>{" "}{t("y el correo en el expediente")}</> : <>{t("Guardar el correo como nota en el expediente")}</>}</span></li>
+              <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{conRecordatorio && recordatorioCalculado ? <>{t("Recordarte prepararla el")}{" "}<b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">{t("Sin recordatorio")}</span>}</span></li>
             </ol>
-            <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">
-              Si rechazas: {enviarCorreo ? <>se responderá a {d.from_email} que no podéis asistir</> : "no se responde a nadie"} y no se crea nada.
-            </p>
+            <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">{t("Si rechazas:")}{" "}{enviarCorreo ? <>{t("se responderá a")}{" "}{d.from_email}{" "}{t("que no podéis asistir")}</> : t("no se responde a nadie")}{" "}{t("y no se crea nada.")}</p>
           </section>
 
           {actionError && <p className="peligro text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
@@ -976,25 +960,22 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <button onClick={() => void run("aceptar")} disabled={!!busy}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold shadow-sm hover:bg-red-700 disabled:opacity-50">
               {busy === "aceptar" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-              {d.estado === "error" ? "Reintentar" : "Aceptar vista"}
+              {d.estado === "error" ? t("Reintentar") : t("Aceptar vista")}
             </button>
             {d.estado !== "error" && (
               <button onClick={() => void run("rechazar")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-bold hover:bg-slate-50 disabled:opacity-50">
-                {busy === "rechazar" ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />} Rechazar
-              </button>
+                {busy === "rechazar" ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}{" "}{t("Rechazar")}</button>
             )}
             {d.estado === "pendiente" && (
-              <button onClick={() => void run("descartar")} disabled={!!busy} title="No responde a nadie: solo la quita de la lista"
+              <button onClick={() => void run("descartar")} disabled={!!busy} title={t("No responde a nadie: solo la quita de la lista")}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 text-xs font-semibold hover:bg-white disabled:opacity-50">
-                {busy === "descartar" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} No es una vista
-              </button>
+                {busy === "descartar" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}{" "}{t("No es una vista")}</button>
             )}
             {d.estado === "descartada" && (
               <button onClick={() => void run("reabrir")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 text-xs font-semibold hover:bg-white disabled:opacity-50">
-                {busy === "reabrir" ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Pasar a "por confirmar"
-              </button>
+                {busy === "reabrir" ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}{" "}{t("Pasar a \"por confirmar\"")}</button>
             )}
           </div>
 
@@ -1002,28 +983,28 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           <section className="rounded-2xl border border-slate-200 bg-white">
             <button type="button" onClick={() => setDetallesAbiertos(!verDetalles)}
               className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-700">
-              <span>Revisar o cambiar detalles <span className="font-normal text-slate-400">· fecha, juzgado, expediente, recordatorio, texto del correo</span></span>
+              <span>{t("Revisar o cambiar detalles")}{" "}<span className="font-normal text-slate-400">{t("· fecha, juzgado, expediente, recordatorio, texto del correo")}</span></span>
               <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${verDetalles ? "rotate-180" : ""}`} />
             </button>
             {verDetalles && (
               <div className="space-y-4 border-t border-slate-100 p-4">
           {/* Datos de la vista */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Datos de la vista</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Datos de la vista")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Field label="Fecha y hora" className="sm:col-span-2">
+              <Field label={t("Fecha y hora")} className="sm:col-span-2">
                 <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Duración (min)">
+              <Field label={t("Duración (min)")}>
                 <input type="number" min={15} max={600} step={15} value={duracion} onChange={(e) => setDuracion(Number(e.target.value) || 120)} className={inputCls} />
               </Field>
-              <Field label="Tipo de acto"><input value={tipoActo} onChange={(e) => setTipoActo(e.target.value)} placeholder="Vista, juicio, audiencia previa…" className={inputCls} /></Field>
-              <Field label="Juzgado" className="sm:col-span-2"><input value={juzgado} onChange={(e) => setJuzgado(e.target.value)} className={inputCls} /></Field>
-              <Field label="Sala"><input value={sala} onChange={(e) => setSala(e.target.value)} className={inputCls} /></Field>
-              <Field label="Nº autos"><input value={autos} onChange={(e) => setAutos(e.target.value)} className={inputCls} /></Field>
-              <Field label="NIG"><input value={nig} onChange={(e) => setNig(e.target.value)} className={inputCls} /></Field>
-              <Field label="Dirección de la sede" className="sm:col-span-2"><input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ciudad de la Justicia, calle…" className={inputCls} /></Field>
-              <Field label="Localidad"><input value={localidad} onChange={(e) => setLocalidad(e.target.value)} className={inputCls} /></Field>
+              <Field label={t("Tipo de acto")}><input value={tipoActo} onChange={(e) => setTipoActo(e.target.value)} placeholder={t("Vista, juicio, audiencia previa…")} className={inputCls} /></Field>
+              <Field label={t("Juzgado")} className="sm:col-span-2"><input value={juzgado} onChange={(e) => setJuzgado(e.target.value)} className={inputCls} /></Field>
+              <Field label={t("Sala")}><input value={sala} onChange={(e) => setSala(e.target.value)} className={inputCls} /></Field>
+              <Field label={t("Nº autos")}><input value={autos} onChange={(e) => setAutos(e.target.value)} className={inputCls} /></Field>
+              <Field label={t("NIG")}><input value={nig} onChange={(e) => setNig(e.target.value)} className={inputCls} /></Field>
+              <Field label={t("Dirección de la sede")} className="sm:col-span-2"><input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder={t("Ciudad de la Justicia, calle…")} className={inputCls} /></Field>
+              <Field label={t("Localidad")}><input value={localidad} onChange={(e) => setLocalidad(e.target.value)} className={inputCls} /></Field>
             </div>
 
             {/* Hueco en la agenda */}
@@ -1032,13 +1013,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                 {checking ? <Loader2 size={14} className="animate-spin text-slate-400" />
                   : conflictos.length ? <AlertTriangle size={14} className="text-amber-600" /> : <Check size={14} className="text-emerald-600" />}
                 <span className={conflictos.length ? "text-amber-800" : "text-emerald-800"}>
-                  {conflictos.length ? `Choca con ${conflictos.length} evento${conflictos.length === 1 ? "" : "s"} de la agenda` : "Hueco libre en la agenda"}
+                  {conflictos.length ? t("Choca con {length} evento{v} de la agenda", { length: conflictos.length, v: conflictos.length === 1 ? "" : "s" }) : t("Hueco libre en la agenda")}
                 </span>
               </div>
               {conflictos.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5 text-xs text-amber-900">
                   {conflictos.map((c) => (
-                    <li key={c.id}>• {c.title} — {c.all_day ? `${fmtFecha(c.start_at, false)} (todo el día)` : `${fmtFecha(c.start_at)}${c.end_at ? " – " + new Date(c.end_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}`}</li>
+                    <li key={c.id}>• {c.title} — {c.all_day ? t("{v} (todo el día)", { v: fmtFecha(c.start_at, false) }) : `${fmtFecha(c.start_at)}${c.end_at ? " – " + new Date(c.end_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}`}</li>
                   ))}
                 </ul>
               )}
@@ -1047,44 +1028,39 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
 
           {/* Expediente, documentos, recordatorio */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Al aceptar</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Al aceptar")}</h3>
             <div className="space-y-2">
               <label className="flex items-start gap-2 text-sm">
                 <input type="radio" checked={expModo === "nuevo"} onChange={() => setExpModo("nuevo")} className="mt-1 accent-red-600" disabled={!!d.expediente_id} />
-                <span>Dar de alta un <b>expediente nuevo</b> con los datos de la vista</span>
+                <span>{t("Dar de alta un")}{" "}<b>{t("expediente nuevo")}</b>{" "}{t("con los datos de la vista")}</span>
               </label>
               {(d.coincidencias.length > 0 || d.expediente_id) && (
                 <label className="flex items-start gap-2 text-sm">
                   <input type="radio" checked={expModo === "existente"} onChange={() => setExpModo("existente")} className="mt-1 accent-red-600" />
-                  <span className="flex-1">
-                    Vincular a un <b>expediente existente</b>
+                  <span className="flex-1">{t("Vincular a un")}{" "}<b>{t("expediente existente")}</b>
                     {d.expediente_id
-                      ? <span className="block text-xs text-slate-500">Ya creado en un intento anterior: {d.expediente ? `${d.expediente.anio}/${d.expediente.num_exp}` : ""}</span>
+                      ? <span className="block text-xs text-slate-500">{t("Ya creado en un intento anterior:")}{" "}{d.expediente ? `${d.expediente.anio}/${d.expediente.num_exp}` : ""}</span>
                       : (
                         <select value={expId} onChange={(e) => { setExpId(e.target.value); setExpModo("existente"); }} className={`${inputCls} mt-1`}>
                           {d.coincidencias.map((c) => (
-                            <option key={c.id} value={c.id}>{c.anio}/{c.num_exp} · {c.descripcion || c.cliente_nombre || "sin descripción"}{c.num_autos ? ` · autos ${c.num_autos}` : ""}</option>
+                            <option key={c.id} value={c.id}>{c.anio}/{c.num_exp} · {c.descripcion || c.cliente_nombre || t("sin descripción")}{c.num_autos ? t(" · autos {num_autos}", { num_autos: c.num_autos }) : ""}</option>
                           ))}
                         </select>
                       )}
-                    {!d.expediente_id && <span className="block text-[11px] text-slate-400 mt-0.5">Coincide el nº de autos o el NIG del correo</span>}
+                    {!d.expediente_id && <span className="block text-[11px] text-slate-400 mt-0.5">{t("Coincide el nº de autos o el NIG del correo")}</span>}
                   </span>
                 </label>
               )}
             </div>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />
-              Guardar los {d.adjuntos.length || ""} adjunto{d.adjuntos.length === 1 ? "" : "s"} en la documentación del expediente
-            </label>
+              <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />{t("Guardar los")}{" "}{d.adjuntos.length || ""}{" "}{t("adjunto")}{d.adjuntos.length === 1 ? "" : "s"}{" "}{t("en la documentación del expediente")}</label>
             <div>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={conRecordatorio} onChange={(e) => setConRecordatorio(e.target.checked)} className="accent-red-600" />
-                Recordatorio para preparar la vista
-              </label>
+                <input type="checkbox" checked={conRecordatorio} onChange={(e) => setConRecordatorio(e.target.checked)} className="accent-red-600" />{t("Recordatorio para preparar la vista")}</label>
               {conRecordatorio && (
                 <div className="ml-6 mt-1.5 flex flex-wrap items-center gap-2">
                   <input type="datetime-local" value={recordatorio} onChange={(e) => setRecordatorio(e.target.value)} className={`${inputCls} max-w-[240px]`} />
-                  <span className="text-xs text-slate-400">{recordatorio ? "" : `Por defecto: ${recordatorioTexto}`}</span>
+                  <span className="text-xs text-slate-400">{recordatorio ? "" : t("Por defecto: {recordatorioTexto}", { recordatorioTexto: recordatorioTexto })}</span>
                 </div>
               )}
             </div>
@@ -1093,36 +1069,33 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           {/* Correo de respuesta */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Respuesta a {d.from_email}</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t("Respuesta a")}{" "}{d.from_email}</h3>
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" /> Enviar correo
-              </label>
+                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" />{" "}{t("Enviar correo")}</label>
             </div>
             {enviarCorreo && (
               <>
-                <Field label="Mensaje adicional (opcional)">
-                  <textarea value={mensaje} onChange={(e) => setMensaje(e.target.value)} rows={2} className={inputCls} placeholder="Se añade al texto de la plantilla" />
+                <Field label={t("Mensaje adicional (opcional)")}>
+                  <textarea value={mensaje} onChange={(e) => setMensaje(e.target.value)} rows={2} className={inputCls} placeholder={t("Se añade al texto de la plantilla")} />
                 </Field>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => void loadPreview("aceptar")} disabled={previewLoading}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                    <Eye size={12} /> Ver/editar correo de aceptación
-                  </button>
+                    <Eye size={12} />{" "}{t("Ver/editar correo de aceptación")}</button>
                   <button onClick={() => void loadPreview("rechazar")} disabled={previewLoading}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                    <Eye size={12} /> Ver/editar correo de rechazo
-                  </button>
+                    <Eye size={12} />{" "}{t("Ver/editar correo de rechazo")}</button>
                   {previewLoading && <Loader2 size={14} className="animate-spin text-slate-400 self-center" />}
                 </div>
                 {modoRespuesta && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold uppercase text-slate-500">Correo de {modoRespuesta === "aceptar" ? "aceptación" : "rechazo"} (editable)</span>
-                      <button onClick={() => setModoRespuesta(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">Usar la plantilla tal cual</button>
+                      <span className="text-[11px] font-bold uppercase text-slate-500">{t("Correo de")}{" "}{modoRespuesta === "aceptar" ? t("aceptación") : t("rechazo")}{" "}{t("(editable)")}</span>
+                      <button onClick={() => setModoRespuesta(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">{t("Usar la plantilla tal cual")}</button>
                     </div>
                     <input value={asunto} onChange={(e) => setAsunto(e.target.value)} className={inputCls} />
                     <textarea value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} rows={9} className={`${inputCls} font-sans`} />
-                    {firmaRegistrada && <p className="text-[11px] text-slate-500">Al final se añadirá la firma «{firmaRegistrada}».</p>}
+                    {firmaRegistrada && <p className="text-[11px] text-slate-500">{t("Al final se añadirá la firma «")}{firmaRegistrada}».</p>}
                   </div>
                 )}
               </>

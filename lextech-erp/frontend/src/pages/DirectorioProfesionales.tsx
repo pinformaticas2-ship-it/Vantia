@@ -10,6 +10,7 @@ import { Spinner } from "../components/Spinner";
 import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import { safeJson } from "../lib/api";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
+import { t } from '../lib/i18n';
 
 // CONTRARIO: partes contrarias habituales (aseguradoras, bancos...) -- misma
 // tabla y pantalla que procuradores/abogados, sin los campos de colegiación.
@@ -89,12 +90,12 @@ function cellValue(p: Profesional, key: ColumnKey): React.ReactNode {
   switch (key) {
     case "turno_oficio":
       return p.turno_oficio
-        ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">Sí</span>
+        ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">{t("Sí")}</span>
         : <span className="text-slate-300">—</span>;
     case "estado":
       return (
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.estado === "Baja" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
-          {p.estado || "Alta"}
+          {p.estado || t("Alta")}
         </span>
       );
     case "num_colegiado":
@@ -173,7 +174,7 @@ function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, page
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-100 bg-white text-xs shrink-0">
-      <span className="text-slate-400">{from}–{to} de {totalItems}</span>
+      <span className="text-slate-400">{from}–{to}{" "}{t("de")}{" "}{totalItems}</span>
       <div className="flex items-center gap-1">
         <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
           className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors">
@@ -267,10 +268,10 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
       if (q.trim()) params.set("q", q.trim());
       const res = await fetch(`/api/directorio?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || `Error ${res.status}`);
+      if (!res.ok) throw new Error(d.error || t("Error {status}", { status: res.status }));
       setItems(d.data || []);
     } catch (e: any) {
-      setError(e.message || "Error al cargar el directorio");
+      setError(e.message || t("Error al cargar el directorio"));
     } finally {
       setLoading(false);
       setRefreshSpin(false);
@@ -325,13 +326,13 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
 
   if (loading) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <Spinner size="xl" label={`Cargando ${desc}...`} />
+      <Spinner size="xl" label={t("Cargando {desc}...", { desc: desc })} />
     </div>
   );
 
   if (error) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
-      <ConnectionErrorBanner error={error} onRetry={() => load(search)} title={`No se han podido cargar los ${desc}`} />
+      <ConnectionErrorBanner error={error} onRetry={() => load(search)} title={t("No se han podido cargar los {desc}", { desc: desc })} />
     </div>
   );
 
@@ -350,14 +351,14 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
               <p className="text-xs text-slate-500 mt-0.5">
                 <span className="font-semibold text-slate-700">{items.length}</span> {desc}
                 {tipo === "ABOGADO" && (
-                  <> {" · "}<span className="font-semibold text-emerald-600">{turnoOficioCount}</span> en turno de oficio</>
+                  <> {" · "}<span className="font-semibold text-emerald-600">{turnoOficioCount}</span>{" "}{t("en turno de oficio")}</>
                 )}
               </p>
             </div>
           </div>
           <button
             onClick={handleRefresh}
-            title="Refrescar datos"
+            title={t("Refrescar datos")}
             className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
           >
             <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
@@ -368,11 +369,11 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
       {/* ── BARRA DE HERRAMIENTAS ───────────────────────────────── */}
       <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
         <div className="flex items-center gap-1.5 min-w-max pb-0.5">
-          <ToolBtn icon={Plus} label="Nuevo" primary onClick={() => navigate(`/dashboard/${base}/new`)} />
-          <ToolBtn icon={Edit3} label="Editar" disabled={!selected} onClick={() => selected && navigate(`/dashboard/${base}/${selected}/edit`)} />
-          <ToolBtn icon={Trash2} label="Eliminar" danger disabled={!selected} onClick={() => selectedItem && setDeleteTarget(selectedItem)} />
+          <ToolBtn icon={Plus} label={t("Nuevo")} primary onClick={() => navigate(`/dashboard/${base}/new`)} />
+          <ToolBtn icon={Edit3} label={t("Editar")} disabled={!selected} onClick={() => selected && navigate(`/dashboard/${base}/${selected}/edit`)} />
+          <ToolBtn icon={Trash2} label={t("Eliminar")} danger disabled={!selected} onClick={() => selectedItem && setDeleteTarget(selectedItem)} />
         </div>
-        <ToolBtn icon={SlidersHorizontal} label="Elegir columnas" onClick={() => setShowColumnModal(true)} />
+        <ToolBtn icon={SlidersHorizontal} label={t("Elegir columnas")} onClick={() => setShowColumnModal(true)} />
       </div>
 
       {/* ── FILTROS / BÚSQUEDA ──────────────────────────────────── */}
@@ -382,7 +383,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar..."
+            placeholder={t("Buscar...")}
             className="w-56 pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300"
           />
           {search && (
@@ -392,7 +393,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
           )}
         </div>
         <span className="text-xs text-slate-400 whitespace-nowrap">
-          {items.length} {items.length === 1 ? "registro" : "registros"}
+          {items.length} {items.length === 1 ? t("registro") : t("registros")}
         </span>
       </div>
 
@@ -420,11 +421,10 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                   <div className="flex flex-col items-center gap-3 text-slate-400">
                     <Icon size={36} className="opacity-15" />
                     <p className="font-medium text-sm">
-                      {search ? "No hay registros que coincidan con la búsqueda" : "No hay registros todavía"}
+                      {search ? t("No hay registros que coincidan con la búsqueda") : t("No hay registros todavía")}
                     </p>
                     {!search && (
-                      <button onClick={() => navigate(`/dashboard/${base}/new`)} className="text-red-600 text-xs font-bold hover:underline">
-                        + Crear {tipo === "CONTRARIO" ? "la primera" : "el primer"} {singular.toLowerCase()}
+                      <button onClick={() => navigate(`/dashboard/${base}/new`)} className="text-red-600 text-xs font-bold hover:underline">{t("+ Crear")}{" "}{tipo === "CONTRARIO" ? t("la primera") : t("el primer")} {singular.toLowerCase()}
                       </button>
                     )}
                   </div>
@@ -464,7 +464,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                     <button
                       onClick={e => { e.stopPropagation(); navigate(`/dashboard/${base}/${p.id}/edit`); }}
                       className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100"
-                      title="Abrir ficha"
+                      title={t("Abrir ficha")}
                     >
                       <ExternalLink size={14} />
                     </button>
@@ -486,18 +486,16 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
         </span>
         {tipo === "ABOGADO" && (
           <span className="whitespace-nowrap">
-            <span className="font-semibold text-emerald-600">Turno de oficio:</span>{" "}
+            <span className="font-semibold text-emerald-600">{t("Turno de oficio:")}</span>{" "}
             <span className="font-mono">{turnoOficioCount.toLocaleString("es-ES")}</span>
           </span>
         )}
-        <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">
-          Doble clic para editar · Ctrl+F para buscar
-        </span>
+        <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">{t("Doble clic para editar · Ctrl+F para buscar")}</span>
       </div>
 
       <ColumnVisibilityModal
         open={showColumnModal}
-        title={`Columnas de ${title}`}
+        title={t("Columnas de {title}", { title: title })}
         sourceLabel="Disponibles"
         targetLabel="Visibles"
         availableItems={availableColumnItems}
@@ -512,15 +510,12 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
       {deleteTarget && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4" onClick={() => setDeleteTarget(null)}>
           <div className="w-full max-w-sm rounded-2xl bg-white border border-slate-200 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-slate-900">¿Eliminar {singular.toLowerCase()}?</h3>
-            <p className="text-sm text-slate-500 mt-1.5">
-              Se eliminará <strong>{deleteTarget.first_name} {deleteTarget.last_name || ""}</strong> del directorio. Esta acción no se puede deshacer.
-            </p>
+            <h3 className="text-base font-bold text-slate-900">{t("¿Eliminar")}{" "}{singular.toLowerCase()}?</h3>
+            <p className="text-sm text-slate-500 mt-1.5">{t("Se eliminará")}{" "}<strong>{deleteTarget.first_name} {deleteTarget.last_name || ""}</strong>{" "}{t("del directorio. Esta acción no se puede deshacer.")}</p>
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
+              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
               <button onClick={handleDelete} disabled={deleting} className="peligro inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 transition-colors">
-                {deleting && <Loader2 size={13} className="animate-spin" />} Eliminar
-              </button>
+                {deleting && <Loader2 size={13} className="animate-spin" />}{" "}{t("Eliminar")}</button>
             </div>
           </div>
         </div>

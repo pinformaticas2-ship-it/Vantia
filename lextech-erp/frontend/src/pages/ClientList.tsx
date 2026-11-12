@@ -32,6 +32,7 @@ import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { aviso, proximamente } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -332,7 +333,7 @@ const CLIENT_EXPORT_FIELDS: ClientExportFieldDef[] = [
   { id: "legal_nature", label: "Naturaleza jurídica", getValue: (row) => row.legal_nature || "" },
   { id: "gender", label: "Sexo", getValue: (row) => fmtGender(row.gender).replace("—", "") },
   { id: "birth_date", label: "Fecha nacimiento", getValue: (row) => row.birth_date ? fmtDate(row.birth_date) : "" },
-  { id: "age", label: "Edad", getValue: (row) => calcAge(row.birth_date) != null ? `${calcAge(row.birth_date)} años` : "" },
+  { id: "age", label: "Edad", getValue: (row) => calcAge(row.birth_date) != null ? t("{n} años", { n: calcAge(row.birth_date) }) : "" },
   { id: "nationality", label: "Nacionalidad", getValue: (row) => row.nationality || "" },
   { id: "expedition_country", label: "País expedición", getValue: (row) => row.expedition_country || "" },
   { id: "address", label: "Dirección", getValue: (row) => row.address || "" },
@@ -716,7 +717,7 @@ function AltaOptionsBtn({
         }`}
       >
         <Plus size={13} />
-        <span className="hidden sm:inline">Alta</span>
+        <span className="hidden sm:inline">{t("Alta@@nuevo")}</span>
         <ChevronDownSmall size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -727,7 +728,7 @@ function AltaOptionsBtn({
           className="fixed z-[9999] w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
         >
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-            <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar clientes</p>
+            <p className="text-sm font-semibold text-slate-600">{t("Elige cómo quieres agregar clientes")}</p>
           </div>
           <div className="p-2">
             {options.map((option) => (
@@ -778,7 +779,7 @@ function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, page
 
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-100 bg-white text-xs shrink-0">
-      <span className="text-slate-400">{from}–{to} de {totalItems}</span>
+      <span className="text-slate-400">{from}–{to}{" "}{t("de")}{" "}{totalItems}</span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
@@ -850,10 +851,10 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
   const handleAccept = async () => {
     setFormError("");
     const mn = Number(generalNum);
-    if (!Number.isInteger(mn) || mn < 1) { setFormError("El número mínimo debe ser un entero >= 1"); return; }
+    if (!Number.isInteger(mn) || mn < 1) { setFormError(t("El número mínimo debe ser un entero >= 1")); return; }
     if (useOverride) {
       const ov = Number(overrideNum);
-      if (!Number.isInteger(ov) || ov < 1) { setFormError("El número específico debe ser un entero >= 1"); return; }
+      if (!Number.isInteger(ov) || ov < 1) { setFormError(t("El número específico debe ser un entero >= 1")); return; }
     }
     setSaving(true);
     try {
@@ -863,7 +864,7 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ min_num: mn, auto_fill: autoFill, override_next: useOverride ? Number(overrideNum) : null }),
       });
-      if (!res.ok) { const d = await res.json(); setFormError(d.error || "Error al guardar"); return; }
+      if (!res.ok) { const d = await res.json(); setFormError(d.error || t("Error al guardar")); return; }
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2500);
       await load();
@@ -880,8 +881,8 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
               <Hash size={15} className="text-red-600" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Configurar numeración</h2>
-              <p className="text-xs text-slate-400">Gestión del contador de nº de cliente</p>
+              <h2 className="text-base font-bold text-slate-900">{t("Configurar numeración")}</h2>
+              <p className="text-xs text-slate-400">{t("Gestión del contador de nº de cliente")}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -893,24 +894,23 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
           {loading ? (
             <div className="flex items-center gap-2 text-slate-400 py-4">
               <Loader2 size={15} className="animate-spin" />
-              <span className="text-sm">Cargando...</span>
+              <span className="text-sm">{t("Cargando...")}</span>
             </div>
           ) : (
             <div className="space-y-4">
               {data && (
                 <div className="flex flex-wrap gap-2">
                   <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
-                    {data.used_count} cliente{data.used_count !== 1 ? "s" : ""} numerado{data.used_count !== 1 ? "s" : ""}
+                    {data.used_count}{" "}{t("cliente")}{data.used_count !== 1 ? "s" : ""}{" "}{t("numerado")}{data.used_count !== 1 ? "s" : ""}
                   </span>
-                  <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                    Próximo: {data.next_num}
+                  <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">{t("Próximo:")}{" "}{data.next_num}
                   </span>
                   {data.gaps?.length > 0 ? (
                     <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                      {data.gaps.length} hueco{data.gaps.length !== 1 ? "s" : ""}: {data.gaps.slice(0, 6).join(", ")}{data.gaps.length > 6 ? "…" : ""}
+                      {data.gaps.length}{" "}{t("hueco")}{data.gaps.length !== 1 ? "s" : ""}: {data.gaps.slice(0, 6).join(", ")}{data.gaps.length > 6 ? "…" : ""}
                     </span>
                   ) : data.used_count > 0 ? (
-                    <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">Sin huecos</span>
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">{t("Sin huecos")}</span>
                   ) : null}
                 </div>
               )}
@@ -919,23 +919,21 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
                 <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
                   className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer shrink-0" />
                 <div>
-                  <span className="text-sm font-semibold text-slate-800">Calcular el Contador de Forma Automática</span>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                    (El contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado clientes)
-                  </p>
+                  <span className="text-sm font-semibold text-slate-800">{t("Calcular el Contador de Forma Automática")}</span>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t("(El contador busca el")}{" "}<strong>{t("primer número libre")}</strong>{t(", rellenando huecos si se han borrado clientes)")}</p>
                 </div>
               </label>
 
               <div className="rounded-xl border border-slate-200 overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                  <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">Contador de Clientes</p>
+                  <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">{t("Contador de Clientes")}</p>
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-2.5 cursor-pointer flex-1">
                       <input type="radio" name="client-counter-mode" checked={!useOverride} onChange={() => setUseOverride(false)}
                         className="w-4 h-4 accent-red-600" />
-                      <span className="text-sm text-slate-700 font-medium">General</span>
+                      <span className="text-sm text-slate-700 font-medium">{t("General")}</span>
                     </label>
                     <input type="number" min="1" step="1" value={generalNum}
                       onChange={e => setGeneralNum(e.target.value)}
@@ -945,7 +943,7 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
                     <label className="flex items-center gap-2.5 cursor-pointer flex-1">
                       <input type="radio" name="client-counter-mode" checked={useOverride} onChange={() => setUseOverride(true)}
                         className="w-4 h-4 accent-red-600" />
-                      <span className="text-sm text-slate-700 font-medium">Número específico</span>
+                      <span className="text-sm text-slate-700 font-medium">{t("Número específico")}</span>
                     </label>
                     <input type="number" min="1" step="1" value={overrideNum}
                       onChange={e => setOverrideNum(e.target.value)}
@@ -953,9 +951,7 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
                       className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-red-500 shadow-sm disabled:bg-slate-50 disabled:text-slate-300" />
                   </div>
                   {useOverride && (
-                    <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">
-                      El próximo cliente usará este número exacto (uso único — después vuelve al modo automático).
-                    </p>
+                    <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">{t("El próximo cliente usará este número exacto (uso único — después vuelve al modo automático).")}</p>
                   )}
                 </div>
               </div>
@@ -970,16 +966,14 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
         </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50">
-          <p className="text-xs text-slate-400">Los cambios se aplican al siguiente cliente creado</p>
+          <p className="text-xs text-slate-400">{t("Los cambios se aplican al siguiente cliente creado")}</p>
           <div className="flex gap-2">
             <button type="button" onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-              Cancelar
-            </button>
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
             <button type="button" onClick={handleAccept} disabled={saving || loading}
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm">
               {saving ? <Loader2 size={13} className="animate-spin" /> : savedOk ? <CheckCircle2 size={13} /> : null}
-              {savedOk ? "Guardado" : "Aceptar"}
+              {savedOk ? t("Guardado") : t("Aceptar")}
             </button>
           </div>
         </div>
@@ -1013,9 +1007,7 @@ function ConfirmModal({
           <button
             onClick={onCancel}
             className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            Cancelar
-          </button>
+          >{t("Cancelar")}</button>
           <button
             onClick={onConfirm}
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all active:scale-95 ${danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-amber-500 text-white hover:bg-amber-600"}`}
@@ -1054,8 +1046,8 @@ function QuickTaskModal({
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Tareas del cliente</p>
-            <h3 className="text-sm font-bold text-slate-800 mt-1">Crear obligación / plazo</h3>
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">{t("Tareas del cliente")}</p>
+            <h3 className="text-sm font-bold text-slate-800 mt-1">{t("Crear obligación / plazo")}</h3>
           </div>
           <button
             onClick={onClose}
@@ -1071,110 +1063,110 @@ function QuickTaskModal({
 
         <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cliente seleccionado</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t("Cliente seleccionado")}</p>
             <p className="mt-1 text-sm font-semibold text-slate-800">
               {(client?.first_name || "").trim()} {(client?.last_name || "").trim()}
             </p>
-            <p className="mt-0.5 text-xs text-slate-500">{client?.nif_cif || client?.email || "Sin dato principal"}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{client?.nif_cif || client?.email || t("Sin dato principal")}</p>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t("Título")}{" "}<span className="text-red-500">*</span></label>
             <input
               value={form.titulo}
               onChange={e => set("titulo", e.target.value)}
-              placeholder="Descripción breve de la tarea..."
+              placeholder={t("Descripción breve de la tarea...")}
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Descripción</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t("Descripción")}</label>
             <textarea
               value={form.descripcion}
               onChange={e => set("descripcion", e.target.value)}
               rows={2}
-              placeholder="Instrucciones o contexto adicional..."
+              placeholder={t("Instrucciones o contexto adicional...")}
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400"
             />
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Tipo")}</label>
               <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                <option value="plazo_procesal">Plazo procesal</option>
-                <option value="vista_juicio">Vista / Juicio</option>
-                <option value="notificacion">Notificación</option>
-                <option value="reunion">Reunión</option>
-                <option value="escrito">Escrito</option>
-                <option value="gestion">Gestión</option>
-                <option value="pago">Pago</option>
-                <option value="llamada">Llamada</option>
-                <option value="diligencia">Diligencia</option>
-                <option value="otro">Otro</option>
+                <option value="plazo_procesal">{t("Plazo procesal")}</option>
+                <option value="vista_juicio">{t("Vista / Juicio")}</option>
+                <option value="notificacion">{t("Notificación")}</option>
+                <option value="reunion">{t("Reunión")}</option>
+                <option value="escrito">{t("Escrito")}</option>
+                <option value="gestion">{t("Gestión")}</option>
+                <option value="pago">{t("Pago")}</option>
+                <option value="llamada">{t("Llamada")}</option>
+                <option value="diligencia">{t("Diligencia")}</option>
+                <option value="otro">{t("Otro")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Fecha límite</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Fecha límite")}</label>
               <input type="date" value={form.plazo} onChange={e => set("plazo", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Estado")}</label>
               <select value={form.estado} onChange={e => set("estado", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                <option value="pendiente">Pendiente</option>
-                <option value="urgente">Urgente</option>
-                <option value="completada">Completada</option>
+                <option value="pendiente">{t("Pendiente")}</option>
+                <option value="urgente">{t("Urgente")}</option>
+                <option value="completada">{t("Completada")}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Prioridad</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Prioridad")}</label>
               <select value={form.prioridad} onChange={e => set("prioridad", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
-                <option value="alta">Alta</option>
-                <option value="media">Media</option>
-                <option value="baja">Baja</option>
+                <option value="alta">{t("Alta@@prioridad")}</option>
+                <option value="media">{t("Media@@prioridad")}</option>
+                <option value="baja">{t("Baja@@prioridad")}</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Expediente</label>
-              <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder="EXP-2024-001" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Expediente")}</label>
+              <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder={t("EXP-2024-001")} className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Juzgado / Tribunal</label>
-              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder="Juzgado nº..." className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Juzgado / Tribunal")}</label>
+              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder={t("Juzgado nº...")} className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Nº procedimiento</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Nº procedimiento")}</label>
               <input value={form.num_proc} onChange={e => set("num_proc", e.target.value)} placeholder="123/2024" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de aviso</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Fecha de aviso")}</label>
               <input type="date" value={form.fecha_aviso} onChange={e => set("fecha_aviso", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Importe (€)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Importe (€)")}</label>
               <input type="number" step="0.01" min="0" value={form.importe} onChange={e => set("importe", e.target.value)} placeholder="0,00" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Etapa</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Etapa")}</label>
               <EtapaSelect value={form.etapa} onChange={v => set("etapa", v)} getToken={getToken} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Notas internas</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t("Notas internas")}</label>
               <textarea
                 value={form.notas}
                 onChange={e => set("notas", e.target.value)}
                 rows={2}
-                placeholder="Observaciones internas..."
+                placeholder={t("Observaciones internas...")}
                 className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400"
               />
             </div>
@@ -1182,17 +1174,13 @@ function QuickTaskModal({
         </div>
 
         <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-            Cancelar
-          </button>
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">{t("Cancelar")}</button>
           <button
             onClick={onSave}
             disabled={saving || !form.titulo.trim()}
             className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95 transition-all"
           >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-            Guardar tarea
-          </button>
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}{t("Guardar tarea")}</button>
         </div>
       </div>
     </div>
@@ -1260,7 +1248,7 @@ function FieldDropdown({ value, onChange, options }: {
         onClick={handleOpen}
         className="flex items-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 min-w-[160px] hover:border-slate-300 focus:outline-none focus:border-red-400 transition-colors select-none"
       >
-        <span className="flex-1 text-left truncate">{selected?.label ?? "Elegir…"}</span>
+        <span className="flex-1 text-left truncate">{selected?.label ?? t("Elegir…")}</span>
         <ChevronDown size={11} className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && createPortal(
@@ -1310,7 +1298,7 @@ function FilterRow({
           type="text"
           value={filter.value}
           onChange={e => onChange(filter.id, { value: e.target.value })}
-          placeholder={filter.field === "any" ? "Buscar…" : `Filtrar por ${FILTER_FIELDS.find(f => f.value === filter.field)?.label ?? ""}…`}
+          placeholder={filter.field === "any" ? t("Buscar…") : t("Filtrar por {v}…", { v: FILTER_FIELDS.find(f => f.value === filter.field)?.label ?? "" })}
           className="w-full sm:w-44 pl-2.5 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300"
         />
         {filter.value && (
@@ -1327,7 +1315,7 @@ function FilterRow({
       {canRemove && (
         <button
           onClick={() => onRemove(filter.id)}
-          title="Quitar este filtro"
+          title={t("Quitar este filtro")}
           className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
         >
           −
@@ -1558,7 +1546,7 @@ export default function ClientList() {
       const res   = await fetch("/api/entities?limit=5000", { headers: { Authorization: `Bearer ${token}` } });
       const result = await safeJson(res);
       if (res.ok) setClients(result.data || []);
-      else throw new Error(result.error || "Error al obtener clientes");
+      else throw new Error(result.error || t("Error al obtener clientes"));
     } catch (err: any) {
       if (!silent) setError(err.message);
     } finally {
@@ -1642,13 +1630,13 @@ export default function ClientList() {
       });
       const j = await safeJson(r);
       if (!r.ok || j?.success === false) {
-        throw new Error(j?.error || "No se pudo asignar el color al cliente.");
+        throw new Error(j?.error || t("No se pudo asignar el color al cliente."));
       }
       const updatedColor = j?.data?.color || color;
       setClients((prev) => prev.map((client) => client.id === selected ? { ...client, color: updatedColor } : client));
       setShowOpciones(false);
     } catch (e: any) {
-      aviso(e?.message || "No se pudo asignar el color al cliente.");
+      aviso(e?.message || t("No se pudo asignar el color al cliente."));
     }
   }, [getToken, selected, selectedClient]);
 
@@ -1713,7 +1701,7 @@ export default function ClientList() {
       if (res.ok) {
         setClients(prev => prev.map(c => c.id === selected ? { ...c, ...result.data } : c));
       } else {
-        aviso(result.error || "Error al reactivar");
+        aviso(result.error || t("Error al reactivar"));
       }
     } catch (err: any) {
       aviso(err.message);
@@ -1739,14 +1727,14 @@ export default function ClientList() {
       });
       const result = await safeJson(res);
       if (!res.ok) {
-        setQuickTaskError(result?.error || "No se pudo crear la tarea");
+        setQuickTaskError(result?.error || t("No se pudo crear la tarea"));
         return;
       }
       setShowQuickTaskModal(false);
       setQuickTaskForm(QUICK_TASK_EMPTY());
       window.dispatchEvent(new CustomEvent("historial-changed"));
     } catch (err: any) {
-      setQuickTaskError(err.message || "Error de conexión");
+      setQuickTaskError(err.message || t("Error de conexión"));
     } finally {
       setQuickTaskSaving(false);
     }
@@ -1843,16 +1831,16 @@ export default function ClientList() {
 
   const saveExportTemplate = async () => {
     if (!exportVisibleFields.length) {
-      setExportError("Selecciona al menos una columna para la plantilla.");
+      setExportError(t("Selecciona al menos una columna para la plantilla."));
       return;
     }
     const trimmedName = exportTemplateName.trim();
     if (exportEditorMode === "create" && !trimmedName) {
-      setExportError("Escribe un nombre para la plantilla.");
+      setExportError(t("Escribe un nombre para la plantilla."));
       return;
     }
     if (exportEditorMode === "edit" && selectedExportTemplate.builtIn) {
-      setExportError("Listado actual no se modifica desde aquí; refleja siempre las columnas visibles del listado.");
+      setExportError(t("Listado actual no se modifica desde aquí; refleja siempre las columnas visibles del listado."));
       return;
     }
 
@@ -1891,7 +1879,7 @@ export default function ClientList() {
     const template = selectedExportTemplate;
     const fields = template.fields;
     if (!fields.length) {
-      setExportError("La plantilla no tiene columnas para exportar.");
+      setExportError(t("La plantilla no tiene columnas para exportar."));
       return;
     }
 
@@ -1934,7 +1922,7 @@ export default function ClientList() {
         await fetchClients(true);
         setSelected(result.data?.id ?? null);
       } else {
-        aviso(result.error || "Error al duplicar");
+        aviso(result.error || t("Error al duplicar"));
       }
     } catch (err: any) {
       aviso(err.message);
@@ -1964,14 +1952,14 @@ export default function ClientList() {
   // ── Render: carga ──────────────────────────────────────────
   if (loading) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <Spinner size="xl" label="Cargando clientes..." />
+      <Spinner size="xl" label={t("Cargando clientes...")} />
     </div>
   );
 
   // ── Render: error ──────────────────────────────────────────
   if (error) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
-      <ConnectionErrorBanner error={error} onRetry={() => fetchClients()} title="No se han podido cargar los clientes" />
+      <ConnectionErrorBanner error={error} onRetry={() => fetchClients()} title={t("No se han podido cargar los clientes")} />
     </div>
   );
 
@@ -1990,7 +1978,7 @@ export default function ClientList() {
     {/* ── Modal confirmación baja ───────────────────────────── */}
     {bajaConfirm && selectedClient && (
       <ConfirmModal
-        title={`Eliminar a ${selectedClient.first_name} ${selectedClient.last_name}`}
+        title={t("Eliminar a {first_name} {last_name}", { first_name: selectedClient.first_name, last_name: selectedClient.last_name })}
         message={`Se borrará el cliente de la base de datos. Tendrás 15 segundos para deshacer.`}
         confirmLabel="Eliminar cliente"
         danger
@@ -2011,7 +1999,7 @@ export default function ClientList() {
     {/* ── Modal confirmación borrado masivo ─────────────────── */}
     {bulkDeleteConfirm && (
       <ConfirmModal
-        title={`¿Eliminar ${selectedIds.size} cliente${selectedIds.size !== 1 ? "s" : ""}?`}
+        title={t("¿Eliminar {size} cliente{v}?", { size: selectedIds.size, v: selectedIds.size !== 1 ? "s" : "" })}
         message="Se borrarán de la base de datos. Tendrás 15 segundos para deshacer."
         confirmLabel="Eliminar seleccionados"
         danger
@@ -2049,8 +2037,8 @@ export default function ClientList() {
         <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Exportar clientes</p>
-              <h3 className="text-[17px] font-bold text-slate-900">Plantillas de exportación</h3>
+              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">{t("Exportar clientes")}</p>
+              <h3 className="text-[17px] font-bold text-slate-900">{t("Plantillas de exportación")}</h3>
             </div>
             <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-700">
               <X size={16} />
@@ -2088,23 +2076,21 @@ export default function ClientList() {
                 })}
               </div>
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
-                <button type="button" onClick={() => void deleteSelectedTemplate()} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
-                <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
-                <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
+                <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">{t("Alta")}</button>
+                <button type="button" onClick={() => void deleteSelectedTemplate()} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">{t("Baja")}</button>
+                <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">{t("Modificar")}</button>
+                <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">{t("Cancelar")}</button>
                 <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
-                  <Download size={13} />
-                  Exportar
-                </button>
+                  <Download size={13} />{t("Exportar")}</button>
               </div>
             </div>
           </div>
 
           <div className="grid min-h-0 flex-1 grid-cols-[250px_minmax(0,1fr)] gap-0">
             <div className="border-r border-slate-200 p-3">
-              <p className="mb-3 text-[13px] leading-5 text-slate-500">Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.</p>
+              <p className="mb-3 text-[13px] leading-5 text-slate-500">{t("Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.")}</p>
               <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Plantilla</div>
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">{t("Plantilla")}</div>
                 <div className="max-h-[calc(100vh-360px)] overflow-y-auto">
                   {exportTemplates.map((template) => (
                     <button
@@ -2133,8 +2119,8 @@ export default function ClientList() {
               <div className="grid min-h-0 gap-3 xl:grid-cols-[250px_minmax(0,1fr)]">
                 <div className="overflow-hidden rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <span>Campos a exportar</span>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length} columnas</span>
+                    <span>{t("Campos a exportar")}</span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length}{" "}{t("columnas")}</span>
                   </div>
                   <div className="max-h-[calc(100vh-360px)] overflow-y-auto px-4 py-3 text-[13px] text-slate-700">
                     {selectedExportTemplate.fields.map((fieldId) => (
@@ -2145,8 +2131,8 @@ export default function ClientList() {
 
                 <div className="overflow-hidden rounded-2xl border border-slate-200">
                   <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <span>Vista previa</span>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length} filas</span>
+                    <span>{t("Vista previa")}</span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length}{" "}{t("filas")}</span>
                   </div>
                   <div className="h-[calc(100vh-360px)] overflow-auto bg-[#f3f6fb] p-3">
                     <div className="inline-block min-w-full overflow-hidden border border-[#cfd8e3] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
@@ -2204,7 +2190,7 @@ export default function ClientList() {
       <div className="fixed inset-0 z-[126] flex items-center justify-center bg-transparent px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
         <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-            <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+            <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? t("Nueva plantilla de exportación") : t("Modificar plantilla de exportación")}</h3>
             <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
               <X size={16} />
             </button>
@@ -2213,10 +2199,10 @@ export default function ClientList() {
             <div className="grid gap-6 lg:grid-cols-[1fr_84px_1fr]">
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="font-semibold text-slate-800">Campos disponibles</h4>
+                  <h4 className="font-semibold text-slate-800">{t("Campos disponibles")}</h4>
                   <div className="relative">
                     <select value="clientes" disabled className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none disabled:opacity-100">
-                      <option>Clientes</option>
+                      <option>{t("Clientes")}</option>
                     </select>
                     <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
@@ -2244,12 +2230,12 @@ export default function ClientList() {
 
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <h4 className="font-semibold text-slate-800">Campos visibles</h4>
+                  <h4 className="font-semibold text-slate-800">{t("Campos visibles")}</h4>
                   <div className="relative">
                     <select value={selectedExportFormat} onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)} className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none">
-                      <option value="excel">Excel</option>
-                      <option value="xml">XML</option>
-                      <option value="word">Word</option>
+                      <option value="excel">{t("Excel")}</option>
+                      <option value="xml">{t("XML")}</option>
+                      <option value="word">{t("Word")}</option>
                     </select>
                     <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
@@ -2270,12 +2256,12 @@ export default function ClientList() {
             </div>
 
             <div className="mt-6">
-              <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">{t("Nombre de la plantilla")}</label>
               <input
                 type="text"
                 value={exportTemplateName}
                 onChange={(e) => setExportTemplateName(e.target.value)}
-                placeholder="Ej. Clientes para seguimiento"
+                placeholder={t("Ej. Clientes para seguimiento")}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-red-300"
               />
             </div>
@@ -2287,8 +2273,8 @@ export default function ClientList() {
             )}
 
             <div className="mt-6 flex items-center justify-end gap-3">
-              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button type="button" onClick={() => void saveExportTemplate()} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Guardar plantilla</button>
+              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
+              <button type="button" onClick={() => void saveExportTemplate()} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">{t("Guardar plantilla")}</button>
             </div>
           </div>
         </div>
@@ -2297,7 +2283,7 @@ export default function ClientList() {
     )}
     <ColumnVisibilityModal
       open={showColumnModal}
-      title="Modificar columnas del listado"
+      title={t("Modificar columnas del listado")}
       sourceLabel="Clientes"
       targetLabel="Columnas visibles"
       availableItems={clientAvailableColumnItems}
@@ -2324,19 +2310,16 @@ export default function ClientList() {
               <Users size={18} className="text-red-600" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Gestión de Clientes</h1>
+              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">{t("Gestión de Clientes")}</h1>
               <p className="text-xs text-slate-500 mt-0.5">
-                <span className="font-semibold text-slate-700">{stats.total}</span> clientes
-                {" · "}
-                <span className="font-semibold text-emerald-600">{stats.activos}</span> activos
-                {" · "}
-                <span className="font-semibold text-red-500">{stats.bajas}</span> bajas
-              </p>
+                <span className="font-semibold text-slate-700">{stats.total}</span>{" "}{t("clientes")}{" · "}
+                <span className="font-semibold text-emerald-600">{stats.activos}</span>{" "}{t("activos")}{" · "}
+                <span className="font-semibold text-red-500">{stats.bajas}</span>{" "}{t("bajas")}</p>
             </div>
           </div>
           <button
             onClick={handleRefresh}
-            title="Refrescar datos"
+            title={t("Refrescar datos")}
             className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
           >
             <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
@@ -2361,7 +2344,7 @@ export default function ClientList() {
 
           {/* ─ Baja (eliminar) ─ */}
           <ToolBtn
-            icon={UserMinus} label="Baja"
+            icon={UserMinus} label={t("Baja@@cliente")}
             disabled={!selected}
             danger
             onClick={() => setBajaConfirm(true)}
@@ -2369,7 +2352,7 @@ export default function ClientList() {
 
           {/* ─ Modificar ─ */}
           <ToolBtn
-            icon={Edit3} label="Modificar"
+            icon={Edit3} label={t("Modificar")}
             disabled={!selected}
             onClick={() => selected && navigate(`/dashboard/clientes/${selected}?edit=1`)}
           />
@@ -2378,7 +2361,7 @@ export default function ClientList() {
 
           {/* ─ Enviar Correo ─ */}
           <DropdownBtn
-            icon={Mail} label="Enviar Correo"
+            icon={Mail} label={t("Enviar Correo")}
             disabled={!selected}
             items={[
               {
@@ -2417,7 +2400,7 @@ export default function ClientList() {
 
           {/* ─ Enviar WhatsApp ─ */}
           <DropdownBtn
-            icon={MessageCircle} label="Enviar WhatsApp"
+            icon={MessageCircle} label={t("Enviar WhatsApp")}
             disabled={!selected}
             items={[
               {
@@ -2464,14 +2447,14 @@ export default function ClientList() {
 
           {/* ─ Sign ─ */}
           <ToolBtn
-            icon={PenLine} label="Sign"
+            icon={PenLine} label={t("Sign")}
             disabled={!selected}
             onClick={() => selected && navigate(`/dashboard/clientes/${selected}#firma`)}
           />
 
           {/* ─ Tareas ─ */}
           <DropdownBtn
-            icon={ClipboardList} label="Tareas"
+            icon={ClipboardList} label={t("Tareas")}
             disabled={!selected}
             items={[
               { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/clientes/${selected}#notas`) },
@@ -2486,17 +2469,17 @@ export default function ClientList() {
 
           {/* ─ Adjuntos ─ */}
           <ToolBtn
-            icon={Paperclip} label="Adjuntos"
+            icon={Paperclip} label={t("Adjuntos")}
             disabled={!selected}
             onClick={() => selected && setShowAdjuntos(true)}
           />
 
           {/* ─ Excel ─ */}
-          <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
+          <ToolBtn icon={FileSpreadsheet} label={t("Excel")} onClick={openExportModal} />
 
           {/* ─ Informes/Dashboard ─ */}
           <ToolBtn
-            icon={BarChart2} label="Informes"
+            icon={BarChart2} label={t("Informes")}
             onClick={() => navigate("/dashboard")}
           />
 
@@ -2517,16 +2500,15 @@ export default function ClientList() {
                 setShowOpciones(v => !v);
               }}
               className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all border active:scale-[0.97] ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 hover:border-slate-300 border-slate-200 bg-white"}`}>
-              <MoreHorizontal size={13} /> <span className="hidden sm:inline">Opciones</span> <ChevronDown size={10} />
+              <MoreHorizontal size={13} /> <span className="hidden sm:inline">{t("Opciones")}</span> <ChevronDown size={10} />
             </button>
             {showOpciones && createPortal(
               <div ref={opcionesMenuRef} style={{ top: opcionesPos.top, right: opcionesPos.right }} className="fixed z-[9999] w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
 
                 {/* Grupo 1 */}
-                <button onClick={() => { proximamente("Seleccionar opciones favoritas"); setShowOpciones(false); }}
+                <button onClick={() => { proximamente(t("Seleccionar opciones favoritas")); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
-                </button>
+                  <Star size={12} className="text-slate-400" />{" "}{t("Seleccionar Opciones Favoritas")}</button>
                 <div className="relative">
                   <button
                     onClick={() => {
@@ -2536,8 +2518,7 @@ export default function ClientList() {
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
-                      <LayoutList size={12} className="text-slate-400" /> Elegir columnas
-                    </span>
+                      <LayoutList size={12} className="text-slate-400" />{" "}{t("Elegir columnas")}</span>
                   </button>
                 </div>
                 <div className="relative">
@@ -2549,8 +2530,7 @@ export default function ClientList() {
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
-                      <Hash size={12} className="text-slate-400" /> Configurar numeración
-                    </span>
+                      <Hash size={12} className="text-slate-400" />{" "}{t("Configurar numeración")}</span>
                   </button>
                 </div>
 
@@ -2561,23 +2541,20 @@ export default function ClientList() {
                   <button
                     onClick={() => setOpcionesSubMenu(s => s === "ira" ? null : "ira")}
                     className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "ira" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
-                    <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" /> Ir a</span>
+                    <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" />{" "}{t("Ir a")}</span>
                     <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "ira" ? "rotate-90" : ""}`} />
                   </button>
                   {opcionesSubMenu === "ira" && (
                     <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
                       <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}`); setShowOpciones(false); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <Users size={12} className="text-slate-400" /> Ir a Ficha Cliente
-                      </button>
+                        <Users size={12} className="text-slate-400" />{" "}{t("Ir a Ficha Cliente")}</button>
                       <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#expedientes`); setShowOpciones(false); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <ClipboardList size={12} className="text-slate-400" /> Ir a Expedientes
-                      </button>
+                        <ClipboardList size={12} className="text-slate-400" />{" "}{t("Ir a Expedientes")}</button>
                       <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#notas`); setShowOpciones(false); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <Paperclip size={12} className="text-slate-400" /> Ir a Notas
-                      </button>
+                        <Paperclip size={12} className="text-slate-400" />{" "}{t("Ir a Notas")}</button>
                     </div>
                   )}
                 </div>
@@ -2587,8 +2564,7 @@ export default function ClientList() {
                     onClick={() => setOpcionesSubMenu(s => s === "color" ? null : "color")}
                     className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "color" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
                     <span className="flex items-center gap-2.5">
-                      <Palette size={12} className="text-slate-400" /> Asignar Color
-                    </span>
+                      <Palette size={12} className="text-slate-400" />{" "}{t("Asignar Color")}</span>
                     <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "color" ? "rotate-90" : ""}`} />
                   </button>
                   {opcionesSubMenu === "color" && (
@@ -2624,51 +2600,44 @@ export default function ClientList() {
                 {/* Grupo 3 */}
                 <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#notas`); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Zap size={12} className="text-slate-400" /> Alta Acción
-                </button>
-                <button onClick={() => { proximamente("Crear Recall"); setShowOpciones(false); }}
+                  <Zap size={12} className="text-slate-400" />{" "}{t("Alta Acción")}</button>
+                <button onClick={() => { proximamente(t("Crear Recall")); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Bell size={12} className="text-slate-400" /> Crear Recall
-                </button>
+                  <Bell size={12} className="text-slate-400" />{" "}{t("Crear Recall")}</button>
 
                 <div className="h-px bg-slate-100 my-1.5" />
 
                 {/* Grupo 4 */}
                 <button onClick={() => { handleDuplicar(); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Copy size={12} className="text-slate-400" /> Duplicar
-                </button>
-                <button onClick={() => { proximamente("Fusionar clientes"); setShowOpciones(false); }}
+                  <Copy size={12} className="text-slate-400" />{" "}{t("Duplicar")}</button>
+                <button onClick={() => { proximamente(t("Fusionar clientes")); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <GitMerge size={12} className="text-slate-400" /> Fusionar
-                </button>
+                  <GitMerge size={12} className="text-slate-400" />{" "}{t("Fusionar")}</button>
 
                 <div className="h-px bg-slate-100 my-1.5" />
 
                 {/* Grupo 5 */}
                 <button onClick={() => { handleSMS(); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Smartphone size={12} className="text-slate-400" /> Enviar SMS
-                </button>
+                  <Smartphone size={12} className="text-slate-400" />{" "}{t("Enviar SMS")}</button>
 
                 {/* Versión Antigua → submenú */}
                 <div className="relative">
                   <button
                     onClick={() => setOpcionesSubMenu(s => s === "ver" ? null : "ver")}
                     className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "ver" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
-                    <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" /> Versión Antigua</span>
+                    <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" />{" "}{t("Versión Antigua")}</span>
                     <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "ver" ? "rotate-90" : ""}`} />
                   </button>
                   {opcionesSubMenu === "ver" && (
                     <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
-                      <button onClick={() => { proximamente("Ver historial de versiones"); setOpcionesSubMenu(null); }}
+                      <button onClick={() => { proximamente(t("Ver historial de versiones")); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <History size={12} className="text-slate-400" /> Ver historial versiones
-                      </button>
-                      <button onClick={() => { proximamente("Comparar versión"); setOpcionesSubMenu(null); }}
+                        <History size={12} className="text-slate-400" />{" "}{t("Ver historial versiones")}</button>
+                      <button onClick={() => { proximamente(t("Comparar versión")); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <RefreshCw size={12} className="text-slate-400" /> Comparar versión
-                      </button>
+                        <RefreshCw size={12} className="text-slate-400" />{" "}{t("Comparar versión")}</button>
                     </div>
                   )}
                 </div>
@@ -2701,7 +2670,7 @@ export default function ClientList() {
                     {/* Añadir otro filtro */}
                     <button
                       onClick={addFilter}
-                      title="Añadir otro filtro"
+                      title={t("Añadir otro filtro")}
                       className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-500 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors text-sm font-bold"
                     >
                       +
@@ -2711,7 +2680,7 @@ export default function ClientList() {
                     {filters.length > 1 && (
                       <button
                         onClick={() => removeFilter(filter.id)}
-                        title="Quitar este filtro"
+                        title={t("Quitar este filtro")}
                         className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
                       >
                         −
@@ -2721,7 +2690,7 @@ export default function ClientList() {
                     {/* Limpiar todos los filtros */}
                     <button
                       onClick={clearAllFilters}
-                      title="Quitar todos los filtros"
+                      title={t("Quitar todos los filtros")}
                       className={`flex items-center justify-center w-6 h-6 rounded-md border transition-colors
                         ${hasActiveFilters || filters.length > 1
                           ? "border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
@@ -2738,8 +2707,8 @@ export default function ClientList() {
                   <div className="ml-auto flex items-center gap-2">
                     <span className="text-xs text-slate-400 whitespace-nowrap">
                       {filtered.length !== clients.length
-                        ? <span className="text-amber-600 font-medium">{filtered.length} de {clients.length}</span>
-                        : <>{clients.length} {clients.length === 1 ? "registro" : "registros"}</>
+                        ? <span className="text-amber-600 font-medium">{filtered.length}{" "}{t("de")}{" "}{clients.length}</span>
+                        : <>{clients.length} {clients.length === 1 ? t("registro") : t("registros")}</>
                       }
                     </span>
 
@@ -2752,7 +2721,7 @@ export default function ClientList() {
                       {!isMobile && (
                         <button
                           onClick={() => switchView("list")}
-                          title="Vista listado"
+                          title={t("Vista listado")}
                           className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
                         >
                           <AlignJustify size={13} />
@@ -2762,7 +2731,7 @@ export default function ClientList() {
                       {/* Vista lista + detalle expandible */}
                       <button
                         onClick={() => switchView("detail")}
-                        title="Vista listado con detalle"
+                        title={t("Vista listado con detalle")}
                         className={`p-1.5 rounded-md transition-all ${viewMode === "detail" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
                       >
                         <LayoutList size={13} />
@@ -2771,7 +2740,7 @@ export default function ClientList() {
                       {/* Vista multiselección */}
                       <button
                         onClick={() => switchView("multiselect")}
-                        title="Selección múltiple"
+                        title={t("Selección múltiple")}
                         className={`p-1.5 rounded-md transition-all ${viewMode === "multiselect" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
                       >
                         <ListChecks size={13} />
@@ -2795,7 +2764,7 @@ export default function ClientList() {
                   onClick={() => setShowSelectionDropdown(v => !v)}
                   className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-full text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors"
                 >
-                  <span>Has seleccionado <strong className="text-slate-700">{selectedIds.size}</strong> elemento{selectedIds.size !== 1 ? "s" : ""}</span>
+                  <span>{t("Has seleccionado")}{" "}<strong className="text-slate-700">{selectedIds.size}</strong>{" "}{t("elemento")}{selectedIds.size !== 1 ? "s" : ""}</span>
                   <svg className={`w-3 h-3 transition-transform ${showSelectionDropdown ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 4l4 4 4-4"/></svg>
                 </button>
                 {showSelectionDropdown && (
@@ -2812,20 +2781,17 @@ export default function ClientList() {
                 onClick={exportSelectedCSV}
                 className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
               >
-                <FileSpreadsheet size={11} /> Exportar seleccionados
-              </button>
+                <FileSpreadsheet size={11} />{" "}{t("Exportar seleccionados")}</button>
               <button
                 onClick={() => setBulkDeleteConfirm(true)}
                 className="flex items-center gap-1.5 px-3 py-1 bg-white text-red-600 border border-red-200 rounded-lg font-semibold hover:bg-red-50 transition-colors"
               >
-                <Trash2 size={11} /> Eliminar seleccionados
-              </button>
+                <Trash2 size={11} />{" "}{t("Eliminar seleccionados")}</button>
               <button
                 onClick={() => { setSelectedIds(new Set()); setShowSelectionDropdown(false); }}
                 className="flex items-center gap-1 text-slate-400 hover:text-slate-600 font-medium"
               >
-                <X size={11} /> Limpiar
-              </button>
+                <X size={11} />{" "}{t("Limpiar")}</button>
             </div>
           </div>
         )}
@@ -2840,38 +2806,38 @@ export default function ClientList() {
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   {visibleColumns.internal_number && <Th label="Nº"                 sortKey="internal_number" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="w-14 pl-4" />}
-                  {visibleColumns.name && <Th label="Nombre y Apellidos" sortKey="first_name"      currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
-                  {visibleColumns.document_type && <Th label="Tipo documento" sortKey="document_type" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.nif_cif && <Th label="NIF / CIF"          sortKey="nif_cif"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
-                  {visibleColumns.last_name && <Th label="Apellidos" sortKey="last_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.commercial_name && <Th label="Nombre comercial" sortKey="commercial_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.legal_nature && <Th label="Naturaleza jurídica" sortKey="legal_nature" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.gender && <Th label="Sexo" sortKey="gender" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.birth_date && <Th label="Fecha nacimiento" sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.age && <Th label="Edad" sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.nationality && <Th label="Nacionalidad" sortKey="nationality" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.expedition_country && <Th label="País expedición" sortKey="expedition_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.address && <Th label="Dirección" sortKey="address" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.address_town && <Th label="Población" sortKey="address_town" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.address_cp && <Th label="Código postal" sortKey="address_cp" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.address_province && <Th label="Provincia" sortKey="address_province" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.address_country && <Th label="País" sortKey="address_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.phone_mobile && <Th label="Móvil"              sortKey="phone_mobile"    currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
-                  {visibleColumns.phone_1 && <Th label="Teléfono"           sortKey="phone_1"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.email && <Th label="Correo Electrónico" sortKey="email"           currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
-                  {visibleColumns.phone_2 && <Th label="Teléfono 2" sortKey="phone_2" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.phone_3 && <Th label="Teléfono 3" sortKey="phone_3" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.phone_fax && <Th label="Fax" sortKey="phone_fax" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.website && <Th label="Página web" sortKey="website" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.type && <Th label="Tipo"               sortKey="type"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
-                  {visibleColumns.lopd && <Th label="LOPD"               sortKey="lopd"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.date_alta && <Th label="Fecha Alta"         sortKey="date_alta"       currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
-                  {visibleColumns.date_baja && <Th label="Fecha baja" sortKey="date_baja" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.center && <Th label="Centro" sortKey="center" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
-                  {visibleColumns.commercial_communications && <Th label="Com. comerciales" sortKey="commercial_communications" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
-                  {visibleColumns.client_status && <Th label="Estado"             sortKey="client_status"   currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
-                  {visibleColumns.total_actuaciones && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Actuac.</th>}
-                  {visibleColumns.total_expedientes && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Exp.</th>}
+                  {visibleColumns.name && <Th label={t("Nombre y Apellidos")} sortKey="first_name"      currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.document_type && <Th label={t("Tipo documento")} sortKey="document_type" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.nif_cif && <Th label={t("NIF / CIF")}          sortKey="nif_cif"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.last_name && <Th label={t("Apellidos")} sortKey="last_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.commercial_name && <Th label={t("Nombre comercial")} sortKey="commercial_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.legal_nature && <Th label={t("Naturaleza jurídica")} sortKey="legal_nature" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.gender && <Th label={t("Sexo")} sortKey="gender" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.birth_date && <Th label={t("Fecha nacimiento")} sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.age && <Th label={t("Edad")} sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.nationality && <Th label={t("Nacionalidad")} sortKey="nationality" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.expedition_country && <Th label={t("País expedición")} sortKey="expedition_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address && <Th label={t("Dirección")} sortKey="address" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address_town && <Th label={t("Población")} sortKey="address_town" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.address_cp && <Th label={t("Código postal")} sortKey="address_cp" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.address_province && <Th label={t("Provincia")} sortKey="address_province" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address_country && <Th label={t("País")} sortKey="address_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_mobile && <Th label={t("Móvil")}              sortKey="phone_mobile"    currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
+                  {visibleColumns.phone_1 && <Th label={t("Teléfono")}           sortKey="phone_1"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.email && <Th label={t("Correo Electrónico")} sortKey="email"           currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
+                  {visibleColumns.phone_2 && <Th label={t("Teléfono 2")} sortKey="phone_2" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_3 && <Th label={t("Teléfono 3")} sortKey="phone_3" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_fax && <Th label={t("Fax")} sortKey="phone_fax" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.website && <Th label={t("Página web")} sortKey="website" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.type && <Th label={t("Tipo")}               sortKey="type"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
+                  {visibleColumns.lopd && <Th label={t("LOPD")}               sortKey="lopd"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.date_alta && <Th label={t("Fecha Alta")}         sortKey="date_alta"       currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
+                  {visibleColumns.date_baja && <Th label={t("Fecha baja")} sortKey="date_baja" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.center && <Th label={t("Centro")} sortKey="center" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.commercial_communications && <Th label={t("Com. comerciales")} sortKey="commercial_communications" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.client_status && <Th label={t("Estado")}             sortKey="client_status"   currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.total_actuaciones && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">{t("Actuac.")}</th>}
+                  {visibleColumns.total_expedientes && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">{t("Exp.")}</th>}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
               </thead>
@@ -2883,13 +2849,13 @@ export default function ClientList() {
                         <Users size={36} className="opacity-15" />
                         <p className="font-medium text-sm">
                           {hasActiveFilters || filters.length > 1
-                            ? "No hay registros que coincidan con los filtros"
-                            : "No hay registros todavía"
+                            ? t("No hay registros que coincidan con los filtros")
+                            : t("No hay registros todavía")
                           }
                         </p>
                         {!hasActiveFilters && filters.length === 1 && (
                           <Link to="/dashboard/clientes/new">
-                            <span className="text-red-600 text-xs font-bold hover:underline">+ Crear el primer cliente</span>
+                            <span className="text-red-600 text-xs font-bold hover:underline">{t("+ Crear el primer cliente")}</span>
                           </Link>
                         )}
                       </div>
@@ -2927,7 +2893,7 @@ export default function ClientList() {
                       {visibleColumns.legal_nature && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.legal_nature || <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.gender && <td className="px-3 py-3 hidden xl:table-cell text-slate-500">{fmtGender(client.gender)}</td>}
                       {visibleColumns.birth_date && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 whitespace-nowrap">{client.birth_date ? fmtDate(client.birth_date) : <span className="text-slate-300">—</span>}</td>}
-                      {visibleColumns.age && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 whitespace-nowrap">{calcAge(client.birth_date) !== null ? `${calcAge(client.birth_date)} años` : <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.age && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 whitespace-nowrap">{calcAge(client.birth_date) !== null ? t("{v} años", { v: calcAge(client.birth_date) }) : <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.nationality && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.nationality || <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.expedition_country && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.expedition_country || <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.address && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 truncate max-w-[220px]">{client.address || <span className="text-slate-300">—</span>}</td>}
@@ -2964,7 +2930,7 @@ export default function ClientList() {
                           : <span className="text-slate-300 text-xs">—</span>}
                       </td>}
                       <td className="px-3 py-3 text-right">
-                        <Link to={`/dashboard/clientes/${client.id}`} onClick={e => e.stopPropagation()} className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title="Abrir ficha">
+                        <Link to={`/dashboard/clientes/${client.id}`} onClick={e => e.stopPropagation()} className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title={t("Abrir ficha")}>
                           <ExternalLink size={14} />
                         </Link>
                       </td>
@@ -2988,7 +2954,7 @@ export default function ClientList() {
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                 <Users size={36} className="opacity-15" />
-                <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? "No hay registros que coincidan con los filtros" : "No hay registros todavía"}</p>
+                <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? t("No hay registros que coincidan con los filtros") : t("No hay registros todavía")}</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -3023,7 +2989,7 @@ export default function ClientList() {
                           {client.first_name} {client.last_name}
                         </p>
                         {client.commercial_name && <p className="text-[11px] text-slate-400 truncate">{client.commercial_name}</p>}
-                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">#{client.internal_number || "—"} · {client.nif_cif || "Sin NIF"}</p>
+                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">#{client.internal_number || "—"} · {client.nif_cif || t("Sin NIF")}</p>
                       </div>
 
                       {/* Separador */}
@@ -3064,12 +3030,12 @@ export default function ClientList() {
                         {client.lopd && <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${lopdColor[client.lopd] || "bg-slate-50 text-slate-500"}`}>{client.lopd}</span>}
                         <div className="flex items-center gap-2">
                           {(client.total_actuaciones ?? 0) > 0 && (
-                            <span className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold" title="Actuaciones">
+                            <span className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold" title={t("Actuaciones")}>
                               <Activity size={9} /> {client.total_actuaciones}
                             </span>
                           )}
                           {(client.total_expedientes ?? 0) > 0 && (
-                            <span className="flex items-center gap-1 text-[10px] text-indigo-600 font-semibold" title="Expedientes">
+                            <span className="flex items-center gap-1 text-[10px] text-indigo-600 font-semibold" title={t("Expedientes")}>
                               <Briefcase size={9} /> {client.total_expedientes}
                             </span>
                           )}
@@ -3084,13 +3050,12 @@ export default function ClientList() {
                           onClick={e => e.stopPropagation()}
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-red-600 text-white rounded-lg text-[11px] font-bold hover:bg-red-700 transition-colors whitespace-nowrap"
                         >
-                          <ExternalLink size={11} /> Ver ficha
-                        </Link>
+                          <ExternalLink size={11} />{" "}{t("Ver ficha")}</Link>
                         <Link
                           to={`/dashboard/clientes/${client.id}?edit=1`}
                           onClick={e => e.stopPropagation()}
                           className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                          title="Editar"
+                          title={t("Editar")}
                         >
                           <Edit3 size={13} />
                         </Link>
@@ -3124,15 +3089,15 @@ export default function ClientList() {
                     ? <CheckSquare size={15} className="text-slate-400" />
                     : <Square size={15} />
                 }
-                {allChecked ? "Deseleccionar todo" : "Seleccionar todo"}
+                {allChecked ? t("Deseleccionar todo") : t("Seleccionar todo")}
               </button>
-              <span className="text-xs text-slate-400">{filtered.length} registros</span>
+              <span className="text-xs text-slate-400">{filtered.length}{" "}{t("registros")}</span>
             </div>
 
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                 <Users size={36} className="opacity-15" />
-                <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? "No hay registros que coincidan con los filtros" : "No hay registros todavía"}</p>
+                <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? t("No hay registros que coincidan con los filtros") : t("No hay registros todavía")}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -3195,12 +3160,12 @@ export default function ClientList() {
                       {((client.total_actuaciones ?? 0) > 0 || (client.total_expedientes ?? 0) > 0) && (
                         <div className="flex items-center gap-1.5 justify-center">
                           {(client.total_actuaciones ?? 0) > 0 && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-blue-600 font-semibold" title="Actuaciones">
+                            <span className="flex items-center gap-0.5 text-[9px] text-blue-600 font-semibold" title={t("Actuaciones")}>
                               <Activity size={8} /> {client.total_actuaciones}
                             </span>
                           )}
                           {(client.total_expedientes ?? 0) > 0 && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 font-semibold" title="Expedientes">
+                            <span className="flex items-center gap-0.5 text-[9px] text-indigo-600 font-semibold" title={t("Expedientes")}>
                               <Briefcase size={8} /> {client.total_expedientes}
                             </span>
                           )}
@@ -3223,25 +3188,22 @@ export default function ClientList() {
         {/* ── BARRA DE ESTADO INFERIOR ─────────────────────────── */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2 border-t border-slate-100 bg-slate-50/60 text-[11px] text-slate-500 shrink-0 overflow-x-auto">
           <span className="whitespace-nowrap">
-            <span className="font-semibold text-slate-700">Clientes:</span>{" "}
+            <span className="font-semibold text-slate-700">{t("Clientes:")}</span>{" "}
             <span className="font-mono">{stats.total.toLocaleString("es-ES")}</span>
           </span>
           <span className="whitespace-nowrap">
-            <span className="font-semibold text-emerald-600">Activos:</span>{" "}
+            <span className="font-semibold text-emerald-600">{t("Activos:")}</span>{" "}
             <span className="font-mono">{stats.activos.toLocaleString("es-ES")}</span>
           </span>
           <span className="whitespace-nowrap">
-            <span className="font-semibold text-red-500">% Bajas:</span>{" "}
+            <span className="font-semibold text-red-500">{t("% Bajas:")}</span>{" "}
             <span className="font-mono">{stats.pctBaja.replace(".", ",")}%</span>
           </span>
           {hasActiveFilters && (
-            <span className="text-amber-600 font-medium whitespace-nowrap">
-              Filtrado: {filtered.length} de {clients.length}
+            <span className="text-amber-600 font-medium whitespace-nowrap">{t("Filtrado:")}{" "}{filtered.length}{" "}{t("de")}{" "}{clients.length}
             </span>
           )}
-          <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">
-            Doble clic para abrir · Enter abre seleccionado · Ctrl+F para filtrar
-          </span>
+          <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">{t("Doble clic para abrir · Enter abre seleccionado · Ctrl+F para filtrar")}</span>
         </div>
       </div>
     </div>

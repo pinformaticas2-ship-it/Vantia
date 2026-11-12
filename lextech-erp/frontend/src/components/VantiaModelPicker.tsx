@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { t } from '../lib/i18n';
 
 // Solo las variantes de Gemini están conectadas de verdad (misma API, mismo
 // backend, solo cambia el id del modelo). ChatGPT, Claude y Vincent AI (el
@@ -87,7 +88,7 @@ export function VantiaModelPickerPanel({ selectedModel, onSelect, usage, usageLo
 
   return (
     <div>
-      <p className="px-3.5 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">Modelo / agente de IA</p>
+      <p className="px-3.5 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">{t("Modelo / agente de IA")}</p>
       {AI_MODELS.map(m => (
         <button
           key={m.id}
@@ -105,27 +106,25 @@ export function VantiaModelPickerPanel({ selectedModel, onSelect, usage, usageLo
           {m.id === selectedModel ? (
             <Check className="h-3.5 w-3.5 text-red-600 shrink-0" />
           ) : !m.available ? (
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300 bg-slate-100 rounded-full px-1.5 py-0.5">Próx.</span>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300 bg-slate-100 rounded-full px-1.5 py-0.5">{t("Próx.")}</span>
           ) : null}
         </button>
       ))}
 
       <div className="mt-1.5 border-t border-slate-100 px-3.5 pt-2.5 pb-2">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">Propiedades de {activeModel.label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mb-1.5">{t("Propiedades de")}{" "}{activeModel.label}</p>
         {usageLoading ? (
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 py-1">
-            <Loader2 className="h-3 w-3 animate-spin" /> Cargando uso de hoy…
-          </div>
+            <Loader2 className="h-3 w-3 animate-spin" />{" "}{t("Cargando uso de hoy…")}</div>
         ) : !activeModel.available ? (
-          <p className="text-[11px] text-slate-400">Todavía sin conectar -- no hay datos de uso.</p>
+          <p className="text-[11px] text-slate-400">{t("Todavía sin conectar -- no hay datos de uso.")}</p>
         ) : (
           <div className="space-y-1 text-[11px] text-slate-500">
-            <div className="flex justify-between"><span>Peticiones hoy</span><span className="font-semibold text-slate-700">{usage ? `${fmt(usage.requests)}${limits ? ` / ${fmt(limits.rpd)}` : ""}` : "—"}</span></div>
-            <div className="flex justify-between"><span>Tokens hoy</span><span className="font-semibold text-slate-700">{usage ? fmt(usage.totalTokens) : "—"}</span></div>
-            {limits && <div className="flex justify-between"><span>Límite por minuto</span><span className="text-slate-600">{limits.rpm} peticiones · {fmt(limits.tpm)} tokens</span></div>}
+            <div className="flex justify-between"><span>{t("Peticiones hoy")}</span><span className="font-semibold text-slate-700">{usage ? `${fmt(usage.requests)}${limits ? ` / ${fmt(limits.rpd)}` : ""}` : "—"}</span></div>
+            <div className="flex justify-between"><span>{t("Tokens hoy")}</span><span className="font-semibold text-slate-700">{usage ? fmt(usage.totalTokens) : "—"}</span></div>
+            {limits && <div className="flex justify-between"><span>{t("Límite por minuto")}</span><span className="text-slate-600">{limits.rpm}{" "}{t("peticiones ·")}{" "}{fmt(limits.tpm)}{" "}{t("tokens")}</span></div>}
             <p className="pt-1 text-slate-400 leading-snug">
-              {usage?.resetsNote || "La cuota gratuita se reinicia cada día."} Cuenta compartida por todo el despacho; es una estimación propia, Google no ofrece un dato de cuota restante en tiempo real.
-            </p>
+              {usage?.resetsNote || t("La cuota gratuita se reinicia cada día.")}{" "}{t("Cuenta compartida por todo el despacho; es una estimación propia, Google no ofrece un dato de cuota restante en tiempo real.")}</p>
           </div>
         )}
       </div>

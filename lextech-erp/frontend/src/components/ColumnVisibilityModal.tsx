@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight, SlidersHorizontal, X } from "lucide-react";
+import { t } from '../lib/i18n';
 
 type ColumnItem = {
   key: string;
@@ -64,9 +65,7 @@ export default function ColumnVisibilityModal({
   ) => (
     <div className="h-[42vh] overflow-auto rounded-2xl border border-slate-200 bg-white">
       {items.length === 0 ? (
-        <div className="flex h-full items-center justify-center px-6 text-sm text-slate-400">
-          No hay columnas en este bloque
-        </div>
+        <div className="flex h-full items-center justify-center px-6 text-sm text-slate-400">{t("No hay columnas en este bloque")}</div>
       ) : (
         <div className="divide-y divide-slate-100">
           {items.map((item) => {
@@ -107,14 +106,14 @@ export default function ColumnVisibilityModal({
             </div>
             <div>
               <h2 className="text-[15px] font-bold text-slate-900">{title}</h2>
-              <p className="text-xs text-slate-400">Elige y ordena los campos que quieres ver en la tabla</p>
+              <p className="text-xs text-slate-400">{t("Elige y ordena los campos que quieres ver en la tabla")}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-2xl border border-slate-200 p-2 text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-            title="Cerrar"
+            title={t("Cerrar")}
           >
             <X size={18} />
           </button>
@@ -124,7 +123,7 @@ export default function ColumnVisibilityModal({
           <div className="min-w-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">Campos disponibles</h3>
+                <h3 className="text-sm font-bold text-slate-800">{t("Campos disponibles")}</h3>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
                   {availableItems.length}
                 </span>
@@ -146,7 +145,7 @@ export default function ColumnVisibilityModal({
                   setSelectedAvailable([]);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                title="Añadir seleccionados"
+                title={t("Añadir seleccionados")}
               >
                 <ArrowRight size={18} />
               </button>
@@ -158,7 +157,7 @@ export default function ColumnVisibilityModal({
                   setSelectedVisible([]);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                title="Quitar seleccionados"
+                title={t("Quitar seleccionados")}
               >
                 <ArrowLeft size={18} />
               </button>
@@ -171,7 +170,7 @@ export default function ColumnVisibilityModal({
                   setSelectedVisible([]);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                title="Añadir todos"
+                title={t("Añadir todos")}
               >
                 <ChevronsRight size={18} />
               </button>
@@ -183,7 +182,7 @@ export default function ColumnVisibilityModal({
                   setSelectedVisible([]);
                 }}
                 className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-                title="Quitar todos"
+                title={t("Quitar todos")}
               >
                 <ChevronsLeft size={18} />
               </button>
@@ -193,7 +192,7 @@ export default function ColumnVisibilityModal({
           <div className="min-w-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">Campos visibles</h3>
+                <h3 className="text-sm font-bold text-slate-800">{t("Campos visibles")}</h3>
                 <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
                   {visibleItems.length}
                 </span>
@@ -208,15 +207,12 @@ export default function ColumnVisibilityModal({
 
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
           <p className="text-xs text-slate-400">
-            {visibleItems.length} campo{visibleItems.length === 1 ? "" : "s"} visible{visibleItems.length === 1 ? "" : "s"} en la tabla
-          </p>
+            {visibleItems.length}{" "}{t("campo")}{visibleItems.length === 1 ? "" : "s"}{" "}{t("visible")}{visibleItems.length === 1 ? "" : "s"}{" "}{t("en la tabla")}</p>
           <button
             type="button"
             onClick={onClose}
             className="rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-red-700"
-          >
-            Listo
-          </button>
+          >{t("Listo")}</button>
         </div>
       </div>
     </div>,

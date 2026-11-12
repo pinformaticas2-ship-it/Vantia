@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { History, X } from 'lucide-react';
 import { getOrganizacionResuelta } from './useOrganizacion';
+import { t } from './i18n';
 
 // ── No perder lo que se está escribiendo (16/10/2026) ───────────────────────
 //  - useAvisoSalida(sucio): si hay cambios sin guardar y se cierra o recarga
@@ -93,16 +94,11 @@ export function AvisoBorrador({ fecha, onRecuperar, onDescartar }: { fecha: numb
   return (
     <div role="status" className="aviso-entra flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <History size={17} className="shrink-0 text-amber-600" />
-      <p className="flex-1 min-w-[12rem] text-sm text-amber-900">
-        Tienes cambios sin guardar de <strong>{haceCuanto(fecha)}</strong>. ¿Quieres recuperarlos?
-      </p>
+      <p className="flex-1 min-w-[12rem] text-sm text-amber-900">{t("Tienes cambios sin guardar de")}{" "}<strong>{haceCuanto(fecha)}</strong>{t(". ¿Quieres recuperarlos?")}</p>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onRecuperar} className="h-8 px-3 rounded-lg bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700">
-          Recuperar
-        </button>
+        <button type="button" onClick={onRecuperar} className="h-8 px-3 rounded-lg bg-amber-600 text-xs font-semibold text-white hover:bg-amber-700">{t("Recuperar")}</button>
         <button type="button" onClick={onDescartar} className="h-8 px-2.5 rounded-lg text-xs font-semibold text-amber-800 hover:bg-amber-100 inline-flex items-center gap-1">
-          <X size={13} /> Descartar
-        </button>
+          <X size={13} />{" "}{t("Descartar")}</button>
       </div>
     </div>
   );

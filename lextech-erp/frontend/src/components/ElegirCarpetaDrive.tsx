@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { ChevronRight, Folder, HardDrive, Loader2, Users, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { t } from '../lib/i18n';
 
 // Explorador de carpetas de Google Drive para elegir la carpeta de
 // plantillas del despacho (backend: GET /api/plantillas/drive/carpetas).
@@ -26,7 +27,7 @@ export default function ElegirCarpetaDrive({ onElegir, onCerrar }: {
     setCarpetas(null); setError('');
     apiFetch(`/api/plantillas/drive/carpetas?padre=${encodeURIComponent(actual.id)}`, { getToken })
       .then((r) => { if (!vivo) return; if (r?.success === false) throw new Error(r.error); setCarpetas(r.data || []); })
-      .catch((e) => vivo && setError(e?.message || 'No se pudieron leer las carpetas.'));
+      .catch((e) => vivo && setError(e?.message || t("No se pudieron leer las carpetas.")));
     return () => { vivo = false; };
   }, [actual.id, getToken]);
 
@@ -38,21 +39,19 @@ export default function ElegirCarpetaDrive({ onElegir, onCerrar }: {
       <div className="w-full max-w-lg max-h-[86vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100">
           <div>
-            <p className="text-base font-bold text-slate-900">Elige la carpeta de plantillas</p>
-            <p className="text-xs text-slate-500">Vantia leerá las plantillas de Word de esa carpeta y sus subcarpetas.</p>
+            <p className="text-base font-bold text-slate-900">{t("Elige la carpeta de plantillas")}</p>
+            <p className="text-xs text-slate-500">{t("Vantia leerá las plantillas de Word de esa carpeta y sus subcarpetas.")}</p>
           </div>
-          <button type="button" onClick={onCerrar} aria-label="Cerrar" className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center"><X size={16} /></button>
+          <button type="button" onClick={onCerrar} aria-label={t("Cerrar")} className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center"><X size={16} /></button>
         </div>
 
         <div className="px-5 py-2.5 flex items-center gap-1 flex-wrap text-xs border-b border-slate-100">
           <button type="button" onClick={() => setMigas([{ id: 'root', nombre: 'Mi unidad' }])}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 ${migas[0].id === 'root' ? 'bg-slate-100 font-semibold text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}>
-            <HardDrive size={12} /> Mi unidad
-          </button>
+            <HardDrive size={12} />{" "}{t("Mi unidad")}</button>
           <button type="button" onClick={() => setMigas([{ id: 'compartidas', nombre: 'Unidades compartidas' }])}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-1 ${migas[0].id === 'compartidas' ? 'bg-slate-100 font-semibold text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}>
-            <Users size={12} /> Unidades compartidas
-          </button>
+            <Users size={12} />{" "}{t("Unidades compartidas")}</button>
         </div>
         {migas.length > 1 && (
           <div className="px-5 pt-2 flex items-center gap-0.5 flex-wrap text-xs text-slate-500">
@@ -68,7 +67,7 @@ export default function ElegirCarpetaDrive({ onElegir, onCerrar }: {
         <div className="flex-1 min-h-[240px] overflow-y-auto px-3 py-2">
           {error ? <p className="px-2 py-6 text-sm text-amber-700">{error}</p>
             : !carpetas ? <div className="py-10 flex justify-center text-slate-400"><Loader2 size={18} className="animate-spin" /></div>
-            : carpetas.length === 0 ? <p className="px-2 py-8 text-center text-sm text-slate-500">Esta carpeta no tiene subcarpetas.</p>
+            : carpetas.length === 0 ? <p className="px-2 py-8 text-center text-sm text-slate-500">{t("Esta carpeta no tiene subcarpetas.")}</p>
             : carpetas.map((c) => (
               <button key={c.id} type="button" onClick={() => setMigas([...migas, c])}
                 className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
@@ -80,13 +79,12 @@ export default function ElegirCarpetaDrive({ onElegir, onCerrar }: {
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 border-t border-slate-100 px-5 py-3">
-          <p className="flex-1 min-w-0 text-xs text-slate-500 truncate" title={ruta}>{raizVirtual ? 'Entra en la carpeta que quieras usar.' : <>Carpeta: <b className="text-slate-700">{ruta}</b></>}</p>
+          <p className="flex-1 min-w-0 text-xs text-slate-500 truncate" title={ruta}>{raizVirtual ? t("Entra en la carpeta que quieras usar.") : <>{t("Carpeta:")}{" "}<b className="text-slate-700">{ruta}</b></>}</p>
           <div className="flex gap-2 justify-end">
-            <button type="button" onClick={onCerrar} className="h-9 px-3.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
+            <button type="button" onClick={onCerrar} className="h-9 px-3.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">{t("Cancelar")}</button>
             <button type="button" disabled={raizVirtual || guardando} onClick={async () => { setGuardando(true); try { await onElegir({ id: actual.id, ruta }); } finally { setGuardando(false); } }}
               className="h-9 px-3.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50 inline-flex items-center gap-1.5">
-              {guardando && <Loader2 size={14} className="animate-spin" />} Usar esta carpeta
-            </button>
+              {guardando && <Loader2 size={14} className="animate-spin" />}{" "}{t("Usar esta carpeta")}</button>
           </div>
         </div>
       </div>

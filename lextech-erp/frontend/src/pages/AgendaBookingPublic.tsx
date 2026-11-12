@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Spinner } from "../components/Spinner";
 import { Scale, Loader2, AlertCircle, CheckCircle2, CalendarClock, ChevronRight } from "lucide-react";
+import { t } from '../lib/i18n';
 
 interface PageInfo {
   title: string;
@@ -44,9 +45,9 @@ export default function AgendaBookingPublic() {
       .then(r => r.json())
       .then(d => {
         if (d.success) { setInfo(d.data); setPageState("picking"); }
-        else { setErrorMsg(d.error || "Enlace no válido"); setPageState("invalid"); }
+        else { setErrorMsg(d.error || t("Enlace no válido")); setPageState("invalid"); }
       })
-      .catch(() => { setErrorMsg("No se pudo conectar con el servidor."); setPageState("invalid"); });
+      .catch(() => { setErrorMsg(t("No se pudo conectar con el servidor.")); setPageState("invalid"); });
   }, [token]);
 
   useEffect(() => {
@@ -70,8 +71,8 @@ export default function AgendaBookingPublic() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) { setFieldError("El nombre es obligatorio."); return; }
-    if (!form.email.trim()) { setFieldError("El email es obligatorio."); return; }
+    if (!form.name.trim()) { setFieldError(t("El nombre es obligatorio.")); return; }
+    if (!form.email.trim()) { setFieldError(t("El email es obligatorio.")); return; }
     setFieldError(null);
     setPageState("submitting");
     try {
@@ -84,11 +85,11 @@ export default function AgendaBookingPublic() {
       if (res.ok && d.success) {
         setPageState("done");
       } else {
-        setErrorMsg(d.error || "Error al confirmar la cita.");
+        setErrorMsg(d.error || t("Error al confirmar la cita."));
         setPageState("error");
       }
     } catch {
-      setErrorMsg("No se pudo conectar con el servidor.");
+      setErrorMsg(t("No se pudo conectar con el servidor."));
       setPageState("error");
     }
   };
@@ -99,13 +100,13 @@ export default function AgendaBookingPublic() {
         <div className="p-2 bg-red-600 rounded-xl">
           <Scale className="w-6 h-6 text-white" />
         </div>
-        <span className="text-xl font-bold text-slate-800 tracking-tight">Vantia Legis</span>
+        <span className="text-xl font-bold text-slate-800 tracking-tight">{t("Vantia Legis")}</span>
       </div>
 
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
         {pageState === "loading" && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Spinner size="lg" label="Verificando enlace..." />
+            <Spinner size="lg" label={t("Verificando enlace...")} />
           </div>
         )}
 
@@ -114,8 +115,8 @@ export default function AgendaBookingPublic() {
             <div className="p-4 bg-red-50 rounded-full mb-4">
               <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">Enlace no disponible</h2>
-            <p className="text-sm text-slate-500">{errorMsg || "Este enlace no es válido o la página no está activa."}</p>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("Enlace no disponible")}</h2>
+            <p className="text-sm text-slate-500">{errorMsg || t("Este enlace no es válido o la página no está activa.")}</p>
           </div>
         )}
 
@@ -124,11 +125,9 @@ export default function AgendaBookingPublic() {
             <div className="p-4 bg-red-50 rounded-full mb-4">
               <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">No se pudo confirmar la cita</h2>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("No se pudo confirmar la cita")}</h2>
             <p className="text-sm text-slate-500 mb-4">{errorMsg}</p>
-            <button onClick={() => setPageState("picking")} className="peligro text-sm text-red-600 hover:underline">
-              Elegir otro horario
-            </button>
+            <button onClick={() => setPageState("picking")} className="peligro text-sm text-red-600 hover:underline">{t("Elegir otro horario")}</button>
           </div>
         )}
 
@@ -137,11 +136,9 @@ export default function AgendaBookingPublic() {
             <div className="p-4 bg-emerald-50 rounded-full mb-4">
               <CheckCircle2 className="w-8 h-8 text-emerald-500" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">Cita confirmada</h2>
+            <h2 className="text-lg font-semibold text-slate-800 mb-2">{t("Cita confirmada")}</h2>
             <p className="text-sm text-slate-500">
-              {new Date(`${date}T${selectedTime}:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}, a las {selectedTime}.
-              Te esperamos.
-            </p>
+              {new Date(`${date}T${selectedTime}:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}{t(", a las")}{" "}{selectedTime}{t(". Te esperamos.")}</p>
           </div>
         )}
 
@@ -154,15 +151,15 @@ export default function AgendaBookingPublic() {
               <div>
                 <h2 className="text-lg font-semibold text-slate-800 mb-1">{info.title}</h2>
                 <p className="text-sm text-slate-500">
-                  {info.description || `Cita de ${info.duration_minutes} minutos`}
-                  {info.owner_name && <> con <strong>{info.owner_name}</strong></>}.
+                  {info.description || t("Cita de {duration_minutes} minutos", { duration_minutes: info.duration_minutes })}
+                  {info.owner_name && <>{" "}{t("con")}{" "}<strong>{info.owner_name}</strong></>}.
                 </p>
               </div>
             </div>
 
             {pageState !== "booking" && pageState !== "submitting" ? (
               <>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{t("Fecha")}</label>
                 <input
                   type="date"
                   value={date}
@@ -172,13 +169,13 @@ export default function AgendaBookingPublic() {
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
 
-                <label className="block text-xs font-medium text-slate-600 mt-4 mb-2">Horarios disponibles</label>
+                <label className="block text-xs font-medium text-slate-600 mt-4 mb-2">{t("Horarios disponibles")}</label>
                 {loadingSlots ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
                   </div>
                 ) : slots.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-4 text-center">No hay huecos disponibles ese día. Prueba otra fecha.</p>
+                  <p className="text-sm text-slate-400 py-4 text-center">{t("No hay huecos disponibles ese día. Prueba otra fecha.")}</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">
                     {slots.map(s => (
@@ -200,41 +197,39 @@ export default function AgendaBookingPublic() {
                   type="button"
                   onClick={() => setPageState("picking")}
                   className="text-xs text-slate-400 hover:text-slate-600 mb-3"
-                >
-                  ← Elegir otro horario
-                </button>
+                >{t("← Elegir otro horario")}</button>
                 <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  {new Date(`${date}T${selectedTime}:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}, a las <strong>{selectedTime}</strong>
+                  {new Date(`${date}T${selectedTime}:00`).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}{t(", a las")}{" "}<strong>{selectedTime}</strong>
                 </div>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Nombre <span className="text-red-500">*</span></label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t("Nombre")}{" "}<span className="text-red-500">*</span></label>
                     <input
                       value={form.name}
                       onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      placeholder="Juan García"
+                      placeholder={t("Juan García")}
                       required
                       className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Correo electrónico <span className="text-red-500">*</span></label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t("Correo electrónico")}{" "}<span className="text-red-500">*</span></label>
                     <input
                       type="email"
                       value={form.email}
                       onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                      placeholder="juan@ejemplo.com"
+                      placeholder={t("juan@ejemplo.com")}
                       required
                       className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Notas (opcional)</label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{t("Notas (opcional)")}</label>
                     <textarea
                       value={form.notes}
                       onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                      placeholder="Cuéntanos brevemente el motivo de la cita…"
+                      placeholder={t("Cuéntanos brevemente el motivo de la cita…")}
                       rows={3}
                       className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                     />
@@ -253,9 +248,9 @@ export default function AgendaBookingPublic() {
                   className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-60 transition-colors"
                 >
                   {pageState === "submitting" ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Confirmando...</>
+                    <><Loader2 className="w-4 h-4 animate-spin" />{" "}{t("Confirmando...")}</>
                   ) : (
-                    <>Confirmar cita <ChevronRight className="w-4 h-4" /></>
+                    <>{t("Confirmar cita")}{" "}<ChevronRight className="w-4 h-4" /></>
                   )}
                 </button>
               </form>

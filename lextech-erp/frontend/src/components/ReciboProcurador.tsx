@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { CheckCircle2, Mail, Printer, RotateCcw } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { aviso } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 // Pago al procurador en efectivo: el despacho necesita su recibo firmado.
 // Aquí vive todo lo de ese recibo -- la etiqueta de estado, pedirlo por
@@ -51,11 +52,11 @@ export function ReciboAcciones({ pago, despacho, onActualizado, compacto }: {
     setEnviando(true);
     try {
       const r = await apiFetch(`/api/facturacion/gastos/${pago.id}/solicitar-recibo`, { getToken, method: "POST", body: "{}" });
-      if (!r?.success) throw new Error(r?.error || "No se pudo enviar.");
+      if (!r?.success) throw new Error(r?.error || t("No se pudo enviar."));
       onActualizado(r.data);
-      aviso.ok(`Recibo solicitado a ${r.enviadoA}`);
+      aviso.ok(t("Recibo solicitado a {enviadoA}", { enviadoA: r.enviadoA }));
     } catch (e: any) {
-      aviso.error(e?.message || "No se pudo enviar el correo al procurador.");
+      aviso.error(e?.message || t("No se pudo enviar el correo al procurador."));
     } finally {
       setEnviando(false);
     }
@@ -64,10 +65,10 @@ export function ReciboAcciones({ pago, despacho, onActualizado, compacto }: {
   const marcar = async (recibido: boolean) => {
     try {
       const r = await apiFetch(`/api/facturacion/gastos/${pago.id}/recibo`, { getToken, method: "POST", body: JSON.stringify({ recibido }) });
-      if (!r?.success) throw new Error(r?.error || "No se pudo guardar.");
+      if (!r?.success) throw new Error(r?.error || t("No se pudo guardar."));
       onActualizado(r.data);
     } catch (e: any) {
-      aviso.error(e?.message || "No se pudo guardar.");
+      aviso.error(e?.message || t("No se pudo guardar."));
     }
   };
 
@@ -75,20 +76,20 @@ export function ReciboAcciones({ pago, despacho, onActualizado, compacto }: {
     <>
       {pago.reciboEstado !== "recibido" && (
         <button type="button" className={boton} disabled={enviando}
-          title={pago.procuradorEmail ? `Pedir el recibo por correo a ${pago.procuradorEmail}` : "El procurador no tiene correo en el Directorio"}
+          title={pago.procuradorEmail ? t("Pedir el recibo por correo a {procuradorEmail}", { procuradorEmail: pago.procuradorEmail }) : t("El procurador no tiene correo en el Directorio")}
           onClick={() => void solicitar()}>
           <Mail size={icono} />
         </button>
       )}
-      <button type="button" className={boton} title="Imprimir recibo para que lo firme" onClick={() => imprimirRecibo(pago, despacho)}>
+      <button type="button" className={boton} title={t("Imprimir recibo para que lo firme")} onClick={() => imprimirRecibo(pago, despacho)}>
         <Printer size={icono} />
       </button>
       {pago.reciboEstado === "recibido" ? (
-        <button type="button" className={boton} title="Volver a marcar como pendiente" onClick={() => void marcar(false)}>
+        <button type="button" className={boton} title={t("Volver a marcar como pendiente")} onClick={() => void marcar(false)}>
           <RotateCcw size={icono} />
         </button>
       ) : (
-        <button type="button" className={`${boton} border-emerald-200 text-emerald-600 hover:bg-emerald-50`} title="Ya tenemos el recibo firmado" onClick={() => void marcar(true)}>
+        <button type="button" className={`${boton} border-emerald-200 text-emerald-600 hover:bg-emerald-50`} title={t("Ya tenemos el recibo firmado")} onClick={() => void marcar(true)}>
           <CheckCircle2 size={icono} />
         </button>
       )}
@@ -160,7 +161,7 @@ declara haber recibido de <strong>${esc(despacho)}</strong>, <strong>en efectivo
 <p style="text-align:center;margin-top:40px"><button onclick="print()" style="font:inherit;padding:8px 20px;cursor:pointer">Imprimir</button></p>
 </body></html>`;
   const w = window.open("", "_blank", "width=800,height=900");
-  if (!w) { aviso.error("El navegador ha bloqueado la ventana del recibo. Permite las ventanas emergentes para Vantia."); return; }
+  if (!w) { aviso.error(t("El navegador ha bloqueado la ventana del recibo. Permite las ventanas emergentes para Vantia.")); return; }
   w.document.open();
   w.document.write(html);
   w.document.close();

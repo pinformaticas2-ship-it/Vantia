@@ -22,6 +22,7 @@ import { useIsMobile } from "../lib/useIsMobile";
 import TikTokPanel, { TikTokIcon } from "../components/TikTokPanel";
 import InstagramPanel from "../components/InstagramPanel";
 import { InstagramSimulado } from "./DemoInstagram";
+import { t } from '../lib/i18n';
 
 // TEMPORAL: mientras Instagram no esté conectado, su pestaña se enseña con datos
 // de ejemplo (para probarlo y grabarlo). Poner a false para volver a lo normal.
@@ -151,7 +152,7 @@ export default function WhatsApp() {
       headers: { Authorization: `Bearer ${token}` },
     });
     const json = await safeJson(response);
-    if (!response.ok) throw new Error(json.error || "No se pudo cargar Comunicación Externa");
+    if (!response.ok) throw new Error(json.error || t("No se pudo cargar Comunicación Externa"));
     return json;
   }, [getToken]);
 
@@ -166,7 +167,7 @@ export default function WhatsApp() {
       body: JSON.stringify(body),
     });
     const json = await safeJson(response);
-    if (!response.ok) throw new Error(json.error || "No se pudo guardar el mensaje");
+    if (!response.ok) throw new Error(json.error || t("No se pudo guardar el mensaje"));
     return json;
   }, [getToken]);
 
@@ -189,7 +190,7 @@ export default function WhatsApp() {
       setStatus(statusRes.data || null);
       setContacts(contactsRes.data || []);
     } catch (err: any) {
-      setError(err.message || "No se pudo cargar Comunicación Externa");
+      setError(err.message || t("No se pudo cargar Comunicación Externa"));
     } finally {
       setLoading(false);
     }
@@ -205,7 +206,7 @@ export default function WhatsApp() {
       const result = await apiGet(`/api/whatsapp/conversations/client/${clientId}`);
       setConversation(result.data?.messages || []);
     } catch (err: any) {
-      setError(err.message || "No se pudo cargar la conversación");
+      setError(err.message || t("No se pudo cargar la conversación"));
     } finally {
       setLoadingConversation(false);
     }
@@ -275,7 +276,7 @@ export default function WhatsApp() {
       )));
       setComposer("");
     } catch (err: any) {
-      setError(err.message || "No se pudo enviar el mensaje");
+      setError(err.message || t("No se pudo enviar el mensaje"));
     } finally {
       setSending(false);
     }
@@ -321,7 +322,7 @@ export default function WhatsApp() {
   if (error && contacts.length === 0 && !status && !tiktokConectado && !instagramConectado) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
+        <ConnectionErrorBanner error={error} onRetry={fetchShell} title={t("No se pudo cargar Comunicación Externa")} />
       </div>
     );
   }
@@ -341,8 +342,7 @@ export default function WhatsApp() {
               canal === "whatsapp" ? "bg-[#25D366]/15 text-[#1a9e4f]" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
             }`}
           >
-            <MessageCircle size={13} /> WhatsApp
-          </button>
+            <MessageCircle size={13} />{" "}{t("WhatsApp")}</button>
         )}
         {canales.includes("instagram") && (
           <button
@@ -352,8 +352,7 @@ export default function WhatsApp() {
               canal === "instagram" ? "bg-gradient-to-r from-fuchsia-500 to-pink-500 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
             }`}
           >
-            <Instagram size={13} /> Instagram
-            {canal !== "instagram" && instagramNoLeidos > 0 && <span className="rounded-full bg-pink-500 px-1.5 text-[10px] font-bold text-white">{instagramNoLeidos}</span>}
+            <Instagram size={13} />{" "}{t("Instagram")}{canal !== "instagram" && instagramNoLeidos > 0 && <span className="rounded-full bg-pink-500 px-1.5 text-[10px] font-bold text-white">{instagramNoLeidos}</span>}
           </button>
         )}
         {canales.includes("tiktok") && (
@@ -364,8 +363,7 @@ export default function WhatsApp() {
               canal === "tiktok" ? "bg-slate-900 text-white" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
             }`}
           >
-            <TikTokIcon size={13} /> TikTok
-          </button>
+            <TikTokIcon size={13} />{" "}{t("TikTok")}</button>
         )}
       </div>
 
@@ -379,31 +377,29 @@ export default function WhatsApp() {
         <div className="border-b border-slate-100 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Bandeja del equipo</p>
-              <h1 className="mt-1 text-base font-bold text-slate-900">WhatsApp</h1>
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">{t("Bandeja del equipo")}</p>
+              <h1 className="mt-1 text-base font-bold text-slate-900">{t("WhatsApp")}</h1>
             </div>
             <button
               type="button"
               onClick={() => navigate("/dashboard/config?section=integraciones")}
               className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
-              title="Configurar en Integraciones"
+              title={t("Configurar en Integraciones")}
             >
               <Settings2 size={16} />
             </button>
           </div>
           <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Canal Business autenticado
-            </div>
-            <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />{t("Canal Business autenticado")}</div>
+            <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || t("WhatsApp Business Cloud API")}</p>
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <Search size={15} className="text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar conversación..."
+              placeholder={t("Buscar conversación...")}
               className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
@@ -416,11 +412,11 @@ export default function WhatsApp() {
                 <UserRound size={24} className="text-slate-300" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-600">Sin conversaciones</p>
+                <p className="text-sm font-semibold text-slate-600">{t("Sin conversaciones")}</p>
                 <p className="mt-1 text-xs text-slate-400 max-w-[220px]">
                   {query.trim()
-                    ? "No hay ningún contacto que coincida con la búsqueda."
-                    : "Los contactos con teléfono que escriban por WhatsApp aparecerán aquí."}
+                    ? t("No hay ningún contacto que coincida con la búsqueda.")
+                    : t("Los contactos con teléfono que escriban por WhatsApp aparecerán aquí.")}
                 </p>
               </div>
             </div>
@@ -453,12 +449,11 @@ export default function WhatsApp() {
                     </span>
                   </div>
                   {contact.internal_number ? (
-                    <p className={`mt-0.5 text-[11px] font-semibold ${isSelected ? "text-[#ab0433]" : "text-emerald-600"}`}>
-                      EXP-{String(contact.internal_number).padStart(4, "0")}
+                    <p className={`mt-0.5 text-[11px] font-semibold ${isSelected ? "text-[#ab0433]" : "text-emerald-600"}`}>{t("EXP-")}{String(contact.internal_number).padStart(4, "0")}
                     </p>
                   ) : null}
                   <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-500">
-                    {contact.last_message_body || "Sin conversación registrada todavía."}
+                    {contact.last_message_body || t("Sin conversación registrada todavía.")}
                   </p>
                 </div>
               </button>
@@ -475,7 +470,7 @@ export default function WhatsApp() {
                 type="button"
                 onClick={() => (isMobile ? setSelectedClientId("") : navigate("/dashboard/clientes"))}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
-                title={isMobile ? "Volver a la lista" : "Volver"}
+                title={isMobile ? t("Volver a la lista") : t("Volver")}
               >
                 <ArrowLeft size={17} />
               </button>
@@ -491,15 +486,13 @@ export default function WhatsApp() {
                   <div>
                     <h2 className="text-base font-bold text-slate-900">{getClientLabel(selectedClient)}</h2>
                     <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                      WhatsApp Cloud API directa
-                    </div>
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />{t("WhatsApp Cloud API directa")}</div>
                   </div>
                 </>
               ) : (
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Panel de mensajería</h2>
-                  <p className="mt-1 text-sm text-slate-500">Selecciona una conversación para empezar.</p>
+                  <h2 className="text-base font-bold text-slate-900">{t("Panel de mensajería")}</h2>
+                  <p className="mt-1 text-sm text-slate-500">{t("Selecciona una conversación para empezar.")}</p>
                 </div>
               )}
             </div>
@@ -507,8 +500,8 @@ export default function WhatsApp() {
             <div className="flex items-center gap-3">
               {selectedClient?.internal_number ? (
                 <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-400">Expediente</p>
-                  <p className="mt-1 text-sm font-bold text-blue-700">EXP-{String(selectedClient.internal_number).padStart(4, "0")}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-400">{t("Expediente")}</p>
+                  <p className="mt-1 text-sm font-bold text-blue-700">{t("EXP-")}{String(selectedClient.internal_number).padStart(4, "0")}</p>
                 </div>
               ) : null}
               <button
@@ -516,9 +509,7 @@ export default function WhatsApp() {
                 onClick={() => selectedClient && fetchConversation(selectedClient.id)}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
-                <RefreshCw size={15} />
-                Actualizar
-              </button>
+                <RefreshCw size={15} />{t("Actualizar")}</button>
             </div>
           </div>
         </div>
@@ -534,10 +525,8 @@ export default function WhatsApp() {
             ) : conversation.length === 0 ? (
               <div className="mx-auto flex max-w-xl flex-col items-center rounded-[28px] border border-dashed border-slate-200 bg-white px-8 py-10 text-center">
                 <MessageCircle size={30} className="text-slate-300" />
-                <p className="mt-4 text-base font-bold text-slate-700">Todavía no hay mensajes</p>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Cuando entren mensajes por el webhook o envíes uno desde el ERP, aparecerán aquí con el historial completo.
-                </p>
+                <p className="mt-4 text-base font-bold text-slate-700">{t("Todavía no hay mensajes")}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{t("Cuando entren mensajes por el webhook o envíes uno desde el ERP, aparecerán aquí con el historial completo.")}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -552,11 +541,11 @@ export default function WhatsApp() {
                           : "rounded-bl-md border border-slate-200 bg-white text-slate-700"
                       }`}
                     >
-                      <p className="text-sm leading-6">{message.body || "Mensaje sin texto"}</p>
+                      <p className="text-sm leading-6">{message.body || t("Mensaje sin texto")}</p>
                       <div className={`mt-2 flex items-center justify-between gap-3 text-[11px] ${
                         outbound ? "text-white/70" : "text-slate-400"
                       }`}>
-                        <span>{outbound ? (message.status || "enviado") : (message.contact_name || "entrante")}</span>
+                        <span>{outbound ? (message.status || t("enviado")) : (message.contact_name || t("entrante"))}</span>
                         <span>{timeLabel(message.created_at)}</span>
                       </div>
                     </div>
@@ -585,14 +574,14 @@ export default function WhatsApp() {
                   <button
                     type="button"
                     className="inline-flex h-11 w-11 items-center justify-center rounded-2xl text-slate-400 transition hover:bg-white hover:text-slate-600"
-                    title="Teléfono"
+                    title={t("Teléfono")}
                   >
                     <Phone size={18} />
                   </button>
                   <textarea
                     value={composer}
                     onChange={(e) => setComposer(e.target.value)}
-                    placeholder="Responder al cliente..."
+                    placeholder={t("Responder al cliente...")}
                     className="min-h-[44px] max-h-32 flex-1 resize-none bg-transparent px-1 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400"
                   />
                   <button
@@ -606,14 +595,12 @@ export default function WhatsApp() {
                     }`}
                   >
                     {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                    {sending ? "Enviando..." : "Enviar"}
+                    {sending ? t("Enviando...") : t("Enviar")}
                   </button>
                 </div>
               </>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-400">
-                Selecciona una conversación para responder desde el ERP.
-              </div>
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-400">{t("Selecciona una conversación para responder desde el ERP.")}</div>
             )}
           </div>
         </div>
@@ -631,19 +618,15 @@ function SinCanales({ onConfigurar }: { onConfigurar: () => void }) {
         <MessageCircle size={28} className="text-slate-400" />
       </div>
       <div>
-        <h2 className="text-base font-bold text-slate-800">No hay ningún canal conectado</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-          Conecta WhatsApp, Instagram o TikTok en Integraciones y aparecerán aquí. Facebook se añadirá a esta
-          misma bandeja cuando estén disponibles.
-        </p>
+        <h2 className="text-base font-bold text-slate-800">{t("No hay ningún canal conectado")}</h2>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">{t("Conecta WhatsApp, Instagram o TikTok en Integraciones y aparecerán aquí. Facebook se añadirá a esta misma bandeja cuando estén disponibles.")}</p>
       </div>
       <button
         type="button"
         onClick={onConfigurar}
         className="mt-1 inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#92042c]"
       >
-        <Settings2 size={15} /> Ir a Integraciones
-      </button>
+        <Settings2 size={15} />{" "}{t("Ir a Integraciones")}</button>
     </div>
   );
 }
@@ -653,10 +636,8 @@ function EmptyConversation() {
     <div className="flex h-full items-center justify-center">
       <div className="max-w-md rounded-[28px] border border-dashed border-slate-200 bg-white px-8 py-10 text-center">
         <MessageCircle size={28} className="mx-auto text-slate-300" />
-        <p className="mt-4 text-base font-semibold text-slate-700">Selecciona una conversación</p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          Aquí verás el historial completo y podrás responder al cliente desde el ERP.
-        </p>
+        <p className="mt-4 text-base font-semibold text-slate-700">{t("Selecciona una conversación")}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">{t("Aquí verás el historial completo y podrás responder al cliente desde el ERP.")}</p>
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import { Modal } from "./Modal";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { loadJuzgadosEspana, getProvincias, getPartidosJudiciales, getJuzgadosDePartido, detectarUbicacion } from "../lib/juzgadosEspana";
 import type { JuzgadoProvinciaData } from "../lib/juzgadosEspanaData";
+import { t } from '../lib/i18n';
 
 // ── Constantes compartidas ────────────────────────────────────
 export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
@@ -174,7 +175,7 @@ function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string
           disabled={!data}
           searchable
           searchPlaceholder="Buscar provincia...">
-          <option value="">{data ? "— Provincia —" : "Cargando..."}</option>
+          <option value="">{data ? t("— Provincia —") : t("Cargando...")}</option>
           {provincias.map(p => <option key={p} value={p}>{p}</option>)}
         </AppSelect>
         <AppSelect
@@ -183,7 +184,7 @@ function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string
           disabled={!provincia}
           searchable
           searchPlaceholder="Buscar partido judicial...">
-          <option value="">— Partido judicial —</option>
+          <option value="">{t("— Partido judicial —")}</option>
           {partidos.map(p => <option key={p} value={p}>{p}</option>)}
         </AppSelect>
         <AppSelect
@@ -195,17 +196,15 @@ function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string
           disabled={!partido}
           searchable
           searchPlaceholder="Buscar juzgado...">
-          <option value={MANUAL}>{partido ? "Escribir manualmente…" : "Elige antes el partido"}</option>
+          <option value={MANUAL}>{partido ? t("Escribir manualmente…") : t("Elige antes el partido")}</option>
           {juzgados.map(j => <option key={j} value={j}>{j}</option>)}
         </AppSelect>
       </div>
       {modoManual && (
         <input value={value} onChange={e => onChange(e.target.value)}
-          placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
+          placeholder={t("Juzgado de 1ª Inst. nº 3 de Madrid")} className={inp} />
       )}
-      <p className="text-[10px] text-slate-400 leading-snug">
-        Listado oficial de partidos judiciales y juzgados de España (CGPJ) — si no encuentras el que buscas, escríbelo manualmente.
-      </p>
+      <p className="text-[10px] text-slate-400 leading-snug">{t("Listado oficial de partidos judiciales y juzgados de España (CGPJ) — si no encuentras el que buscas, escríbelo manualmente.")}</p>
     </div>
   );
 }
@@ -287,8 +286,8 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
       const res = await fetch(`/api/files/${entityId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) setFiles(data.data || []);
-      else setError(data?.error || "Error al cargar");
-    } catch (e: any) { setError(e?.message || "Error de conexión"); }
+      else setError(data?.error || t("Error al cargar"));
+    } catch (e: any) { setError(e?.message || t("Error de conexión")); }
     finally { setLoading(false); }
   }, [entityId, getToken]);
 
@@ -310,12 +309,12 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setError(d?.error || `Error ${res.status}`);
+        setError(d?.error || t("Error {status}", { status: res.status }));
       } else {
         await load();
         window.dispatchEvent(new CustomEvent("historial-changed"));
       }
-    } catch (e: any) { setError(e?.message || "Error al subir"); }
+    } catch (e: any) { setError(e?.message || t("Error al subir")); }
     finally { setUploading(false); }
   };
 
@@ -360,18 +359,15 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
           disabled={uploading}
           className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
         >
-          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
-          Subir
-        </button>
-        <span className="text-[11px] text-slate-400">{loading ? "Cargando…" : `${files.length} archivo${files.length !== 1 ? "s" : ""}`}</span>
+          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}{t("Subir")}</button>
+        <span className="text-[11px] text-slate-400">{loading ? t("Cargando…") : t("{length} archivo{v}", { length: files.length, v: files.length !== 1 ? "s" : "" })}</span>
         {error && <span className="peligro text-[11px] text-red-600 font-medium truncate flex-1">{error}</span>}
         <button
           onClick={onOpenFull}
-          title="Abrir en ventana completa"
+          title={t("Abrir en ventana completa")}
           className="ml-auto flex items-center gap-1 px-2 py-1 text-[11px] text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
         >
-          <Maximize2 size={11} /> Ventana completa
-        </button>
+          <Maximize2 size={11} />{" "}{t("Ventana completa")}</button>
         <input ref={fileRef} type="file" multiple className="hidden"
           onChange={e => { if (e.target.files) { upload(e.target.files); e.target.value = ""; } }} />
       </div>
@@ -381,7 +377,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
         {isDrag && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-red-50/95 border-2 border-dashed border-red-400 rounded pointer-events-none">
             <Upload size={24} className="text-red-500 mb-1 animate-bounce" />
-            <p className="text-xs font-bold text-red-600">Suelta para subir</p>
+            <p className="text-xs font-bold text-red-600">{t("Suelta para subir")}</p>
           </div>
         )}
         {loading ? (
@@ -392,16 +388,16 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
             className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 cursor-pointer hover:text-slate-400 transition-colors group"
           >
             <Upload size={24} className="group-hover:text-red-400 transition-colors" />
-            <span className="text-xs font-medium">Sin adjuntos — haz clic o arrastra archivos</span>
+            <span className="text-xs font-medium">{t("Sin adjuntos — haz clic o arrastra archivos")}</span>
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
               <tr>
-                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre</th>
-                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Tipo</th>
-                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
-                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Nombre")}</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">{t("Tipo")}</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Tamaño")}</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">{t("Fecha")}</th>
                 <th className="px-3 py-1.5 w-16"></th>
               </tr>
             </thead>
@@ -418,7 +414,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
                   </td>
                   <td className="px-3 py-1.5 hidden sm:table-cell">
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
-                      {f.attachment_type || "Sin clasificar"}
+                      {f.attachment_type || t("Sin clasificar")}
                     </span>
                   </td>
                   <td className="px-3 py-1.5 text-[11px] text-slate-400 whitespace-nowrap hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
@@ -429,12 +425,12 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => downloadFile(f.id, f.original_name)}
-                        title="Descargar"
+                        title={t("Descargar")}
                         className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                       ><Download size={12} /></button>
                       <button
                         onClick={() => setConfirmDeleteId(f.id)}
-                        title="Eliminar"
+                        title={t("Eliminar")}
                         className="peligro p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       ><Trash2 size={12} /></button>
                     </div>
@@ -452,12 +448,12 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
         variant="confirm"
         icon={<AlertTriangle size={18} />}
         iconTone="danger"
-        title="¿Eliminar este archivo?"
-        subtitle="Tendrás 15 segundos para deshacer."
+        title={t("¿Eliminar este archivo?")}
+        subtitle={t("Tendrás 15 segundos para deshacer.")}
         footer={
           <>
-            <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => del(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
+            <button onClick={() => del(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Eliminar")}</button>
           </>
         }
       />
@@ -491,8 +487,8 @@ function IndicadoresModal({ expedienteId }: { expedienteId: string }) {
         const data = await safeJson(res);
         if (!vivo) return;
         if (res.ok) setInd(data.data);
-        else setError(data.error || "Error");
-      } catch { if (vivo) setError("Error de conexión"); }
+        else setError(data.error || t("Error"));
+      } catch { if (vivo) setError(t("Error de conexión")); }
     })();
     return () => { vivo = false; };
   }, [expedienteId, getToken]);
@@ -502,9 +498,9 @@ function IndicadoresModal({ expedienteId }: { expedienteId: string }) {
 
   const euros = (v: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(v ?? 0);
   const filas: [string, string, string][] = [
-    ["Días sin actuaciones", ind.dias_sin_actuacion == null ? "—" : `${ind.dias_sin_actuacion} días`,
+    ["Días sin actuaciones", ind.dias_sin_actuacion == null ? "—" : t("{n} días", { n: ind.dias_sin_actuacion }),
       ind.dias_sin_actuacion > 30 ? "text-amber-600" : "text-slate-700"],
-    ["Días abierto",         ind.dias_desde_apertura == null ? "—" : `${ind.dias_desde_apertura} días`, "text-slate-700"],
+    ["Días abierto",         ind.dias_desde_apertura == null ? "—" : t("{n} días", { n: ind.dias_desde_apertura }), "text-slate-700"],
     ["Tareas pendientes",    String(ind.tareas_pendientes), ind.tareas_pendientes > 0 ? "text-amber-600" : "text-slate-700"],
     ["Tareas vencidas",      String(ind.tareas_vencidas), ind.tareas_vencidas > 0 ? "text-rose-600" : "text-slate-700"],
     ["Archivos",             String(ind.total_archivos), "text-slate-700"],
@@ -620,14 +616,14 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
         }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo crear el cliente");
+      if (!res.ok) throw new Error(d.error || t("No se pudo crear el cliente"));
       const cliente = d.data;
       onClienteCreated?.(cliente);
       set("cliente_id", cliente.id);
       set("cliente_nombre", `${cliente.first_name || ""} ${cliente.last_name || ""}`.trim());
       closeNewCliente();
     } catch (e: any) {
-      setNewClienteError(e.message || "No se pudo crear el cliente");
+      setNewClienteError(e.message || t("No se pudo crear el cliente"));
     } finally {
       setCreatingCliente(false);
     }
@@ -653,11 +649,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           <div className="flex flex-col justify-center">
             <h1 className="text-lg font-extrabold text-slate-800 leading-none tracking-tight mb-1">
               {editId
-                ? `Expediente ${form.anio}/${(form as any).num_exp || "—"}`
-                : "Nuevo expediente"}
+                ? t("Expediente {anio}/{v}", { anio: form.anio, v: (form as any).num_exp || "—" })
+                : t("Nuevo expediente")}
             </h1>
             <p className="text-xs font-medium text-slate-500">
-              {form.descripcion || "Rellena los datos del expediente"}
+              {form.descripcion || t("Rellena los datos del expediente")}
             </p>
           </div>
         </div>
@@ -667,48 +663,41 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             <button
               onClick={() => onSave(form)}
               disabled={saving || missingFields.length > 0}
-              title={missingFields.length > 0 ? `Falta rellenar ${missingFields.join(" y ")}` : undefined}
+              title={missingFields.length > 0 ? t("Falta rellenar {join}", { join: missingFields.join(" y ") }) : undefined}
               className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 border border-red-700 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 active:scale-[0.98]"
             >
               {saving && <Loader2 size={13} className="animate-spin" />}
-              {editId ? "Guardar cambios" : "Crear expediente"}
+              {editId ? t("Guardar cambios") : t("Crear expediente")}
             </button>
             {!saving && missingFields.length > 0 && (
-              <p className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
-                Falta rellenar {missingFields.join(" y ")}
+              <p className="text-[11px] font-medium text-slate-400 whitespace-nowrap">{t("Falta rellenar")}{" "}{missingFields.join(" y ")}
               </p>
             )}
           </div>
           <button onClick={onClose}
-            className="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors focus:outline-none">
-            Cancelar
-          </button>
+            className="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors focus:outline-none">{t("Cancelar")}</button>
 
           <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
 
           <button
             onClick={() => editId && setShowAdj(true)}
             disabled={!editId}
-            title={!editId ? "Guarda el expediente primero" : "Adjuntos"}
+            title={!editId ? t("Guarda el expediente primero") : t("Adjuntos")}
             className={`hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
               editId ? "text-slate-600 hover:bg-slate-100" : "text-slate-400 opacity-50 cursor-not-allowed"
             }`}
           >
-            <Paperclip size={12} /> Adjuntos
-          </button>
+            <Paperclip size={12} />{" "}{t("Adjuntos")}</button>
           <button disabled className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-400 opacity-50 cursor-not-allowed">
-            <Activity size={12} /> Historial
-          </button>
+            <Activity size={12} />{" "}{t("Historial")}</button>
           <button disabled className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-400 opacity-50 cursor-not-allowed">
-            <FileSpreadsheet size={12} /> Económico
-          </button>
+            <FileSpreadsheet size={12} />{" "}{t("Económico")}</button>
 
           <div className="w-px h-6 bg-slate-200 mx-1 hidden lg:block" />
 
           <button onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 focus:outline-none">
-            <ArrowLeft size={12} /> Volver
-          </button>
+            <ArrowLeft size={12} />{" "}{t("Volver")}</button>
         </div>
       </div>
 
@@ -729,26 +718,25 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             {/* IDENTIFICACIÓN */}
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <FolderOpen size={15} className="text-slate-400" /> Identificación
-              </h3>
+                <FolderOpen size={15} className="text-slate-400" />{" "}{t("Identificación")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Núm. Exp</label>
+                  <label className={lbl}>{t("Núm. Exp")}</label>
                   <input value={(form as any).num_exp || (editId ? "—" : "Auto")} readOnly className={inpRO} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Año</label>
+                  <label className={lbl}>{t("Año")}</label>
                   <input type="number" value={form.anio}
                     onChange={e => set("anio", parseInt(e.target.value) || new Date().getFullYear())}
                     className={inp} min={2000} max={2100} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha Alta</label>
+                  <label className={lbl}>{t("Fecha Alta")}</label>
                   <input type="date" value={form.fecha_inicio}
                     onChange={e => set("fecha_inicio", e.target.value)} className={inp} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Estado</label>
+                  <label className={lbl}>{t("Estado")}</label>
                   <AppSelect value={form.estado} onChange={e => set("estado", e.target.value)} searchable searchPlaceholder="Buscar estado...">
                     {Object.entries(ESTADOS).map(([k, v]) => (
                       <option key={k} value={k}>{v.label}</option>
@@ -757,12 +745,12 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className={lbl}>Descripción Expediente <span className="text-red-500">*</span></label>
+                  <label className={lbl}>{t("Descripción Expediente")}{" "}<span className="text-red-500">*</span></label>
                   <input value={form.descripcion} onChange={e => set("descripcion", e.target.value)}
-                    placeholder="Ej: Reclamación de cantidad contra BBVA" className={inp} />
+                    placeholder={t("Ej: Reclamación de cantidad contra BBVA")} className={inp} />
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className={lbl}>Tipo de Expediente</label>
+                  <label className={lbl}>{t("Tipo de Expediente")}</label>
                   <AppSelect value={form.tipo} onChange={e => set("tipo", e.target.value)} searchable searchPlaceholder="Buscar tipo...">
                     {Object.entries(TIPOS).map(([k, v]) => (
                       <option key={k} value={k}>{v.label}</option>
@@ -771,40 +759,40 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 </div>
 
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className={lbl}>Tipos de Asunto</label>
+                  <label className={lbl}>{t("Tipos de Asunto")}</label>
                   <AppSelect value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)} searchable searchPlaceholder="Buscar tipo de asunto...">
-                    <option value="">— Seleccionar —</option>
-                    <option value="CIVIL">CIVIL</option>
-                    <option value="PENAL">PENAL</option>
-                    <option value="SOCIAL">SOCIAL</option>
-                    <option value="CONTENCIOSO - ADMINISTRATIVO">CONTENCIOSO - ADMINISTRATIVO</option>
-                    <option value="EXTRAJUDICIAL">EXTRAJUDICIAL</option>
-                    <option value="DERECHO BANCARIO">DERECHO BANCARIO</option>
-                    <option value="FAMILIA">FAMILIA</option>
-                    <option value="VÍA ADMINISTRATIVA">VÍA ADMINISTRATIVA</option>
-                    <option value="HERENCIA">HERENCIA</option>
-                    <option value="MENORES">MENORES</option>
-                    <option value="VIOLENCIA DE GÉNERO">VIOLENCIA DE GÉNERO</option>
-                    <option value="CONCURSAL">CONCURSAL</option>
-                    <option value="MERCANTIL">MERCANTIL</option>
-                    <option value="MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD">MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD</option>
-                    <option value="USURA Y TRANSPARENCIA - MICROCREDITOS">USURA Y TRANSPARENCIA - MICROCREDITOS</option>
-                    <option value="FECHA_FIN_PLAZO_CONTESTAR_DEMANDA">FECHA_FIN_PLAZO_CONTESTAR_DEMANDA</option>
-                    <option value="CONTESTACIÓN A LA DEMANDA">CONTESTACIÓN A LA DEMANDA</option>
-                    <option value="PLAZO_APELACION">PLAZO_APELACION</option>
-                    <option value="DEMANDA ODH">DEMANDA ODH</option>
-                    <option value="DEMANDA UT">DEMANDA UT</option>
+                    <option value="">{t("— Seleccionar —")}</option>
+                    <option value="CIVIL">{t("CIVIL")}</option>
+                    <option value="PENAL">{t("PENAL")}</option>
+                    <option value="SOCIAL">{t("SOCIAL")}</option>
+                    <option value="CONTENCIOSO - ADMINISTRATIVO">{t("CONTENCIOSO - ADMINISTRATIVO")}</option>
+                    <option value="EXTRAJUDICIAL">{t("EXTRAJUDICIAL")}</option>
+                    <option value="DERECHO BANCARIO">{t("DERECHO BANCARIO")}</option>
+                    <option value="FAMILIA">{t("FAMILIA")}</option>
+                    <option value="VÍA ADMINISTRATIVA">{t("VÍA ADMINISTRATIVA")}</option>
+                    <option value="HERENCIA">{t("HERENCIA")}</option>
+                    <option value="MENORES">{t("MENORES")}</option>
+                    <option value="VIOLENCIA DE GÉNERO">{t("VIOLENCIA DE GÉNERO")}</option>
+                    <option value="CONCURSAL">{t("CONCURSAL")}</option>
+                    <option value="MERCANTIL">{t("MERCANTIL")}</option>
+                    <option value="MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD">{t("MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD")}</option>
+                    <option value="USURA Y TRANSPARENCIA - MICROCREDITOS">{t("USURA Y TRANSPARENCIA - MICROCREDITOS")}</option>
+                    <option value="FECHA_FIN_PLAZO_CONTESTAR_DEMANDA">{t("FECHA_FIN_PLAZO_CONTESTAR_DEMANDA")}</option>
+                    <option value="CONTESTACIÓN A LA DEMANDA">{t("CONTESTACIÓN A LA DEMANDA")}</option>
+                    <option value="PLAZO_APELACION">{t("PLAZO_APELACION")}</option>
+                    <option value="DEMANDA ODH">{t("DEMANDA ODH")}</option>
+                    <option value="DEMANDA UT">{t("DEMANDA UT")}</option>
                   </AppSelect>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Puedes escribir para filtrar y encontrar el asunto más rápido.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{t("Puedes escribir para filtrar y encontrar el asunto más rápido.")}</p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Etapa</label>
+                  <label className={lbl}>{t("Etapa")}</label>
                   <AppSelect value={form.etapa} onChange={e => set("etapa", e.target.value)} searchable searchPlaceholder="Buscar etapa...">
-                    {ETAPAS.map(et => <option key={et} value={et}>{et || "— Seleccionar —"}</option>)}
+                    {ETAPAS.map(et => <option key={et} value={et}>{et || t("— Seleccionar —")}</option>)}
                   </AppSelect>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Fecha Cierre</label>
+                  <label className={lbl}>{t("Fecha Cierre")}</label>
                   <input type="date" value={form.fecha_cierre}
                     onChange={e => set("fecha_cierre", e.target.value)} className={inp} />
                 </div>
@@ -814,16 +802,15 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             {/* PROCEDIMIENTO JUDICIAL */}
             <div className="pt-6 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Scale size={15} className="text-slate-400" /> Procedimiento Judicial
-              </h3>
+                <Scale size={15} className="text-slate-400" />{" "}{t("Procedimiento Judicial")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Tipo de Procedimiento</label>
+                  <label className={lbl}>{t("Tipo de Procedimiento")}</label>
                   <input value={form.tipo_proc} onChange={e => set("tipo_proc", e.target.value)}
-                    placeholder="Monitorio, Ordinario…" className={inp} />
+                    placeholder={t("Monitorio, Ordinario…")} className={inp} />
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-2">
-                  <label className={lbl}>Juzgado / Tribunal</label>
+                  <label className={lbl}>{t("Juzgado / Tribunal")}</label>
                   <JuzgadoField value={form.juzgado} onChange={v => set("juzgado", v)} />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -832,7 +819,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     placeholder="2809042120240001302" className={`${inp} font-mono`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Núm. Autos</label>
+                  <label className={lbl}>{t("Núm. Autos")}</label>
                   <input value={form.num_autos} onChange={e => set("num_autos", e.target.value)}
                     placeholder="1302/2024" className={`${inp} font-mono`} />
                 </div>
@@ -842,35 +829,34 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             {/* CUANTÍAS ECONÓMICAS */}
             <div className="pt-6 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Coins size={15} className="text-slate-400" /> Cuantías Económicas
-              </h3>
+                <Coins size={15} className="text-slate-400" />{" "}{t("Cuantías Económicas")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Cuantía Principal (€)</label>
+                  <label className={lbl}>{t("Cuantía Principal (€)")}</label>
                   <input type="number" value={form.cuantia_principal}
                     onChange={e => set("cuantia_principal", e.target.value)}
                     placeholder="0.00" step="0.01" className={`${inp} text-right`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Intereses (€)</label>
+                  <label className={lbl}>{t("Intereses (€)")}</label>
                   <input type="number" value={form.intereses}
                     onChange={e => set("intereses", e.target.value)}
                     placeholder="0.00" step="0.01" className={`${inp} text-right`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Costas (€)</label>
+                  <label className={lbl}>{t("Costas (€)")}</label>
                   <input type="number" value={form.costas}
                     onChange={e => set("costas", e.target.value)}
                     placeholder="0.00" step="0.01" className={`${inp} text-right`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Cuantía Total (€)</label>
+                  <label className={lbl}>{t("Cuantía Total (€)")}</label>
                   <input value={form.cuantia_total} readOnly
                     placeholder="0.00" className={`${inpRO} text-right font-bold`} />
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Importe (€)</label>
+                  <label className={lbl}>{t("Importe (€)")}</label>
                   <input type="number" value={form.importe}
                     onChange={e => set("importe", e.target.value)}
                     placeholder="0.00" step="0.01" className={`${inp} text-right`} />
@@ -881,7 +867,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                       checked={form.indeterminado === true || form.indeterminado === "true"}
                       onChange={e => set("indeterminado", e.target.checked)}
                       className="w-4 h-4 border border-slate-300 rounded text-red-600 focus:ring-1 focus:ring-red-500 cursor-pointer" />
-                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Cuantía indeterminada</span>
+                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">{t("Cuantía indeterminada")}</span>
                   </label>
                 </div>
               </div>
@@ -890,26 +876,25 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             {/* REFERENCIAS Y DATOS INTERNOS */}
             <div className="pt-6 border-t border-slate-100">
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <MoreHorizontal size={15} className="text-slate-400" /> Referencias y Datos Internos
-              </h3>
+                <MoreHorizontal size={15} className="text-slate-400" />{" "}{t("Referencias y Datos Internos")}</h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Ref. Propia</label>
+                  <label className={lbl}>{t("Ref. Propia")}</label>
                   <input value={form.ref_propia} onChange={e => set("ref_propia", e.target.value)}
-                    placeholder="2024-CIVIL-001" className={`${inp} font-mono`} />
+                    placeholder={t("2024-CIVIL-001")} className={`${inp} font-mono`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Ref. Expediente</label>
+                  <label className={lbl}>{t("Ref. Expediente")}</label>
                   <input value={form.ref_expediente} onChange={e => set("ref_expediente", e.target.value)}
-                    placeholder="REF-EXP-001" className={`${inp} font-mono`} />
+                    placeholder={t("REF-EXP-001")} className={`${inp} font-mono`} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Centro</label>
+                  <label className={lbl}>{t("Centro")}</label>
                   <input value={form.centro} onChange={e => set("centro", e.target.value)}
-                    placeholder="Oficina / Centro" className={inp} />
+                    placeholder={t("Oficina / Centro")} className={inp} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={lbl}>Color</label>
+                  <label className={lbl}>{t("Color")}</label>
                   <AppSelect value={form.color} onChange={e => set("color", e.target.value)}>
                     {COLORES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </AppSelect>
@@ -923,8 +908,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7 animate-card-in-2">
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Users size={15} className="text-slate-400" /> Partes Implicadas
-              </h3>
+                <Users size={15} className="text-slate-400" />{" "}{t("Partes Implicadas")}</h3>
 
               <div className="flex flex-col gap-6">
 
@@ -933,7 +917,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <label className={`${lbl} text-slate-700`}>Cliente <span className="text-red-500">*</span></label>
+                      <label className={`${lbl} text-slate-700`}>{t("Cliente")}{" "}<span className="text-red-500">*</span></label>
                     </div>
                     {!showNewCliente && (
                       <button
@@ -941,15 +925,14 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                         onClick={() => setShowNewCliente(true)}
                         className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
                       >
-                        <UserPlus size={12} /> Nuevo cliente
-                      </button>
+                        <UserPlus size={12} />{" "}{t("Nuevo cliente")}</button>
                     )}
                   </div>
 
                   {showNewCliente ? (
                     <div className="flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Alta rápida de cliente</span>
+                        <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">{t("Alta rápida de cliente")}</span>
                         <button type="button" onClick={closeNewCliente} className="text-slate-400 hover:text-slate-600">
                           <XIcon size={13} />
                         </button>
@@ -957,20 +940,20 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                       <input
                         value={newClienteNombre}
                         onChange={e => setNewClienteNombre(e.target.value)}
-                        placeholder="Nombre *"
+                        placeholder={t("Nombre *")}
                         autoFocus
                         className={inp}
                       />
                       <input
                         value={newClienteApellidos}
                         onChange={e => setNewClienteApellidos(e.target.value)}
-                        placeholder="Apellidos"
+                        placeholder={t("Apellidos")}
                         className={inp}
                       />
                       <input
                         value={newClienteNif}
                         onChange={e => setNewClienteNif(e.target.value)}
-                        placeholder="NIF/CIF (opcional)"
+                        placeholder={t("NIF/CIF (opcional)")}
                         className={inp}
                       />
                       {newClienteError && <p className="text-xs text-red-600">{newClienteError}</p>}
@@ -981,12 +964,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                           disabled={creatingCliente || !newClienteNombre.trim()}
                           className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md transition-colors"
                         >
-                          {creatingCliente && <Loader2 size={12} className="animate-spin" />}
-                          Crear y seleccionar
-                        </button>
-                        <button type="button" onClick={closeNewCliente} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700">
-                          Cancelar
-                        </button>
+                          {creatingCliente && <Loader2 size={12} className="animate-spin" />}{t("Crear y seleccionar")}</button>
+                        <button type="button" onClick={closeNewCliente} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700">{t("Cancelar")}</button>
                       </div>
                     </div>
                   ) : (
@@ -999,19 +978,16 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                         searchable
                         searchPlaceholder="Buscar cliente..."
                       >
-                        <option value="" disabled>— Selecciona un cliente —</option>
+                        <option value="" disabled>{t("— Selecciona un cliente —")}</option>
                         {clientes.map((c: any) => (
                           <option key={c.id} value={c.id}>
-                            {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}
+                            {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || t("Cliente sin nombre")}
                           </option>
                         ))}
                       </AppSelect>
                       {clientes.length === 0 && (
-                        <p className="text-xs text-slate-400">
-                          Todavía no hay clientes.{" "}
-                          <button type="button" onClick={() => setShowNewCliente(true)} className="font-semibold text-emerald-700 hover:underline">
-                            Crea el primero
-                          </button>.
+                        <p className="text-xs text-slate-400">{t("Todavía no hay clientes.")}{" "}
+                          <button type="button" onClick={() => setShowNewCliente(true)} className="font-semibold text-emerald-700 hover:underline">{t("Crea el primero")}</button>.
                         </p>
                       )}
                     </>
@@ -1024,10 +1000,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    <label className={`${lbl} text-slate-700`}>Parte Contraria</label>
+                    <label className={`${lbl} text-slate-700`}>{t("Parte Contraria")}</label>
                   </div>
                   <input value={form.contrario} onChange={e => set("contrario", e.target.value)}
-                    placeholder="Nombre / Razón Social" className={inp} list="dl-contrarios" />
+                    placeholder={t("Nombre / Razón Social")} className={inp} list="dl-contrarios" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1036,10 +1012,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <label className={`${lbl} text-slate-700`}>Abogado</label>
+                    <label className={`${lbl} text-slate-700`}>{t("Abogado")}</label>
                   </div>
                   <ProfesionalInput tipo="ABOGADO" value={(form as any).abogado_propio || ""} onChange={v => set("abogado_propio", v)}
-                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder="Nombre del abogado" />
+                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder={t("Nombre del abogado")} />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1048,10 +1024,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                    <label className={`${lbl} text-slate-700`}>Procurador</label>
+                    <label className={`${lbl} text-slate-700`}>{t("Procurador")}</label>
                   </div>
                   <ProfesionalInput tipo="PROCURADOR" value={form.procurador || ""} onChange={v => set("procurador", v)}
-                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder="Nombre del procurador" />
+                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder={t("Nombre del procurador")} />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1060,10 +1036,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                    <label className={`${lbl} text-slate-700`}>Abogado Contrario</label>
+                    <label className={`${lbl} text-slate-700`}>{t("Abogado Contrario")}</label>
                   </div>
                   <ProfesionalInput tipo="ABOGADO" value={(form as any).abogado_contrario || ""} onChange={v => set("abogado_contrario", v)}
-                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder="Nombre del abogado contrario" />
+                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder={t("Nombre del abogado contrario")} />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1072,10 +1048,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
-                    <label className={`${lbl} text-slate-700`}>Procurador Contrario</label>
+                    <label className={`${lbl} text-slate-700`}>{t("Procurador Contrario")}</label>
                   </div>
                   <ProfesionalInput tipo="PROCURADOR" value={(form as any).procurador_contrario || ""} onChange={v => set("procurador_contrario", v)}
-                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder="Nombre del procurador contrario" />
+                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder={t("Nombre del procurador contrario")} />
                 </div>
 
                 <datalist id="dl-contrarios">
@@ -1089,11 +1065,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             <div className="flex-1 flex flex-col gap-2 min-h-[120px]">
               <div className="w-full h-px bg-slate-100" />
               <div className="pt-1 flex flex-col gap-2 flex-1">
-                <label className={lbl}>Observaciones / Notas</label>
+                <label className={lbl}>{t("Observaciones / Notas")}</label>
                 <textarea
                   value={form.observaciones}
                   onChange={e => set("observaciones", e.target.value)}
-                  placeholder="Notas internas del expediente…"
+                  placeholder={t("Notas internas del expediente…")}
                   className="flex-1 w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors resize-none placeholder:text-slate-400 min-h-[100px]"
                 />
               </div>
@@ -1104,7 +1080,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
                   <Activity size={13} className="text-slate-400" />
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Indicadores</span>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Indicadores")}</span>
                 </div>
                 <IndicadoresModal expedienteId={editId} />
               </div>
@@ -1130,7 +1106,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               </button>
             ))}
             <div className="ml-auto flex items-center pr-1 pb-1">
-              <span className="text-[10px] text-slate-300 italic">Más pestañas próximamente</span>
+              <span className="text-[10px] text-slate-300 italic">{t("Más pestañas próximamente")}</span>
             </div>
           </div>
           <div className={`flex-1 overflow-hidden bg-white ${tab !== "adjuntos" ? "overflow-y-auto p-4" : ""}`}>
@@ -1138,7 +1114,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               <textarea
                 value={form.observaciones}
                 onChange={e => set("observaciones", e.target.value)}
-                placeholder="Escribe aquí las notas internas del expediente…"
+                placeholder={t("Escribe aquí las notas internas del expediente…")}
                 className="w-full h-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 resize-none placeholder:text-slate-300"
               />
             ) : tab === "adjuntos" ? (
@@ -1150,7 +1126,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2">
                 <FolderOpen size={28} className="opacity-20" />
-                <span className="text-xs font-medium">Sin datos por ahora</span>
+                <span className="text-xs font-medium">{t("Sin datos por ahora")}</span>
               </div>
             )}
           </div>

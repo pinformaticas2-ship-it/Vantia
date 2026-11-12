@@ -25,7 +25,7 @@ function revisar(archivo) {
         (ts.isCallExpression(p) && /^(console\.|fetch|apiFetch|localStorage|sessionStorage|querySelector|addEventListener|removeEventListener|require|new URL|encodeURIComponent|setAttribute|getAttribute|startsWith|endsWith|includes|split|replace|join|matchMedia|test)/.test(p.expression.getText(fuente).split('.').pop() || '')) ||
         /^[\w./:-]*$/.test(texto) || /^(bg|text|border|flex|grid|px|py|rounded|w-|h-)/.test(texto) || texto.includes('className');
       if (!ignorar && PARECE_FRASE.test(texto) && !/^\s*$/.test(texto)) {
-        out.push(`${path.relative(process.cwd(), archivo)}:${fuente.getLineAndCharacterOfPosition(n.getStart()).line + 1}  ${texto.slice(0, 110)}`);
+        out.push(`${path.relative(process.cwd(), archivo)}:${fuente.getLineAndCharacterOfPosition(n.getStart()).line + 1}  ${process.env.FULL ? JSON.stringify(texto) : texto.slice(0, 110)}`);
       }
     }
     ts.forEachChild(n, visitar);

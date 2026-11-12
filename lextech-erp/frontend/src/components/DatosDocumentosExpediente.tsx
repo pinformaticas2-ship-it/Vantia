@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { CheckCircle2, ChevronDown, FilePlus2, Loader2, Search, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { aviso } from '../lib/avisos';
+import { t } from '../lib/i18n';
 
 // ── Datos para documentos (15/10/2026) ──────────────────────────────────────
 // Los datos propios del asunto que Vantia no guarda en otra ficha (WIZINK,
@@ -32,7 +33,7 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
       if (r?.success === false) throw new Error(r.error);
       setCampos(r.data.campos);
       setValores(r.data.valores || {});
-    } catch (e: any) { aviso.error(e?.message || 'No se pudieron cargar los datos.'); setCampos([]); }
+    } catch (e: any) { aviso.error(e?.message || t("No se pudieron cargar los datos.")); setCampos([]); }
   }, [expedienteId, getToken]);
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -50,7 +51,7 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
     } catch (e: any) {
       Object.assign(pendientes.current, lote);
       setGuardando(null);
-      aviso.error(e?.message || 'No se pudo guardar.');
+      aviso.error(e?.message || t("No se pudo guardar."));
     }
   }, [expedienteId, getToken]);
   useEffect(() => () => { if (temporizador.current) window.clearTimeout(temporizador.current); void guardar(); }, [guardar]);
@@ -82,33 +83,32 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
     <div className="space-y-4">
       <div className="flex flex-col gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-slate-800">Datos para documentos</h3>
-          <p className="text-xs text-slate-500">Rellénalos una vez: todas las plantillas de este expediente los usarán. Se guardan solos.</p>
+          <h3 className="text-sm font-bold text-slate-800">{t("Datos para documentos")}</h3>
+          <p className="text-xs text-slate-500">{t("Rellénalos una vez: todas las plantillas de este expediente los usarán. Se guardan solos.")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {guardando && (
             <span className="text-xs text-slate-500 inline-flex items-center gap-1">
-              {guardando === 'ok' ? <><CheckCircle2 size={12} className="text-emerald-600" /> Guardado</> : <><Loader2 size={12} className="animate-spin" /> Guardando</>}
+              {guardando === 'ok' ? <><CheckCircle2 size={12} className="text-emerald-600" />{" "}{t("Guardado")}</> : <><Loader2 size={12} className="animate-spin" />{" "}{t("Guardando")}</>}
             </span>
           )}
           <div className="relative">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar un dato…"
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Buscar un dato…")}
               className="h-9 w-48 sm:w-64 rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-sm outline-none focus:border-red-300" />
           </div>
           {!bloqueado && disponibles.length > 0 && (
             <div className="relative">
               <button type="button" onClick={() => setEligiendo((v) => !v)}
                 className="h-9 px-3 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 inline-flex items-center gap-1.5">
-                <FilePlus2 size={14} /> Añadir datos de…
-              </button>
+                <FilePlus2 size={14} />{" "}{t("Añadir datos de…")}</button>
               {eligiendo && (
                 <div className="absolute right-0 top-full mt-1.5 z-30 w-72 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
                   {disponibles.map((g) => (
                     <button key={g} type="button" onClick={() => { setVisibles((p) => new Set(p).add(g)); setAbiertos((p) => new Set(p).add(g)); setEligiendo(false); }}
                       className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
                       <span className="truncate">{g}</span>
-                      <span className="shrink-0 text-[11px] text-slate-400">{grupos.get(g)!.length} datos</span>
+                      <span className="shrink-0 text-[11px] text-slate-400">{grupos.get(g)!.length}{" "}{t("datos")}</span>
                     </button>
                   ))}
                 </div>
@@ -120,8 +120,8 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
 
       {gruposVisibles.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
-          <p className="text-sm font-semibold text-slate-700">{texto ? 'Ningún dato coincide.' : 'Este expediente aún no tiene datos propios.'}</p>
-          {!texto && <p className="mt-1 text-xs text-slate-500">Pulsa «Añadir datos de…» y elige, por ejemplo, WIZINK o Cláusulas abusivas. Los datos del cliente, contrario, juzgado o despacho ya salen solos de sus fichas.</p>}
+          <p className="text-sm font-semibold text-slate-700">{texto ? t("Ningún dato coincide.") : t("Este expediente aún no tiene datos propios.")}</p>
+          {!texto && <p className="mt-1 text-xs text-slate-500">{t("Pulsa «Añadir datos de…» y elige, por ejemplo, WIZINK o Cláusulas abusivas. Los datos del cliente, contrario, juzgado o despacho ya salen solos de sus fichas.")}</p>}
         </div>
       )}
 
@@ -136,10 +136,10 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
                 className="flex-1 min-w-0 flex items-center gap-2 text-left">
                 <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${abierto ? '' : '-rotate-90'}`} />
                 <span className="text-sm font-semibold text-slate-800 truncate">{g}</span>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${n ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{n} de {grupos.get(g)!.length}</span>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${n ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{n}{" "}{t("de")}{" "}{grupos.get(g)!.length}</span>
               </button>
               {n === 0 && visibles.has(g) && (
-                <button type="button" title="Quitar" onClick={() => setVisibles((p) => { const s = new Set(p); s.delete(g); return s; })}
+                <button type="button" title={t("Quitar")} onClick={() => setVisibles((p) => { const s = new Set(p); s.delete(g); return s; })}
                   className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 flex items-center justify-center"><X size={14} /></button>
               )}
             </div>
@@ -150,7 +150,7 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 truncate" title={`«${c.nombre}»`}>{c.etiqueta}</span>
                     <input value={valores[c.clave] || ''} disabled={bloqueado}
                       onChange={(e) => cambiar(c, e.target.value)}
-                      placeholder={esFecha(c.etiqueta) ? 'dd/mm/aaaa' : ''}
+                      placeholder={esFecha(c.etiqueta) ? t("dd/mm/aaaa") : ''}
                       className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:bg-white focus:border-red-300 disabled:opacity-60" />
                   </label>
                 ))}

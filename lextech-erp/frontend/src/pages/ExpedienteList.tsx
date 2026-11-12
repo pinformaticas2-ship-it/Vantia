@@ -34,6 +34,7 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
 import AppSelect from "../components/AppSelect";
 import { aviso, proximamente } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 type SortKey = "anio" | "num_exp" | "descripcion" | "tipo" | "cliente_nombre" | "contrario" | "juzgado" | "estado" | "fecha_inicio";
 type SortDir = "asc" | "desc";
@@ -263,7 +264,7 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
           rowNumber: index + 1,
           fieldId: "ref_propia",
           fieldLabel: "Referencia interna",
-          message: `Referencia duplicada en el CSV (ya aparece en fila ${seen.get(val)})`,
+          message: t("Referencia duplicada en el CSV (ya aparece en fila {fila})", { fila: seen.get(val) }),
         });
       } else {
         seen.set(val, index + 1);
@@ -1193,8 +1194,8 @@ function CsvImportView({
             <FileSpreadsheet size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">Importar expedientes</h1>
-            <p className="text-xs font-medium text-slate-500">Carga masiva desde archivo CSV (Paso 1 de 3)</p>
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{t("Importar expedientes")}</h1>
+            <p className="text-xs font-medium text-slate-500">{t("Carga masiva desde archivo CSV (Paso 1 de 3)")}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -1202,14 +1203,12 @@ function CsvImportView({
             onClick={onOpenHistory}
             className="px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
           >
-            <History size={13} className="text-slate-400" /> Historial
-          </button>
+            <History size={13} className="text-slate-400" />{" "}{t("Historial")}</button>
           <button
             onClick={onBack}
             className="px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
           >
-            <ArrowLeft size={13} /> Volver
-          </button>
+            <ArrowLeft size={13} />{" "}{t("Volver")}</button>
         </div>
       </div>
 
@@ -1217,9 +1216,9 @@ function CsvImportView({
       <div className="bg-white border-b border-slate-200 py-4 flex-shrink-0 shadow-sm">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" active first />
-          <ImportStep step={2} label="Configurar columnas" />
-          <ImportStep step={3} label="Revisar e Importar" last />
+          <ImportStep step={1} label={t("Subir archivo")} active first />
+          <ImportStep step={2} label={t("Configurar columnas")} />
+          <ImportStep step={3} label={t("Revisar e Importar")} last />
         </div>
       </div>
 
@@ -1231,7 +1230,7 @@ function CsvImportView({
           <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px] animate-card-in-1">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
               <Upload size={14} className="text-slate-400" />
-              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Cargar Archivo de Datos</h3>
+              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Cargar Archivo de Datos")}</h3>
             </div>
             <div className="flex-1 p-6 flex items-center justify-center">
               <div
@@ -1259,15 +1258,11 @@ function CsvImportView({
                   <FileSpreadsheet size={32} />
                 </div>
                 <h3 className="mb-2 text-xl font-bold text-slate-800 text-center">
-                  {fileName ? fileName : "Selecciona o arrastra aquí tu CSV"}
+                  {fileName ? fileName : t("Selecciona o arrastra aquí tu CSV")}
                 </h3>
-                <p className="text-sm text-slate-500 text-center max-w-md">
-                  El archivo no debe superar los 10MB. Asegúrate de haber rellenado los datos utilizando alguna de nuestras plantillas.
-                </p>
+                <p className="text-sm text-slate-500 text-center max-w-md">{t("El archivo no debe superar los 10MB. Asegúrate de haber rellenado los datos utilizando alguna de nuestras plantillas.")}</p>
                 {!fileName && (
-                  <div className="mt-8 px-6 py-2 bg-white border border-slate-200 rounded-md text-sm font-semibold text-slate-700 shadow-sm group-hover:border-red-300 group-hover:text-red-600 transition-colors">
-                    Explorar archivos
-                  </div>
+                  <div className="mt-8 px-6 py-2 bg-white border border-slate-200 rounded-md text-sm font-semibold text-slate-700 shadow-sm group-hover:border-red-300 group-hover:text-red-600 transition-colors">{t("Explorar archivos")}</div>
                 )}
               </div>
             </div>
@@ -1280,10 +1275,10 @@ function CsvImportView({
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden animate-card-in-2">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <FileSpreadsheet size={14} className="text-emerald-600" />
-                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Plantillas para Excel</h3>
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Plantillas para Excel")}</h3>
               </div>
               <div className="p-6 flex flex-col gap-4">
-                <p className="text-xs text-slate-500">Descarga, rellena en Excel y sube el archivo en el panel izquierdo. Borra las filas de ejemplo antes de importar.</p>
+                <p className="text-xs text-slate-500">{t("Descarga, rellena en Excel y sube el archivo en el panel izquierdo. Borra las filas de ejemplo antes de importar.")}</p>
                 <button
                   onClick={() => downloadCsvTemplate("basica")}
                   className="group flex items-start gap-4 p-4 rounded-lg border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-all shadow-sm text-left"
@@ -1292,8 +1287,8 @@ function CsvImportView({
                     <Download size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla básica</span>
-                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">Campos esenciales: ref., juzgado, procedimiento, cliente, contrario.</span>
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{t("Plantilla básica")}</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">{t("Campos esenciales: ref., juzgado, procedimiento, cliente, contrario.")}</span>
                   </div>
                 </button>
                 <button
@@ -1304,8 +1299,8 @@ function CsvImportView({
                     <Download size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla completa</span>
-                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">Todos los campos disponibles del expediente listos para importar.</span>
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{t("Plantilla completa")}</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">{t("Todos los campos disponibles del expediente listos para importar.")}</span>
                   </div>
                 </button>
               </div>
@@ -1315,24 +1310,22 @@ function CsvImportView({
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 animate-card-in-3">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <ListChecks size={14} className="text-slate-400" />
-                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Formato Esperado</h3>
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Formato Esperado")}</h3>
               </div>
               <div className="p-6 flex flex-col gap-4">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  El separador de columnas puede ser coma{" "}
-                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">,</code>{" "}
-                  o punto y coma{" "}
+                <p className="text-xs text-slate-600 leading-relaxed">{t("El separador de columnas puede ser coma")}{" "}
+                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">,</code>{" "}{t("o punto y coma")}{" "}
                   <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">;</code>.
                 </p>
                 <ul className="flex flex-col gap-3 text-xs text-slate-600">
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>Referencia</strong> (ID interno)</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Número de procedimiento</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Tipo y Número de juzgado</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Población / Municipio</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>{t("Referencia")}</strong>{" "}{t("(ID interno)")}</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" />{" "}{t("Número de procedimiento")}</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" />{" "}{t("Tipo y Número de juzgado")}</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" />{" "}{t("Población / Municipio")}</li>
                 </ul>
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md flex items-start gap-2.5">
                   <AlertCircle size={12} className="text-blue-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-blue-700 leading-snug">Podrás revisar y vincular las columnas manualmente en el <strong>Paso 2</strong>.</p>
+                  <p className="text-[11px] text-blue-700 leading-snug">{t("Podrás revisar y vincular las columnas manualmente en el")}{" "}<strong>{t("Paso 2")}</strong>.</p>
                 </div>
               </div>
             </div>
@@ -1346,15 +1339,12 @@ function CsvImportView({
         <button
           onClick={onBack}
           className="px-5 py-2.5 text-sm font-semibold text-slate-400 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
-        >
-          Cancelar
-        </button>
+        >{t("Cancelar")}</button>
         <button
           disabled={!fileName}
           onClick={onSelectFile}
           className="px-6 py-2.5 text-sm font-bold text-white bg-slate-800 hover:bg-black rounded-md shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Siguiente paso: Configurar <ArrowRight size={13} />
+        >{t("Siguiente paso: Configurar")}{" "}<ArrowRight size={13} />
         </button>
       </div>
 
@@ -1398,13 +1388,11 @@ function CsvImportHistoryView({
     const hasErrors = row.error_count > 0;
     if (hasErrors && row.completed_count > 0) return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Parcial
-      </span>
+        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />{" "}{t("Parcial")}</span>
     );
     if (hasErrors) return (
       <span className="peligro inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
-        <div className="peligro w-1.5 h-1.5 rounded-full bg-red-500" /> Con errores
-      </span>
+        <div className="peligro w-1.5 h-1.5 rounded-full bg-red-500" />{" "}{t("Con errores")}</span>
     );
     if (row.status === "processing" || row.status === "reviewing" || row.status === "configuring") return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
@@ -1413,8 +1401,7 @@ function CsvImportHistoryView({
     );
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Completada
-      </span>
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{" "}{t("Completada")}</span>
     );
   };
 
@@ -1424,26 +1411,24 @@ function CsvImportHistoryView({
       {/* Header */}
       <div className="px-6 lg:px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 border-b border-slate-200 animate-card-in">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Historial de importaciones</h1>
-          <p className="text-sm text-slate-500 mt-1">Historial de todas las importaciones de expedientes realizadas</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">{t("Historial de importaciones")}</h1>
+          <p className="text-sm text-slate-500 mt-1">{t("Historial de todas las importaciones de expedientes realizadas")}</p>
         </div>
         <button
           onClick={onBack}
           className="w-max px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2"
         >
-          <ArrowLeft size={14} /> Volver
-        </button>
+          <ArrowLeft size={14} />{" "}{t("Volver")}</button>
       </div>
 
       {/* Toolbar */}
       <div className="px-6 lg:px-8 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 flex-shrink-0 animate-card-in-1">
-        <h3 className="text-sm font-bold text-slate-800">Importaciones recientes</h3>
+        <h3 className="text-sm font-bold text-slate-800">{t("Importaciones recientes")}</h3>
         <button
           onClick={onReload}
           className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
         >
-          <RefreshCw size={13} className="text-slate-400" /> Actualizar
-        </button>
+          <RefreshCw size={13} className="text-slate-400" />{" "}{t("Actualizar")}</button>
       </div>
 
       {error && (
@@ -1457,14 +1442,14 @@ function CsvImportHistoryView({
         <table className="w-full min-w-[1000px] text-left border-collapse">
           <thead className="sticky top-0 bg-white border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
             <tr>
-              <th className="pl-6 lg:pl-8 pr-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Completados</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Errores</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Pendientes</th>
-              <th className="pr-6 lg:pr-8 pl-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+              <th className="pl-6 lg:pl-8 pr-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Fecha")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("ID")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Estado")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Total")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Completados")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Errores")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Pendientes")}</th>
+              <th className="pr-6 lg:pr-8 pl-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Acciones")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -1473,15 +1458,13 @@ function CsvImportHistoryView({
                 <td colSpan={8} className="px-6 py-20 text-center text-slate-400">
                   <div className="flex items-center justify-center gap-3">
                     <Loader2 size={18} className="animate-spin" />
-                    <span>Cargando importaciones...</span>
+                    <span>{t("Cargando importaciones...")}</span>
                   </div>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-6 py-20 text-center text-slate-400">
-                  No hay importaciones registradas
-                </td>
+                <td colSpan={8} className="px-6 py-20 text-center text-slate-400">{t("No hay importaciones registradas")}</td>
               </tr>
             ) : (
               pageRows.map((row) => {
@@ -1535,11 +1518,9 @@ function CsvImportHistoryView({
 
       {/* Footer */}
       <div className="px-6 lg:px-8 py-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0 animate-card-in-3">
-        <span className="text-sm text-slate-500">
-          Mostrando <span className="font-bold text-slate-700">{from}</span> a{" "}
-          <span className="font-bold text-slate-700">{to}</span> de{" "}
-          <span className="font-bold text-slate-700">{rows.length}</span> resultados
-        </span>
+        <span className="text-sm text-slate-500">{t("Mostrando")}{" "}<span className="font-bold text-slate-700">{from}</span> a{" "}
+          <span className="font-bold text-slate-700">{to}</span>{" "}{t("de")}{" "}
+          <span className="font-bold text-slate-700">{rows.length}</span>{" "}{t("resultados")}</span>
         <div className="flex items-center gap-1 sm:mr-16">
           <button
             onClick={() => goToPage(Math.max(1, page - 1))}
@@ -1700,7 +1681,7 @@ function CsvFieldRow({
             {field.sample}
           </span>
         ) : (
-          <span className="text-xs font-mono text-slate-400 italic">Sin detectar</span>
+          <span className="text-xs font-mono text-slate-400 italic">{t("Sin detectar")}</span>
         )}
       </div>
     </div>
@@ -1763,17 +1744,15 @@ function CsvImportConfigureView({
               <FileSpreadsheet size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Importar expedientes</h1>
-              <p className="text-sm text-slate-500">Configuración y mapeo de las columnas del archivo subido</p>
+              <h1 className="text-lg font-bold text-slate-900">{t("Importar expedientes")}</h1>
+              <p className="text-sm text-slate-500">{t("Configuración y mapeo de las columnas del archivo subido")}</p>
             </div>
           </div>
           <button
             onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 flex-shrink-0"
           >
-            <ChevronLeft size={16} />
-            Volver a inicio
-          </button>
+            <ChevronLeft size={16} />{t("Volver a inicio")}</button>
         </div>
       </div>
 
@@ -1781,9 +1760,9 @@ function CsvImportConfigureView({
       <div className="flex-shrink-0 bg-white border-b border-slate-200 py-4 shadow-sm animate-card-in-1">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" completed first />
-          <ImportStep step={2} label="Configurar columnas" active />
-          <ImportStep step={3} label="Revisar e Importar" last />
+          <ImportStep step={1} label={t("Subir archivo")} completed first />
+          <ImportStep step={2} label={t("Configurar columnas")} active />
+          <ImportStep step={3} label={t("Revisar e Importar")} last />
         </div>
       </div>
 
@@ -1795,17 +1774,15 @@ function CsvImportConfigureView({
               <FileSpreadsheet size={15} className="text-slate-500" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800">{fileName || "Sin archivo"}</p>
-              <p className="text-xs text-slate-500">Archivo seleccionado</p>
+              <p className="text-sm font-semibold text-slate-800">{fileName || t("Sin archivo")}</p>
+              <p className="text-xs text-slate-500">{t("Archivo seleccionado")}</p>
             </div>
           </div>
           <button
             onClick={onSelectFile}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-white"
           >
-            <RefreshCw size={13} />
-            Cambiar archivo
-          </button>
+            <RefreshCw size={13} />{t("Cambiar archivo")}</button>
         </div>
       </div>
 
@@ -1815,17 +1792,15 @@ function CsvImportConfigureView({
 
           {/* Intro */}
           <div className="animate-card-in">
-            <h2 className="text-xl font-bold text-slate-900">Conecta las columnas de tu archivo</h2>
-            <p className="mt-2 text-sm text-slate-500 max-w-2xl">
-              Indica qué columna de tu CSV corresponde a cada campo del sistema. Los campos obligatorios deben estar asignados para poder continuar. Hemos detectado automáticamente las columnas que mejor coinciden.
-            </p>
+            <h2 className="text-xl font-bold text-slate-900">{t("Conecta las columnas de tu archivo")}</h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-2xl">{t("Indica qué columna de tu CSV corresponde a cada campo del sistema. Los campos obligatorios deben estar asignados para poder continuar. Hemos detectado automáticamente las columnas que mejor coinciden.")}</p>
           </div>
 
           {/* Required fields */}
           <div className="animate-card-in-1">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-1.5">
-                <h3 className="text-base font-bold text-slate-900">Campos obligatorios</h3>
+                <h3 className="text-base font-bold text-slate-900">{t("Campos obligatorios")}</h3>
                 <span className="text-red-500 font-bold">*</span>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -1833,14 +1808,13 @@ function CsvImportConfigureView({
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
-                {assignedRequired} de {requiredFields.length} asignados
-              </span>
+                {assignedRequired}{" "}{t("de")}{" "}{requiredFields.length}{" "}{t("asignados")}</span>
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Vantia</div>
-                <div className="col-span-4">Columna en tu CSV</div>
-                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+                <div className="col-span-5">{t("Campo en Vantia")}</div>
+                <div className="col-span-4">{t("Columna en tu CSV")}</div>
+                <div className="col-span-3 text-right">{t("Ejemplo de tus datos")}</div>
               </div>
               {requiredFields.map((field) => (
                 <CsvFieldRow
@@ -1857,16 +1831,15 @@ function CsvImportConfigureView({
           {/* Optional fields */}
           <div className="animate-card-in-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900">Campos opcionales</h3>
+              <h3 className="text-base font-bold text-slate-900">{t("Campos opcionales")}</h3>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {assignedOptional} de {optionalFields.length} asignados
-              </span>
+                {assignedOptional}{" "}{t("de")}{" "}{optionalFields.length}{" "}{t("asignados")}</span>
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Vantia</div>
-                <div className="col-span-4">Columna en tu CSV</div>
-                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+                <div className="col-span-5">{t("Campo en Vantia")}</div>
+                <div className="col-span-4">{t("Columna en tu CSV")}</div>
+                <div className="col-span-3 text-right">{t("Ejemplo de tus datos")}</div>
               </div>
               {visibleOptional.map((field) => (
                 <CsvFieldRow key={field.id} field={field} options={mappingOptions} onChange={onChangeMapping} />
@@ -1877,9 +1850,7 @@ function CsvImportConfigureView({
                   onClick={() => setShowAllOptional(true)}
                   className="w-full py-3.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors border-t border-slate-100 flex items-center justify-center gap-2"
                 >
-                  <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold leading-none">+</span>
-                  Mostrar {hiddenOptionalCount} campos opcionales más
-                </button>
+                  <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold leading-none">+</span>{t("Mostrar")}{" "}{hiddenOptionalCount}{" "}{t("campos opcionales más")}</button>
               )}
             </div>
           </div>
@@ -1895,9 +1866,7 @@ function CsvImportConfigureView({
             onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
           >
-            <ChevronLeft size={16} />
-            Atrás
-          </button>
+            <ChevronLeft size={16} />{t("Atrás")}</button>
           <button
             type="button"
             onClick={onContinue}
@@ -1907,9 +1876,7 @@ function CsvImportConfigureView({
                 ? "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md"
                 : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
             }`}
-          >
-            Siguiente paso: Revisar
-            <ChevronRight size={16} />
+          >{t("Siguiente paso: Revisar")}<ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -1960,17 +1927,15 @@ function CsvImportReviewView({
               <FileSpreadsheet size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Importar expedientes</h1>
-              <p className="text-sm text-slate-500">Revisa los datos mapeados antes de confirmar la importación final</p>
+              <h1 className="text-lg font-bold text-slate-900">{t("Importar expedientes")}</h1>
+              <p className="text-sm text-slate-500">{t("Revisa los datos mapeados antes de confirmar la importación final")}</p>
             </div>
           </div>
           <button
             onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 flex-shrink-0"
           >
-            <ChevronLeft size={16} />
-            Volver a inicio
-          </button>
+            <ChevronLeft size={16} />{t("Volver a inicio")}</button>
         </div>
       </div>
 
@@ -1978,9 +1943,9 @@ function CsvImportReviewView({
       <div className="flex-shrink-0 bg-white border-b border-slate-200 py-4 shadow-sm animate-card-in-1">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" completed first />
-          <ImportStep step={2} label="Configurar columnas" completed />
-          <ImportStep step={3} label="Revisar e Importar" active last />
+          <ImportStep step={1} label={t("Subir archivo")} completed first />
+          <ImportStep step={2} label={t("Configurar columnas")} completed />
+          <ImportStep step={3} label={t("Revisar e Importar")} active last />
         </div>
       </div>
 
@@ -1993,13 +1958,12 @@ function CsvImportReviewView({
             </div>
             <div>
               <h2 className={`text-lg font-extrabold leading-tight ${hasIssues ? "text-amber-800" : "text-emerald-800"}`}>
-                {hasIssues ? "Revisión con avisos" : "Listo para importar"}
+                {hasIssues ? t("Revisión con avisos") : t("Listo para importar")}
               </h2>
               <p className={`text-sm font-medium mt-0.5 ${hasIssues ? "text-amber-600" : "text-emerald-600"}`}>
-                {fileName || "archivo.csv"}
+                {fileName || t("archivo.csv")}
                 <span className="opacity-50 mx-2">|</span>
-                {previewRows.length} registros analizados
-              </p>
+                {previewRows.length}{" "}{t("registros analizados")}</p>
             </div>
           </div>
           <div className={`flex items-center gap-2 bg-white/60 px-4 py-2 rounded-lg border shadow-sm flex-shrink-0 ${hasIssues ? "border-amber-200" : "border-emerald-200"}`}>
@@ -2008,8 +1972,8 @@ function CsvImportReviewView({
               : <Check size={14} className="text-emerald-500" />}
             <span className={`text-sm font-bold ${hasIssues ? "text-amber-700" : "text-emerald-700"}`}>
               {hasIssues
-                ? `${previewRows.length} registros — ${validationSummary.issues.length} ${validationSummary.issues.length === 1 ? "aviso" : "avisos"}`
-                : `${previewRows.length} registros listos para importar`}
+                ? t("{length} registros — {length2} {v}", { length: previewRows.length, length2: validationSummary.issues.length, v: validationSummary.issues.length === 1 ? "aviso" : "avisos" })
+                : t("{length} registros listos para importar", { length: previewRows.length })}
             </span>
           </div>
         </div>
@@ -2019,20 +1983,20 @@ function CsvImportReviewView({
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 px-6 lg:px-8 py-4 bg-white border-b border-slate-100 flex items-center gap-2">
           <Eye size={15} className="text-slate-400" />
-          <h3 className="text-sm font-bold text-slate-800">Vista previa de los primeros registros</h3>
+          <h3 className="text-sm font-bold text-slate-800">{t("Vista previa de los primeros registros")}</h3>
         </div>
         <div className="flex-1 overflow-auto bg-slate-50/30">
           <table className="w-full min-w-[1200px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
               <tr>
-                <th className="pl-6 lg:pl-8 pr-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Referencia</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Descripción</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Nº Procedimiento</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Juzgado / Tribunal</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Tipo Procedimiento</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Cliente</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Fecha alta</th>
-                <th className="pr-6 lg:pr-8 pl-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Estado</th>
+                <th className="pl-6 lg:pl-8 pr-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Referencia")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Descripción")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Nº Procedimiento")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Juzgado / Tribunal")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Tipo Procedimiento")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Cliente")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Fecha alta")}</th>
+                <th className="pr-6 lg:pr-8 pl-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Estado")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -2057,7 +2021,7 @@ function CsvImportReviewView({
               })}
               {previewRows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-14 text-center text-sm text-slate-400">Sin registros para mostrar</td>
+                  <td colSpan={8} className="py-14 text-center text-sm text-slate-400">{t("Sin registros para mostrar")}</td>
                 </tr>
               )}
             </tbody>
@@ -2072,7 +2036,7 @@ function CsvImportReviewView({
             <div className="flex items-center justify-between gap-4 mb-2">
               <div className="flex items-center gap-2 text-blue-700">
                 <Loader2 size={15} className="animate-spin" />
-                <span className="text-sm font-semibold">Importando expedientes…</span>
+                <span className="text-sm font-semibold">{t("Importando expedientes…")}</span>
               </div>
               <span className="text-sm font-bold text-blue-700">{importProgress.done} / {importProgress.total}</span>
             </div>
@@ -2090,17 +2054,13 @@ function CsvImportReviewView({
               onClick={onBack}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
             >
-              <ChevronLeft size={16} />
-              Volver
-            </button>
+              <ChevronLeft size={16} />{t("Volver")}</button>
             <button
               type="button"
               onClick={onImport}
               className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 text-sm font-bold shadow-md shadow-red-500/20 transition-all border border-red-700"
             >
-              <Upload size={15} />
-              Importar expedientes
-            </button>
+              <Upload size={15} />{t("Importar expedientes")}</button>
           </div>
         )}
       </div>
@@ -2134,17 +2094,15 @@ function CsvImportCompleteView({
       <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-white shrink-0">
         <BackButton onClick={onBack} />
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-bold text-slate-900 leading-tight">Importar expedientes</h1>
-          <p className="text-xs text-slate-400 truncate">{fileName || "archivo.csv"}</p>
+          <h1 className="text-base font-bold text-slate-900 leading-tight">{t("Importar expedientes")}</h1>
+          <p className="text-xs text-slate-400 truncate">{fileName || t("archivo.csv")}</p>
         </div>
         <button
           type="button"
           onClick={onRestart}
           className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433] shrink-0"
         >
-          <RefreshCw size={14} />
-          Nueva importacion
-        </button>
+          <RefreshCw size={14} />{t("Nueva importacion")}</button>
       </div>
 
       {/* ── Contenido ────────────────────────────────────────────── */}
@@ -2165,15 +2123,14 @@ function CsvImportCompleteView({
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-bold leading-tight">
-                {hasErrors ? "Importacion con incidencias" : "Importacion completada"}
+                {hasErrors ? t("Importacion con incidencias") : t("Importacion completada")}
               </h2>
               <p className="mt-0.5 text-sm text-white/80 truncate">
-                {totalProcessed} registros procesados con validacion estricta
-              </p>
+                {totalProcessed}{" "}{t("registros procesados con validacion estricta")}</p>
             </div>
             <div className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-center">
               <p className="text-xl font-bold leading-none">{successRate}%</p>
-              <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">éxito</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">{t("éxito")}</p>
             </div>
           </div>
 
@@ -2193,10 +2150,10 @@ function CsvImportCompleteView({
               <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <Check size={14} className="text-emerald-600" />
               </div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Importados</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Importados")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{successCount}</p>
-            <p className="mt-1 text-xs text-slate-500">registros correctos</p>
+            <p className="mt-1 text-xs text-slate-500">{t("registros correctos")}</p>
           </div>
 
           <div className={`rounded-2xl p-4 border ${hasErrors ? "border-rose-100 bg-rose-50/60" : "border-slate-100 bg-slate-50/60"}`}>
@@ -2204,18 +2161,17 @@ function CsvImportCompleteView({
               <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-rose-100" : "bg-slate-100"}`}>
                 <AlertCircle size={14} className={hasErrors ? "text-rose-500" : "text-slate-400"} />
               </div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Con errores")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{errorCount}</p>
-            <p className="mt-1 text-xs text-slate-500">filas bloqueadas</p>
+            <p className="mt-1 text-xs text-slate-500">{t("filas bloqueadas")}</p>
             {hasErrors && (
               <button
                 type="button"
                 onClick={onViewDetails}
                 className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
               >
-                <Eye size={12} /> Ver detalles
-              </button>
+                <Eye size={12} />{" "}{t("Ver detalles")}</button>
             )}
           </div>
 
@@ -2224,10 +2180,10 @@ function CsvImportCompleteView({
               <div className="h-7 w-7 rounded-lg bg-sky-100 flex items-center justify-center">
                 <FileSpreadsheet size={14} className="text-sky-600" />
               </div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Total")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{totalProcessed}</p>
-            <p className="mt-1 text-xs text-slate-500">registros revisados</p>
+            <p className="mt-1 text-xs text-slate-500">{t("registros revisados")}</p>
           </div>
         </div>
 
@@ -2235,22 +2191,20 @@ function CsvImportCompleteView({
         {hasErrors && (
           <div className="rounded-2xl border border-red-100 bg-white p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
-              <p className="text-sm font-bold text-slate-900">Detalle de errores</p>
+              <p className="text-sm font-bold text-slate-900">{t("Detalle de errores")}</p>
               <span className="peligro rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">
-                {issues.length} incidencias
-              </span>
+                {issues.length}{" "}{t("incidencias")}</span>
             </div>
             <div className="space-y-2">
               {visibleIssues.map((issue, index) => (
                 <div key={`${issue.rowNumber}-${issue.fieldId}-${index}`} className="rounded-xl border border-red-100 bg-red-50/60 px-3 py-2.5">
-                  <p className="text-xs font-semibold text-slate-700">Fila {issue.rowNumber} · {issue.fieldLabel}</p>
+                  <p className="text-xs font-semibold text-slate-700">{t("Fila")}{" "}{issue.rowNumber} · {issue.fieldLabel}</p>
                   <p className="mt-0.5 text-xs text-red-600">{issue.message}</p>
                 </div>
               ))}
               {issues.length > visibleIssues.length && (
                 <p className="text-xs text-slate-400 pt-1">
-                  +{issues.length - visibleIssues.length} incidencias adicionales — usa "Ver detalles" para verlas todas.
-                </p>
+                  +{issues.length - visibleIssues.length}{" "}{t("incidencias adicionales — usa \"Ver detalles\" para verlas todas.")}</p>
               )}
             </div>
           </div>
@@ -2263,17 +2217,13 @@ function CsvImportCompleteView({
             onClick={onRestart}
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <RefreshCw size={14} />
-            Nueva importacion
-          </button>
+            <RefreshCw size={14} />{t("Nueva importacion")}</button>
           <button
             type="button"
             onClick={onFinish}
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#ab0433] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#92042c]"
           >
-            <Check size={14} />
-            Finalizar
-          </button>
+            <Check size={14} />{t("Finalizar")}</button>
         </div>
 
       </div>
@@ -2331,15 +2281,14 @@ function CsvImportErrorDetailView({
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-base font-bold text-slate-900">Detalles de importacion</h1>
+          <h1 className="text-base font-bold text-slate-900">{t("Detalles de importacion")}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
-              Lote {batchId ? `${batchId.slice(0, 8)}...` : "Temporal"}
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">{t("Lote")}{" "}{batchId ? `${batchId.slice(0, 8)}...` : t("Temporal")}
             </span>
-            <span>{fileName || "archivo.csv"}</span>
+            <span>{fileName || t("archivo.csv")}</span>
           </div>
         </div>
-        <BackButton onClick={onBack} label="Volver al historial" />
+        <BackButton onClick={onBack} label={t("Volver al historial")} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -2347,29 +2296,27 @@ function CsvImportErrorDetailView({
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Estado del lote</p>
-                <h2 className="mt-2 text-xl font-bold text-slate-900">Importacion con incidencias</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Estado del lote")}</p>
+                <h2 className="mt-2 text-xl font-bold text-slate-900">{t("Importacion con incidencias")}</h2>
               </div>
-              <span className="peligro inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">
-                Error
-              </span>
+              <span className="peligro inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">{t("Error")}</span>
             </div>
 
             <div className="mt-5 rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-slate-500">Archivo</span>
-                <span className="max-w-[180px] truncate font-semibold text-slate-800">{fileName || "archivo.csv"}</span>
+                <span className="font-medium text-slate-500">{t("Archivo")}</span>
+                <span className="max-w-[180px] truncate font-semibold text-slate-800">{fileName || t("archivo.csv")}</span>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-                <span className="font-medium text-slate-500">ID del lote</span>
-                <span className="font-semibold text-slate-800">{batchId || "Temporal"}</span>
+                <span className="font-medium text-slate-500">{t("ID del lote")}</span>
+                <span className="font-semibold text-slate-800">{batchId || t("Temporal")}</span>
               </div>
             </div>
 
             <div className="mt-5 space-y-4">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-900">Tasa de exito</span>
+                  <span className="font-semibold text-slate-900">{t("Tasa de exito")}</span>
                   <span className="font-semibold text-slate-700">{completedPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -2379,7 +2326,7 @@ function CsvImportErrorDetailView({
 
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-900">Impacto de errores</span>
+                  <span className="font-semibold text-slate-900">{t("Impacto de errores")}</span>
                   <span className="font-semibold text-slate-700">{errorPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -2390,27 +2337,27 @@ function CsvImportErrorDetailView({
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Resumen numerico</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Resumen numerico")}</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completados</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{t("Completados")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{successCount}</p>
                 <p className="text-xs text-slate-500">({completedPct.toFixed(2)}%)</p>
               </div>
               <div className="rounded-2xl bg-red-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">{t("Errores")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{errorCount}</p>
                 <p className="text-xs text-slate-500">({errorPct.toFixed(2)}%)</p>
               </div>
               <div className="rounded-2xl bg-amber-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pendientes</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">{t("Pendientes")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">0</p>
                 <p className="text-xs text-slate-500">(0.00%)</p>
               </div>
               <div className="rounded-2xl bg-slate-100 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Total</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("Total")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{totalProcessed}</p>
-                <p className="text-xs text-slate-500">registros</p>
+                <p className="text-xs text-slate-500">{t("registros")}</p>
               </div>
             </div>
           </div>
@@ -2420,19 +2367,15 @@ function CsvImportErrorDetailView({
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Analisis</p>
-                <h2 className="mt-2 text-2xl font-bold text-slate-900">Incidencias detectadas</h2>
-                <p className="mt-1.5 text-sm text-slate-500">
-                  La informacion es la misma, pero distribuida para leer mas rapido el lote y los errores agrupados.
-                </p>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Analisis")}</p>
+                <h2 className="mt-2 text-2xl font-bold text-slate-900">{t("Incidencias detectadas")}</h2>
+                <p className="mt-1.5 text-sm text-slate-500">{t("La informacion es la misma, pero distribuida para leer mas rapido el lote y los errores agrupados.")}</p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-600">
-                  {issues.length} incidencias
-                </div>
+                  {issues.length}{" "}{t("incidencias")}</div>
                 <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
-                  {Object.keys(groupedIssues).length} grupos
-                </div>
+                  {Object.keys(groupedIssues).length}{" "}{t("grupos")}</div>
               </div>
             </div>
           </div>
@@ -2444,9 +2387,7 @@ function CsvImportErrorDetailView({
               className={`border-b-2 px-2 py-3 text-sm font-semibold ${
                 activeTab === "errors" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500"
               }`}
-            >
-              Analisis de errores
-              <span className="peligro ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">{issues.length}</span>
+            >{t("Analisis de errores")}<span className="peligro ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">{issues.length}</span>
             </button>
             <button
               type="button"
@@ -2454,9 +2395,7 @@ function CsvImportErrorDetailView({
               className={`border-b-2 px-2 py-3 text-sm font-semibold ${
                 activeTab === "records" ? "border-slate-900 text-slate-900" : "border-transparent text-slate-500"
               }`}
-            >
-              Registros
-            </button>
+            >{t("Registros")}</button>
           </div>
 
           {activeTab === "errors" ? (
@@ -2465,8 +2404,8 @@ function CsvImportErrorDetailView({
                 <div key={key} className="overflow-hidden rounded-[24px] border border-red-200 bg-white shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-red-100 bg-gradient-to-r from-red-50 to-white px-6 py-5">
                     <div>
-                      <p className="peligro text-xs font-bold uppercase tracking-[0.18em] text-red-500">Incidencia {index + 1}</p>
-                      <h3 className="mt-2 text-xl font-bold text-slate-900">Error en {group.length} registros</h3>
+                      <p className="peligro text-xs font-bold uppercase tracking-[0.18em] text-red-500">{t("Incidencia")}{" "}{index + 1}</p>
+                      <h3 className="mt-2 text-xl font-bold text-slate-900">{t("Error en")}{" "}{group.length}{" "}{t("registros")}</h3>
                     </div>
                     <span className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white">{group.length}</span>
                   </div>
@@ -2477,9 +2416,9 @@ function CsvImportErrorDetailView({
                         <span className="font-semibold text-red-800">{group[0].fieldId}:</span> {group[0].message}
                       </div>
                       <div className="rounded-2xl bg-slate-50 px-4 py-4">
-                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Impacto</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Impacto")}</p>
                         <p className="mt-2 text-xl font-bold text-slate-900">{group.length}</p>
-                        <p className="text-sm text-slate-500">registros afectados</p>
+                        <p className="text-sm text-slate-500">{t("registros afectados")}</p>
                       </div>
                     </div>
 
@@ -2487,22 +2426,16 @@ function CsvImportErrorDetailView({
                       <button
                         type="button"
                         className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-                      >
-                        Ver registros para editar
-                      </button>
+                      >{t("Ver registros para editar")}</button>
                       <div className="flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
-                        >
-                          Descartar todos
-                        </button>
+                        >{t("Descartar todos")}</button>
                         <button
                           type="button"
                           className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-                        >
-                          Reintentar todos
-                        </button>
+                        >{t("Reintentar todos")}</button>
                       </div>
                     </div>
                   </div>
@@ -2514,24 +2447,22 @@ function CsvImportErrorDetailView({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h3 className="flex items-center gap-2 text-xl font-bold text-slate-900">
-                    <FileSpreadsheet size={18} className="text-[#ffcf26]" />
-                    Detalle de registros
-                  </h3>
-                  <p className="mt-1.5 text-sm text-slate-500">Vista detallada de todos los registros importados</p>
+                    <FileSpreadsheet size={18} className="text-[#ffcf26]" />{t("Detalle de registros")}</h3>
+                  <p className="mt-1.5 text-sm text-slate-500">{t("Vista detallada de todos los registros importados")}</p>
                 </div>
-                <p className="text-sm text-slate-500">Mostrando {filteredRecords.length} de {records.length} registros</p>
+                <p className="text-sm text-slate-500">{t("Mostrando")}{" "}{filteredRecords.length}{" "}{t("de")}{" "}{records.length}{" "}{t("registros")}</p>
               </div>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <label className="text-sm font-semibold text-slate-700">Filtrar por estado:</label>
+                <label className="text-sm font-semibold text-slate-700">{t("Filtrar por estado:")}</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as "all" | "error" | "ok")}
                   className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm outline-none transition-colors hover:border-slate-300"
                 >
-                  <option value="all">Todos los estados</option>
-                  <option value="error">Error</option>
-                  <option value="ok">Correcto</option>
+                  <option value="all">{t("Todos los estados")}</option>
+                  <option value="error">{t("Error")}</option>
+                  <option value="ok">{t("Correcto")}</option>
                 </select>
               </div>
 
@@ -2539,12 +2470,12 @@ function CsvImportErrorDetailView({
                 <table className="min-w-full text-left">
                   <thead className="bg-slate-50 text-sm font-semibold text-slate-800">
                     <tr>
-                      <th className="px-4 py-4">Estado</th>
-                      <th className="px-4 py-4">NIG</th>
-                      <th className="px-4 py-4">Num. Procedimiento</th>
-                      <th className="px-4 py-4">Juzgado</th>
-                      <th className="px-4 py-4">Demandante/Demandado</th>
-                      <th className="px-4 py-4">Errores</th>
+                      <th className="px-4 py-4">{t("Estado")}</th>
+                      <th className="px-4 py-4">{t("NIG")}</th>
+                      <th className="px-4 py-4">{t("Num. Procedimiento")}</th>
+                      <th className="px-4 py-4">{t("Juzgado")}</th>
+                      <th className="px-4 py-4">{t("Demandante/Demandado")}</th>
+                      <th className="px-4 py-4">{t("Errores")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-sm">
@@ -2554,7 +2485,7 @@ function CsvImportErrorDetailView({
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
                             record.status === "error" ? "bg-rose-600 text-white" : "bg-emerald-100 text-emerald-700"
                           }`}>
-                            {record.status === "error" ? "Error" : "Correcto"}
+                            {record.status === "error" ? t("Error") : t("Correcto")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-700">{record.nig}</td>
@@ -2578,9 +2509,7 @@ function CsvImportErrorDetailView({
                     ))}
                     {filteredRecords.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">
-                          No hay registros para este filtro.
-                        </td>
+                        <td colSpan={6} className="px-4 py-12 text-center text-sm text-slate-400">{t("No hay registros para este filtro.")}</td>
                       </tr>
                     )}
                   </tbody>
@@ -2795,19 +2724,19 @@ function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
       <p className={`text-2xl font-semibold transition-colors duration-200 ${
         isDragging || isClicked ? 'text-[#ab0433]' : 'text-slate-700'
       }`}>
-        {isDragging ? '¡Suelta el archivo aquí!'
-          : isClicked ? 'Abriendo selector...'
-          : zipFileName ?? 'Añade un ZIP o un PDF suelto'}
+        {isDragging ? t("¡Suelta el archivo aquí!")
+          : isClicked ? t("Abriendo selector...")
+          : zipFileName ?? t("Añade un ZIP o un PDF suelto")}
       </p>
       <p className="mt-2 max-w-xl text-base leading-7 text-slate-400">
         {zipFileName
-          ? 'Haz click para cambiar el archivo'
-          : 'Arrastra un ZIP o un PDF aquí, o haz click para seleccionarlo'}
+          ? t("Haz click para cambiar el archivo")
+          : t("Arrastra un ZIP o un PDF aquí, o haz click para seleccionarlo")}
       </p>
       {zipFileName && (
         <div className="mt-4 flex items-center gap-2 rounded-full bg-green-50 px-4 py-1.5">
           <CheckCircle2 size={14} className="text-green-500" />
-          <span className="text-sm font-medium text-green-700">Archivo listo para procesar</span>
+          <span className="text-sm font-medium text-green-700">{t("Archivo listo para procesar")}</span>
         </div>
       )}
     </button>
@@ -2936,12 +2865,10 @@ function DocumentImportView({
             onClick={onBack}
             className="w-max inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
           >
-            <ChevronLeft size={13} />
-            Volver a Expedientes
-          </button>
+            <ChevronLeft size={13} />{t("Volver a Expedientes")}</button>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Importar Expedientes desde Documentos</h1>
-            <p className="text-sm text-slate-500 mt-1">Sube un ZIP con varios documentos, o un único PDF suelto, para crear nuevos expedientes automáticamente.</p>
+            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">{t("Importar Expedientes desde Documentos")}</h1>
+            <p className="text-sm text-slate-500 mt-1">{t("Sube un ZIP con varios documentos, o un único PDF suelto, para crear nuevos expedientes automáticamente.")}</p>
           </div>
         </div>
       </div>
@@ -2956,12 +2883,12 @@ function DocumentImportView({
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
               <SlidersHorizontal size={14} className="text-slate-400" />
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Configuración de Asignación (Opcional)</h3>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("Configuración de Asignación (Opcional)")}</h3>
             </div>
             <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-bold text-slate-800">Asignar automáticamente organizaciones</p>
-                <p className="text-xs text-slate-500 mt-1">Puedes asignar automáticamente los expedientes creados a otras organizaciones.</p>
+                <p className="text-sm font-bold text-slate-800">{t("Asignar automáticamente organizaciones")}</p>
+                <p className="text-xs text-slate-500 mt-1">{t("Puedes asignar automáticamente los expedientes creados a otras organizaciones.")}</p>
               </div>
               <button
                 type="button"
@@ -2974,8 +2901,8 @@ function DocumentImportView({
             {autoAssignOrganizations && (
               <div className="px-6 pb-6 pt-4 grid gap-4 md:grid-cols-2 border-t border-slate-100">
                 <PrettyAssignSelect
-                  label="Cliente"
-                  placeholder="Seleccionar cliente..."
+                  label={t("Cliente")}
+                  placeholder={t("Seleccionar cliente...")}
                   value={selectedClientId}
                   options={clientOptions}
                   emptyMessage="No hay clientes disponibles"
@@ -2983,12 +2910,12 @@ function DocumentImportView({
                   onChange={onChangeClient}
                 />
                 <label className="block">
-                  <span className="mb-1.5 block text-sm font-semibold text-slate-900">Procurador</span>
+                  <span className="mb-1.5 block text-sm font-semibold text-slate-900">{t("Procurador")}</span>
                   <input
                     type="text"
                     value={selectedProcurador}
                     onChange={(e) => onChangeProcurador(e.target.value)}
-                    placeholder="Escribir procurador..."
+                    placeholder={t("Escribir procurador...")}
                     list="dl-procuradores-import"
                     className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#ab0433]/35 focus:ring-4 focus:ring-[#ab0433]/10"
                   />
@@ -3007,21 +2934,21 @@ function DocumentImportView({
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-shrink-0">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
               <Upload size={14} className="text-slate-400" />
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Importar Expedientes</h3>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("Importar Expedientes")}</h3>
             </div>
             <div className="p-6 flex flex-col">
-              <p className="text-sm text-slate-500 mb-2">Sube un ZIP con documentos del expediente (cada documento se procesará como un nuevo expediente), o un único PDF suelto para dar de alta un expediente a partir de él.</p>
+              <p className="text-sm text-slate-500 mb-2">{t("Sube un ZIP con documentos del expediente (cada documento se procesará como un nuevo expediente), o un único PDF suelto para dar de alta un expediente a partir de él.")}</p>
               <ZipDropArea zipFileName={zipFileName} onSelectFile={onSelectFile} onFileChange={onFileChange} />
             </div>
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-bold text-slate-800">
-                  {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP o un PDF para comenzar"}
+                  {zipFile ? t("Archivo listo para importar") : t("Selecciona un ZIP o un PDF para comenzar")}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {zipFile
-                    ? `${zipFile.name} · ${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
-                    : "El sistema extraerá texto de cada documento."}
+                    ? t("{name} · {toFixed} MB", { name: zipFile.name, toFixed: (zipFile.size / (1024 * 1024)).toFixed(2) })
+                    : t("El sistema extraerá texto de cada documento.")}
                 </p>
                 {importError && <p className="mt-1 text-xs font-medium text-rose-600">{importError}</p>}
                 {importBusy && (() => {
@@ -3038,10 +2965,10 @@ function DocumentImportView({
                       <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
                         <span>
                           {uploadStage === "uploading"
-                            ? "Subiendo archivo..."
+                            ? t("Subiendo archivo...")
                             : knowsTotal
-                              ? `Procesando documento ${Math.min(processingDone + 1, processingTotal)} de ${processingTotal}...`
-                              : "Preparando documentos..."}
+                              ? t("Procesando documento {min} de {processingTotal}...", { min: Math.min(processingDone + 1, processingTotal), processingTotal: processingTotal })
+                              : t("Preparando documentos...")}
                         </span>
                         <span>
                           {uploadStage === "uploading" ? `${uploadProgress}%` : knowsTotal ? `${processingDone}/${processingTotal}` : ""}
@@ -3056,7 +2983,7 @@ function DocumentImportView({
                         />
                       </div>
                       <p className="mt-1 text-[10px] text-slate-400">
-                        {uploadStage === "processing" && "Puedes seguir usando el resto de la aplicación mientras se procesa."}
+                        {uploadStage === "processing" && t("Puedes seguir usando el resto de la aplicación mientras se procesa.")}
                       </p>
                     </div>
                   );
@@ -3073,7 +3000,7 @@ function DocumentImportView({
                 }`}
               >
                 {importBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                {importBusy ? "Importando documentos..." : "Procesar e importar"}
+                {importBusy ? t("Importando documentos...") : t("Procesar e importar")}
               </button>
             </div>
           </div>
@@ -3093,10 +3020,10 @@ function DocumentImportView({
             <div ref={activeBatchSectionRef} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0 scroll-mt-4">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Última importación</h3>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{t("Última importación")}</h3>
                   {activeBatch && (activeBatch.pending_count ?? 0) > 0 && (
                     <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                      {activeBatch.pending_count} pendiente{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
+                      {activeBatch.pending_count}{" "}{t("pendiente")}{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
                     </span>
                   )}
                 </div>
@@ -3127,10 +3054,10 @@ function DocumentImportView({
               )}
               <div className="overflow-x-auto">
                 <div className="grid grid-cols-[88px_minmax(0,1.3fr)_110px_minmax(0,1.2fr)_110px] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 min-w-[560px]">
-                  <span>Fila</span><span>Documento</span><span>Estado</span><span>Resultado</span><span>Acción</span>
+                  <span>{t("Fila")}</span><span>{t("Documento")}</span><span>{t("Estado")}</span><span>{t("Resultado")}</span><span>{t("Acción")}</span>
                 </div>
                 {activeItems.length === 0 ? (
-                  <div className="px-4 py-6 text-sm text-slate-400">Todavía no hay elementos para mostrar.</div>
+                  <div className="px-4 py-6 text-sm text-slate-400">{t("Todavía no hay elementos para mostrar.")}</div>
                 ) : activeItems.map((item) => {
                   const fileName = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
                   const expedienteLabel = item.anio && item.num_exp ? `${item.anio}/${item.num_exp}` : item.descripcion || "Expediente creado";
@@ -3146,23 +3073,22 @@ function DocumentImportView({
                         : item.status === "uploaded" ? "bg-amber-50 text-amber-700"
                         : "bg-red-50 text-red-700"
                       }`}>
-                        {item.status === "completed" ? "Creado" : item.status === "uploaded" ? "Pendiente" : "Error"}
+                        {item.status === "completed" ? t("Creado") : item.status === "uploaded" ? t("Pendiente") : t("Error")}
                       </span>
                       <div className="min-w-0">
                         {item.status === "completed" ? <p className="truncate text-slate-700">{expedienteLabel}</p>
-                        : item.status === "uploaded" ? <p className="truncate text-amber-700">Listo para revisión</p>
-                        : <p className="truncate text-rose-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>}
+                        : item.status === "uploaded" ? <p className="truncate text-amber-700">{t("Listo para revisión")}</p>
+                        : <p className="truncate text-rose-600">{item.payload?.userError || item.error_message || t("No se pudo procesar")}</p>}
                       </div>
                       <div className="flex flex-col gap-1">
                         {(item.status === "uploaded" || item.status === "failed") && (
                           <button type="button" onClick={() => onVerifyItem(item)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]">
-                            <Eye size={12} />{item.status === "uploaded" ? "Verificar" : "Revisar"}
+                            <Eye size={12} />{item.status === "uploaded" ? t("Verificar") : t("Revisar")}
                           </button>
                         )}
                         {item.created_expediente_id ? (
                           <button type="button" onClick={() => navigate(`/dashboard/expedientes/${item.created_expediente_id}`)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]">
-                            <ExternalLink size={12} />Abrir
-                          </button>
+                            <ExternalLink size={12} />{t("Abrir")}</button>
                         ) : <span className="text-xs text-slate-300">—</span>}
                       </div>
                     </div>
@@ -3178,30 +3104,24 @@ function DocumentImportView({
           <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
             <div>
               <h2 className="text-[13px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <History size={14} className="text-slate-400" />
-                Historial reciente
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Últimos lotes procesados.</p>
+                <History size={14} className="text-slate-400" />{t("Historial reciente")}</h2>
+              <p className="text-xs text-slate-500 mt-0.5">{t("Últimos lotes procesados.")}</p>
             </div>
             <button
               type="button"
               onClick={onReloadHistory}
               className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
             >
-              <RefreshCw size={12} className="text-slate-400" />
-              Recargar
-            </button>
+              <RefreshCw size={12} className="text-slate-400" />{t("Recargar")}</button>
           </div>
 
           <div className="modules-scrollbar flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2.5 bg-slate-50/30">
             {historyError && <p className="text-sm text-rose-600 px-2 py-1">{historyError}</p>}
             {loadingHistory ? (
               <div className="flex items-center justify-center gap-2 text-sm text-slate-400 py-10">
-                <Loader2 size={15} className="animate-spin" />
-                Cargando historial...
-              </div>
+                <Loader2 size={15} className="animate-spin" />{t("Cargando historial...")}</div>
             ) : history.length === 0 ? (
-              <div className="text-sm text-slate-400 py-10 text-center">Aún no hay importaciones registradas.</div>
+              <div className="text-sm text-slate-400 py-10 text-center">{t("Aún no hay importaciones registradas.")}</div>
             ) : history.slice(0, 5).map((batch) => (
               <div key={batch.id} className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm flex items-center justify-between group hover:border-slate-300 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
@@ -3215,7 +3135,7 @@ function DocumentImportView({
                   <div className="flex flex-col min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{batch.file_name}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {new Date(batch.created_at).toLocaleString("es-ES")} · <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count} creados</span>
+                      {new Date(batch.created_at).toLocaleString("es-ES")} · <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count}{" "}{t("creados")}</span>
                     </p>
                   </div>
                 </div>
@@ -3224,9 +3144,7 @@ function DocumentImportView({
                     onClick={() => onReviewBatch(batch)}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
                   >
-                    <Eye size={11} />
-                    Revisar
-                  </button>
+                    <Eye size={11} />{t("Revisar")}</button>
                   <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
                     batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                     : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
@@ -3236,7 +3154,7 @@ function DocumentImportView({
                   </span>
                   <button
                     onClick={() => onDeleteBatch(batch.id)}
-                    title="Eliminar del historial"
+                    title={t("Eliminar del historial")}
                     className="peligro text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 size={14} />
@@ -3253,9 +3171,7 @@ function DocumentImportView({
                 onClick={onOpenHistory}
                 className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
               >
-                <History size={12} />
-                Ver todo el historial
-                {history.length > 5 && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 rounded-full">{history.length}</span>}
+                <History size={12} />{t("Ver todo el historial")}{history.length > 5 && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 rounded-full">{history.length}</span>}
               </button>
             </div>
           )}
@@ -3344,8 +3260,8 @@ function PartyRow({ color, value, onChange, onRemove, list }: {
         className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white"
       />
       <select className="shrink-0 border border-slate-200 rounded-lg px-1.5 py-1.5 text-xs text-slate-600 bg-white focus:outline-none focus:border-red-400 max-w-[82px]">
-        <option value="fisica">Persona fisi...</option>
-        <option value="juridica">Persona jur...</option>
+        <option value="fisica">{t("Persona fisi...")}</option>
+        <option value="juridica">{t("Persona jur...")}</option>
       </select>
       {onRemove && (
         <button type="button" onClick={onRemove}
@@ -3402,7 +3318,7 @@ function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew
       <button
         type="button"
         tabIndex={-1}
-        title="Ver la lista completa del Directorio"
+        title={t("Ver la lista completa del Directorio")}
         onMouseDown={e => { e.preventDefault(); if (open) setOpen(false); else openAll(); }}
         className="absolute right-1.5 top-[calc(50%+2px)] -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700"
       >
@@ -3425,7 +3341,7 @@ function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew
               </button>
             ))
           ) : (
-            <p className="px-3 py-2 text-xs text-slate-400">{options.length ? "Sin coincidencias en el Directorio." : "Todavía no hay nadie dado de alta en el Directorio."}</p>
+            <p className="px-3 py-2 text-xs text-slate-400">{options.length ? t("Sin coincidencias en el Directorio.") : t("Todavía no hay nadie dado de alta en el Directorio.")}</p>
           )}
           <button
             type="button"
@@ -3524,7 +3440,7 @@ function DocumentImportVerifyView({
         body: JSON.stringify({ tipo, first_name: newProfNombre.trim(), last_name: newProfApellidos.trim() }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo crear el registro");
+      if (!res.ok) throw new Error(d.error || t("No se pudo crear el registro"));
       const nombreCompleto = `${d.data.first_name || ""} ${d.data.last_name || ""}`.trim();
       if (tipo === "ABOGADO") {
         setAbogadoOptions(prev => [...prev, nombreCompleto]);
@@ -3535,7 +3451,7 @@ function DocumentImportVerifyView({
       }
       closeNewProfesional();
     } catch (e: any) {
-      setNewProfError(e.message || "No se pudo crear el registro");
+      setNewProfError(e.message || t("No se pudo crear el registro"));
     } finally {
       setCreatingProf(false);
     }
@@ -3716,7 +3632,7 @@ function DocumentImportVerifyView({
     return (
       <button
         type="button"
-        title="Ver en el documento"
+        title={t("Ver en el documento")}
         onClick={() => activateHighlight(term)}
         className={`inline-flex items-center rounded p-0.5 transition-colors flex-shrink-0 ${
           active ? "text-amber-500 bg-amber-50" : "text-slate-300 hover:text-amber-400 hover:bg-amber-50"
@@ -3763,8 +3679,7 @@ function DocumentImportVerifyView({
               onClick={() => setForceTextMode(true)}
               className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-white/95 border border-slate-200 rounded-lg shadow hover:bg-white transition-colors"
             >
-              <Eye size={11} /> Ver texto extraído
-            </button>
+              <Eye size={11} />{" "}{t("Ver texto extraído")}</button>
           )}
         </div>
       );
@@ -3787,21 +3702,19 @@ function DocumentImportVerifyView({
                 onClick={() => { setForceTextMode(false); setHighlightTerm(null); }}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               >
-                <ArrowLeft size={11} /> Ver documento
-              </button>
+                <ArrowLeft size={11} />{" "}{t("Ver documento")}</button>
             )}
             {previewUrl && (
               <a href={previewUrl} target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ab0433]">
-                <ExternalLink size={12} /> Abrir archivo
-              </a>
+                <ExternalLink size={12} />{" "}{t("Abrir archivo")}</a>
             )}
           </div>
         </div>
         {highlightTerm && (
           <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-800">
             <Eye size={12} />
-            <span>Resaltando: <span className="font-bold">"{highlightTerm}"</span></span>
+            <span>{t("Resaltando:")}{" "}<span className="font-bold">"{highlightTerm}"</span></span>
             <button type="button" onClick={() => setHighlightTerm(null)} className="ml-auto text-amber-400 hover:text-amber-700 transition-colors">
               <X size={12} />
             </button>
@@ -3845,13 +3758,13 @@ function DocumentImportVerifyView({
         <div className="min-w-[520px] basis-[44%] shrink-0 border-l border-slate-200 bg-white overflow-y-auto flex flex-col">
 
           {/* Detalles del documento */}
-          <PanelSection title="Detalles del documento">
+          <PanelSection title={t("Detalles del documento")}>
             <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
               <FolderOpen size={13} className="text-slate-400 shrink-0" />
               <span className="truncate font-medium text-slate-800">{fileName}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-500 mt-2">
-              <span className="shrink-0">Recibido el</span>
+              <span className="shrink-0">{t("Recibido el")}</span>
               <input
                 type="date"
                 value={safeFechaInicio}
@@ -3866,15 +3779,15 @@ function DocumentImportVerifyView({
 
           {/* Fecha límite de respuesta */}
           {deadlineDate && (
-            <PanelSection title="Fecha límite de respuesta">
+            <PanelSection title={t("Fecha límite de respuesta")}>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-base font-bold text-slate-900">{fmtDateObj(deadlineDate)}</span>
-                <span className="text-xs text-slate-400">20 días hábiles</span>
+                <span className="text-xs text-slate-400">{t("20 días hábiles")}</span>
               </div>
               <div className="mt-3 flex flex-wrap gap-1">
                 {calendarStrip.map((d, i) => (
                   <div key={i}
-                    title={d.isDeadline ? "Fecha límite" : d.isWeekend ? "Fin de semana" : "Día hábil"}
+                    title={d.isDeadline ? t("Fecha límite") : d.isWeekend ? t("Fin de semana") : t("Día hábil")}
                     className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-semibold select-none ${
                       d.isDeadline  ? "bg-[#ab0433] text-white shadow-sm" :
                       d.isWeekend   ? "bg-slate-50 text-slate-300"        :
@@ -3889,47 +3802,47 @@ function DocumentImportVerifyView({
           )}
 
           {/* Detalles del procedimiento */}
-          <PanelSection title="Detalles del procedimiento">
+          <PanelSection title={t("Detalles del procedimiento")}>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Tipo procedimiento <EyeBtn term={safeTipoProc} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Tipo procedimiento")}{" "}<EyeBtn term={safeTipoProc} /></p>
                 <input value={safeTipoProc} onChange={e => onChange("tipo_proc", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Juzgado <EyeBtn term={safeJuzgado} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Juzgado")}{" "}<EyeBtn term={safeJuzgado} /></p>
                 <input value={safeJuzgado} onChange={e => onChange("juzgado", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Tipo expediente</p>
+                <p className={lbl}>{t("Tipo expediente")}</p>
                 <AppSelect value={String(form.tipo ?? "judicial")} onChange={e => onChange("tipo", e.target.value)}>
                   {Object.entries(TIPOS).map(([v, info]) => <option key={v} value={v}>{info.label}</option>)}
                 </AppSelect>
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Tipo asunto <EyeBtn term={safeTipoAsunto} /></p>
-                <input value={safeTipoAsunto} onChange={e => onChange("tipos_asunto", e.target.value)} className={inp} placeholder="Civil, Penal…" />
+                <p className={`${lbl} flex items-center gap-1`}>{t("Tipo asunto")}{" "}<EyeBtn term={safeTipoAsunto} /></p>
+                <input value={safeTipoAsunto} onChange={e => onChange("tipos_asunto", e.target.value)} className={inp} placeholder={t("Civil, Penal…")} />
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>NIG <EyeBtn term={safeNig} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("NIG")}{" "}<EyeBtn term={safeNig} /></p>
                 <input value={safeNig} onChange={e => onChange("nig", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Núm. procedimiento <EyeBtn term={safeNumAutos} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Núm. procedimiento")}{" "}<EyeBtn term={safeNumAutos} /></p>
                 <input value={safeNumAutos} onChange={e => onChange("num_autos", e.target.value)} className={inp} />
               </div>
             </div>
           </PanelSection>
 
           {/* Descripción */}
-          <PanelSection title="Descripción del expediente">
+          <PanelSection title={t("Descripción del expediente")}>
             <div className="mt-1">
-              <p className={`${lbl} flex items-center gap-1 mb-1`}>Descripción <EyeBtn term={safeDescripcion} /></p>
+              <p className={`${lbl} flex items-center gap-1 mb-1`}>{t("Descripción")}{" "}<EyeBtn term={safeDescripcion} /></p>
               <input value={safeDescripcion} onChange={e => onChange("descripcion", e.target.value)} className={inp}
-                placeholder="Resumen del expediente…" />
+                placeholder={t("Resumen del expediente…")} />
             </div>
           </PanelSection>
 
-          <PanelSection title="Representación del despacho">
+          <PanelSection title={t("Representación del despacho")}>
             <div className="grid grid-cols-2 gap-3 mt-1">
               <button
                 type="button"
@@ -3940,9 +3853,9 @@ function DocumentImportVerifyView({
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                <p className="text-sm font-semibold">Representamos a demandantes</p>
+                <p className="text-sm font-semibold">{t("Representamos a demandantes")}</p>
                 <p className="mt-1 text-xs opacity-80">
-                  {extractedDemandantes.length ? extractedDemandantes.join(" | ") : "Sin demandantes detectados"}
+                  {extractedDemandantes.length ? extractedDemandantes.join(" | ") : t("Sin demandantes detectados")}
                 </p>
               </button>
               <button
@@ -3954,9 +3867,9 @@ function DocumentImportVerifyView({
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                <p className="text-sm font-semibold">Representamos a demandados</p>
+                <p className="text-sm font-semibold">{t("Representamos a demandados")}</p>
                 <p className="mt-1 text-xs opacity-80">
-                  {extractedDemandados.length ? extractedDemandados.join(" | ") : "Sin demandados detectados"}
+                  {extractedDemandados.length ? extractedDemandados.join(" | ") : t("Sin demandados detectados")}
                 </p>
               </button>
             </div>
@@ -3986,7 +3899,7 @@ function DocumentImportVerifyView({
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                     lado.nuestro ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-red-50 text-red-700 border border-red-200"
                   }`}>
-                    {lado.nuestro ? "Nuestro cliente" : "Parte contraria"}
+                    {lado.nuestro ? t("Nuestro cliente") : t("Parte contraria")}
                   </span>
                   <EyeBtn term={lado.lista.filter(Boolean).join(" ")} />
                 </span>
@@ -4006,31 +3919,27 @@ function DocumentImportVerifyView({
           ))}
 
           {/* Abogados y Procuradores */}
-          <PanelSection title="Abogados y Procuradores">
+          <PanelSection title={t("Abogados y Procuradores")}>
             <div className="grid grid-cols-2 gap-x-3 gap-y-3 mt-2">
 
               {/* Abogado propio — sugerencias del Directorio de Profesionales */}
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  Abogado propio
-                </p>
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />{t("Abogado propio")}</p>
                 {showNewProfesional === "ABOGADO" ? (
                   <div className="mt-1 space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
                     <input autoFocus value={newProfNombre} onChange={e => setNewProfNombre(e.target.value)}
-                      placeholder="Nombre" className={inp} />
+                      placeholder={t("Nombre")} className={inp} />
                     <input value={newProfApellidos} onChange={e => setNewProfApellidos(e.target.value)}
-                      placeholder="Apellidos" className={inp} />
+                      placeholder={t("Apellidos")} className={inp} />
                     {newProfError && <p className="text-xs text-red-600">{newProfError}</p>}
                     <div className="flex gap-1.5">
                       <button type="button" disabled={creatingProf || !newProfNombre.trim()} onClick={createProfesionalRapido}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-                        {creatingProf ? "Creando…" : "Crear abogado"}
+                        {creatingProf ? t("Creando…") : t("Crear abogado")}
                       </button>
                       <button type="button" onClick={closeNewProfesional}
-                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">
-                        Cancelar
-                      </button>
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">{t("Cancelar")}</button>
                     </div>
                   </div>
                 ) : (
@@ -4038,7 +3947,7 @@ function DocumentImportVerifyView({
                     value={safeAbogadoPropio}
                     onChange={v => onChange("abogado_propio" as any, v)}
                     options={abogadoOptions}
-                    placeholder="Nombre del abogado…"
+                    placeholder={t("Nombre del abogado…")}
                     onCreateNew={() => setShowNewProfesional("ABOGADO")}
                     createLabel="Crear nuevo abogado"
                   />
@@ -4048,39 +3957,35 @@ function DocumentImportVerifyView({
               {/* Abogado contrario */}
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                  Abogado contrario <EyeBtn term={safeAbogadoContrario} />
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />{t("Abogado contrario")}{" "}<EyeBtn term={safeAbogadoContrario} />
                 </p>
                 <div className="mt-1">
                   <ProfesionalInput tipo="ABOGADO" value={safeAbogadoContrario}
                     onChange={v => onChange("abogado_contrario" as any, v)}
                     options={abogadoOptions} onCreated={n => setAbogadoOptions(p => [...p, n])}
-                    placeholder="Nombre del abogado contrario…" />
+                    placeholder={t("Nombre del abogado contrario…")} />
                 </div>
               </div>
 
               {/* Procurador propio */}
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  Procurador propio <EyeBtn term={safeProcurador} />
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />{t("Procurador propio")}{" "}<EyeBtn term={safeProcurador} />
                 </p>
                 {showNewProfesional === "PROCURADOR" ? (
                   <div className="mt-1 space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
                     <input autoFocus value={newProfNombre} onChange={e => setNewProfNombre(e.target.value)}
-                      placeholder="Nombre" className={inp} />
+                      placeholder={t("Nombre")} className={inp} />
                     <input value={newProfApellidos} onChange={e => setNewProfApellidos(e.target.value)}
-                      placeholder="Apellidos" className={inp} />
+                      placeholder={t("Apellidos")} className={inp} />
                     {newProfError && <p className="text-xs text-red-600">{newProfError}</p>}
                     <div className="flex gap-1.5">
                       <button type="button" disabled={creatingProf || !newProfNombre.trim()} onClick={createProfesionalRapido}
                         className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-                        {creatingProf ? "Creando…" : "Crear procurador"}
+                        {creatingProf ? t("Creando…") : t("Crear procurador")}
                       </button>
                       <button type="button" onClick={closeNewProfesional}
-                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">
-                        Cancelar
-                      </button>
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">{t("Cancelar")}</button>
                     </div>
                   </div>
                 ) : (
@@ -4088,7 +3993,7 @@ function DocumentImportVerifyView({
                     value={rawProcurador}
                     onChange={v => onChange("procurador", v)}
                     options={procuradorOptionsVerify}
-                    placeholder="Nombre del procurador propio…"
+                    placeholder={t("Nombre del procurador propio…")}
                     onCreateNew={() => setShowNewProfesional("PROCURADOR")}
                     createLabel="Crear nuevo procurador"
                   />
@@ -4098,14 +4003,13 @@ function DocumentImportVerifyView({
               {/* Procurador contrario */}
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                  Procurador contrario <EyeBtn term={safeProcuradorContrario} />
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />{t("Procurador contrario")}{" "}<EyeBtn term={safeProcuradorContrario} />
                 </p>
                 <div className="mt-1">
                   <ProfesionalInput tipo="PROCURADOR" value={safeProcuradorContrario}
                     onChange={v => onChange("procurador_contrario" as any, v)}
                     options={procuradorOptionsVerify} onCreated={n => setProcuradorOptionsVerify(p => [...p, n])}
-                    placeholder="Nombre del procurador contrario…" />
+                    placeholder={t("Nombre del procurador contrario…")} />
                 </div>
               </div>
 
@@ -4113,28 +4017,28 @@ function DocumentImportVerifyView({
           </PanelSection>
 
           {/* Campos adicionales */}
-          <PanelSection title="Más datos">
+          <PanelSection title={t("Más datos")}>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Ref. expediente <EyeBtn term={safeRefExpediente} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Ref. expediente")}{" "}<EyeBtn term={safeRefExpediente} /></p>
                 <input value={safeRefExpediente} onChange={e => onChange("ref_expediente", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Cuantía principal <EyeBtn term={safeCuantiaPrincipal} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Cuantía principal")}{" "}<EyeBtn term={safeCuantiaPrincipal} /></p>
                 <input type="number" value={safeCuantiaPrincipal} onChange={e => onChange("cuantia_principal", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={`${lbl} flex items-center gap-1`}>Centro <EyeBtn term={safeCentro} /></p>
+                <p className={`${lbl} flex items-center gap-1`}>{t("Centro")}{" "}<EyeBtn term={safeCentro} /></p>
                 <input value={safeCentro} onChange={e => onChange("centro", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Estado</p>
+                <p className={lbl}>{t("Estado")}</p>
                 <AppSelect value={String(form.estado ?? "abierto")} onChange={e => onChange("estado", e.target.value)}>
                   {Object.entries(ESTADOS).map(([v, info]) => <option key={v} value={v}>{info.label}</option>)}
                 </AppSelect>
               </div>
               <div className="col-span-2">
-                <p className={lbl}>Observaciones</p>
+                <p className={lbl}>{t("Observaciones")}</p>
                 <textarea value={safeObservaciones} onChange={e => onChange("observaciones", e.target.value)}
                   className={`${inp} min-h-[72px] resize-y`} />
               </div>
@@ -4146,13 +4050,13 @@ function DocumentImportVerifyView({
             <div className="border-t border-amber-200 bg-amber-50 p-4 space-y-3">
               {(error || userError) && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Aviso de lectura</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">{t("Aviso de lectura")}</p>
                   <p className="text-xs text-amber-900">{error || userError}</p>
                 </div>
               )}
               {developerError && (
                 <details className="text-xs">
-                  <summary className="font-semibold text-slate-500 cursor-pointer">Detalle técnico</summary>
+                  <summary className="font-semibold text-slate-500 cursor-pointer">{t("Detalle técnico")}</summary>
                   <pre className="mt-1 whitespace-pre-wrap text-slate-600 bg-white rounded-lg p-2 border border-slate-200">{developerError}</pre>
                 </details>
               )}
@@ -4164,9 +4068,7 @@ function DocumentImportVerifyView({
       {/* ── Barra inferior ─────────────────────────────────────────── */}
       <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-slate-200">
         <button type="button" onClick={onBack}
-          className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">
-          Cancelar
-        </button>
+          className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">{t("Cancelar")}</button>
         <button type="button" onClick={onAccept} disabled={!canAccept}
           className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl transition-all ${
             canAccept
@@ -4175,7 +4077,7 @@ function DocumentImportVerifyView({
           }`}
         >
           {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-          {saving ? "Creando expediente…" : "Crear expediente"}
+          {saving ? t("Creando expediente…") : t("Crear expediente")}
         </button>
       </div>
     </div>
@@ -4272,12 +4174,10 @@ function DocumentImportHistoryView({
             onClick={onBack}
             className="w-max inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
           >
-            <ChevronLeft size={13} />
-            Volver a Importar
-          </button>
+            <ChevronLeft size={13} />{t("Volver a Importar")}</button>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Historial de importaciones</h1>
-            <p className="text-sm text-slate-500 mt-1">Todos los lotes importados desde documentos.</p>
+            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">{t("Historial de importaciones")}</h1>
+            <p className="text-sm text-slate-500 mt-1">{t("Todos los lotes importados desde documentos.")}</p>
           </div>
         </div>
       </div>
@@ -4285,15 +4185,13 @@ function DocumentImportHistoryView({
       {/* Toolbar */}
       <div className="flex-shrink-0 px-6 lg:px-10 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between animate-card-in-1">
         <p className="text-sm font-semibold text-slate-700">
-          {loading ? "Cargando..." : `${history.length} lote${history.length !== 1 ? "s" : ""} registrado${history.length !== 1 ? "s" : ""}`}
+          {loading ? t("Cargando...") : t("{length} lote{v} registrado{v2}", { length: history.length, v: history.length !== 1 ? "s" : "", v2: history.length !== 1 ? "s" : "" })}
         </p>
         <button
           onClick={onReload}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
         >
-          <RefreshCw size={12} className="text-slate-400" />
-          Actualizar
-        </button>
+          <RefreshCw size={12} className="text-slate-400" />{t("Actualizar")}</button>
       </div>
 
       {error && (
@@ -4306,11 +4204,9 @@ function DocumentImportHistoryView({
       <div className="modules-scrollbar flex-1 min-h-0 overflow-y-auto bg-[#f4f6f8] p-6 lg:p-10 animate-card-in-2">
         {loading ? (
           <div className="flex items-center justify-center gap-3 text-sm text-slate-400 py-20">
-            <Loader2 size={18} className="animate-spin" />
-            Cargando historial...
-          </div>
+            <Loader2 size={18} className="animate-spin" />{t("Cargando historial...")}</div>
         ) : history.length === 0 ? (
-          <div className="text-sm text-slate-400 py-20 text-center">Aún no hay importaciones documentales registradas.</div>
+          <div className="text-sm text-slate-400 py-20 text-center">{t("Aún no hay importaciones documentales registradas.")}</div>
         ) : (
           <div className="flex flex-col gap-3 max-w-3xl mx-auto">
             {history.map((batch) => (
@@ -4330,9 +4226,9 @@ function DocumentImportHistoryView({
                     <p className="text-xs text-slate-500 mt-0.5">
                       {new Date(batch.created_at).toLocaleString("es-ES")}
                       {" · "}
-                      <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count} creados</span>
+                      <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count}{" "}{t("creados")}</span>
                       {batch.error_count > 0 && (
-                        <span className="text-rose-500 ml-1">· {batch.error_count} error{batch.error_count !== 1 ? "es" : ""}</span>
+                        <span className="text-rose-500 ml-1">· {batch.error_count}{" "}{t("error")}{batch.error_count !== 1 ? t("es") : ""}</span>
                       )}
                     </p>
                   </div>
@@ -4342,9 +4238,7 @@ function DocumentImportHistoryView({
                     onClick={() => onReviewBatch(batch)}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
                   >
-                    <Eye size={12} />
-                    Revisar
-                  </button>
+                    <Eye size={12} />{t("Revisar")}</button>
                   <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
                     batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                     : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
@@ -4354,7 +4248,7 @@ function DocumentImportHistoryView({
                   </span>
                   <button
                     onClick={() => onDeleteBatch(batch.id)}
-                    title="Eliminar del historial"
+                    title={t("Eliminar del historial")}
                     className="peligro p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 size={14} />
@@ -4405,7 +4299,7 @@ function FieldDropdown({ value, onChange, options }: {
         onClick={handleOpen}
         className={`flex h-full items-center gap-1.5 text-xs rounded-l-lg px-2.5 min-w-[160px] transition-colors select-none focus:outline-none ${open ? "bg-slate-50 text-slate-700" : "bg-transparent text-slate-600 hover:bg-slate-50"}`}
       >
-        <span className="flex-1 text-left truncate">{selected?.label ?? "Elegir…"}</span>
+        <span className="flex-1 text-left truncate">{selected?.label ?? t("Elegir…")}</span>
         <ChevronDown size={11} className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && createPortal(
@@ -4451,7 +4345,7 @@ function FilterRow({
         ref={inputRef}
         value={filter.value}
         onChange={e => onChange(filter.id, { value: e.target.value })}
-        placeholder="Buscar..."
+        placeholder={t("Buscar...")}
         className="h-full min-w-0 flex-1 sm:flex-none sm:w-48 border-0 bg-transparent px-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-0"
       />
       {canRemove && (
@@ -4459,7 +4353,7 @@ function FilterRow({
           <div className="h-4 w-px shrink-0 bg-slate-200" />
           <button
             onClick={() => onRemove(filter.id)}
-            title="Quitar filtro"
+            title={t("Quitar filtro")}
             className="flex h-full items-center px-2 text-slate-300 hover:text-red-500 transition-colors"
           >
             <X size={12} />
@@ -4534,10 +4428,10 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
   const handleAccept = async () => {
     setFormError("");
     const mn = Number(generalNum);
-    if (!Number.isInteger(mn) || mn < 1) { setFormError("El número mínimo debe ser un entero >= 1"); return; }
+    if (!Number.isInteger(mn) || mn < 1) { setFormError(t("El número mínimo debe ser un entero >= 1")); return; }
     if (useOverride) {
       const ov = Number(overrideNum);
-      if (!Number.isInteger(ov) || ov < 1) { setFormError("El número específico debe ser un entero >= 1"); return; }
+      if (!Number.isInteger(ov) || ov < 1) { setFormError(t("El número específico debe ser un entero >= 1")); return; }
     }
     setSaving(true);
     try {
@@ -4547,7 +4441,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ anio: selectedAnio, min_num: mn, auto_fill: autoFill, override_next: useOverride ? Number(overrideNum) : null }),
       });
-      if (!res.ok) { const d = await res.json(); setFormError(d.error || "Error al guardar"); return; }
+      if (!res.ok) { const d = await res.json(); setFormError(d.error || t("Error al guardar")); return; }
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2500);
       // Refrescar datos del año
@@ -4569,8 +4463,8 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
               <Hash size={15} className="text-[#ab0433]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Configurar numeración</h2>
-              <p className="text-xs text-slate-400">Gestión de contadores de expedientes por ejercicio</p>
+              <h2 className="text-base font-bold text-slate-900">{t("Configurar numeración")}</h2>
+              <p className="text-xs text-slate-400">{t("Gestión de contadores de expedientes por ejercicio")}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -4583,9 +4477,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 
           {/* Panel izquierdo — años */}
           <div className="w-36 shrink-0 border-r border-slate-100 bg-slate-50 flex flex-col">
-            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-              Ejercicio
-            </div>
+            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">{t("Ejercicio")}</div>
             {yearsLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 size={14} className="animate-spin text-slate-300" />
@@ -4605,16 +4497,15 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
           {/* Panel derecho — configuración */}
           <div className="flex-1 p-6 space-y-5">
             <div>
-              <p className="text-sm font-bold text-slate-800">Contadores</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Establece la numeración automática para los expedientes del ejercicio <strong>{selectedAnio}</strong>.
+              <p className="text-sm font-bold text-slate-800">{t("Contadores")}</p>
+              <p className="text-xs text-slate-500 mt-1">{t("Establece la numeración automática para los expedientes del ejercicio")}{" "}<strong>{selectedAnio}</strong>.
               </p>
             </div>
 
             {yearLoading ? (
               <div className="flex items-center gap-2 text-slate-400 py-4">
                 <Loader2 size={15} className="animate-spin" />
-                <span className="text-sm">Cargando...</span>
+                <span className="text-sm">{t("Cargando...")}</span>
               </div>
             ) : (
               <div className="space-y-4">
@@ -4622,17 +4513,16 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
                 {yearData && (
                   <div className="flex flex-wrap gap-2">
                     <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
-                      {yearData.used_count} expediente{yearData.used_count !== 1 ? "s" : ""} en {selectedAnio}
+                      {yearData.used_count}{" "}{t("expediente")}{yearData.used_count !== 1 ? "s" : ""}{" "}{t("en")}{" "}{selectedAnio}
                     </span>
-                    <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
-                      Próximo: {yearData.next_num}
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">{t("Próximo:")}{" "}{yearData.next_num}
                     </span>
                     {yearData.gaps?.length > 0 ? (
                       <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                        {yearData.gaps.length} hueco{yearData.gaps.length !== 1 ? "s" : ""}: {yearData.gaps.slice(0, 6).join(", ")}{yearData.gaps.length > 6 ? "…" : ""}
+                        {yearData.gaps.length}{" "}{t("hueco")}{yearData.gaps.length !== 1 ? "s" : ""}: {yearData.gaps.slice(0, 6).join(", ")}{yearData.gaps.length > 6 ? "…" : ""}
                       </span>
                     ) : yearData.used_count > 0 ? (
-                      <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">Sin huecos</span>
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">{t("Sin huecos")}</span>
                     ) : null}
                   </div>
                 )}
@@ -4642,25 +4532,23 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
                   <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
                     className="mt-0.5 w-4 h-4 accent-[#ab0433] cursor-pointer shrink-0" />
                   <div>
-                    <span className="text-sm font-semibold text-slate-800">Calcular los Contadores de Forma Automática</span>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                      (El contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado expedientes)
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Esta opción afecta al contador de expedientes de este ejercicio.</p>
+                    <span className="text-sm font-semibold text-slate-800">{t("Calcular los Contadores de Forma Automática")}</span>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t("(El contador busca el")}{" "}<strong>{t("primer número libre")}</strong>{t(", rellenando huecos si se han borrado expedientes)")}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{t("Esta opción afecta al contador de expedientes de este ejercicio.")}</p>
                   </div>
                 </label>
 
                 {/* Contador de Expedientes */}
                 <div className="rounded-xl border border-slate-200 overflow-hidden">
                   <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                    <p className="text-[11px] font-bold text-[#ab0433] uppercase tracking-widest">Contador de Expedientes</p>
+                    <p className="text-[11px] font-bold text-[#ab0433] uppercase tracking-widest">{t("Contador de Expedientes")}</p>
                   </div>
                   <div className="p-4 space-y-3">
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-2.5 cursor-pointer flex-1">
                         <input type="radio" name={`mode-${selectedAnio}`} checked={!useOverride} onChange={() => setUseOverride(false)}
                           className="w-4 h-4 accent-[#ab0433]" />
-                        <span className="text-sm text-slate-700 font-medium">General</span>
+                        <span className="text-sm text-slate-700 font-medium">{t("General")}</span>
                       </label>
                       <input type="number" min="1" step="1" value={generalNum}
                         onChange={e => setGeneralNum(e.target.value)}
@@ -4670,7 +4558,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
                       <label className="flex items-center gap-2.5 cursor-pointer flex-1">
                         <input type="radio" name={`mode-${selectedAnio}`} checked={useOverride} onChange={() => setUseOverride(true)}
                           className="w-4 h-4 accent-[#ab0433]" />
-                        <span className="text-sm text-slate-700 font-medium">Número específico</span>
+                        <span className="text-sm text-slate-700 font-medium">{t("Número específico")}</span>
                       </label>
                       <input type="number" min="1" step="1" value={overrideNum}
                         onChange={e => setOverrideNum(e.target.value)}
@@ -4678,9 +4566,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
                         className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#ab0433] shadow-sm disabled:bg-slate-50 disabled:text-slate-300" />
                     </div>
                     {useOverride && (
-                      <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">
-                        El próximo expediente usará este número exacto (uso único — después vuelve al modo automático).
-                      </p>
+                      <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">{t("El próximo expediente usará este número exacto (uso único — después vuelve al modo automático).")}</p>
                     )}
                   </div>
                 </div>
@@ -4697,16 +4583,14 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 
         {/* Footer con botones */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50">
-          <p className="text-xs text-slate-400">Los cambios se aplican al siguiente expediente creado</p>
+          <p className="text-xs text-slate-400">{t("Los cambios se aplican al siguiente expediente creado")}</p>
           <div className="flex gap-2">
             <button type="button" onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
-              Cancelar
-            </button>
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
             <button type="button" onClick={handleAccept} disabled={saving || yearLoading}
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ab0433] text-white text-sm font-bold hover:bg-[#92042c] disabled:opacity-50 transition-colors shadow-sm">
               {saving ? <Loader2 size={13} className="animate-spin" /> : savedOk ? <CheckCircle2 size={13} /> : null}
-              {savedOk ? "Guardado" : "Aceptar"}
+              {savedOk ? t("Guardado") : t("Aceptar")}
             </button>
           </div>
         </div>
@@ -4923,7 +4807,7 @@ export default function ExpedienteList() {
     if (!titulo) return;
     const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
     const withClient = items.filter(e => e.cliente_id);
-    if (!withClient.length) { setBulkTareaError("Ninguno de los expedientes marcados tiene un cliente asociado."); return; }
+    if (!withClient.length) { setBulkTareaError(t("Ninguno de los expedientes marcados tiene un cliente asociado.")); return; }
     setBulkTareaLoading(true);
     setBulkTareaError("");
     try {
@@ -4945,9 +4829,9 @@ export default function ExpedienteList() {
       setBulkTareaTitulo("");
       setSelectedIds(new Set());
       if (withClient.length < items.length) {
-        aviso(`Creada en ${withClient.length} de ${items.length}: ${items.length - withClient.length} no tienen cliente asociado.`);
+        aviso(t("Creada en {length} de {length2}: {v} no tienen cliente asociado.", { length: withClient.length, length2: items.length, v: items.length - withClient.length }));
       }
-    } catch { setBulkTareaError("No se pudo crear la tarea en todos los expedientes."); }
+    } catch { setBulkTareaError(t("No se pudo crear la tarea en todos los expedientes.")); }
     finally { setBulkTareaLoading(false); }
   };
 
@@ -4958,7 +4842,7 @@ export default function ExpedienteList() {
     const emails = Array.from(new Set(
       items.map(exp => clientes.find((c: any) => c.id === exp.cliente_id)?.email).filter(Boolean)
     ));
-    if (!emails.length) { aviso("Ninguno de los expedientes marcados tiene un cliente con email."); return; }
+    if (!emails.length) { aviso(t("Ninguno de los expedientes marcados tiene un cliente con email.")); return; }
     const params = new URLSearchParams({ compose: "1", to: emails.join(","), subject: `${items.length} expedientes` });
     navigate(`/dashboard/correo?${params.toString()}`);
   };
@@ -5000,8 +4884,8 @@ export default function ExpedienteList() {
       setShowBulkWaForm(false);
       setBulkWaMessage("");
       setSelectedIds(new Set());
-      if (failed > 0) aviso(`No se pudo enviar a ${failed} de ${bulkWaRecipients.length} destinatarios.`);
-    } catch { setBulkWaError("No se pudo enviar el mensaje."); }
+      if (failed > 0) aviso(t("No se pudo enviar a {failed} de {length} destinatarios.", { failed: failed, length: bulkWaRecipients.length }));
+    } catch { setBulkWaError(t("No se pudo enviar el mensaje.")); }
     finally { setBulkWaLoading(false); }
   };
 
@@ -5275,7 +5159,7 @@ export default function ExpedienteList() {
     const isZip = lowerName.endsWith(".zip");
     const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
     if (!isZip && !isPdf) {
-      setDocumentImportError("Selecciona un archivo ZIP o un PDF válido.");
+      setDocumentImportError(t("Selecciona un archivo ZIP o un PDF válido."));
       return;
     }
     setDocumentImportError(null);
@@ -5290,7 +5174,7 @@ export default function ExpedienteList() {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await safeJson(res);
-    if (!res.ok) throw new Error(data.error || "No se pudo cargar el detalle de la importación");
+    if (!res.ok) throw new Error(data.error || t("No se pudo cargar el detalle de la importación"));
     setDocumentImportActiveBatch(data.data?.batch || null);
     setDocumentImportItems(data.data?.items || []);
   }, [getToken]);
@@ -5306,10 +5190,10 @@ export default function ExpedienteList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo cargar el historial de importación documental");
+      if (!res.ok) throw new Error(data.error || t("No se pudo cargar el historial de importación documental"));
       setDocumentImportHistory(data.data || []);
     } catch (e: any) {
-      if (!silent) setDocumentImportHistoryError(e.message || "No se pudo cargar el historial de importación documental");
+      if (!silent) setDocumentImportHistoryError(e.message || t("No se pudo cargar el historial de importación documental"));
     } finally {
       if (!silent) setDocumentImportHistoryLoading(false);
     }
@@ -5370,11 +5254,11 @@ export default function ExpedienteList() {
   const handleAcceptDocumentImportItem = useCallback(async () => {
     if (!documentImportActiveBatch || !documentImportVerifyItem) return;
     if (!String(documentImportVerifyForm.descripcion ?? "").trim()) {
-      setDocumentImportVerifyError("Añade una descripción antes de aceptar el expediente.");
+      setDocumentImportVerifyError(t("Añade una descripción antes de aceptar el expediente."));
       return;
     }
     if (!String(documentImportVerifyForm.cliente_id ?? "").trim() && !String(documentImportVerifyForm.cliente_nombre ?? "").trim()) {
-      setDocumentImportVerifyError("Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente.");
+      setDocumentImportVerifyError(t("Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente."));
       return;
     }
 
@@ -5394,14 +5278,14 @@ export default function ExpedienteList() {
         body: JSON.stringify({ draft: documentImportVerifyForm, representa_a: documentImportRepresentaA }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo crear el expediente desde el documento verificado");
+      if (!res.ok) throw new Error(data.error || t("No se pudo crear el expediente desde el documento verificado"));
 
       await Promise.all([
         fetchDocumentImportBatch(documentImportActiveBatch.id),
         fetchDocumentImportHistory(true),
       ]);
 
-      const successNotice = `Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`;
+      const successNotice = t("Se creó el expediente correctamente desde «{nombre}».", { nombre: documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `${t("Documento")} ${documentImportVerifyItem.row_number}` });
       const proposal = data.data?.deadlineProposal;
       setDocumentImportVerifyItem(null);
       setViewMode("documentImport");
@@ -5424,7 +5308,7 @@ export default function ExpedienteList() {
         setDocumentImportSuccessNotice(successNotice);
       }
     } catch (e: any) {
-      setDocumentImportVerifyError(e.message || "No se pudo aceptar el documento");
+      setDocumentImportVerifyError(e.message || t("No se pudo aceptar el documento"));
     } finally {
       setDocumentImportVerifySaving(false);
     }
@@ -5457,16 +5341,16 @@ export default function ExpedienteList() {
         }
       );
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo procesar el plazo propuesto");
+      if (!res.ok) throw new Error(data.error || t("No se pudo procesar el plazo propuesto"));
 
       setDocumentImportSuccessNotice(
         action === "confirm"
-          ? `${deadlineProposal.successNotice} Se añadió el plazo a Tareas y Agenda.`
+          ? `${deadlineProposal.successNotice} ${t("Se añadió el plazo a Tareas y Agenda.")}`
           : deadlineProposal.successNotice
       );
       setDeadlineProposal(null);
     } catch (e: any) {
-      setDeadlineProposalError(e.message || "No se pudo procesar el plazo propuesto");
+      setDeadlineProposalError(e.message || t("No se pudo procesar el plazo propuesto"));
     } finally {
       setDeadlineProposalSaving(false);
     }
@@ -5490,12 +5374,12 @@ export default function ExpedienteList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los elementos del lote");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron cargar los elementos del lote"));
       setDocumentImportActiveBatch(data.data?.batch || batch);
       setDocumentImportItems(data.data?.items || []);
       setViewMode("documentImport");
     } catch (e: any) {
-      aviso(e.message || "Error al cargar el lote");
+      aviso(e.message || t("Error al cargar el lote"));
     }
   }, [getToken]);
 
@@ -5536,11 +5420,11 @@ export default function ExpedienteList() {
 
   async function handleStartDocumentImport() {
     if (!documentImportZipFile) {
-      setDocumentImportError("Selecciona primero un archivo ZIP o un PDF.");
+      setDocumentImportError(t("Selecciona primero un archivo ZIP o un PDF."));
       return;
     }
     if (documentImportAutoAssignOrganizations && !documentImportAssignedClientId) {
-      setDocumentImportError("Selecciona un cliente para la asignación automática.");
+      setDocumentImportError(t("Selecciona un cliente para la asignación automática."));
       return;
     }
 
@@ -5592,15 +5476,15 @@ export default function ExpedienteList() {
           try {
             const parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
             if (xhr.status < 200 || xhr.status >= 300) {
-              reject(new Error(parsed.error || "No se pudo importar el archivo"));
+              reject(new Error(parsed.error || t("No se pudo importar el archivo")));
               return;
             }
             resolve(parsed);
           } catch (parseError: any) {
-            reject(new Error(parseError?.message || "No se pudo interpretar la respuesta de la importación"));
+            reject(new Error(parseError?.message || t("No se pudo interpretar la respuesta de la importación")));
           }
         };
-        xhr.onerror = () => reject(new Error("No se pudo subir el archivo al servidor"));
+        xhr.onerror = () => reject(new Error(t("No se pudo subir el archivo al servidor")));
         xhr.send(formData);
       });
 
@@ -5611,7 +5495,7 @@ export default function ExpedienteList() {
         fetchExpedientes(true),
       ]);
     } catch (e: any) {
-      setDocumentImportError(e.message || "No se pudo importar el archivo");
+      setDocumentImportError(e.message || t("No se pudo importar el archivo"));
     } finally {
       stopDocumentImportPolling();
       setDocumentProcessingIndicator(false);
@@ -5657,12 +5541,12 @@ export default function ExpedienteList() {
         }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo registrar la importacion");
+      if (!res.ok) throw new Error(d.error || t("No se pudo registrar la importacion"));
       setCsvImportBatchId(d.data?.id || null);
       setImportHistory((prev) => [d.data, ...prev]);
       switchView("csvImportConfigure");
     } catch (e: any) {
-      aviso(e.message || "No se pudo registrar la importacion.");
+      aviso(e.message || t("No se pudo registrar la importacion."));
     }
   };
 
@@ -5734,7 +5618,7 @@ export default function ExpedienteList() {
             error_count: summary.errorCount,
             pending_count: 0,
             notes: summary.errorCount > 0
-              ? `Importación finalizada: ${summary.successCount} correctos, ${summary.errorCount} con errores.`
+              ? t("Importación finalizada: {ok} correctos, {mal} con errores.", { ok: summary.successCount, mal: summary.errorCount })
               : "Importación completada correctamente.",
           }),
         });
@@ -5769,7 +5653,7 @@ export default function ExpedienteList() {
         return fetchExpedientes(silent, true);
       }
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "Error al cargar expedientes");
+      if (!res.ok) throw new Error(d.error || t("Error al cargar expedientes"));
       let all: any[] = d.data || [];
       const total = Number(d.total || all.length);
       let offset = all.length;
@@ -5802,10 +5686,10 @@ export default function ExpedienteList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "Error al cargar el historial de importaciones");
+      if (!res.ok) throw new Error(d.error || t("Error al cargar el historial de importaciones"));
       setImportHistory(d.data || []);
     } catch (e: any) {
-      if (!silent) setImportHistoryError(e.message || "Error al cargar el historial de importaciones");
+      if (!silent) setImportHistoryError(e.message || t("Error al cargar el historial de importaciones"));
     } finally {
       if (!silent) setLoadingImportHistory(false);
     }
@@ -5922,10 +5806,10 @@ export default function ExpedienteList() {
         body: JSON.stringify(payload),
       });
       const d = await safeJson(res);
-      if (!res.ok) { setSaveError(d.error || "No se pudo guardar el expediente."); return; }
+      if (!res.ok) { setSaveError(d.error || t("No se pudo guardar el expediente.")); return; }
       setShowModal(false); setEditItem(null);
       fetchExpedientes(true);
-    } catch (e: any) { setSaveError(e.message || "No se pudo guardar el expediente."); }
+    } catch (e: any) { setSaveError(e.message || t("No se pudo guardar el expediente.")); }
     finally { setSaving(false); }
   };
 
@@ -6068,11 +5952,11 @@ export default function ExpedienteList() {
         body: JSON.stringify({ ...selectedExp, color }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo asignar el color");
+      if (!res.ok) throw new Error(d.error || t("No se pudo asignar el color"));
       setExpedientes((prev) => prev.map((item) => (item.id === selectedExp.id ? { ...item, color } : item)));
       setShowOpciones(false);
     } catch (e: any) {
-      aviso(e?.message || "No se pudo asignar el color");
+      aviso(e?.message || t("No se pudo asignar el color"));
     }
   }, [getToken, selectedExp]);
   const toggleExpedienteEstado = useCallback(async () => {
@@ -6092,7 +5976,7 @@ export default function ExpedienteList() {
       if (!res.ok) {
         // Revert on failure
         setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
-        aviso(d.error || "No se pudo cambiar el estado del expediente");
+        aviso(d.error || t("No se pudo cambiar el estado del expediente"));
       }
     } catch {
       setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
@@ -6109,7 +5993,7 @@ export default function ExpedienteList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los expedientes relacionados");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron cargar los expedientes relacionados"));
       setRelatedExpedientes(data.data || []);
     } catch (_e) {
       if (!silent) setRelatedExpedientes([]);
@@ -6132,11 +6016,11 @@ export default function ExpedienteList() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
+      if (!res.ok) throw new Error(data.error || t("No se pudieron buscar expedientes"));
       setRelacionarResults((data.data || []).filter((item: any) => item.id !== selectedExp.id && !relatedExpedienteIds.has(item.id)));
     } catch (e: any) {
       setRelacionarResults([]);
-      setRelacionarSearchError(e?.message || "No se pudieron buscar expedientes");
+      setRelacionarSearchError(e?.message || t("No se pudieron buscar expedientes"));
     } finally {
       setRelacionarSearching(false);
     }
@@ -6181,14 +6065,14 @@ export default function ExpedienteList() {
         body: JSON.stringify({ related_expediente_id: relatedId }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "No se pudo asociar el expediente");
+      if (!res.ok) throw new Error(data.error || t("No se pudo asociar el expediente"));
       setShowRelacionarModal(false);
       setRelacionarQuery("");
       setRelacionarResults([]);
       setRelacionarHasSearched(false);
       await loadRelatedExpedientes(selected, true);
     } catch (e: any) {
-      setRelacionarAssociateError(e?.message || "No se pudo asociar el expediente");
+      setRelacionarAssociateError(e?.message || t("No se pudo asociar el expediente"));
     } finally {
       setRelacionarSavingId(null);
     }
@@ -6267,7 +6151,7 @@ export default function ExpedienteList() {
 
   const openCreateExportTemplate = () => {
     setExportEditorMode("create");
-    setExportTemplateName(`Nueva plantilla ${new Date().toLocaleDateString("es-ES")}`);
+    setExportTemplateName(t("Nueva plantilla {fecha}", { fecha: new Date().toLocaleDateString("es-ES") }));
     setSelectedExportFormat(selectedExportTemplate?.format || "excel");
     setExportVisibleFields(selectedExportTemplate?.fields?.length ? selectedExportTemplate.fields : DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.fields);
     setExportAvailableSelected([]);
@@ -6302,11 +6186,11 @@ export default function ExpedienteList() {
   const saveExportTemplate = () => {
     const trimmedName = exportTemplateName.trim();
     if (!trimmedName) {
-      setExportError("Escribe un nombre para la plantilla.");
+      setExportError(t("Escribe un nombre para la plantilla."));
       return;
     }
     if (!exportVisibleFields.length) {
-      setExportError("Selecciona al menos un campo visible.");
+      setExportError(t("Selecciona al menos un campo visible."));
       return;
     }
     if (exportEditorMode === "edit" && selectedExportTemplate.builtIn) {
@@ -6348,7 +6232,7 @@ export default function ExpedienteList() {
   const runExport = () => {
     const fields = selectedExportTemplate.fields;
     if (!fields.length) {
-      setExportError("La plantilla seleccionada no tiene campos configurados.");
+      setExportError(t("La plantilla seleccionada no tiene campos configurados."));
       return;
     }
     const resolvedFields = fields
@@ -6389,16 +6273,15 @@ export default function ExpedienteList() {
   // ── Render: carga ─────────────────────────────────────────────
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Spinner size="xl" label="Cargando expedientes..." />
+      <Spinner size="xl" label={t("Cargando expedientes...")} />
     </div>
   );
 
   if (error) return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-        <FolderOpen size={20} className="text-rose-600" /> Gestión de Expedientes
-      </h1>
-      <ConnectionErrorBanner error={error} onRetry={() => fetchExpedientes()} title="No se han podido cargar los expedientes" />
+        <FolderOpen size={20} className="text-rose-600" />{" "}{t("Gestión de Expedientes")}</h1>
+      <ConnectionErrorBanner error={error} onRetry={() => fetchExpedientes()} title={t("No se han podido cargar los expedientes")} />
     </div>
   );
 
@@ -6408,7 +6291,7 @@ export default function ExpedienteList() {
         fileName={csvFileName}
         onBack={() => switchView("list")}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
+        onOpenSettings={() => proximamente(t("Configuración avanzada de importación"))}
         onSelectFile={() => csvInputRef.current?.click()}
         onFileChange={(file) => handleCsvSelected(file)}
         inputRef={csvInputRef}
@@ -6429,7 +6312,7 @@ export default function ExpedienteList() {
         onBack={() => switchView("csvImport")}
         onContinue={() => switchView("csvImportReview")}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
+        onOpenSettings={() => proximamente(t("Configuración avanzada de importación"))}
         onSelectFile={() => csvInputRef.current?.click()}
         onChangeMapping={handleCsvMappingChange}
         onFileChange={(file) => handleCsvSelected(file)}
@@ -6449,7 +6332,7 @@ export default function ExpedienteList() {
         onBack={() => switchView("csvImportConfigure")}
         onImport={handleImportCsv}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
+        onOpenSettings={() => proximamente(t("Configuración avanzada de importación"))}
       />
     );
   }
@@ -6544,52 +6427,50 @@ export default function ExpedienteList() {
                 <AlertTriangle size={15} className="text-amber-600" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Plazo procesal detectado</h2>
+                <h2 className="text-base font-bold text-slate-900">{t("Plazo procesal detectado")}</h2>
                 <p className="text-xs text-slate-400">{deadlineProposal.expedienteLabel}</p>
               </div>
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-slate-600">
-                Se ha detectado una fecha en el documento. ¿Quieres crear el seguimiento en Tareas y Agenda?
-              </p>
+              <p className="text-sm text-slate-600">{t("Se ha detectado una fecha en el documento. ¿Quieres crear el seguimiento en Tareas y Agenda?")}</p>
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 space-y-1">
-                <p><span className="font-semibold text-slate-700">Aviso previo:</span> {deadlineProposal.reminderDate}</p>
-                <p><span className="font-semibold text-slate-700">Fecha límite:</span> {deadlineProposal.deadlineDate}</p>
+                <p><span className="font-semibold text-slate-700">{t("Aviso previo:")}</span> {deadlineProposal.reminderDate}</p>
+                <p><span className="font-semibold text-slate-700">{t("Fecha límite:")}</span> {deadlineProposal.deadlineDate}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tipo de tarea</label>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">{t("Tipo de tarea")}</label>
                   <select
                     value={deadlineProposalTipoTarea}
                     onChange={(e) => setDeadlineProposalTipoTarea(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   >
-                    <option value="plazo_procesal">Plazo procesal</option>
-                    <option value="vista_juicio">Vista / Juicio</option>
-                    <option value="notificacion">Notificación</option>
-                    <option value="reunion">Reunión</option>
-                    <option value="escrito">Escrito</option>
-                    <option value="gestion">Gestión</option>
-                    <option value="pago">Pago</option>
-                    <option value="llamada">Llamada</option>
-                    <option value="diligencia">Diligencia</option>
-                    <option value="otro">Otro</option>
+                    <option value="plazo_procesal">{t("Plazo procesal")}</option>
+                    <option value="vista_juicio">{t("Vista / Juicio")}</option>
+                    <option value="notificacion">{t("Notificación")}</option>
+                    <option value="reunion">{t("Reunión")}</option>
+                    <option value="escrito">{t("Escrito")}</option>
+                    <option value="gestion">{t("Gestión")}</option>
+                    <option value="pago">{t("Pago")}</option>
+                    <option value="llamada">{t("Llamada")}</option>
+                    <option value="diligencia">{t("Diligencia")}</option>
+                    <option value="otro">{t("Otro")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tipo de actuación (agenda)</label>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">{t("Tipo de actuación (agenda)")}</label>
                   <select
                     value={deadlineProposalTipoAgenda}
                     onChange={(e) => setDeadlineProposalTipoAgenda(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
                   >
-                    <option value="plazo">Plazo</option>
-                    <option value="vista">Vista oral</option>
-                    <option value="reunion">Reunión</option>
-                    <option value="cita">Cita</option>
-                    <option value="llamada">Llamada</option>
-                    <option value="otro">Otro</option>
+                    <option value="plazo">{t("Plazo")}</option>
+                    <option value="vista">{t("Vista oral")}</option>
+                    <option value="reunion">{t("Reunión")}</option>
+                    <option value="cita">{t("Cita")}</option>
+                    <option value="llamada">{t("Llamada")}</option>
+                    <option value="otro">{t("Otro")}</option>
                   </select>
                 </div>
               </div>
@@ -6604,18 +6485,14 @@ export default function ExpedienteList() {
                 disabled={deadlineProposalSaving}
                 onClick={() => handleResolveDeadlineProposal("dismiss")}
                 className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-50"
-              >
-                Descartar
-              </button>
+              >{t("Descartar")}</button>
               <button
                 type="button"
                 disabled={deadlineProposalSaving}
                 onClick={() => handleResolveDeadlineProposal("confirm")}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-[#ab0433] rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
               >
-                {deadlineProposalSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                Confirmar y crear
-              </button>
+                {deadlineProposalSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{t("Confirmar y crear")}</button>
             </div>
           </div>
         </div>,
@@ -6683,7 +6560,7 @@ export default function ExpedienteList() {
 
       <ColumnVisibilityModal
         open={showColumnModal}
-        title="Modificar columnas del listado"
+        title={t("Modificar columnas del listado")}
         sourceLabel="Expedientes"
         targetLabel="Columnas visibles"
         availableItems={expedienteAvailableColumnItems}
@@ -6706,9 +6583,8 @@ export default function ExpedienteList() {
           >
             <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Relacionar expediente</p>
-                <h3 className="text-lg font-bold text-slate-900">
-                  Asociar expedientes a {selectedExp.ref_expediente || `${selectedExp.anio}/${selectedExp.num_exp}`}
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t("Relacionar expediente")}</p>
+                <h3 className="text-lg font-bold text-slate-900">{t("Asociar expedientes a")}{" "}{selectedExp.ref_expediente || `${selectedExp.anio}/${selectedExp.num_exp}`}
                 </h3>
               </div>
               <button
@@ -6727,7 +6603,7 @@ export default function ExpedienteList() {
                   <input
                     value={relacionarQuery}
                     onChange={(e) => setRelacionarQuery(e.target.value)}
-                    placeholder="Buscar por referencia, descripción, NIG, juzgado..."
+                    placeholder={t("Buscar por referencia, descripción, NIG, juzgado...")}
                     autoFocus
                     spellCheck={false}
                     autoComplete="off"
@@ -6739,9 +6615,7 @@ export default function ExpedienteList() {
                   disabled={!relacionarQuery.trim() || relacionarSearching}
                   className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {relacionarSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                  Buscar
-                </button>
+                  {relacionarSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}{t("Buscar")}</button>
               </form>
 
               {relacionarSearchError && (
@@ -6763,30 +6637,28 @@ export default function ExpedienteList() {
                       <Search size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
-                      <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                      <p className="text-sm font-semibold text-slate-600">{t("Busca un expediente")}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{t("Escribe la referencia, descripción, NIG o juzgado")}</p>
                     </div>
                   </div>
                 ) : relacionarSearching || loadingRelatedExpedientes ? (
                   <div className="flex items-center justify-center gap-2.5 px-5 py-12 bg-slate-50/60 text-sm text-slate-400">
-                    <Loader2 size={16} className="animate-spin" />
-                    Buscando expedientes...
-                  </div>
+                    <Loader2 size={16} className="animate-spin" />{t("Buscando expedientes...")}</div>
                 ) : relacionarResults.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
                     <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
                       <AlertCircle size={20} />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
-                      <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                      <p className="text-sm font-semibold text-slate-600">{t("Sin resultados")}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{t("Prueba con otra búsqueda o revisa si ya están relacionados.")}</p>
                     </div>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
                       <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                        {relacionarResults.length} {relacionarResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                        {relacionarResults.length} {relacionarResults.length === 1 ? t("expediente encontrado") : t("expedientes encontrados")}
                       </span>
                     </div>
                     <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
@@ -6825,9 +6697,7 @@ export default function ExpedienteList() {
                               disabled={relacionarSavingId === item.id}
                               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
                             >
-                              {relacionarSavingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                              Asociar
-                            </button>
+                              {relacionarSavingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}{t("Asociar")}</button>
                           </div>
                         );
                       })}
@@ -6848,8 +6718,8 @@ export default function ExpedienteList() {
             {/* Header */}
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 flex-shrink-0 bg-white">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 mb-0.5">Exportar expedientes</p>
-                <h3 className="text-xl font-bold text-slate-800">Plantillas de exportación</h3>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 mb-0.5">{t("Exportar expedientes")}</p>
+                <h3 className="text-xl font-bold text-slate-800">{t("Plantillas de exportación")}</h3>
               </div>
               <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
                 <X size={14} />
@@ -6861,11 +6731,9 @@ export default function ExpedienteList() {
 
               {/* Left sidebar: plantilla selector */}
               <div className="w-72 border-r border-slate-200 bg-white p-6 flex flex-col gap-6 flex-shrink-0 shadow-[1px_0_4px_rgba(0,0,0,0.02)]">
-                <p className="text-sm text-slate-500 leading-relaxed">
-                  Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.
-                </p>
+                <p className="text-sm text-slate-500 leading-relaxed">{t("Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.")}</p>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">Plantilla</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">{t("Plantilla")}</span>
                   <div className="space-y-2">
                     {exportTemplates.map((template) => {
                       const active = selectedExportTemplateId === template.id;
@@ -6918,13 +6786,12 @@ export default function ExpedienteList() {
                     })}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <button type="button" onClick={openCreateExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Alta</button>
-                    <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Baja</button>
-                    <button type="button" onClick={openEditExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Modificar</button>
-                    <button type="button" onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm ml-2">Cancelar</button>
+                    <button type="button" onClick={openCreateExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">{t("Alta")}</button>
+                    <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">{t("Baja")}</button>
+                    <button type="button" onClick={openEditExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">{t("Modificar")}</button>
+                    <button type="button" onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm ml-2">{t("Cancelar")}</button>
                     <button type="button" onClick={runExport} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors">
-                      <Download size={13} /> Exportar
-                    </button>
+                      <Download size={13} />{" "}{t("Exportar")}</button>
                   </div>
                 </div>
 
@@ -6934,8 +6801,8 @@ export default function ExpedienteList() {
                   {/* Campos a exportar */}
                   <div className="w-full xl:w-[280px] bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-shrink-0">
                     <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Campos a exportar</span>
-                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{selectedExportTemplate.fields.length} columnas</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{t("Campos a exportar")}</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{selectedExportTemplate.fields.length}{" "}{t("columnas")}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto py-2">
                       {selectedExportTemplate.fields.map((fieldId) => (
@@ -6947,8 +6814,8 @@ export default function ExpedienteList() {
                   {/* Vista previa */}
                   <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-w-0">
                     <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0 bg-white shadow-sm">
-                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Vista previa</span>
-                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{exportPreviewRows.length} filas</span>
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{t("Vista previa")}</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{exportPreviewRows.length}{" "}{t("filas")}</span>
                     </div>
                     <div className="flex-1 overflow-auto">
                       <table className="border-collapse text-[11px] text-slate-700 w-max min-w-full">
@@ -7006,7 +6873,7 @@ export default function ExpedienteList() {
         <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-overlay-in" onClick={() => setShowExportTemplateEditor(false)}>
           <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden animate-modal-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-              <h3 className="text-xl font-bold text-slate-800">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+              <h3 className="text-xl font-bold text-slate-800">{exportEditorMode === "create" ? t("Nueva plantilla de exportación") : t("Modificar plantilla de exportación")}</h3>
               <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
                 <X size={14} />
               </button>
@@ -7016,10 +6883,8 @@ export default function ExpedienteList() {
                 {/* Campos disponibles */}
                 <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">Campos disponibles</span>
-                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wide select-none">
-                      Expedientes
-                    </span>
+                    <span className="font-semibold text-slate-800">{t("Campos disponibles")}</span>
+                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wide select-none">{t("Expedientes")}</span>
                   </div>
                   <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {availableExportFields.map((field) => (
@@ -7047,7 +6912,7 @@ export default function ExpedienteList() {
                 {/* Campos visibles */}
                 <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">Campos visibles</span>
+                    <span className="font-semibold text-slate-800">{t("Campos visibles")}</span>
                     <div className="relative">
                       <button
                         ref={formatDropdownBtnRef}
@@ -7061,7 +6926,7 @@ export default function ExpedienteList() {
                         }}
                         className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors min-w-[80px] justify-between shadow-sm ${showFormatDropdown ? "bg-slate-100 border-slate-300 text-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                       >
-                        <span>{selectedExportFormat === "excel" ? "Excel" : selectedExportFormat === "xml" ? "XML" : "Word"}</span>
+                        <span>{selectedExportFormat === "excel" ? t("Excel") : selectedExportFormat === "xml" ? t("XML") : t("Word")}</span>
                         <ChevronDown size={11} className="text-slate-400 shrink-0" />
                       </button>
                       {showFormatDropdown && typeof document !== "undefined" && createPortal(
@@ -7077,7 +6942,7 @@ export default function ExpedienteList() {
                               onClick={() => { setSelectedExportFormat(fmt); setShowFormatDropdown(false); }}
                               className={`w-full flex items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors ${selectedExportFormat === fmt ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
                             >
-                              {fmt === "excel" ? "Excel" : fmt === "xml" ? "XML" : "Word"}
+                              {fmt === "excel" ? t("Excel") : fmt === "xml" ? t("XML") : t("Word")}
                             </button>
                           ))}
                         </div>,
@@ -7102,12 +6967,12 @@ export default function ExpedienteList() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">{t("Nombre de la plantilla")}</label>
                 <input
                   value={exportTemplateName}
                   onChange={(e) => setExportTemplateName(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-200"
-                  placeholder="Ej. Listado actual"
+                  placeholder={t("Ej. Listado actual")}
                 />
               </div>
 
@@ -7118,8 +6983,8 @@ export default function ExpedienteList() {
               )}
 
               <div className="flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
-                <button type="button" onClick={saveExportTemplate} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">Guardar</button>
+                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">{t("Cancelar")}</button>
+                <button type="button" onClick={saveExportTemplate} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">{t("Guardar")}</button>
               </div>
             </div>
           </div>
@@ -7188,22 +7053,20 @@ export default function ExpedienteList() {
         variant="confirm"
         icon={<AlertTriangle size={18} />}
         iconTone="danger"
-        title={deleteTargetIsArchived ? "¿Eliminar definitivamente este expediente?" : "¿Dar de baja este expediente?"}
+        title={deleteTargetIsArchived ? t("¿Eliminar definitivamente este expediente?") : t("¿Dar de baja este expediente?")}
         subtitle={deleteTargetIsArchived
-          ? "Ya está archivado. Esto SÍ borra el registro de la base de datos. No hay deshacer."
-          : "Se archiva (no se borra) y puedes deshacerlo en los próximos 15 segundos."}
+          ? t("Ya está archivado. Esto SÍ borra el registro de la base de datos. No hay deshacer.")
+          : t("Se archiva (no se borra) y puedes deshacerlo en los próximos 15 segundos.")}
         zIndex={9999}
         footer={
           <>
-            <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
             {deleteTargetIsArchived ? (
               <button onClick={() => handleHardDeleteSingle(deleteId!)} disabled={hardDeleteSingleLoading}
                 className="peligro flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95">
-                {hardDeleteSingleLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                Eliminar definitivamente
-              </button>
+                {hardDeleteSingleLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}{t("Eliminar definitivamente")}</button>
             ) : (
-              <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
+              <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Dar de baja")}</button>
             )}
           </>
         }
@@ -7233,9 +7096,9 @@ export default function ExpedienteList() {
         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <FolderOpen size={20} className="text-red-600" />
-            <h1 className="text-xl font-bold text-slate-800">Gestión de Expedientes</h1>
+            <h1 className="text-xl font-bold text-slate-800">{t("Gestión de Expedientes")}</h1>
           </div>
-          <button onClick={() => fetchExpedientes(true)} title="Refrescar"
+          <button onClick={() => fetchExpedientes(true)} title={t("Refrescar")}
             className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
             <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
           </button>
@@ -7259,19 +7122,19 @@ export default function ExpedienteList() {
                     setShowAltaMenu(v => !v);
                   }}
                   className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">
-                  <Plus size={12} /> Alta <ChevronDown size={10} />
+                  <Plus size={12} />{" "}{t("Alta@@nuevo")}{" "}<ChevronDown size={10} />
                 </button>
               </div>
               {showAltaMenu && typeof document !== "undefined" && createPortal(
                 <div data-alta-menu style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
                   className="w-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                   <div className="border-b border-slate-100 bg-slate-50 px-3.5 py-2.5">
-                    <p className="text-xs font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                    <p className="text-xs font-semibold text-slate-600">{t("Elige cómo quieres agregar expedientes")}</p>
                   </div>
                   <div className="p-1">
-                    <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
-                    <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
-                    <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
+                    <AltaOption icon={Plus} title={t("Crear manualmente")} description={t("Crea un expediente desde cero introduciendo los datos")} iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
+                    <AltaOption icon={FileSpreadsheet} title={t("Importar desde CSV")} description={t("Sube un archivo CSV con múltiples expedientes")} iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
+                    <AltaOption icon={ClipboardList} title={t("Desde documentos")} description={t("Procesa documentos para crear expedientes")} iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
                   </div>
                 </div>,
                 document.body
@@ -7280,24 +7143,24 @@ export default function ExpedienteList() {
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Baja, Modificar, Duplicar -- Baja/Duplicar trabajan en bloque con 2+ marcados */}
-              <ToolBtn icon={Trash2} label={selectedIds.size >= 2 ? `Baja (${selectedIds.size})` : "Baja"} danger
+              <ToolBtn icon={Trash2} label={selectedIds.size >= 2 ? t("Baja ({size})", { size: selectedIds.size }) : t("Baja@@expediente")} danger
                 disabled={!toolbarSelected && selectedIds.size < 2}
                 onClick={() => selectedIds.size >= 2 ? setBulkDeleteConfirm(true) : toolbarSelected && setDeleteId(toolbarSelected)} />
               {selectedExp?.estado === "archivado" && (
-                <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
+                <ToolBtn icon={FolderOpen} label={t("Quitar de archivado")} disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
               )}
-              <ToolBtn icon={ExternalLink} label="Abrir" disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`)} />
-              <ToolBtn icon={Edit3} label="Modificar" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
-              <ToolBtn icon={Copy} label={duplicateTargets.length > 1 ? `Duplicar ${duplicateTargets.length}` : "Duplicar"} disabled={!duplicateTargets.length}
+              <ToolBtn icon={ExternalLink} label={t("Abrir")} disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`)} />
+              <ToolBtn icon={Edit3} label={t("Modificar")} disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
+              <ToolBtn icon={Copy} label={duplicateTargets.length > 1 ? t("Duplicar {length}", { length: duplicateTargets.length }) : t("Duplicar")} disabled={!duplicateTargets.length}
                 onClick={() => setDuplicateConfirm(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Correo, WhatsApp -- en bloque con 2+ marcados */}
               {selectedIds.size >= 2 ? (
-                <ToolBtn icon={Mail} label={`Correo (${selectedIds.size})`} onClick={handleBulkComposeEmail} />
+                <ToolBtn icon={Mail} label={t("Correo ({size})", { size: selectedIds.size })} onClick={handleBulkComposeEmail} />
               ) : (
-                <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!toolbarSelected} items={[
+                <DropdownToolBtn icon={Mail} label={t("Enviar Correo")} disabled={!toolbarSelected} items={[
                   { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
                   { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
                   { divider: true, label: '' },
@@ -7310,9 +7173,9 @@ export default function ExpedienteList() {
                 ]} />
               )}
               {selectedIds.size >= 2 ? (
-                <ToolBtn icon={MessageCircle} label={`WhatsApp (${selectedIds.size})`} onClick={() => setShowBulkWaForm(true)} />
+                <ToolBtn icon={MessageCircle} label={t("WhatsApp ({size})", { size: selectedIds.size })} onClick={() => setShowBulkWaForm(true)} />
               ) : (
-                <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
+                <DropdownToolBtn icon={MessageCircle} label={t("Enviar WhatsApp")} disabled={!selectedExp?.cliente_id} items={[
                   { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
                   { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
                   { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
@@ -7324,22 +7187,22 @@ export default function ExpedienteList() {
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Sign, Tareas, Asociar, Adjuntos -- Tareas/Asociar trabajan en bloque con 2+ marcados */}
-              <ToolBtn icon={PenLine} label="Sign" disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`)} />
+              <ToolBtn icon={PenLine} label={t("Sign")} disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`)} />
               {selectedIds.size >= 2 ? (
-                <ToolBtn icon={ClipboardList} label={`Tareas (${selectedIds.size})`} onClick={() => setShowBulkTareaForm(true)} />
+                <ToolBtn icon={ClipboardList} label={t("Tareas ({size})", { size: selectedIds.size })} onClick={() => setShowBulkTareaForm(true)} />
               ) : (
-                <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!toolbarSelected || selectedExpLocked} items={[
+                <DropdownToolBtn icon={ClipboardList} label={t("Tareas")} disabled={!toolbarSelected || selectedExpLocked} items={[
                   { label: "Nueva actuación", icon: Activity, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=actuacion&newActuacion=1`) },
                   { label: "Crear obligaciones", icon: ClipboardList, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
                 ]} />
               )}
-              <ToolBtn icon={GitMerge} label={selectedIds.size >= 2 ? `Asociar ${selectedIds.size}` : "Asociar"} disabled={!selectedExp && selectedIds.size < 2} onClick={() => selectedIds.size >= 2 ? handleBulkAsociar() : openRelacionarModal()} />
-              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && setShowAdjuntos(true)} />
+              <ToolBtn icon={GitMerge} label={selectedIds.size >= 2 ? t("Asociar {size}", { size: selectedIds.size }) : t("Asociar")} disabled={!selectedExp && selectedIds.size < 2} onClick={() => selectedIds.size >= 2 ? handleBulkAsociar() : openRelacionarModal()} />
+              <ToolBtn icon={Paperclip} label={t("Adjuntos")} disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && setShowAdjuntos(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Excel */}
-              <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
+              <ToolBtn icon={FileSpreadsheet} label={t("Excel")} onClick={openExportModal} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -7356,32 +7219,31 @@ export default function ExpedienteList() {
                     setShowOpciones(v => !v);
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200 bg-white"}`}>
-                  <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
+                  <MoreHorizontal size={13} />{" "}{t("Opciones")}{" "}<ChevronDown size={10} />
                 </button>
                 {showOpciones && typeof document !== "undefined" && createPortal(
                   <div data-opciones-menu style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
                     className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[230px] py-1 overflow-visible">
-                    <button onClick={() => proximamente("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                      <Star size={13} className="text-slate-400 shrink-0" /> Seleccionar Opciones Favoritas
-                    </button>
+                    <button onClick={() => proximamente(t("Seleccionar opciones favoritas"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Star size={13} className="text-slate-400 shrink-0" />{" "}{t("Seleccionar Opciones Favoritas")}</button>
                     <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
-                      <span className="flex items-center gap-2.5"><LayoutList size={13} className="text-slate-400 shrink-0" /> Elegir columnas</span>
+                      <span className="flex items-center gap-2.5"><LayoutList size={13} className="text-slate-400 shrink-0" />{" "}{t("Elegir columnas")}</span>
                     </button>
                     <div className="h-px bg-slate-100 my-1" />
                     <div className="relative">
                       <button type="button" onClick={() => setOpcionesSubmenu(s => s === "ir_a" ? null : "ir_a")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        <span className="flex items-center gap-2.5"><ExternalLink size={13} className="text-slate-400 shrink-0" /> Ir a</span>
+                        <span className="flex items-center gap-2.5"><ExternalLink size={13} className="text-slate-400 shrink-0" />{" "}{t("Ir a")}</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "ir_a" ? "block" : "hidden"}`}>
-                        <button onClick={() => { selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
-                        <button onClick={() => { toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
-                        <button onClick={() => proximamente("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
+                        <button onClick={() => { selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" />{" "}{t("Ir a Cliente")}</button>
+                        <button onClick={() => { toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" />{" "}{t("Ir a Expediente")}</button>
+                        <button onClick={() => proximamente(t("Ir a Juzgado"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" />{" "}{t("Ir a Juzgado")}</button>
                       </div>
                     </div>
                     <div className="relative">
                       <button type="button" onClick={() => setOpcionesSubmenu(s => s === "color" ? null : "color")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        <span className="flex items-center gap-2.5"><Palette size={13} className="text-slate-400 shrink-0" /> Asignar Color</span>
+                        <span className="flex items-center gap-2.5"><Palette size={13} className="text-slate-400 shrink-0" />{" "}{t("Asignar Color")}</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 min-w-[190px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl ${opcionesSubmenu === "color" ? "block" : "hidden"}`}>
@@ -7406,25 +7268,25 @@ export default function ExpedienteList() {
                     <button disabled={!selectedExp} onClick={toggleExpedienteEstado}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                       {selectedExp?.estado === "cerrado"
-                        ? <><Unlock size={13} className="text-slate-400 shrink-0" /> Reabrir expediente</>
-                        : <><Lock size={13} className="text-slate-400 shrink-0" /> Cerrar expediente</>}
+                        ? <><Unlock size={13} className="text-slate-400 shrink-0" />{" "}{t("Reabrir expediente")}</>
+                        : <><Lock size={13} className="text-slate-400 shrink-0" />{" "}{t("Cerrar expediente")}</>}
                     </button>
-                    <button onClick={() => proximamente("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
+                    <button onClick={() => proximamente(t("Alta Acción"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" />{" "}{t("Alta Acción")}</button>
                     <div className="h-px bg-slate-100 my-1" />
-                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" /> Configurar numeración</button>
+                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" />{" "}{t("Configurar numeración")}</button>
                     <div className="h-px bg-slate-100 my-1" />
-                    <button onClick={() => proximamente("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" /> Duplicar</button>
-                    <button onClick={() => proximamente("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
+                    <button onClick={() => proximamente(t("Duplicar expediente"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" />{" "}{t("Duplicar")}</button>
+                    <button onClick={() => proximamente(t("Fusionar expedientes"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" />{" "}{t("Fusionar")}</button>
                     <div className="h-px bg-slate-100 my-1" />
-                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" /> Enviar SMS</button>
+                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" />{" "}{t("Enviar SMS")}</button>
                     <div className="relative">
                       <button type="button" onClick={() => setOpcionesSubmenu(s => s === "version" ? null : "version")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-                        <span className="flex items-center gap-2.5"><History size={13} className="text-slate-400 shrink-0" /> Versión Antigua</span>
+                        <span className="flex items-center gap-2.5"><History size={13} className="text-slate-400 shrink-0" />{" "}{t("Versión Antigua")}</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "version" ? "block" : "hidden"}`}>
-                        <button onClick={() => proximamente("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
-                        <button onClick={() => proximamente("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
+                        <button onClick={() => proximamente(t("Restaurar versión anterior"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" />{" "}{t("Ver historial versiones")}</button>
+                        <button onClick={() => proximamente(t("Comparar con versión"))} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" />{" "}{t("Comparar versión")}</button>
                       </div>
                     </div>
                   </div>,
@@ -7448,46 +7310,46 @@ export default function ExpedienteList() {
                   inputRef={idx === 0 ? firstInputRef : undefined}
                 />
               ))}
-              <button onClick={addFilter} title="Añadir filtro"
+              <button onClick={addFilter} title={t("Añadir filtro")}
                 className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 shadow-sm transition-colors">
                 <Plus size={13} />
               </button>
-              <button onClick={clearAllFilters} title="Limpiar filtros"
+              <button onClick={clearAllFilters} title={t("Limpiar filtros")}
                 className={`flex items-center justify-center w-8 h-8 rounded-lg border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
                 <ListFilter size={12} />
               </button>
               <div className="w-px h-5 bg-slate-200" />
-              <button onClick={toggleShowArchived} title="Los expedientes dados de baja se archivan, no se borran -- aquí se ven"
+              <button onClick={toggleShowArchived} title={t("Los expedientes dados de baja se archivan, no se borran -- aquí se ven")}
                 className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-semibold shadow-sm transition-colors ${
                   archivedFilterActive ? "border-red-300 bg-red-50 text-red-600" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
                 }`}>
                 <FolderOpen size={12} />
-                {archivedFilterActive ? "Viendo archivados" : "Ver archivados"}
+                {archivedFilterActive ? t("Viendo archivados") : t("Ver archivados")}
               </button>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
               <span className="inline-flex h-8 items-center whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500">
                 {filtered.length !== expedientes.length
-                  ? <span className="text-amber-600 font-semibold">{filtered.length} de {expedientes.length}</span>
-                  : <span className="text-slate-600">{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</span>}
+                  ? <span className="text-amber-600 font-semibold">{filtered.length}{" "}{t("de")}{" "}{expedientes.length}</span>
+                  : <span className="text-slate-600">{expedientes.length} {expedientes.length === 1 ? t("registro") : t("registros")}</span>}
               </span>
               <div className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
                 {!isMobile && (
-                  <button onClick={() => switchView("list")} title="Vista listado"
+                  <button onClick={() => switchView("list")} title={t("Vista listado")}
                     className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "list" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                     <AlignJustify size={12} />
                   </button>
                 )}
-                <button onClick={() => switchView("detail")} title="Vista detalle"
+                <button onClick={() => switchView("detail")} title={t("Vista detalle")}
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "detail" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <LayoutList size={12} />
                 </button>
-                <button onClick={() => switchView("multiselect")} title="Selección múltiple"
+                <button onClick={() => switchView("multiselect")} title={t("Selección múltiple")}
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "multiselect" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <ListChecks size={12} />
                 </button>
               </div>
-              <button onClick={handleRefresh} title="Refrescar datos"
+              <button onClick={handleRefresh} title={t("Refrescar datos")}
                 className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all bg-white shadow-sm">
                 <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
               </button>
@@ -7502,19 +7364,19 @@ export default function ExpedienteList() {
             <table className="w-full text-left text-sm min-w-[1100px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  {visibleColumns.anio && <Th label="Año"                    sk="anio"          sort={sort} dir={dir} onSort={handleSort} className="w-14 pl-4" />}
-                  {visibleColumns.num_exp && <Th label="Núm. Exp"               sk="num_exp"        sort={sort} dir={dir} onSort={handleSort} className="w-16" />}
-                  {visibleColumns.ref_propia && <Th label="Ref. Propia"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
-                  {visibleColumns.descripcion && <Th label="Descripción Expediente" sk="descripcion"    sort={sort} dir={dir} onSort={handleSort} className="min-w-[180px]" />}
-                  {visibleColumns.tipo && <Th label="Tipo de Expediente"     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />}
-                  {visibleColumns.cliente_nombre && <Th label="Cliente"                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
-                  {visibleColumns.contrario && <Th label="Contrario"              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
-                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32" />}
-                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44" />}
-                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
-                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
-                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
-                  {visibleColumns.estado && <Th label="Estado"                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.anio && <Th label={t("Año")}                    sk="anio"          sort={sort} dir={dir} onSort={handleSort} className="w-14 pl-4" />}
+                  {visibleColumns.num_exp && <Th label={t("Núm. Exp")}               sk="num_exp"        sort={sort} dir={dir} onSort={handleSort} className="w-16" />}
+                  {visibleColumns.ref_propia && <Th label={t("Ref. Propia")}                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.descripcion && <Th label={t("Descripción Expediente")} sk="descripcion"    sort={sort} dir={dir} onSort={handleSort} className="min-w-[180px]" />}
+                  {visibleColumns.tipo && <Th label={t("Tipo de Expediente")}     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />}
+                  {visibleColumns.cliente_nombre && <Th label={t("Cliente")}                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
+                  {visibleColumns.contrario && <Th label={t("Contrario")}              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
+                  {visibleColumns.procurador && <Th label={t("Procurador Propio")}                          sort={sort} dir={dir} onSort={handleSort} className="w-32" />}
+                  {visibleColumns.juzgado && <Th label={t("Juzgado Principal")}      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44" />}
+                  {visibleColumns.tipo_proc && <Th label={t("Tipo Procedimiento")}                         sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
+                  {visibleColumns.num_autos && <Th label={t("Núm. Autos")}                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.nig && <Th label={t("NIG")}                                        sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
+                  {visibleColumns.estado && <Th label={t("Estado")}                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
               </thead>
@@ -7526,14 +7388,12 @@ export default function ExpedienteList() {
                         <FolderOpen size={36} className="opacity-15" />
                         <p className="font-medium text-sm">
                           {hasActiveFilters || filters.length > 1
-                            ? "No hay expedientes con esos filtros"
-                            : "No hay expedientes todavía"}
+                            ? t("No hay expedientes con esos filtros")
+                            : t("No hay expedientes todavía")}
                         </p>
                         {!hasActiveFilters && filters.length === 1 && (
                           <button onClick={() => { setEditItem(null); setSaveError(null); setShowModal(true); }}
-                            className="text-red-600 text-xs font-bold hover:underline">
-                            + Crear el primer expediente
-                          </button>
+                            className="text-red-600 text-xs font-bold hover:underline">{t("+ Crear el primer expediente")}</button>
                         )}
                       </div>
                     </td>
@@ -7555,7 +7415,7 @@ export default function ExpedienteList() {
                       {/* Año */}
                       {visibleColumns.anio && <td className={`pl-4 pr-3 py-3 font-mono relative ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>
                         {exp.estado === "cerrado" && (
-                          <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title="Expediente cerrado" />
+                          <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title={t("Expediente cerrado")} />
                         )}
                         {exp.anio}
                       </td>}
@@ -7573,7 +7433,7 @@ export default function ExpedienteList() {
                       {/* Descripción */}
                       {visibleColumns.descripcion && <td className="px-3 py-3">
                         <span className={`font-semibold truncate block max-w-[220px] ${isSel ? colorStyle.descriptionSelected : "text-slate-800"}`}>
-                          {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripción</span>}
+                          {exp.descripcion || <span className="text-slate-300 font-normal">{t("Sin descripción")}</span>}
                         </span>
                       </td>}
 
@@ -7588,7 +7448,7 @@ export default function ExpedienteList() {
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/dashboard/clientes/${exp.cliente_id}`); }}
                             className="appearance-none p-0 leading-normal text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left truncate block max-w-[130px]">
-                            {exp.cliente_nombre || "Ver"}
+                            {exp.cliente_nombre || t("Ver")}
                           </button>
                         ) : (
                           <span className="text-slate-400 truncate block max-w-[130px]">
@@ -7637,7 +7497,7 @@ export default function ExpedienteList() {
                         <button
                           onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
                           className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100"
-                          title="Abrir expediente">
+                          title={t("Abrir expediente")}>
                           <ExternalLink size={14} />
                         </button>
                       </td>
@@ -7667,8 +7527,8 @@ export default function ExpedienteList() {
                   />
                   <span className="text-xs font-semibold text-slate-600">
                     {selectedIds.size > 0
-                      ? `${selectedIds.size} seleccionado${selectedIds.size !== 1 ? "s" : ""}`
-                      : "Seleccionar todo"}
+                      ? t("{size} seleccionado{v}", { size: selectedIds.size, v: selectedIds.size !== 1 ? "s" : "" })
+                      : t("Seleccionar todo")}
                   </span>
                 </label>
 
@@ -7681,9 +7541,7 @@ export default function ExpedienteList() {
                         disabled={bulkStateLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Activity size={12} />
-                        Cambiar estado
-                        <ChevronDown size={10} className={showBulkStateMenu ? "rotate-180" : ""} />
+                        <Activity size={12} />{t("Cambiar estado")}<ChevronDown size={10} className={showBulkStateMenu ? "rotate-180" : ""} />
                       </button>
                       {showBulkStateMenu && (
                         <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
@@ -7702,19 +7560,17 @@ export default function ExpedienteList() {
                         disabled={bulkReassignLoading}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Users size={12} />
-                        Reasignar
-                      </button>
+                        <Users size={12} />{t("Reasignar")}</button>
                       {showBulkReassign && (
                         <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 min-w-[220px]">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Abogado responsable</label>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t("Abogado responsable")}</label>
                           <div className="flex items-center gap-1.5">
                             <input
                               autoFocus
                               value={bulkReassignValue}
                               onChange={e => setBulkReassignValue(e.target.value)}
                               onKeyDown={e => { if (e.key === "Enter") handleBulkReassign(); }}
-                              placeholder="Nombre del abogado"
+                              placeholder={t("Nombre del abogado")}
                               className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-400"
                             />
                             <button
@@ -7730,27 +7586,20 @@ export default function ExpedienteList() {
                     </div>
                     <button onClick={handleBulkExport}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors">
-                      <Download size={12} />
-                      Exportar
-                    </button>
+                      <Download size={12} />{t("Exportar")}</button>
                     {selectedHasArchived && (
                       <>
                         <button onClick={handleBulkUnarchive} disabled={unarchiveLoading}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-lg transition-colors">
-                          {unarchiveLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderOpen size={12} />}
-                          Quitar de archivado
-                        </button>
+                          {unarchiveLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderOpen size={12} />}{t("Quitar de archivado")}</button>
                         <button onClick={() => setHardDeleteConfirm(true)}
                           className="peligro flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 border border-red-800 rounded-lg transition-colors">
-                          <Trash2 size={12} />
-                          Eliminar definitivamente
-                        </button>
+                          <Trash2 size={12} />{t("Eliminar definitivamente")}</button>
                       </>
                     )}
                     <button onClick={deselectAll}
                       className="ml-auto flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                      <X size={11} /> Limpiar
-                    </button>
+                      <X size={11} />{" "}{t("Limpiar")}</button>
                   </>
                 )}
               </div>
@@ -7767,11 +7616,11 @@ export default function ExpedienteList() {
                           onChange={e => e.target.checked ? selectAll() : deselectAll()}
                           className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer" />
                       </th>
-                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-20">Exp.</th>
-                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Descripción</th>
-                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden sm:table-cell">Tipo</th>
-                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden md:table-cell">Cliente</th>
-                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-24">Estado</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-20">{t("Exp.")}</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{t("Descripción")}</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden sm:table-cell">{t("Tipo")}</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden md:table-cell">{t("Cliente")}</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-24">{t("Estado")}</th>
                       <th className="w-10" />
                     </tr>
                   </thead>
@@ -7780,7 +7629,7 @@ export default function ExpedienteList() {
                       <tr><td colSpan={7} className="py-20 text-center text-slate-400">
                         <div className="flex flex-col items-center gap-3">
                           <FolderOpen size={36} className="opacity-15" />
-                          <p className="font-medium text-sm">No hay expedientes</p>
+                          <p className="font-medium text-sm">{t("No hay expedientes")}</p>
                         </div>
                       </td></tr>
                     ) : filtered.map(exp => {
@@ -7797,13 +7646,13 @@ export default function ExpedienteList() {
                           </td>
                           <td className="px-3 py-3 relative">
                             {exp.estado === "cerrado" && (
-                              <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title="Expediente cerrado" />
+                              <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title={t("Expediente cerrado")} />
                             )}
                             <span className={`font-extrabold text-base ${isSel ? "text-red-700" : "text-slate-700"}`}>{exp.anio}/{exp.num_exp}</span>
                           </td>
                           <td className="px-3 py-3">
                             <span className="font-semibold text-slate-800 truncate block max-w-[280px]">
-                              {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripción</span>}
+                              {exp.descripcion || <span className="text-slate-300 font-normal">{t("Sin descripción")}</span>}
                             </span>
                             {exp.cliente_nombre && <span className="text-xs text-slate-400 block md:hidden truncate">{exp.cliente_nombre}</span>}
                           </td>
@@ -7818,7 +7667,7 @@ export default function ExpedienteList() {
                           </td>
                           <td className="px-3 py-3 text-right">
                             <button onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
-                              className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title="Abrir">
+                              className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title={t("Abrir")}>
                               <ExternalLink size={13} />
                             </button>
                           </td>
@@ -7838,13 +7687,13 @@ export default function ExpedienteList() {
             variant="confirm"
             icon={<AlertTriangle size={18} />}
             iconTone="danger"
-            title={`¿Dar de baja ${selectedIds.size} expediente${selectedIds.size !== 1 ? "s" : ""}?`}
-            subtitle="Se archivan (no se borran) y puedes deshacerlo en los próximos 15 segundos."
+            title={t("¿Dar de baja {size} expediente{v}?", { size: selectedIds.size, v: selectedIds.size !== 1 ? "s" : "" })}
+            subtitle={t("Se archivan (no se borran) y puedes deshacerlo en los próximos 15 segundos.")}
             zIndex={9999}
             footer={
               <>
-                <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
+                <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
+                <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">{t("Dar de baja")}</button>
               </>
             }
           />
@@ -7856,21 +7705,19 @@ export default function ExpedienteList() {
             variant="confirm"
             icon={<AlertTriangle size={18} />}
             iconTone="danger"
-            title={`¿Eliminar definitivamente ${selectedArchivedCount} expediente${selectedArchivedCount !== 1 ? "s" : ""}?`}
+            title={t("¿Eliminar definitivamente {selectedArchivedCount} expediente{v}?", { selectedArchivedCount: selectedArchivedCount, v: selectedArchivedCount !== 1 ? "s" : "" })}
             subtitle={
               selectedArchivedCount < selectedIds.size
-                ? `Esto SÍ borra el registro de la base de datos. No hay deshacer. Los ${selectedIds.size - selectedArchivedCount} seleccionados que no están archivados no se tocan.`
-                : "Esto SÍ borra el registro de la base de datos. No hay deshacer."
+                ? t("Esto SÍ borra el registro de la base de datos. No hay deshacer. Los {v} seleccionados que no están archivados no se tocan.", { v: selectedIds.size - selectedArchivedCount })
+                : t("Esto SÍ borra el registro de la base de datos. No hay deshacer.")
             }
             zIndex={9999}
             footer={
               <>
-                <button onClick={() => setHardDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={() => setHardDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
                 <button onClick={handleBulkHardDelete} disabled={hardDeleteLoading}
                   className="peligro flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95">
-                  {hardDeleteLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  Eliminar definitivamente
-                </button>
+                  {hardDeleteLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}{t("Eliminar definitivamente")}</button>
               </>
             }
           />
@@ -7881,38 +7728,36 @@ export default function ExpedienteList() {
             onClose={() => { setShowBulkTareaForm(false); setBulkTareaError(""); }}
             variant="confirm"
             icon={<ClipboardList size={18} />}
-            title={`Crear tarea en ${selectedIds.size} expedientes`}
-            subtitle="Se crea la misma tarea en cada uno de los expedientes marcados."
+            title={t("Crear tarea en {size} expedientes", { size: selectedIds.size })}
+            subtitle={t("Se crea la misma tarea en cada uno de los expedientes marcados.")}
             zIndex={9999}
             footer={
               <>
-                <button onClick={() => { setShowBulkTareaForm(false); setBulkTareaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={() => { setShowBulkTareaForm(false); setBulkTareaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
                 <button onClick={handleBulkCreateTarea} disabled={!bulkTareaTitulo.trim() || bulkTareaLoading}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95">
-                  {bulkTareaLoading ? <Loader2 size={12} className="animate-spin" /> : <ClipboardList size={12} />}
-                  Crear
-                </button>
+                  {bulkTareaLoading ? <Loader2 size={12} className="animate-spin" /> : <ClipboardList size={12} />}{t("Crear")}</button>
               </>
             }
           >
             <div className="space-y-3">
               <label className="block">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Título</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t("Título")}</span>
                 <input
                   autoFocus
                   value={bulkTareaTitulo}
                   onChange={e => setBulkTareaTitulo(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && bulkTareaTitulo.trim()) handleBulkCreateTarea(); }}
-                  placeholder="Ej. Revisar plazo de contestación"
+                  placeholder={t("Ej. Revisar plazo de contestación")}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400"
                 />
               </label>
               <label className="block">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tipo</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t("Tipo")}</span>
                 <select value={bulkTareaTipo} onChange={e => setBulkTareaTipo(e.target.value as "tarea" | "plazo")}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 bg-white">
-                  <option value="tarea">Tarea</option>
-                  <option value="plazo">Plazo procesal</option>
+                  <option value="tarea">{t("Tarea")}</option>
+                  <option value="plazo">{t("Plazo procesal")}</option>
                 </select>
               </label>
               {bulkTareaError && <p className="text-xs text-red-600">{bulkTareaError}</p>}
@@ -7925,17 +7770,15 @@ export default function ExpedienteList() {
             onClose={() => setDuplicateConfirm(false)}
             variant="confirm"
             icon={<Copy size={18} />}
-            title={duplicateTargets.length > 1 ? `¿Duplicar ${duplicateTargets.length} expedientes?` : "¿Duplicar este expediente?"}
-            subtitle="Se crea una copia con número propio de cada uno; el original no se toca."
+            title={duplicateTargets.length > 1 ? t("¿Duplicar {length} expedientes?", { length: duplicateTargets.length }) : t("¿Duplicar este expediente?")}
+            subtitle={t("Se crea una copia con número propio de cada uno; el original no se toca.")}
             zIndex={9999}
             footer={
               <>
-                <button onClick={() => setDuplicateConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={() => setDuplicateConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
                 <button onClick={handleDuplicateConfirm} disabled={!duplicateTargets.length || duplicateLoading}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95">
-                  {duplicateLoading ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
-                  Duplicar
-                </button>
+                  {duplicateLoading ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}{t("Duplicar")}</button>
               </>
             }
           >
@@ -7943,7 +7786,7 @@ export default function ExpedienteList() {
               {duplicateTargets.map(exp => (
                 <li key={exp.id} className="flex items-center gap-2 text-slate-600">
                   <span className="font-mono text-xs font-bold text-slate-400 shrink-0">{exp.anio}/{exp.num_exp}</span>
-                  <span className="truncate">{exp.descripcion || "Sin descripción"}</span>
+                  <span className="truncate">{exp.descripcion || t("Sin descripción")}</span>
                 </li>
               ))}
             </ul>
@@ -7955,33 +7798,31 @@ export default function ExpedienteList() {
             onClose={() => { setShowBulkWaForm(false); setBulkWaError(""); }}
             variant="confirm"
             icon={<MessageCircle size={18} />}
-            title={`Enviar WhatsApp a ${bulkWaRecipients.length} de ${selectedIds.size} marcados`}
+            title={t("Enviar WhatsApp a {length} de {size} marcados", { length: bulkWaRecipients.length, size: selectedIds.size })}
             subtitle={
               bulkWaRecipients.length < selectedIds.size
-                ? "El resto no tiene un cliente con teléfono asociado. Se envía de verdad al confirmar, no es un borrador."
-                : "Se envía de verdad al confirmar, no es un borrador."
+                ? t("El resto no tiene un cliente con teléfono asociado. Se envía de verdad al confirmar, no es un borrador.")
+                : t("Se envía de verdad al confirmar, no es un borrador.")
             }
             zIndex={9999}
             footer={
               <>
-                <button onClick={() => { setShowBulkWaForm(false); setBulkWaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={() => { setShowBulkWaForm(false); setBulkWaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">{t("Cancelar")}</button>
                 <button onClick={handleBulkSendWhatsApp} disabled={!bulkWaMessage.trim() || !bulkWaRecipients.length || bulkWaLoading}
                   className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg active:scale-95">
-                  {bulkWaLoading ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
-                  Enviar
-                </button>
+                  {bulkWaLoading ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}{t("Enviar")}</button>
               </>
             }
           >
             <div className="space-y-3">
               <label className="block">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Mensaje</span>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t("Mensaje")}</span>
                 <textarea
                   autoFocus
                   rows={4}
                   value={bulkWaMessage}
                   onChange={e => setBulkWaMessage(e.target.value)}
-                  placeholder="Escribe el mensaje que recibirán todos los destinatarios"
+                  placeholder={t("Escribe el mensaje que recibirán todos los destinatarios")}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 resize-none"
                 />
               </label>
@@ -7994,7 +7835,7 @@ export default function ExpedienteList() {
               {filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                   <FolderOpen size={36} className="opacity-15" />
-                  <p className="font-medium text-sm">{(hasActiveFilters || filters.length > 1) ? "No hay expedientes con esos filtros" : "No hay expedientes"}</p>
+                  <p className="font-medium text-sm">{(hasActiveFilters || filters.length > 1) ? t("No hay expedientes con esos filtros") : t("No hay expedientes")}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -8016,7 +7857,7 @@ export default function ExpedienteList() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold text-sm truncate ${isSel ? colorStyle.cardDescriptionSelected : "text-slate-800"}`}>
-                              {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripci\u00f3n</span>}
+                              {exp.descripcion || <span className="text-slate-300 font-normal">{t("Sin descripci\\u00f3n")}</span>}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tipoConf.color}`}>{tipoConf.short}</span>
@@ -8029,20 +7870,20 @@ export default function ExpedienteList() {
                             <button
                               onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
                               className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                              title="Abrir expediente">
+                              title={t("Abrir expediente")}>
                               <ExternalLink size={14} />
                             </button>
                           </div>
                         </div>
                         {isSel && (
                           <div className="px-4 pb-3 pt-2 border-t border-red-100 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
-                            {exp.contrario  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Contrario</p><p className="text-xs text-slate-700 truncate">{exp.contrario}</p></div>}
-                            {exp.juzgado    && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Juzgado</p><p className="text-xs text-slate-700 truncate">{exp.juzgado}</p></div>}
-                            {exp.num_autos  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Núm. autos</p><p className="text-xs text-slate-700 font-mono">{exp.num_autos}</p></div>}
-                            {exp.nig        && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">NIG</p><p className="text-xs text-slate-700 font-mono truncate">{exp.nig}</p></div>}
-                            {exp.procurador && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Procurador</p><p className="text-xs text-slate-700 truncate">{exp.procurador}</p></div>}
-                            {exp.tipo_proc  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tipo proc.</p><p className="text-xs text-slate-700 uppercase">{exp.tipo_proc}</p></div>}
-                            {exp.fecha_inicio && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Inicio</p><p className="text-xs text-slate-700">{fmtDateHuman(exp.fecha_inicio)}</p></div>}
+                            {exp.contrario  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Contrario")}</p><p className="text-xs text-slate-700 truncate">{exp.contrario}</p></div>}
+                            {exp.juzgado    && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Juzgado")}</p><p className="text-xs text-slate-700 truncate">{exp.juzgado}</p></div>}
+                            {exp.num_autos  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Núm. autos")}</p><p className="text-xs text-slate-700 font-mono">{exp.num_autos}</p></div>}
+                            {exp.nig        && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("NIG")}</p><p className="text-xs text-slate-700 font-mono truncate">{exp.nig}</p></div>}
+                            {exp.procurador && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Procurador")}</p><p className="text-xs text-slate-700 truncate">{exp.procurador}</p></div>}
+                            {exp.tipo_proc  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Tipo proc.")}</p><p className="text-xs text-slate-700 uppercase">{exp.tipo_proc}</p></div>}
+                            {exp.fecha_inicio && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">{t("Inicio")}</p><p className="text-xs text-slate-700">{fmtDateHuman(exp.fecha_inicio)}</p></div>}
                           </div>
                         )}
                       </div>

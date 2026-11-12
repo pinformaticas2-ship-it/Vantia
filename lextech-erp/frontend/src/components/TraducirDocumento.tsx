@@ -5,6 +5,7 @@ import { Modal } from "./Modal";
 import { apiFetch } from "../lib/api";
 import { aviso } from "../lib/avisos";
 import { IDIOMAS, nombreEspanol } from "../lib/idiomas";
+import { t } from '../lib/i18n';
 
 // Traducir un documento entero (adjunto de un cliente/expediente o documento
 // del editor). El servidor lo hace en segundo plano (puede tardar minutos) y
@@ -48,7 +49,7 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
     setError("");
     guardar(CLAVE_IDIOMA, idioma); guardar(CLAVE_MODO, modo);
     const r = await apiFetch(url, { getToken, method: "POST", body: JSON.stringify({ idioma, modo }) }).catch((e: any) => ({ success: false, error: e?.message }));
-    if (!r?.success || !r.data?.trabajoId) { setError(r?.error || "No se pudo empezar la traducción."); return; }
+    if (!r?.success || !r.data?.trabajoId) { setError(r?.error || t("No se pudo empezar la traducción.")); return; }
     setProgreso({ hechos: 0, total: 0 });
     const id = r.data.trabajoId as string;
     // Sigue aunque se cierre la ventana: al terminar, aviso con acceso al resultado.
@@ -65,10 +66,10 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
       const d = e.data;
       if (d.estado === "en_curso") { if (abierta.current) setProgreso({ hechos: d.hechos, total: d.total }); continue; }
       if (d.estado === "error") {
-        if (abierta.current) { setProgreso(null); setError(d.error || "No se pudo traducir el documento."); } else aviso.error(`Traducción de «${nombre}»: ${d.error || "no se pudo hacer"}`);
+        if (abierta.current) { setProgreso(null); setError(d.error || t("No se pudo traducir el documento.")); } else aviso.error(t("Traducción de «{nombre}»: {v}", { nombre: nombre, v: d.error || "no se pudo hacer" }));
         return;
       }
-      if (d.resultado?.parcial) aviso.info("El documento era muy largo: solo se ha traducido el principio.", { duracion: 10000 });
+      if (d.resultado?.parcial) aviso.info(t("El documento era muy largo: solo se ha traducido el principio."), { duracion: 10000 });
       onHecho(d.resultado);
       if (abierta.current) onClose();
       return;
@@ -78,41 +79,38 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
   const enCurso = progreso !== null;
   const pct = progreso && progreso.total ? Math.round((progreso.hechos / progreso.total) * 100) : 0;
   return (
-    <Modal open onClose={onClose} title="Traducir documento" subtitle={nombre} maxWidth="max-w-lg"
+    <Modal open onClose={onClose} title={t("Traducir documento")} subtitle={nombre} maxWidth="max-w-lg"
       footer={enCurso ? (
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-          Seguir trabajando (te aviso al terminar)
-        </button>
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Seguir trabajando (te aviso al terminar)")}</button>
       ) : (<>
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+        <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">{t("Cancelar")}</button>
         <button type="button" onClick={empezar} className="inline-flex items-center gap-1.5 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
-          <Languages size={15} /> Traducir
-        </button>
+          <Languages size={15} />{" "}{t("Traducir")}</button>
       </>)}>
       {enCurso ? (
         <div className="space-y-3 py-2">
           <div className="flex items-center gap-2 text-sm text-slate-700">
             <Loader2 size={16} className="animate-spin text-red-700" />
-            {progreso.total > 1 ? `Traduciendo… parte ${Math.min(progreso.hechos + 1, progreso.total)} de ${progreso.total}` : "Traduciendo…"}
+            {progreso.total > 1 ? t("Traduciendo… parte {min} de {total}", { min: Math.min(progreso.hechos + 1, progreso.total), total: progreso.total }) : t("Traduciendo…")}
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-red-700 transition-all duration-500" style={{ width: `${Math.max(pct, 6)}%` }} />
           </div>
-          <p className="text-xs text-slate-500">Un documento largo tarda unos minutos. Puedes cerrar esta ventana: se guardará igualmente y te avisaré.</p>
+          <p className="text-xs text-slate-500">{t("Un documento largo tarda unos minutos. Puedes cerrar esta ventana: se guardará igualmente y te avisaré.")}</p>
         </div>
       ) : (
         <div className="space-y-4">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Traducir al</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">{t("Traducir al")}</span>
             <select value={idioma} onChange={(e) => setIdioma(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-400">
-              {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.codigo === "es" ? "Español (de un documento en otro idioma)" : i.nombre}{i.codigo === sugerido ? " · idioma del cliente" : ""}</option>)}
+              {IDIOMAS.map((i) => <option key={i.codigo} value={i.codigo}>{i.codigo === "es" ? t("Español (de un documento en otro idioma)") : i.nombre}{i.codigo === sugerido ? t(" · idioma del cliente") : ""}</option>)}
             </select>
           </label>
           <div>
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Formato</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">{t("Formato")}</span>
             <div className="grid grid-cols-2 gap-2">
-              {([["traduccion", "El mismo documento", `Idéntico, pero en ${nombreEspanol(idioma)}`], ["bilingue", "Original y traducción", "A dos columnas, párrafo a párrafo"]] as const).map(([v, t, s]) => (
+              {([["traduccion", "El mismo documento", t("Idéntico, pero en {idioma}", { idioma: t(nombreEspanol(idioma)) })], ["bilingue", "Original y traducción", "A dos columnas, párrafo a párrafo"]] as const).map(([v, t, s]) => (
                 <button key={v} type="button" onClick={() => setModo(v)}
                   className={`rounded-xl border px-3 py-2.5 text-left ${modo === v ? "border-red-700 bg-red-50/60 ring-1 ring-red-700" : "border-slate-200 hover:bg-slate-50"}`}>
                   <span className="block text-sm font-semibold text-slate-800">{t}</span>
@@ -123,10 +121,9 @@ export function TraducirDocumento({ nombre, url, idiomaSugerido, onClose, onHech
           </div>
           <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
             {modo === "traduccion"
-              ? "Un Word sale exactamente igual (membrete, logos, fuentes, márgenes, tablas, encabezados y pies): solo cambia el texto. Un PDF o un escaneado no se puede copiar tal cual: se rehace en Word con sus títulos, listas y tablas."
-              : "Para revisar o para que el cliente compare: cada párrafo junto a su traducción."}
-            {" "}Se guarda como documento nuevo junto al original. Es una traducción automática, no jurada: revísala antes de enviarla.
-          </p>
+              ? t("Un Word sale exactamente igual (membrete, logos, fuentes, márgenes, tablas, encabezados y pies): solo cambia el texto. Un PDF o un escaneado no se puede copiar tal cual: se rehace en Word con sus títulos, listas y tablas.")
+              : t("Para revisar o para que el cliente compare: cada párrafo junto a su traducción.")}
+            {" "}{t("Se guarda como documento nuevo junto al original. Es una traducción automática, no jurada: revísala antes de enviarla.")}</p>
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         </div>
       )}

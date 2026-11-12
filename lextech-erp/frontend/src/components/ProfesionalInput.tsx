@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Plus, ChevronDown, Check } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { t } from '../lib/i18n';
 
 const inputCls = "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors";
 const miniInputCls = "w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500";
@@ -74,13 +75,13 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
         body: JSON.stringify({ tipo, first_name: nombre.trim(), last_name: apellidos.trim() }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo crear el registro");
+      if (!res.ok) throw new Error(d.error || t("No se pudo crear el registro"));
       const full = `${d.data.first_name || ""} ${d.data.last_name || ""}`.trim();
       onCreated(full);
       onChange(full);
       closeCreate();
     } catch (e: any) {
-      setError(e.message || "No se pudo crear el registro");
+      setError(e.message || t("No se pudo crear el registro"));
     } finally {
       setSaving(false);
     }
@@ -89,18 +90,16 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
   if (creating) {
     return (
       <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
-        <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" className={miniInputCls} />
-        <input value={apellidos} onChange={e => setApellidos(e.target.value)} placeholder="Apellidos" className={miniInputCls} />
+        <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)} placeholder={t("Nombre")} className={miniInputCls} />
+        <input value={apellidos} onChange={e => setApellidos(e.target.value)} placeholder={t("Apellidos")} className={miniInputCls} />
         {error && <p className="peligro text-xs text-red-600">{error}</p>}
         <div className="flex gap-1.5">
           <button type="button" disabled={saving || !nombre.trim()} onClick={create}
             className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
-            {saving ? "Creando…" : `Crear ${label}`}
+            {saving ? t("Creando…") : t("Crear {label}", { label: label })}
           </button>
           <button type="button" onClick={closeCreate}
-            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">
-            Cancelar
-          </button>
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">{t("Cancelar")}</button>
         </div>
       </div>
     );
@@ -119,7 +118,7 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
       <button
         type="button"
         tabIndex={-1}
-        title={`Ver todos los ${tipo === "ABOGADO" ? "abogados" : "procuradores"} del Directorio`}
+        title={t("Ver todos los {v} del Directorio", { v: tipo === "ABOGADO" ? "abogados" : "procuradores" })}
         onMouseDown={e => { e.preventDefault(); if (open) setOpen(false); else openAll(); }}
         className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700"
       >
@@ -143,14 +142,14 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
               </button>
             ))
           ) : (
-            <p className="px-3 py-2 text-xs text-slate-400">{options.length ? "Sin coincidencias en el Directorio." : `Todavía no hay ningún ${label} en el Directorio.`}</p>
+            <p className="px-3 py-2 text-xs text-slate-400">{options.length ? t("Sin coincidencias en el Directorio.") : t("Todavía no hay ningún {label} en el Directorio.", { label: label })}</p>
           )}
           <button
             type="button"
             onMouseDown={() => { setCreating(true); setOpen(false); }}
             className="mt-1 flex w-[calc(100%-12px)] mx-1.5 items-center gap-1.5 rounded-lg border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
           >
-            <Plus size={13} /> Crear nuevo {label}
+            <Plus size={13} />{" "}{t("Crear nuevo")}{" "}{label}
           </button>
         </div>,
         document.body

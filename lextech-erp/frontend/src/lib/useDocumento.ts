@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { apiFetch, safeJson } from "./api";
 import { useEditorTexto } from "../components/EditorTexto";
+import { t } from './i18n';
 
 // Un documento de Vantia abierto en el editor: carga, guardado automático y
 // descarga en Word. Lo usan la página Documentos y el panel lateral de Chat IA.
@@ -98,7 +99,7 @@ export function useDocumento(id: string | null | undefined, opts: { onGuardado?:
         setTitulo(r.data.titulo);
         setEstadoGuardado("guardado");
       })
-      .catch((e) => { if (vivo) { setDoc(null); setError(e.message || "No se pudo abrir el documento."); } })
+      .catch((e) => { if (vivo) { setDoc(null); setError(e.message || t("No se pudo abrir el documento.")); } })
       .finally(() => { if (vivo) setCargando(false); });
     return () => { vivo = false; };
   }, [id, getToken, guardarYa]);
@@ -124,7 +125,7 @@ export function useDocumento(id: string | null | undefined, opts: { onGuardado?:
       await guardarYa();
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/documentos/${docId}/docx`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error((await safeJson(res))?.error || "No se pudo exportar a Word.");
+      if (!res.ok) throw new Error((await safeJson(res))?.error || t("No se pudo exportar a Word."));
       const blob = await res.blob();
       const disp = res.headers.get("Content-Disposition") || "";
       const nombre = decodeURIComponent(/filename\*=UTF-8''([^;]+)/.exec(disp)?.[1] || "documento.docx");

@@ -15,6 +15,7 @@ import {
 import BackButton from "../components/BackButton";
 import { safeJson } from "../lib/api";
 import { aviso, confirmar } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -329,7 +330,7 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
           rowNumber: index + 1,
           fieldId: "nif_cif",
           fieldLabel: "NIF / CIF",
-          message: `NIF/CIF duplicado en el CSV (ya aparece en fila ${seen.get(val)})`,
+          message: t("NIF/CIF duplicado en el CSV (ya aparece en fila {fila})", { fila: seen.get(val) }),
         });
       } else {
         seen.set(val, index + 1);
@@ -491,7 +492,7 @@ function CsvFieldRow({ field, options, invalid = false, onChange }: {
             {field.sample}
           </span>
         ) : (
-          <span className="text-xs font-mono text-slate-400 italic">Sin detectar</span>
+          <span className="text-xs font-mono text-slate-400 italic">{t("Sin detectar")}</span>
         )}
       </div>
     </div>
@@ -523,28 +524,26 @@ function CsvImportUploadView({
             <FileSpreadsheet size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">Importar clientes</h1>
-            <p className="text-xs font-medium text-slate-500">Carga masiva desde archivo CSV (Paso 1 de 3)</p>
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{t("Importar clientes")}</h1>
+            <p className="text-xs font-medium text-slate-500">{t("Carga masiva desde archivo CSV (Paso 1 de 3)")}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={onOpenHistory}
             className="px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-            <History size={13} className="text-slate-400" /> Historial
-          </button>
+            <History size={13} className="text-slate-400" />{" "}{t("Historial")}</button>
           <button onClick={onBack}
             className="px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-            <ArrowLeft size={13} /> Volver
-          </button>
+            <ArrowLeft size={13} />{" "}{t("Volver")}</button>
         </div>
       </div>
 
       <div className="bg-white border-b border-slate-200 py-4 flex-shrink-0 shadow-sm">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" active first />
-          <ImportStep step={2} label="Configurar columnas" />
-          <ImportStep step={3} label="Revisar e Importar" last />
+          <ImportStep step={1} label={t("Subir archivo")} active first />
+          <ImportStep step={2} label={t("Configurar columnas")} />
+          <ImportStep step={3} label={t("Revisar e Importar")} last />
         </div>
       </div>
 
@@ -554,7 +553,7 @@ function CsvImportUploadView({
           <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
               <Upload size={14} className="text-slate-400" />
-              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Cargar Archivo de Datos</h3>
+              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Cargar Archivo de Datos")}</h3>
             </div>
             <div className="flex-1 p-6 flex items-center justify-center">
               <div
@@ -580,15 +579,11 @@ function CsvImportUploadView({
                   <FileSpreadsheet size={32} />
                 </div>
                 <h3 className="mb-2 text-xl font-bold text-slate-800 text-center">
-                  {fileName ? fileName : "Selecciona o arrastra aquí tu CSV"}
+                  {fileName ? fileName : t("Selecciona o arrastra aquí tu CSV")}
                 </h3>
-                <p className="text-sm text-slate-500 text-center max-w-md">
-                  El archivo no debe superar los 10MB. Asegúrate de haber rellenado los datos utilizando la plantilla.
-                </p>
+                <p className="text-sm text-slate-500 text-center max-w-md">{t("El archivo no debe superar los 10MB. Asegúrate de haber rellenado los datos utilizando la plantilla.")}</p>
                 {!fileName && (
-                  <div className="mt-8 px-6 py-2 bg-white border border-slate-200 rounded-md text-sm font-semibold text-slate-700 shadow-sm group-hover:border-red-300 group-hover:text-red-600 transition-colors">
-                    Explorar archivos
-                  </div>
+                  <div className="mt-8 px-6 py-2 bg-white border border-slate-200 rounded-md text-sm font-semibold text-slate-700 shadow-sm group-hover:border-red-300 group-hover:text-red-600 transition-colors">{t("Explorar archivos")}</div>
                 )}
               </div>
             </div>
@@ -598,18 +593,18 @@ function CsvImportUploadView({
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <FileSpreadsheet size={14} className="text-emerald-600" />
-                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Plantilla para Excel</h3>
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Plantilla para Excel")}</h3>
               </div>
               <div className="p-6 flex flex-col gap-4">
-                <p className="text-xs text-slate-500">Descarga, rellena en Excel y sube el archivo en el panel izquierdo. Borra las filas de ejemplo antes de importar.</p>
+                <p className="text-xs text-slate-500">{t("Descarga, rellena en Excel y sube el archivo en el panel izquierdo. Borra las filas de ejemplo antes de importar.")}</p>
                 <button onClick={() => downloadCsvTemplate()}
                   className="group flex items-start gap-4 p-4 rounded-lg border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-all shadow-sm text-left">
                   <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
                     <Download size={16} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla de clientes</span>
-                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">Nombre, NIF/CIF, email, teléfono, población, fecha de alta.</span>
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{t("Plantilla de clientes")}</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">{t("Nombre, NIF/CIF, email, teléfono, población, fecha de alta.")}</span>
                   </div>
                 </button>
               </div>
@@ -618,23 +613,21 @@ function CsvImportUploadView({
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <ListChecks size={14} className="text-slate-400" />
-                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Formato Esperado</h3>
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">{t("Formato Esperado")}</h3>
               </div>
               <div className="p-6 flex flex-col gap-4">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  El separador de columnas puede ser coma{" "}
-                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">,</code>{" "}
-                  o punto y coma{" "}
+                <p className="text-xs text-slate-600 leading-relaxed">{t("El separador de columnas puede ser coma")}{" "}
+                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">,</code>{" "}{t("o punto y coma")}{" "}
                   <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">;</code>.
                 </p>
                 <ul className="flex flex-col gap-3 text-xs text-slate-600">
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>Nombre</strong> (obligatorio)</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> NIF/CIF, email y teléfono</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Dirección, población, provincia</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>{t("Nombre")}</strong>{" "}{t("(obligatorio)")}</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" />{" "}{t("NIF/CIF, email y teléfono")}</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" />{" "}{t("Dirección, población, provincia")}</li>
                 </ul>
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md flex items-start gap-2.5">
                   <AlertCircle size={12} className="text-blue-500 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-blue-700 leading-snug">Podrás revisar y vincular las columnas manualmente en el <strong>Paso 2</strong>.</p>
+                  <p className="text-[11px] text-blue-700 leading-snug">{t("Podrás revisar y vincular las columnas manualmente en el")}{" "}<strong>{t("Paso 2")}</strong>.</p>
                 </div>
               </div>
             </div>
@@ -643,12 +636,9 @@ function CsvImportUploadView({
       </div>
 
       <div className="bg-white border-t border-slate-200 px-6 sm:px-10 py-4 flex items-center justify-between flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
-        <button onClick={onBack} className="px-5 py-2.5 text-sm font-semibold text-slate-400 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors">
-          Cancelar
-        </button>
+        <button onClick={onBack} className="px-5 py-2.5 text-sm font-semibold text-slate-400 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors">{t("Cancelar")}</button>
         <button disabled={!fileName} onClick={onSelectFile}
-          className="px-6 py-2.5 text-sm font-bold text-white bg-slate-800 hover:bg-black rounded-md shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          Siguiente paso: Configurar <ArrowRight size={13} />
+          className="px-6 py-2.5 text-sm font-bold text-white bg-slate-800 hover:bg-black rounded-md shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">{t("Siguiente paso: Configurar")}{" "}<ArrowRight size={13} />
         </button>
       </div>
     </div>
@@ -696,23 +686,22 @@ function CsvImportConfigureView({
               <FileSpreadsheet size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Importar clientes</h1>
-              <p className="text-sm text-slate-500">Configuración y mapeo de las columnas del archivo subido</p>
+              <h1 className="text-lg font-bold text-slate-900">{t("Importar clientes")}</h1>
+              <p className="text-sm text-slate-500">{t("Configuración y mapeo de las columnas del archivo subido")}</p>
             </div>
           </div>
           <button onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 flex-shrink-0">
-            <ChevronLeft size={16} /> Volver a inicio
-          </button>
+            <ChevronLeft size={16} />{" "}{t("Volver a inicio")}</button>
         </div>
       </div>
 
       <div className="flex-shrink-0 bg-white border-b border-slate-200 py-4 shadow-sm">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" completed first />
-          <ImportStep step={2} label="Configurar columnas" active />
-          <ImportStep step={3} label="Revisar e Importar" last />
+          <ImportStep step={1} label={t("Subir archivo")} completed first />
+          <ImportStep step={2} label={t("Configurar columnas")} active />
+          <ImportStep step={3} label={t("Revisar e Importar")} last />
         </div>
       </div>
 
@@ -723,30 +712,27 @@ function CsvImportConfigureView({
               <FileSpreadsheet size={15} className="text-slate-500" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-800">{fileName || "Sin archivo"}</p>
-              <p className="text-xs text-slate-500">Archivo seleccionado</p>
+              <p className="text-sm font-semibold text-slate-800">{fileName || t("Sin archivo")}</p>
+              <p className="text-xs text-slate-500">{t("Archivo seleccionado")}</p>
             </div>
           </div>
           <button onClick={onSelectFile}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-white">
-            <RefreshCw size={13} /> Cambiar archivo
-          </button>
+            <RefreshCw size={13} />{" "}{t("Cambiar archivo")}</button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-8 flex flex-col gap-10">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Conecta las columnas de tu archivo</h2>
-            <p className="mt-2 text-sm text-slate-500 max-w-2xl">
-              Indica qué columna de tu CSV corresponde a cada campo del sistema. Los campos obligatorios deben estar asignados para poder continuar. Hemos detectado automáticamente las columnas que mejor coinciden.
-            </p>
+            <h2 className="text-xl font-bold text-slate-900">{t("Conecta las columnas de tu archivo")}</h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-2xl">{t("Indica qué columna de tu CSV corresponde a cada campo del sistema. Los campos obligatorios deben estar asignados para poder continuar. Hemos detectado automáticamente las columnas que mejor coinciden.")}</p>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-1.5">
-                <h3 className="text-base font-bold text-slate-900">Campos obligatorios</h3>
+                <h3 className="text-base font-bold text-slate-900">{t("Campos obligatorios")}</h3>
                 <span className="text-red-500 font-bold">*</span>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -754,14 +740,13 @@ function CsvImportConfigureView({
                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
-                {assignedRequired} de {requiredFields.length} asignados
-              </span>
+                {assignedRequired}{" "}{t("de")}{" "}{requiredFields.length}{" "}{t("asignados")}</span>
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Vantia</div>
-                <div className="col-span-4">Columna en tu CSV</div>
-                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+                <div className="col-span-5">{t("Campo en Vantia")}</div>
+                <div className="col-span-4">{t("Columna en tu CSV")}</div>
+                <div className="col-span-3 text-right">{t("Ejemplo de tus datos")}</div>
               </div>
               {requiredFields.map((field) => (
                 <CsvFieldRow key={field.id} field={field} options={mappingOptions} invalid={field.selected === CSV_UNASSIGNED} onChange={onChangeMapping} />
@@ -771,16 +756,15 @@ function CsvImportConfigureView({
 
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-slate-900">Campos opcionales</h3>
+              <h3 className="text-base font-bold text-slate-900">{t("Campos opcionales")}</h3>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {assignedOptional} de {optionalFields.length} asignados
-              </span>
+                {assignedOptional}{" "}{t("de")}{" "}{optionalFields.length}{" "}{t("asignados")}</span>
             </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
               <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <div className="col-span-5">Campo en Vantia</div>
-                <div className="col-span-4">Columna en tu CSV</div>
-                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+                <div className="col-span-5">{t("Campo en Vantia")}</div>
+                <div className="col-span-4">{t("Columna en tu CSV")}</div>
+                <div className="col-span-3 text-right">{t("Ejemplo de tus datos")}</div>
               </div>
               {visibleOptional.map((field) => (
                 <CsvFieldRow key={field.id} field={field} options={mappingOptions} onChange={onChangeMapping} />
@@ -788,9 +772,7 @@ function CsvImportConfigureView({
               {!showAllOptional && hiddenOptionalCount > 0 && (
                 <button type="button" onClick={() => setShowAllOptional(true)}
                   className="w-full py-3.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors border-t border-slate-100 flex items-center justify-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold leading-none">+</span>
-                  Mostrar {hiddenOptionalCount} campos opcionales más
-                </button>
+                  <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold leading-none">+</span>{t("Mostrar")}{" "}{hiddenOptionalCount}{" "}{t("campos opcionales más")}</button>
               )}
             </div>
           </div>
@@ -801,13 +783,11 @@ function CsvImportConfigureView({
         <div className="flex items-center justify-between max-w-[1200px] mx-auto">
           <button type="button" onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50">
-            <ChevronLeft size={16} /> Atrás
-          </button>
+            <ChevronLeft size={16} />{" "}{t("Atrás")}</button>
           <button type="button" onClick={onContinue} disabled={!canContinue}
             className={`inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold shadow-sm transition-all ${
               canContinue ? "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md" : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
-            }`}>
-            Siguiente paso: Revisar <ChevronRight size={16} />
+            }`}>{t("Siguiente paso: Revisar")}{" "}<ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -848,23 +828,22 @@ function CsvImportReviewView({
               <FileSpreadsheet size={20} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Importar clientes</h1>
-              <p className="text-sm text-slate-500">Revisa los datos mapeados antes de confirmar la importación final</p>
+              <h1 className="text-lg font-bold text-slate-900">{t("Importar clientes")}</h1>
+              <p className="text-sm text-slate-500">{t("Revisa los datos mapeados antes de confirmar la importación final")}</p>
             </div>
           </div>
           <button onClick={onBack}
             className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 flex-shrink-0">
-            <ChevronLeft size={16} /> Volver a inicio
-          </button>
+            <ChevronLeft size={16} />{" "}{t("Volver a inicio")}</button>
         </div>
       </div>
 
       <div className="flex-shrink-0 bg-white border-b border-slate-200 py-4 shadow-sm">
         <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
           <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
-          <ImportStep step={1} label="Subir archivo" completed first />
-          <ImportStep step={2} label="Configurar columnas" completed />
-          <ImportStep step={3} label="Revisar e Importar" active last />
+          <ImportStep step={1} label={t("Subir archivo")} completed first />
+          <ImportStep step={2} label={t("Configurar columnas")} completed />
+          <ImportStep step={3} label={t("Revisar e Importar")} active last />
         </div>
       </div>
 
@@ -876,21 +855,20 @@ function CsvImportReviewView({
             </div>
             <div>
               <h2 className={`text-lg font-extrabold leading-tight ${hasIssues ? "text-amber-800" : "text-emerald-800"}`}>
-                {hasIssues ? "Revisión con avisos" : "Listo para importar"}
+                {hasIssues ? t("Revisión con avisos") : t("Listo para importar")}
               </h2>
               <p className={`text-sm font-medium mt-0.5 ${hasIssues ? "text-amber-600" : "text-emerald-600"}`}>
-                {fileName || "archivo.csv"}
+                {fileName || t("archivo.csv")}
                 <span className="opacity-50 mx-2">|</span>
-                {previewRows.length} registros analizados
-              </p>
+                {previewRows.length}{" "}{t("registros analizados")}</p>
             </div>
           </div>
           <div className={`flex items-center gap-2 bg-white/60 px-4 py-2 rounded-lg border shadow-sm flex-shrink-0 ${hasIssues ? "border-amber-200" : "border-emerald-200"}`}>
             {hasIssues ? <AlertTriangle size={14} className="text-amber-500" /> : <Check size={14} className="text-emerald-500" />}
             <span className={`text-sm font-bold ${hasIssues ? "text-amber-700" : "text-emerald-700"}`}>
               {hasIssues
-                ? `${previewRows.length} registros — ${validationSummary.issues.length} ${validationSummary.issues.length === 1 ? "aviso" : "avisos"}`
-                : `${previewRows.length} registros listos para importar`}
+                ? t("{length} registros — {length2} {v}", { length: previewRows.length, length2: validationSummary.issues.length, v: validationSummary.issues.length === 1 ? "aviso" : "avisos" })
+                : t("{length} registros listos para importar", { length: previewRows.length })}
             </span>
           </div>
         </div>
@@ -899,18 +877,18 @@ function CsvImportReviewView({
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-shrink-0 px-6 lg:px-8 py-4 bg-white border-b border-slate-100 flex items-center gap-2">
           <Eye size={15} className="text-slate-400" />
-          <h3 className="text-sm font-bold text-slate-800">Vista previa de los primeros registros</h3>
+          <h3 className="text-sm font-bold text-slate-800">{t("Vista previa de los primeros registros")}</h3>
         </div>
         <div className="flex-1 overflow-auto bg-slate-50/30">
           <table className="w-full min-w-[1100px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
               <tr>
-                <th className="pl-6 lg:pl-8 pr-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Nombre</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">NIF / CIF</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Teléfono</th>
-                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Población</th>
-                <th className="pr-6 lg:pr-8 pl-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">Fecha alta</th>
+                <th className="pl-6 lg:pl-8 pr-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Nombre")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("NIF / CIF")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Email")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Teléfono")}</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Población")}</th>
+                <th className="pr-6 lg:pr-8 pl-4 py-4 text-xs font-bold text-slate-600 uppercase tracking-wider">{t("Fecha alta")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -929,7 +907,7 @@ function CsvImportReviewView({
                 );
               })}
               {previewRows.length === 0 && (
-                <tr><td colSpan={6} className="py-14 text-center text-sm text-slate-400">Sin registros para mostrar</td></tr>
+                <tr><td colSpan={6} className="py-14 text-center text-sm text-slate-400">{t("Sin registros para mostrar")}</td></tr>
               )}
             </tbody>
           </table>
@@ -942,7 +920,7 @@ function CsvImportReviewView({
             <div className="flex items-center justify-between gap-4 mb-2">
               <div className="flex items-center gap-2 text-blue-700">
                 <Loader2 size={15} className="animate-spin" />
-                <span className="text-sm font-semibold">Importando clientes…</span>
+                <span className="text-sm font-semibold">{t("Importando clientes…")}</span>
               </div>
               <span className="text-sm font-bold text-blue-700">{importProgress.done} / {importProgress.total}</span>
             </div>
@@ -954,12 +932,10 @@ function CsvImportReviewView({
           <div className="flex items-center justify-between">
             <button type="button" onClick={onBack}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50">
-              <ChevronLeft size={16} /> Volver
-            </button>
+              <ChevronLeft size={16} />{" "}{t("Volver")}</button>
             <button type="button" onClick={onImport}
               className="inline-flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 text-sm font-bold shadow-md shadow-red-500/20 transition-all border border-red-700">
-              <Upload size={15} /> Importar clientes
-            </button>
+              <Upload size={15} />{" "}{t("Importar clientes")}</button>
           </div>
         )}
       </div>
@@ -988,13 +964,12 @@ function CsvImportCompleteView({
       <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-white shrink-0">
         <BackButton onClick={onBack} />
         <div className="flex-1 min-w-0">
-          <h1 className="text-base font-bold text-slate-900 leading-tight">Importar clientes</h1>
-          <p className="text-xs text-slate-400 truncate">{fileName || "archivo.csv"}</p>
+          <h1 className="text-base font-bold text-slate-900 leading-tight">{t("Importar clientes")}</h1>
+          <p className="text-xs text-slate-400 truncate">{fileName || t("archivo.csv")}</p>
         </div>
         <button type="button" onClick={onRestart}
           className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700 shrink-0">
-          <RefreshCw size={14} /> Nueva importación
-        </button>
+          <RefreshCw size={14} />{" "}{t("Nueva importación")}</button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -1007,12 +982,12 @@ function CsvImportCompleteView({
               {hasErrors ? <AlertCircle size={22} strokeWidth={2.5} /> : <Check size={22} strokeWidth={3} />}
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-base font-bold leading-tight">{hasErrors ? "Importación con incidencias" : "Importación completada"}</h2>
-              <p className="mt-0.5 text-sm text-white/80 truncate">{totalProcessed} registros procesados</p>
+              <h2 className="text-base font-bold leading-tight">{hasErrors ? t("Importación con incidencias") : t("Importación completada")}</h2>
+              <p className="mt-0.5 text-sm text-white/80 truncate">{totalProcessed}{" "}{t("registros procesados")}</p>
             </div>
             <div className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-center">
               <p className="text-xl font-bold leading-none">{successRate}%</p>
-              <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">éxito</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">{t("éxito")}</p>
             </div>
           </div>
           <div className="mt-4 h-1.5 rounded-full bg-white/20">
@@ -1024,10 +999,10 @@ function CsvImportCompleteView({
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center"><Check size={14} className="text-emerald-600" /></div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Importados</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Importados")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{successCount}</p>
-            <p className="mt-1 text-xs text-slate-500">clientes correctos</p>
+            <p className="mt-1 text-xs text-slate-500">{t("clientes correctos")}</p>
           </div>
 
           <div className={`rounded-2xl p-4 border ${hasErrors ? "border-rose-100 bg-rose-50/60" : "border-slate-100 bg-slate-50/60"}`}>
@@ -1035,43 +1010,42 @@ function CsvImportCompleteView({
               <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-rose-100" : "bg-slate-100"}`}>
                 <AlertCircle size={14} className={hasErrors ? "text-rose-500" : "text-slate-400"} />
               </div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Con errores")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{errorCount}</p>
-            <p className="mt-1 text-xs text-slate-500">filas bloqueadas</p>
+            <p className="mt-1 text-xs text-slate-500">{t("filas bloqueadas")}</p>
             {hasErrors && (
               <button type="button" onClick={onViewDetails}
                 className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50">
-                <Eye size={12} /> Ver detalles
-              </button>
+                <Eye size={12} />{" "}{t("Ver detalles")}</button>
             )}
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
             <div className="flex items-center gap-2 mb-3">
               <div className="h-7 w-7 rounded-lg bg-sky-100 flex items-center justify-center"><FileSpreadsheet size={14} className="text-sky-600" /></div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("Total")}</p>
             </div>
             <p className="text-xl font-bold text-slate-900">{totalProcessed}</p>
-            <p className="mt-1 text-xs text-slate-500">registros revisados</p>
+            <p className="mt-1 text-xs text-slate-500">{t("registros revisados")}</p>
           </div>
         </div>
 
         {hasErrors && (
           <div className="rounded-2xl border border-red-100 bg-white p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
-              <p className="text-sm font-bold text-slate-900">Detalle de errores</p>
-              <span className="peligro rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">{issues.length} incidencias</span>
+              <p className="text-sm font-bold text-slate-900">{t("Detalle de errores")}</p>
+              <span className="peligro rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">{issues.length}{" "}{t("incidencias")}</span>
             </div>
             <div className="space-y-2">
               {visibleIssues.map((issue, index) => (
                 <div key={`${issue.rowNumber}-${issue.fieldId}-${index}`} className="rounded-xl border border-red-100 bg-red-50/60 px-3 py-2.5">
-                  <p className="text-xs font-semibold text-slate-700">Fila {issue.rowNumber} · {issue.fieldLabel}</p>
+                  <p className="text-xs font-semibold text-slate-700">{t("Fila")}{" "}{issue.rowNumber} · {issue.fieldLabel}</p>
                   <p className="mt-0.5 text-xs text-red-600">{issue.message}</p>
                 </div>
               ))}
               {issues.length > visibleIssues.length && (
-                <p className="text-xs text-slate-400 pt-1">+{issues.length - visibleIssues.length} incidencias adicionales — usa "Ver detalles" para verlas todas.</p>
+                <p className="text-xs text-slate-400 pt-1">+{issues.length - visibleIssues.length}{" "}{t("incidencias adicionales — usa \"Ver detalles\" para verlas todas.")}</p>
               )}
             </div>
           </div>
@@ -1080,12 +1054,10 @@ function CsvImportCompleteView({
         <div className="flex items-center justify-end gap-2 pt-1">
           <button type="button" onClick={onRestart}
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700">
-            <RefreshCw size={14} /> Nueva importación
-          </button>
+            <RefreshCw size={14} />{" "}{t("Nueva importación")}</button>
           <button type="button" onClick={onFinish}
             className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-red-700">
-            <Check size={14} /> Finalizar
-          </button>
+            <Check size={14} />{" "}{t("Finalizar")}</button>
         </div>
       </div>
     </div>
@@ -1128,15 +1100,14 @@ function CsvImportErrorDetailView({
     <div className="p-6 lg:p-8 space-y-6 overflow-y-auto h-full">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-base font-bold text-slate-900">Detalles de importación</h1>
+          <h1 className="text-base font-bold text-slate-900">{t("Detalles de importación")}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
-              Lote {batchId ? `${batchId.slice(0, 8)}...` : "Temporal"}
+            <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">{t("Lote")}{" "}{batchId ? `${batchId.slice(0, 8)}...` : t("Temporal")}
             </span>
-            <span>{fileName || "archivo.csv"}</span>
+            <span>{fileName || t("archivo.csv")}</span>
           </div>
         </div>
-        <BackButton onClick={onBack} label="Volver" />
+        <BackButton onClick={onBack} label={t("Volver")} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -1144,15 +1115,15 @@ function CsvImportErrorDetailView({
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Estado del lote</p>
-                <h2 className="mt-2 text-xl font-bold text-slate-900">Importación con incidencias</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Estado del lote")}</p>
+                <h2 className="mt-2 text-xl font-bold text-slate-900">{t("Importación con incidencias")}</h2>
               </div>
-              <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">Error</span>
+              <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">{t("Error")}</span>
             </div>
             <div className="mt-5 space-y-4">
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-900">Tasa de éxito</span>
+                  <span className="font-semibold text-slate-900">{t("Tasa de éxito")}</span>
                   <span className="font-semibold text-slate-700">{completedPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -1161,7 +1132,7 @@ function CsvImportErrorDetailView({
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-900">Impacto de errores</span>
+                  <span className="font-semibold text-slate-900">{t("Impacto de errores")}</span>
                   <span className="font-semibold text-slate-700">{errorPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
@@ -1172,18 +1143,18 @@ function CsvImportErrorDetailView({
           </div>
 
           <div className="rounded-[24px] border border-slate-200 bg-white/90 p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Resumen numérico</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{t("Resumen numérico")}</p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completados</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{t("Completados")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{successCount}</p>
               </div>
               <div className="rounded-2xl bg-red-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">{t("Errores")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{errorCount}</p>
               </div>
               <div className="rounded-2xl bg-slate-100 px-4 py-3 col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Total</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{t("Total")}</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{totalProcessed}</p>
               </div>
             </div>
@@ -1192,14 +1163,14 @@ function CsvImportErrorDetailView({
 
         <div className="rounded-[24px] border border-slate-200 bg-white/90 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
-            <p className="text-sm font-bold text-slate-900">Registros</p>
+            <p className="text-sm font-bold text-slate-900">{t("Registros")}</p>
             <div className="flex items-center gap-1.5">
               {(["all", "error", "ok"] as const).map((f) => (
                 <button key={f} type="button" onClick={() => setStatusFilter(f)}
                   className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
                     statusFilter === f ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}>
-                  {f === "all" ? "Todos" : f === "error" ? "Con error" : "Correctos"}
+                  {f === "all" ? t("Todos") : f === "error" ? t("Con error") : t("Correctos")}
                 </button>
               ))}
             </div>
@@ -1208,11 +1179,11 @@ function CsvImportErrorDetailView({
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Fila</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">NIF/CIF</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Fila")}</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Nombre")}</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("NIF/CIF")}</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Email")}</th>
+                  <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Estado")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1226,13 +1197,13 @@ function CsvImportErrorDetailView({
                       {r.status === "error" ? (
                         <span className="peligro text-red-600 font-medium">{r.errors}</span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} /> Correcto</span>
+                        <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} />{" "}{t("Correcto")}</span>
                       )}
                     </td>
                   </tr>
                 ))}
                 {filteredRecords.length === 0 && (
-                  <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">Sin registros que mostrar</td></tr>
+                  <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-400">{t("Sin registros que mostrar")}</td></tr>
                 )}
               </tbody>
             </table>
@@ -1253,13 +1224,11 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
     const hasErrors = row.error_count > 0;
     if (hasErrors && row.completed_count > 0) return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Parcial
-      </span>
+        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />{" "}{t("Parcial")}</span>
     );
     if (hasErrors) return (
       <span className="peligro inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
-        <div className="peligro w-1.5 h-1.5 rounded-full bg-red-500" /> Con errores
-      </span>
+        <div className="peligro w-1.5 h-1.5 rounded-full bg-red-500" />{" "}{t("Con errores")}</span>
     );
     return (
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold ${importStatusMeta(row.status).className}`}>
@@ -1272,21 +1241,19 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
     <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
       <div className="px-6 lg:px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 border-b border-slate-200">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Historial de importaciones</h1>
-          <p className="text-sm text-slate-500 mt-1">Historial de todas las importaciones de clientes realizadas</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">{t("Historial de importaciones")}</h1>
+          <p className="text-sm text-slate-500 mt-1">{t("Historial de todas las importaciones de clientes realizadas")}</p>
         </div>
         <button onClick={onBack}
           className="w-max px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2">
-          <ArrowLeft size={14} /> Volver
-        </button>
+          <ArrowLeft size={14} />{" "}{t("Volver")}</button>
       </div>
 
       <div className="px-6 lg:px-8 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 flex-shrink-0">
-        <h3 className="text-sm font-bold text-slate-800">Importaciones recientes</h3>
+        <h3 className="text-sm font-bold text-slate-800">{t("Importaciones recientes")}</h3>
         <button onClick={onReload}
           className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-          <RefreshCw size={13} className="text-slate-400" /> Actualizar
-        </button>
+          <RefreshCw size={13} className="text-slate-400" />{" "}{t("Actualizar")}</button>
       </div>
 
       {error && (
@@ -1297,22 +1264,22 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
         <table className="w-full min-w-[900px] text-left border-collapse">
           <thead className="sticky top-0 bg-white border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
             <tr>
-              <th className="pl-6 lg:pl-8 pr-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Completados</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Errores</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Archivo</th>
+              <th className="pl-6 lg:pl-8 pr-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Fecha")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Estado")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Total")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Completados")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Errores")}</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Archivo")}</th>
               <th className="w-10" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">
-                <div className="flex items-center justify-center gap-3"><Loader2 size={18} className="animate-spin" /><span>Cargando importaciones...</span></div>
+                <div className="flex items-center justify-center gap-3"><Loader2 size={18} className="animate-spin" /><span>{t("Cargando importaciones...")}</span></div>
               </td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">No hay importaciones registradas</td></tr>
+              <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">{t("No hay importaciones registradas")}</td></tr>
             ) : (
               rows.map((row) => (
                 <tr key={row.id} onClick={() => onSelectBatch(row.id)}
@@ -1375,13 +1342,13 @@ function CsvImportHistoryDetailView({
     <div className="p-6 lg:p-8 flex flex-col gap-6 overflow-y-auto h-full">
       <div className="flex items-start justify-between gap-4 flex-shrink-0">
         <div>
-          <h1 className="text-base font-bold text-slate-900">Detalle de la importación</h1>
+          <h1 className="text-base font-bold text-slate-900">{t("Detalle de la importación")}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            <span>{batch?.file_name || "archivo.csv"}</span>
+            <span>{batch?.file_name || t("archivo.csv")}</span>
             {batch && <span>· {fmtDateTime(batch.created_at)}</span>}
           </div>
         </div>
-        <BackButton onClick={onBack} label="Volver al historial" />
+        <BackButton onClick={onBack} label={t("Volver al historial")} />
       </div>
 
       {error && (
@@ -1390,25 +1357,24 @@ function CsvImportHistoryDetailView({
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center gap-3 text-slate-400 py-20">
-          <Loader2 size={18} className="animate-spin" /> Cargando detalle...
-        </div>
+          <Loader2 size={18} className="animate-spin" />{" "}{t("Cargando detalle...")}</div>
       ) : batch ? (
         <>
           <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="rounded-2xl bg-slate-100 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("Total")}</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{batch.total_count}</p>
             </div>
             <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completados</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">{t("Completados")}</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{batch.completed_count}</p>
             </div>
             <div className="rounded-2xl bg-red-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">{t("Errores")}</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{batch.error_count}</p>
             </div>
             <div className="rounded-2xl bg-slate-100 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("Estado")}</p>
               <p className="mt-1 text-sm font-bold text-slate-900">{importStatusMeta(batch.status).label}</p>
             </div>
           </div>
@@ -1421,25 +1387,24 @@ function CsvImportHistoryDetailView({
             <button type="button" onClick={onRetryFailed} disabled={failedCount === 0 || retrying}
               className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors">
               {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              {retrying && retryProgress ? `Reintentando ${retryProgress.done}/${retryProgress.total}...` : `Reintentar fallidas (${failedCount})`}
+              {retrying && retryProgress ? t("Reintentando {done}/{total}...", { done: retryProgress.done, total: retryProgress.total }) : t("Reintentar fallidas ({failedCount})", { failedCount: failedCount })}
             </button>
             <button type="button" onClick={onUndo} disabled={!canUndo || undoing}
               className="peligro inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 px-4 py-2.5 text-sm font-bold transition-colors">
-              {undoing ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
-              Deshacer importación ({completedItems.length})
+              {undoing ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}{t("Deshacer importación (")}{completedItems.length})
             </button>
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col rounded-[24px] border border-slate-200 bg-white/90 shadow-sm overflow-hidden">
             <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
-              <p className="text-sm font-bold text-slate-900">Filas ({filteredItems.length})</p>
+              <p className="text-sm font-bold text-slate-900">{t("Filas (")}{filteredItems.length})</p>
               <div className="flex items-center gap-1.5">
                 {(["all", "error", "ok"] as const).map((f) => (
                   <button key={f} type="button" onClick={() => setStatusFilter(f)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
                       statusFilter === f ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}>
-                    {f === "all" ? "Todas" : f === "error" ? "Con error" : "Correctas"}
+                    {f === "all" ? t("Todas") : f === "error" ? t("Con error") : t("Correctas")}
                   </button>
                 ))}
               </div>
@@ -1448,10 +1413,10 @@ function CsvImportHistoryDetailView({
               <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Fila</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">NIF/CIF</th>
-                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Fila")}</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Nombre")}</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("NIF/CIF")}</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Estado")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1464,15 +1429,15 @@ function CsvImportHistoryDetailView({
                         {it.status === "failed" ? (
                           <span className="text-red-600 font-medium">{it.error_message}</span>
                         ) : it.status === "completed" && !it.created_entity_id ? (
-                          <span className="inline-flex items-center gap-1 text-slate-400 font-semibold"><AlertTriangle size={11} /> Deshecha</span>
+                          <span className="inline-flex items-center gap-1 text-slate-400 font-semibold"><AlertTriangle size={11} />{" "}{t("Deshecha")}</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} /> Correcto</span>
+                          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} />{" "}{t("Correcto")}</span>
                         )}
                       </td>
                     </tr>
                   ))}
                   {filteredItems.length === 0 && (
-                    <tr><td colSpan={4} className="py-10 text-center text-sm text-slate-400">Sin filas que mostrar</td></tr>
+                    <tr><td colSpan={4} className="py-10 text-center text-sm text-slate-400">{t("Sin filas que mostrar")}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -1518,10 +1483,10 @@ export default function ClientCsvImport() {
       const token = await getToken({ skipCache: true });
       const res = await fetch("/api/entities/imports?limit=100", { headers: { Authorization: `Bearer ${token}` } });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "Error al cargar el historial de importaciones");
+      if (!res.ok) throw new Error(d.error || t("Error al cargar el historial de importaciones"));
       setImportHistory(d.data || []);
     } catch (e: any) {
-      if (!silent) setImportHistoryError(e.message || "Error al cargar el historial de importaciones");
+      if (!silent) setImportHistoryError(e.message || t("Error al cargar el historial de importaciones"));
     } finally {
       if (!silent) setLoadingImportHistory(false);
     }
@@ -1551,12 +1516,12 @@ export default function ClientCsvImport() {
         }),
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo registrar la importacion");
+      if (!res.ok) throw new Error(d.error || t("No se pudo registrar la importacion"));
       setCsvImportBatchId(d.data?.id || null);
       setImportHistory((prev) => [d.data, ...prev]);
       setViewMode("configure");
     } catch (e: any) {
-      aviso(e.message || "No se pudo registrar la importacion.");
+      aviso(e.message || t("No se pudo registrar la importacion."));
     }
   };
 
@@ -1658,7 +1623,7 @@ export default function ClientCsvImport() {
             error_count: summary.errorCount,
             pending_count: 0,
             notes: summary.errorCount > 0
-              ? `Importación finalizada: ${summary.successCount} correctos, ${summary.errorCount} con errores.`
+              ? t("Importación finalizada: {ok} correctos, {mal} con errores.", { ok: summary.successCount, mal: summary.errorCount })
               : "Importación completada correctamente.",
             items: results.map((r) => ({
               row_number: r.rowNumber, reference: r.reference, status: r.status,
@@ -1684,10 +1649,10 @@ export default function ClientCsvImport() {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/entities/imports/${batchId}`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo cargar el detalle de la importación");
+      if (!res.ok) throw new Error(d.error || t("No se pudo cargar el detalle de la importación"));
       setHistoryDetailBatch(d.data);
     } catch (e: any) {
-      setHistoryDetailError(e.message || "Error al cargar el detalle de la importación");
+      setHistoryDetailError(e.message || t("Error al cargar el detalle de la importación"));
     } finally {
       setLoadingHistoryDetail(false);
     }
@@ -1729,7 +1694,7 @@ export default function ClientCsvImport() {
           completed_count: completedTotal,
           error_count: errorTotal,
           pending_count: 0,
-          notes: `Reintento: ${recovered} de ${failedItems.length} filas recuperadas.`,
+          notes: t("Reintento: {ok} de {total} filas recuperadas.", { ok: recovered, total: failedItems.length }),
           items: mergedItems,
         }),
       });
@@ -1738,10 +1703,10 @@ export default function ClientCsvImport() {
         openHistoryDetail(historyDetailBatch.id);
         fetchImportHistory(true);
       } else {
-        setHistoryDetailError(patchData.error || "No se pudo guardar el resultado del reintento");
+        setHistoryDetailError(patchData.error || t("No se pudo guardar el resultado del reintento"));
       }
     } catch (e: any) {
-      setHistoryDetailError(e.message || "No se pudieron reintentar las filas fallidas");
+      setHistoryDetailError(e.message || t("No se pudieron reintentar las filas fallidas"));
     } finally {
       setRetryingFailedItems(false);
       setRetryProgress(null);
@@ -1751,9 +1716,9 @@ export default function ClientCsvImport() {
   const handleUndoBatch = useCallback(async () => {
     if (!historyDetailBatch) return;
     const confirmed = await confirmar({
-      titulo: "¿Deshacer esta importación?",
-      mensaje: `Se eliminarán los ${historyDetailBatch.completed_count} clientes que se crearon en este lote. Esta acción no se puede deshacer.`,
-      confirmar: "Deshacer importación",
+      titulo: t("¿Deshacer esta importación?"),
+      mensaje: t("Se eliminarán los {completed_count} clientes que se crearon en este lote. Esta acción no se puede deshacer.", { completed_count: historyDetailBatch.completed_count }),
+      confirmar: t("Deshacer importación"),
       peligro: true,
     });
     if (!confirmed) return;
@@ -1765,12 +1730,12 @@ export default function ClientCsvImport() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await safeJson(res);
-      if (!res.ok) throw new Error(d.error || "No se pudo deshacer la importación");
-      aviso(`Se eliminaron ${d.data.deletedCount} cliente(s) creados por esta importación.`);
+      if (!res.ok) throw new Error(d.error || t("No se pudo deshacer la importación"));
+      aviso(t("Se eliminaron {deletedCount} cliente(s) creados por esta importación.", { deletedCount: d.data.deletedCount }));
       openHistoryDetail(historyDetailBatch.id);
       fetchImportHistory(true);
     } catch (e: any) {
-      setHistoryDetailError(e.message || "No se pudo deshacer la importación");
+      setHistoryDetailError(e.message || t("No se pudo deshacer la importación"));
     } finally {
       setUndoingBatch(false);
     }

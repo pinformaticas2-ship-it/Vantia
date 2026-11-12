@@ -6,6 +6,7 @@ import {
   ChevronDown as ChevronDownIcon,
 } from "lucide-react";
 import { aviso } from "../lib/avisos";
+import { t } from '../lib/i18n';
 
 // ── Tipos ──────────────────────────────────────────────────────
 export interface Atajo {
@@ -124,10 +125,10 @@ export function NuevoAtajoModal({
             </div>
             <div>
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                {initial ? "Modificar atajo" : "Nuevo atajo"} · {modulo}
+                {initial ? t("Modificar atajo") : t("Nuevo atajo")} · {modulo}
               </p>
               <h3 className="text-base font-bold text-slate-900">
-                {initial ? (initial.nombre || "Editar atajo") : "Crear nuevo atajo"}
+                {initial ? (initial.nombre || t("Editar atajo")) : t("Crear nuevo atajo")}
               </h3>
             </div>
           </div>
@@ -144,11 +145,11 @@ export function NuevoAtajoModal({
 
           {/* Nombre */}
           <div>
-            <label className={lbl}>Nombre del atajo</label>
+            <label className={lbl}>{t("Nombre del atajo")}</label>
             <input
               value={form.nombre}
               onChange={e => set("nombre", e.target.value)}
-              placeholder="Ej: Enviar Correo de Bienvenida"
+              placeholder={t("Ej: Enviar Correo de Bienvenida")}
               autoFocus
               className={inp}
             />
@@ -158,7 +159,7 @@ export function NuevoAtajoModal({
 
           {/* Acción */}
           <div>
-            <label className={lbl}>Acción</label>
+            <label className={lbl}>{t("Acción")}</label>
             <select value={form.accion} onChange={e => set("accion", e.target.value)} className={inp}>
               {ACCIONES.map(a => <option key={a} value={a === ACCIONES[0] ? "" : a}>{a}</option>)}
             </select>
@@ -167,35 +168,35 @@ export function NuevoAtajoModal({
           {/* Documento + Forma de envío */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Documento</label>
+              <label className={lbl}>{t("Documento")}</label>
               <select value={form.documento} onChange={e => set("documento", e.target.value)} className={inp}>
-                <option value="">— Ninguno —</option>
-                <option value="Carátula Expediente">Carátula Expediente</option>
-                <option value="Informe Detallado">Informe Detallado</option>
-                <option value="Informe Resumido">Informe Resumido</option>
-                <option value="Valoración">Valoración</option>
-                <option value="Solicitud Documentación">Solicitud Documentación</option>
-                <option value="Provisión de Fondos">Provisión de Fondos</option>
-                <option value="Firma de Documento">Firma de Documento</option>
-                <option value="Comunicación Novedades">Comunicación Novedades</option>
+                <option value="">{t("— Ninguno —")}</option>
+                <option value="Carátula Expediente">{t("Carátula Expediente")}</option>
+                <option value="Informe Detallado">{t("Informe Detallado")}</option>
+                <option value="Informe Resumido">{t("Informe Resumido")}</option>
+                <option value="Valoración">{t("Valoración")}</option>
+                <option value="Solicitud Documentación">{t("Solicitud Documentación")}</option>
+                <option value="Provisión de Fondos">{t("Provisión de Fondos")}</option>
+                <option value="Firma de Documento">{t("Firma de Documento")}</option>
+                <option value="Comunicación Novedades">{t("Comunicación Novedades")}</option>
               </select>
             </div>
             <div>
-              <label className={lbl}>Forma de envío</label>
+              <label className={lbl}>{t("Forma de envío")}</label>
               <select value={form.formaEnvio} onChange={e => set("formaEnvio", e.target.value)} className={inp}>
-                {FORMAS_ENVIO.map(f => <option key={f} value={f}>{f || "— Seleccionar —"}</option>)}
+                {FORMAS_ENVIO.map(f => <option key={f} value={f}>{f || t("— Seleccionar —")}</option>)}
               </select>
             </div>
           </div>
 
           {/* Plantilla de correo */}
           <div>
-            <label className={lbl}>Plantilla de correo</label>
+            <label className={lbl}>{t("Plantilla de correo")}</label>
             <div className="relative">
               <input
                 value={form.plantillaCorreo}
                 onChange={e => set("plantillaCorreo", e.target.value)}
-                placeholder="Buscar plantilla..."
+                placeholder={t("Buscar plantilla...")}
                 className={`${inp} pr-9`}
               />
               <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
@@ -207,7 +208,7 @@ export function NuevoAtajoModal({
           {/* Módulos + Carpeta */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Módulos</label>
+              <label className={lbl}>{t("Módulos")}</label>
               <div className="flex gap-1.5 flex-wrap">
                 {MODULOS_DISPONIBLES.map(m => (
                   <button
@@ -227,7 +228,7 @@ export function NuevoAtajoModal({
               </div>
             </div>
             <div>
-              <label className={lbl}>Carpeta</label>
+              <label className={lbl}>{t("Carpeta")}</label>
               <select value={form.carpeta} onChange={e => set("carpeta", e.target.value)} className={inp}>
                 {CARPETAS_DEFAULT.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -242,18 +243,14 @@ export function NuevoAtajoModal({
                 checked={form.habilitado}
                 onChange={e => set("habilitado", e.target.checked)}
                 className="rounded border-slate-300 accent-red-600"
-              />
-              Habilitado
-            </label>
+              />{t("Habilitado")}</label>
             <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={form.enBarra}
                 onChange={e => set("enBarra", e.target.checked)}
                 className="rounded border-slate-300 accent-red-600"
-              />
-              Mostrar en barra de atajos
-            </label>
+              />{t("Mostrar en barra de atajos")}</label>
           </div>
         </div>
 
@@ -266,15 +263,11 @@ export function NuevoAtajoModal({
             }}
             disabled={!form.nombre.trim()}
             className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl active:scale-95 transition-all"
-          >
-            Guardar
-          </button>
+          >{t("Guardar")}</button>
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
-          >
-            Cancelar
-          </button>
+          >{t("Cancelar")}</button>
         </div>
       </div>
     </div>
@@ -372,8 +365,8 @@ export function ListadoAtajosModal({
                 <Bookmark size={15} className="text-amber-600" />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Configuración · {modulo}</p>
-                <h3 className="text-base font-bold text-slate-900">Atajos de acción</h3>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t("Configuración ·")}{" "}{modulo}</p>
+                <h3 className="text-base font-bold text-slate-900">{t("Atajos de acción")}</h3>
               </div>
             </div>
             <button
@@ -390,26 +383,23 @@ export function ListadoAtajosModal({
               onClick={() => setShowNuevo(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95 transition-all"
             >
-              <Plus size={12} /> Nuevo
-            </button>
+              <Plus size={12} />{" "}{t("Nuevo")}</button>
             <span className="w-px h-4 bg-slate-200 mx-1" />
             <button
               disabled={!selectedAtajo}
               onClick={() => selectedAtajo && setEditando(selectedAtajo)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <Pencil size={11} /> Modificar
-            </button>
+              <Pencil size={11} />{" "}{t("Modificar")}</button>
             <button
               disabled={!selectedAtajo}
               onClick={() => selectedAtajo && setConfirmDeleteId(selectedAtajo.id)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              <Trash2 size={11} /> Eliminar
-            </button>
+              <Trash2 size={11} />{" "}{t("Eliminar")}</button>
             {filtrados.length > 0 && (
               <span className="ml-auto text-[11px] font-semibold text-slate-400">
-                {filtrados.length} {filtrados.length === 1 ? "atajo" : "atajos"}
+                {filtrados.length} {filtrados.length === 1 ? t("atajo") : t("atajos")}
               </span>
             )}
           </div>
@@ -422,17 +412,17 @@ export function ListadoAtajosModal({
                 value={buscar}
                 onChange={e => setBuscar(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-red-400 bg-white text-slate-700"
-                placeholder="Buscar atajo..."
+                placeholder={t("Buscar atajo...")}
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Módulo</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Módulo")}</span>
               <select value={moduloFiltro} onChange={e => setModuloFiltro(e.target.value)} className={filterSel}>
                 {modulosFiltroOpts.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carpeta</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t("Carpeta")}</span>
               <select value={categoriaFiltro} onChange={e => setCategoriaFiltro(e.target.value)} className={filterSel}>
                 {carpetas.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -444,12 +434,12 @@ export function ListadoAtajosModal({
             <table className="w-full text-left">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <th className={th}>Nombre del atajo</th>
-                  <th className={th}>Módulos</th>
-                  <th className={th}>Forma de envío</th>
-                  <th className={th}>Carpeta</th>
-                  <th className={`${th} text-center`}>Activo</th>
-                  <th className={`${th} text-center`}>En barra</th>
+                  <th className={th}>{t("Nombre del atajo")}</th>
+                  <th className={th}>{t("Módulos")}</th>
+                  <th className={th}>{t("Forma de envío")}</th>
+                  <th className={th}>{t("Carpeta")}</th>
+                  <th className={`${th} text-center`}>{t("Activo")}</th>
+                  <th className={`${th} text-center`}>{t("En barra")}</th>
                   <th className={th + " w-16"}></th>
                 </tr>
               </thead>
@@ -461,13 +451,11 @@ export function ListadoAtajosModal({
                         <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-300">
                           <Bookmark size={20} />
                         </div>
-                        <p className="text-sm font-semibold text-slate-500">No hay atajos todavía</p>
+                        <p className="text-sm font-semibold text-slate-500">{t("No hay atajos todavía")}</p>
                         <button
                           onClick={() => setShowNuevo(true)}
                           className="text-red-600 text-xs font-bold hover:underline"
-                        >
-                          + Crear el primer atajo
-                        </button>
+                        >{t("+ Crear el primer atajo")}</button>
                       </div>
                     </td>
                   </tr>
@@ -498,7 +486,7 @@ export function ListadoAtajosModal({
                       <td className={`${td} text-center`}>
                         <button
                           onClick={e => { e.stopPropagation(); toggleHabilitado(a.id); }}
-                          title={a.habilitado ? "Deshabilitar" : "Habilitar"}
+                          title={a.habilitado ? t("Deshabilitar") : t("Habilitar")}
                         >
                           {a.habilitado
                             ? <Check size={14} className="text-emerald-500 mx-auto" />
@@ -516,7 +504,7 @@ export function ListadoAtajosModal({
                             onClick={e => { e.stopPropagation(); moveUp(idx); }}
                             disabled={idx === 0}
                             className="p-1 rounded text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
-                            title="Subir"
+                            title={t("Subir")}
                           >
                             <ChevronUp size={12} />
                           </button>
@@ -524,7 +512,7 @@ export function ListadoAtajosModal({
                             onClick={e => { e.stopPropagation(); moveDown(idx); }}
                             disabled={idx === filtrados.length - 1}
                             className="p-1 rounded text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
-                            title="Bajar"
+                            title={t("Bajar")}
                           >
                             <ChevronDownIcon size={12} />
                           </button>
@@ -564,23 +552,19 @@ export function ListadoAtajosModal({
                 <AlertTriangle size={18} className="peligro text-red-600" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">¿Eliminar atajo?</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Esta acción no se puede deshacer.</p>
+                <h3 className="font-bold text-slate-900 text-sm">{t("¿Eliminar atajo?")}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{t("Esta acción no se puede deshacer.")}</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setConfirmDeleteId(null)}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
+              >{t("Cancelar")}</button>
               <button
                 onClick={() => handleDelete(confirmDeleteId)}
                 className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl active:scale-95 transition-all"
-              >
-                Eliminar
-              </button>
+              >{t("Eliminar")}</button>
             </div>
           </div>
         </div>
@@ -645,7 +629,7 @@ export function AtajosButton({ modulo }: { modulo: string }) {
           onClick={openMenu}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${open ? "bg-amber-50 border-amber-300 text-amber-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}
         >
-          <Bookmark size={13} /> Atajos <ChevronDown size={10} />
+          <Bookmark size={13} />{" "}{t("Atajos")}{" "}<ChevronDown size={10} />
         </button>
       </div>
 
@@ -658,8 +642,8 @@ export function AtajosButton({ modulo }: { modulo: string }) {
           {visibles.length === 0 ? (
             <div className="px-4 py-6 text-center">
               <Bookmark size={22} className="text-slate-200 mx-auto mb-2" />
-              <p className="text-xs text-slate-400 font-medium">No hay atajos configurados</p>
-              <p className="text-[10px] text-slate-300 mt-0.5">Crea el primero con "Añadir nuevo"</p>
+              <p className="text-xs text-slate-400 font-medium">{t("No hay atajos configurados")}</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">{t("Crea el primero con \"Añadir nuevo\"")}</p>
             </div>
           ) : (
             Object.entries(porCarpeta).map(([carpeta, items]) => (
@@ -672,7 +656,7 @@ export function AtajosButton({ modulo }: { modulo: string }) {
                 {items.map(a => (
                   <button
                     key={a.id}
-                    onClick={() => { setOpen(false); aviso(`Ejecutando: ${a.nombre}`); }}
+                    onClick={() => { setOpen(false); aviso(t("Ejecutando: {nombre}", { nombre: a.nombre })); }}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                   >
                     <Bookmark size={13} className="text-slate-400 shrink-0" />
@@ -688,14 +672,12 @@ export function AtajosButton({ modulo }: { modulo: string }) {
             onClick={() => { setOpen(false); setShowNuevo(true); }}
             className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
-            <Plus size={13} className="text-slate-300 shrink-0" /> Añadir atajo
-          </button>
+            <Plus size={13} className="text-slate-300 shrink-0" />{" "}{t("Añadir atajo")}</button>
           <button
             onClick={() => { setOpen(false); setShowListado(true); }}
             className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
-            <Settings size={13} className="text-slate-300 shrink-0" /> Configurar Atajos
-          </button>
+            <Settings size={13} className="text-slate-300 shrink-0" />{" "}{t("Configurar Atajos")}</button>
         </div>,
         document.body
       )}

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Image as ImageIcon, Loader2, Palette, Code2, Upload, X, AlertTriangle } from "lucide-react";
 import { resolveApiUrl } from "../lib/api";
+import { t } from '../lib/i18n';
 
 // Editor de firmas de correo (Correo → Firmas). Tres formas de hacerla:
 //  · Diseñar: logo + texto en dos columnas, colores y fondo (como las firmas
@@ -94,13 +95,13 @@ export function useFirmaUpload() {
       const bmp = await createImageBitmap(blob);
       const c = document.createElement("canvas"); c.width = bmp.width; c.height = bmp.height;
       c.getContext("2d")!.drawImage(bmp, 0, 0);
-      blob = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("No se pudo convertir la imagen"))), "image/png"));
+      blob = await new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error(t("No se pudo convertir la imagen")))), "image/png"));
     }
     blob = await prepararImagen(blob);
     const token = await getToken();
     const res = await fetch("/api/firma-imagenes", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": blob.type }, body: blob });
     const j = await res.json().catch(() => null);
-    if (!res.ok || !j?.success) throw new Error(j?.error || "No se pudo subir la imagen");
+    if (!res.ok || !j?.success) throw new Error(j?.error || t("No se pudo subir la imagen"));
     return urlAbsoluta(j.data.path);
   };
 }
@@ -134,17 +135,16 @@ export function ImagenesNoAccesibles({ html, onChange }: { html: string; onChang
   };
   return (
     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
-      <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><AlertTriangle size={13} /> {rotas.length === 1 ? "Hay una imagen" : `Hay ${rotas.length} imágenes`} que solo existe{rotas.length === 1 ? "" : "n"} en tu ordenador</p>
-      <p className="mb-2 text-amber-800">Vienen de la firma de Outlook o de una carpeta local: ni Vantia ni quien reciba el correo pueden verlas. Sube el archivo de cada una para que se vea en todas partes.</p>
+      <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><AlertTriangle size={13} /> {rotas.length === 1 ? t("Hay una imagen") : t("Hay {length} imágenes", { length: rotas.length })}{" "}{t("que solo existe")}{rotas.length === 1 ? "" : "n"}{" "}{t("en tu ordenador")}</p>
+      <p className="mb-2 text-amber-800">{t("Vienen de la firma de Outlook o de una carpeta local: ni Vantia ni quien reciba el correo pueden verlas. Sube el archivo de cada una para que se vea en todas partes.")}</p>
       <ul className="space-y-1">
         {rotas.map((src) => (
           <li key={src} className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={src}>{decodeURIComponent(src.split(/[\\/]/).pop() || src)}</span>
             <button type="button" disabled={!!subiendo} onClick={() => { objetivo.current = src; inputRef.current?.click(); }}
               className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 disabled:opacity-50">
-              {subiendo === src ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Subir imagen
-            </button>
-            <button type="button" onClick={() => quitar(src)} className="text-amber-700 hover:text-red-600">Quitar</button>
+              {subiendo === src ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}{" "}{t("Subir imagen")}</button>
+            <button type="button" onClick={() => quitar(src)} className="text-amber-700 hover:text-red-600">{t("Quitar")}</button>
           </li>
         ))}
       </ul>
@@ -155,7 +155,7 @@ export function ImagenesNoAccesibles({ html, onChange }: { html: string; onChang
           const src = objetivo.current;
           if (!f || !src) return;
           setSubiendo(src); setError("");
-          try { reemplazar(src, await subir(f)); } catch (err: any) { setError(err?.message || "No se pudo subir"); } finally { setSubiendo(null); }
+          try { reemplazar(src, await subir(f)); } catch (err: any) { setError(err?.message || t("No se pudo subir")); } finally { setSubiendo(null); }
         }} />
     </div>
   );
@@ -187,7 +187,7 @@ function ImagenInput({ label, value, onChange, ayuda }: { label: string; value: 
   const elegir = async (f?: File | null) => {
     if (!f) return;
     setSubiendo(true); setError("");
-    try { onChange(await subir(f)); } catch (e: any) { setError(e?.message || "Error subiendo"); } finally { setSubiendo(false); }
+    try { onChange(await subir(f)); } catch (e: any) { setError(e?.message || t("Error subiendo")); } finally { setSubiendo(false); }
   };
   return (
     <div>
@@ -198,9 +198,9 @@ function ImagenInput({ label, value, onChange, ayuda }: { label: string; value: 
         </div>
         <button type="button" onClick={() => ref.current?.click()} disabled={subiendo}
           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-          {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} {value ? "Cambiar" : "Subir imagen"}
+          {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} {value ? t("Cambiar") : t("Subir imagen")}
         </button>
-        {value && <button type="button" onClick={() => onChange("")} className="text-xs text-gray-400 hover:text-red-600">Quitar</button>}
+        {value && <button type="button" onClick={() => onChange("")} className="text-xs text-gray-400 hover:text-red-600">{t("Quitar")}</button>}
         <input ref={ref} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { void elegir(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
       {ayuda && <p className="mt-1 text-[11px] text-gray-400">{ayuda}</p>}
@@ -266,8 +266,8 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
       <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto p-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Nombre de la firma</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Administración" className={inputCls} />
+            <label className="mb-1 block text-xs font-medium text-gray-500">{t("Nombre de la firma")}</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("Ej. Administración")} className={inputCls} />
           </div>
           <div className="flex rounded-lg bg-gray-100 p-0.5 text-xs font-semibold">
             {tabs.map((t) => (
@@ -278,55 +278,52 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
 
           {modo === "disenar" && (
             <div className="space-y-3">
-              <ImagenInput label="Logo" value={diseno.logo} onChange={(logo) => set({ logo })} ayuda="PNG o JPG. Se coloca a la izquierda." />
+              <ImagenInput label={t("Logo")} value={diseno.logo} onChange={(logo) => set({ logo })} ayuda={t("PNG o JPG. Se coloca a la izquierda.")} />
               {diseno.logo && (
-                <label className="block text-xs text-gray-500">Ancho del logo: {diseno.anchoLogo}px
-                  <input type="range" min={60} max={300} value={diseno.anchoLogo} onChange={(e) => set({ anchoLogo: Number(e.target.value) })} className="w-full accent-indigo-600" />
+                <label className="block text-xs text-gray-500">{t("Ancho del logo:")}{" "}{diseno.anchoLogo}{t("px")}<input type="range" min={60} max={300} value={diseno.anchoLogo} onChange={(e) => set({ anchoLogo: Number(e.target.value) })} className="w-full accent-indigo-600" />
                 </label>
               )}
               <div className="grid grid-cols-2 gap-2">
-                <input value={diseno.linea1} onChange={(e) => set({ linea1: e.target.value })} placeholder="Cargo / departamento" className={inputCls} />
-                <input value={diseno.linea2} onChange={(e) => set({ linea2: e.target.value })} placeholder="Nombre o despacho" className={inputCls} />
+                <input value={diseno.linea1} onChange={(e) => set({ linea1: e.target.value })} placeholder={t("Cargo / departamento")} className={inputCls} />
+                <input value={diseno.linea2} onChange={(e) => set({ linea2: e.target.value })} placeholder={t("Nombre o despacho")} className={inputCls} />
               </div>
-              <textarea value={diseno.direccion} onChange={(e) => set({ direccion: e.target.value })} rows={2} placeholder="Dirección (una o varias líneas)" className={`${inputCls} resize-none`} />
+              <textarea value={diseno.direccion} onChange={(e) => set({ direccion: e.target.value })} rows={2} placeholder={t("Dirección (una o varias líneas)")} className={`${inputCls} resize-none`} />
               <div className="grid grid-cols-2 gap-2">
-                <input value={diseno.email} onChange={(e) => set({ email: e.target.value })} placeholder="Correo" className={inputCls} />
-                <input value={diseno.telefono} onChange={(e) => set({ telefono: e.target.value })} placeholder="Tel./Fax: …" className={inputCls} />
+                <input value={diseno.email} onChange={(e) => set({ email: e.target.value })} placeholder={t("Correo")} className={inputCls} />
+                <input value={diseno.telefono} onChange={(e) => set({ telefono: e.target.value })} placeholder={t("Tel./Fax: …")} className={inputCls} />
               </div>
-              <input value={diseno.web} onChange={(e) => set({ web: e.target.value })} placeholder="www.tudespacho.es" className={inputCls} />
+              <input value={diseno.web} onChange={(e) => set({ web: e.target.value })} placeholder={t("www.tudespacho.es")} className={inputCls} />
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-                <label className="flex items-center gap-1.5">Color <input type="color" value={diseno.color} onChange={(e) => set({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-gray-200" /></label>
-                <label className="flex items-center gap-1.5">Letra
-                  <select value={diseno.fuente} onChange={(e) => set({ fuente: e.target.value })} className="rounded border border-gray-200 px-2 py-1">
+                <label className="flex items-center gap-1.5">{t("Color")}{" "}<input type="color" value={diseno.color} onChange={(e) => set({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-gray-200" /></label>
+                <label className="flex items-center gap-1.5">{t("Letra")}<select value={diseno.fuente} onChange={(e) => set({ fuente: e.target.value })} className="rounded border border-gray-200 px-2 py-1">
                     {Object.keys(FUENTES).map((f) => <option key={f}>{f}</option>)}
                   </select>
                 </label>
-                <label className="flex items-center gap-1.5"><input type="checkbox" checked={diseno.separador} onChange={(e) => set({ separador: e.target.checked })} className="accent-indigo-600" /> Línea entre logo y texto</label>
+                <label className="flex items-center gap-1.5"><input type="checkbox" checked={diseno.separador} onChange={(e) => set({ separador: e.target.checked })} className="accent-indigo-600" />{" "}{t("Línea entre logo y texto")}</label>
               </div>
-              <ImagenInput label="Fondo (opcional, se repite como un mosaico)" value={diseno.fondo} onChange={(fondo) => set({ fondo })}
-                ayuda="Una imagen suave, p.ej. el símbolo del logo en tono claro. Outlook de escritorio no muestra fondos: allí sale en blanco." />
-              <textarea value={diseno.aviso} onChange={(e) => set({ aviso: e.target.value })} rows={2} placeholder="Aviso legal / confidencialidad (opcional, en letra pequeña)" className={`${inputCls} resize-none text-xs`} />
+              <ImagenInput label={t("Fondo (opcional, se repite como un mosaico)")} value={diseno.fondo} onChange={(fondo) => set({ fondo })}
+                ayuda={t("Una imagen suave, p.ej. el símbolo del logo en tono claro. Outlook de escritorio no muestra fondos: allí sale en blanco.")} />
+              <textarea value={diseno.aviso} onChange={(e) => set({ aviso: e.target.value })} rows={2} placeholder={t("Aviso legal / confidencialidad (opcional, en letra pequeña)")} className={`${inputCls} resize-none text-xs`} />
             </div>
           )}
 
           {modo === "imagen" && (
             <div className="space-y-3">
-              <ImagenInput label="Firma en imagen" value={imagen.src} onChange={(src) => setImagen((i) => ({ ...i, src }))}
-                ayuda="Se verá exactamente igual en todos los correos. El texto de la imagen no se puede seleccionar ni pulsar." />
-              <label className="block text-xs text-gray-500">Ancho: {imagen.ancho}px
-                <input type="range" min={200} max={700} value={imagen.ancho} onChange={(e) => setImagen((i) => ({ ...i, ancho: Number(e.target.value) }))} className="w-full accent-indigo-600" />
+              <ImagenInput label={t("Firma en imagen")} value={imagen.src} onChange={(src) => setImagen((i) => ({ ...i, src }))}
+                ayuda={t("Se verá exactamente igual en todos los correos. El texto de la imagen no se puede seleccionar ni pulsar.")} />
+              <label className="block text-xs text-gray-500">{t("Ancho:")}{" "}{imagen.ancho}{t("px")}<input type="range" min={200} max={700} value={imagen.ancho} onChange={(e) => setImagen((i) => ({ ...i, ancho: Number(e.target.value) }))} className="w-full accent-indigo-600" />
               </label>
-              <input value={imagen.enlace} onChange={(e) => setImagen((i) => ({ ...i, enlace: e.target.value }))} placeholder="Enlace al pulsarla (opcional), p.ej. www.tudespacho.es" className={inputCls} />
-              <input value={imagen.alt} onChange={(e) => setImagen((i) => ({ ...i, alt: e.target.value }))} placeholder="Texto alternativo (si no cargan las imágenes)" className={inputCls} />
+              <input value={imagen.enlace} onChange={(e) => setImagen((i) => ({ ...i, enlace: e.target.value }))} placeholder={t("Enlace al pulsarla (opcional), p.ej. www.tudespacho.es")} className={inputCls} />
+              <input value={imagen.alt} onChange={(e) => setImagen((i) => ({ ...i, alt: e.target.value }))} placeholder={t("Texto alternativo (si no cargan las imágenes)")} className={inputCls} />
             </div>
           )}
 
           {modo === "html" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500">{verCodigo ? "Código HTML" : "Pega aquí una firma copiada de Outlook, Gmail o una web"}</p>
+                <p className="text-xs text-gray-500">{verCodigo ? t("Código HTML") : t("Pega aquí una firma copiada de Outlook, Gmail o una web")}</p>
                 <button type="button" onClick={() => { if (!verCodigo && editableRef.current) setHtml(editableRef.current.innerHTML); setVerCodigo(!verCodigo); }}
-                  className="text-xs font-medium text-indigo-600 hover:underline">{verCodigo ? "Ver como firma" : "Ver código"}</button>
+                  className="text-xs font-medium text-indigo-600 hover:underline">{verCodigo ? t("Ver como firma") : t("Ver código")}</button>
               </div>
               {verCodigo ? (
                 <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={12} className={`${inputCls} resize-none font-mono text-xs`} />
@@ -335,18 +332,18 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
                   className="min-h-[180px] overflow-auto rounded-lg border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               )}
               <ImagenesNoAccesibles html={html} onChange={(h) => { setHtml(h); if (editableRef.current) editableRef.current.innerHTML = h; }} />
-              <p className="text-[11px] text-gray-400">Las imágenes pegadas se suben a Vantia al guardar, para que el destinatario las vea.</p>
+              <p className="text-[11px] text-gray-400">{t("Las imágenes pegadas se suben a Vantia al guardar, para que el destinatario las vea.")}</p>
             </div>
           )}
         </div>
 
         <div className="flex min-h-0 flex-col">
-          <p className="mb-1 text-xs font-medium text-gray-500">Vista previa</p>
+          <p className="mb-1 text-xs font-medium text-gray-500">{t("Vista previa")}</p>
           <div className="flex-1 overflow-auto rounded-xl border border-gray-200 bg-white p-4">
             {htmlFinal
-              ? <iframe title="Vista previa de la firma" sandbox="" className="h-[340px] w-full"
+              ? <iframe title={t("Vista previa de la firma")} sandbox="" className="h-[340px] w-full"
                   srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:0;font-family:Arial,sans-serif;font-size:14px;color:#333"><p style="margin:0 0 12px">Un cordial saludo,</p>${htmlFinal}</body>`} />
-              : <p className="py-16 text-center text-sm text-gray-300">Aquí verás la firma</p>}
+              : <p className="py-16 text-center text-sm text-gray-300">{t("Aquí verás la firma")}</p>}
           </div>
         </div>
       </div>
@@ -359,11 +356,10 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
         </div>
       )}
       <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-3">
-        <button onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+        <button onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">{t("Cancelar")}</button>
         <button onClick={() => void guardar()} disabled={!name.trim() || !htmlFinal.trim() || guardando}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50">
-          {guardando && <Loader2 size={14} className="animate-spin" />} Guardar
-        </button>
+          {guardando && <Loader2 size={14} className="animate-spin" />}{" "}{t("Guardar")}</button>
       </div>
     </div>
   );
