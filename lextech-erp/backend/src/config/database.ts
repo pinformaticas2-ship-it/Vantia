@@ -4,6 +4,14 @@ import dns from 'dns';
 
 dotenv.config();
 
+// Pruebas (12/11/2026): con TEST_DATABASE_URL definida, SIEMPRE esa base de
+// datos, aunque un test importe código del servidor antes de cambiar
+// DATABASE_URL (los import se ejecutan primero, y .env apunta a producción).
+// Así unos tests escribieron en producción; esto lo hace imposible.
+if (process.env.TEST_DATABASE_URL?.trim()) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL.trim();
+}
+
 const rawUrl = process.env.DATABASE_URL?.trim().replace(/['"]/g, '');
 
 if (!rawUrl) {

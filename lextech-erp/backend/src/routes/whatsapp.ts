@@ -14,6 +14,7 @@ import {
   sendWhatsAppMessage,
   testWhatsAppConfig,
   verifyWebhook,
+  whatsappAltaMeta,
 } from '../controllers/whatsappController';
 
 const router = Router();
@@ -28,6 +29,7 @@ router.get('/status', getWhatsAppStatus);
 router.get('/config', getWhatsAppConfig);
 router.put('/config', saveWhatsAppConfig);
 router.post('/config/test', testWhatsAppConfig);
+router.post('/alta-meta', whatsappAltaMeta);
 router.get('/contacts', getWhatsAppContacts);
 router.get('/conversations/client/:clientId', getConversationByClient);
 router.get('/conversations/phone/:phone', getConversationByPhone);

@@ -714,7 +714,8 @@ export function MisDatosPanel() {
 
 // ── Ayuda e información (16/10/2026) ──────────────────────────────────────
 // Los textos legales se publican fuera de la app: sus direcciones van en
-// VITE_TERMINOS_URL y VITE_PRIVACIDAD_URL (sin ellas, "Pendiente de publicar").
+// VITE_TERMINOS_URL y VITE_PRIVACIDAD_URL. Mientras no estén publicados, no se
+// muestran (12/11/2026: antes salían como «Pendiente de publicar»).
 const URL_TERMINOS = import.meta.env.VITE_TERMINOS_URL as string | undefined;
 const URL_PRIVACIDAD = import.meta.env.VITE_PRIVACIDAD_URL as string | undefined;
 
@@ -734,24 +735,25 @@ export function AyudaPanel() {
     try { await navigator.clipboard.writeText(infoSoporte); setCopiado(true); window.setTimeout(() => setCopiado(false), 2500); } catch { /* sin portapapeles */ }
   };
   const enlace = 'flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50';
-  const legal = (url: string | undefined, label: string) => url
-    ? <a href={url} target="_blank" rel="noopener noreferrer" className={enlace}>{t(label)} <ExternalLink size={14} className="text-slate-400" /></a>
-    : <div className={`${enlace} cursor-default !text-slate-400 hover:bg-white`}>{t(label)} <span className="text-[11px] font-normal">{t("Pendiente de publicar")}</span></div>;
+  const legales = [
+    { url: URL_TERMINOS, label: 'Términos y condiciones' },
+    { url: URL_PRIVACIDAD, label: 'Política de privacidad' },
+  ].filter((l) => l.url);
   return (
     <div className="space-y-6">
-      <Tarjeta titulo={t("Ayuda")}>
+      <Tarjeta titulo={t("Soporte")}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Link to="/dashboard/config?section=manual" className={enlace}><span className="flex items-center gap-2"><BookOpen size={15} className="text-slate-400" />{" "}{t("Manual de usuario")}</span></Link>
           <Link to="/dashboard/soporte" className={enlace}><span className="flex items-center gap-2"><LifeBuoy size={15} className="text-slate-400" />{" "}{t("Centro de soporte")}</span></Link>
         </div>
         <p className="mt-3 text-xs text-slate-500">{t("¿Algo no funciona o tienes una duda? Abre un ticket en el Centro de soporte: te contestamos por ahí y por correo.")}</p>
       </Tarjeta>
-      <Tarjeta titulo={t("Información legal")}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {legal(URL_TERMINOS, 'Términos y condiciones')}
-          {legal(URL_PRIVACIDAD, 'Política de privacidad')}
-        </div>
-      </Tarjeta>
+      {legales.length > 0 && (
+        <Tarjeta titulo={t("Información legal")}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {legales.map((l) => <a key={l.label} href={l.url} target="_blank" rel="noopener noreferrer" className={enlace}>{t(l.label)} <ExternalLink size={14} className="text-slate-400" /></a>)}
+          </div>
+        </Tarjeta>
+      )}
       <Tarjeta titulo={t("Versión")}>
         <p className="text-sm text-slate-700">{t("Vantia")}{" "}<span className="font-semibold">{version || '—'}</span>{commit && <span className="text-slate-400"> · {commit}</span>}</p>
         {fechaBuild && <p className="mt-0.5 text-xs text-slate-500">{t("Publicada el")}{" "}{fechaBuild}</p>}

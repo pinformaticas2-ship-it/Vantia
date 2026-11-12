@@ -11,7 +11,9 @@ import { SeguridadPanel } from '../components/SeguridadPanel';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
-import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
+import { useOrganizacion, avisarOrganizacionCambiada, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
+import { altaWhatsAppConMeta } from '../lib/altaWhatsAppMeta';
+import { aviso } from '../lib/avisos';
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
 import SkillsPanel from './SkillsPanel';
@@ -114,8 +116,8 @@ const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
   { key: 'notificaciones', label: t("Notificaciones"),          icon: Bell },
   { key: 'seguridad',     label: t("Seguridad"),                icon: ShieldCheck },
   { key: 'misdatos',      label: t("Mis datos"),   icon: Lock },
-  { key: 'manual',        label: t("Manual de usuario"),        icon: BookOpen },
-  { key: 'ayuda',         label: t("Ayuda e información"),      icon: Info },
+  // 12/11/2026: Manual y Ayuda en una sola entrada, con dos pestañas.
+  { key: 'ayuda',         label: t("Ayuda"),                    icon: LifeBuoy },
 ];
 const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGestor?: boolean }[] = [
   { key: 'despacho',        label: t("Mi Despacho"),          icon: Building2 },
@@ -379,436 +381,264 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
   );
 }
 
+// ── Mi Despacho (12/11/2026) ──────────────────────────────────────────────
+// Antes: un formulario larguísimo con un solo «Guardar» (y si te ibas sin
+// guardar, se perdía). Ahora en bloques que se guardan solos al poco de
+// escribir; cada bloque dice si está guardando, guardado o con un error, y
+// si sales con algo pendiente se guarda igualmente o el navegador avisa.
+// Cambiar de organización y crear una nueva están en el selector de la barra
+// lateral; el correo de bienvenida, en Automatizaciones.
+type CampoDespacho = 'nombre' | 'nifCif' | 'direccionFiscal' | 'telefono' | 'emailContacto' | 'web' | 'textoLegalFacturas';
+type BloqueDespacho = 'identidad' | 'fiscal' | 'contacto' | 'facturacion';
+const BLOQUE_DE: Record<CampoDespacho, BloqueDespacho> = {
+  nombre: 'identidad', nifCif: 'fiscal', direccionFiscal: 'fiscal',
+  telefono: 'contacto', emailContacto: 'contacto', web: 'contacto', textoLegalFacturas: 'facturacion',
+};
+const inputDespacho = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400';
+
+function BloqueDespachoCard({ titulo, desc, estado, children, icono: Icono }: {
+  titulo: string; desc?: string; estado?: React.ReactNode; children: React.ReactNode; icono: any;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500"><Icono size={17} /></div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-800">{titulo}</h3>
+            {desc && <p className="mt-0.5 text-xs text-slate-500">{desc}</p>}
+          </div>
+        </div>
+        {estado}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function DespachoPanel() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { organizacion, rol, organizaciones, isLoaded, switchOrganizacion } = useOrganizacion();
-  const [nombre, setNombre] = useState('');
-  const [nifCif, setNifCif] = useState('');
-  const [direccionFiscal, setDireccionFiscal] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [emailContacto, setEmailContacto] = useState('');
-  const [web, setWeb] = useState('');
-  const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
-  const [saving, setSaving] = useState(false);
+  const { organizacion, rol, isLoaded } = useOrganizacion();
+  const canEdit = rol === 'propietario' || rol === 'admin';
+  const vacio: Record<CampoDespacho, string> = { nombre: '', nifCif: '', direccionFiscal: '', telefono: '', emailContacto: '', web: '', textoLegalFacturas: '' };
+  const [vals, setVals] = useState(vacio);
+  const [guardados, setGuardados] = useState(vacio);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState('');
+  const [recien, setRecien] = useState<Set<BloqueDespacho>>(new Set());
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const [creating, setCreating] = useState(false);
-  const [newNombre, setNewNombre] = useState('');
-  const [newNifCif, setNewNifCif] = useState('');
-  const [newDireccionFiscal, setNewDireccionFiscal] = useState('');
-  const [newTextoLegalFacturas, setNewTextoLegalFacturas] = useState('');
-  const [newLogoFile, setNewLogoFile] = useState<File | null>(null);
-  const [newLogoPreview, setNewLogoPreview] = useState<string | null>(null);
-  const newLogoInputRef = useRef<HTMLInputElement>(null);
-  const [creatingLoading, setCreatingLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const cargadoDe = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!organizacion) return;
-    setNombre(organizacion.nombre);
-    setNifCif(organizacion.nifCif || '');
-    setDireccionFiscal(organizacion.direccionFiscal || '');
-    setTelefono(organizacion.telefono || '');
-    setEmailContacto(organizacion.emailContacto || '');
-    setWeb(organizacion.web || '');
-    setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
+    if (!organizacion || cargadoDe.current === organizacion.id) return;
+    cargadoDe.current = organizacion.id;
+    const v = {
+      nombre: organizacion.nombre || '', nifCif: organizacion.nifCif || '', direccionFiscal: organizacion.direccionFiscal || '',
+      telefono: organizacion.telefono || '', emailContacto: organizacion.emailContacto || '', web: organizacion.web || '',
+      textoLegalFacturas: organizacion.textoLegalFacturas || '',
+    };
+    setVals(v); setGuardados(v);
   }, [organizacion]);
 
-  const canEdit = rol === 'propietario' || rol === 'admin';
+  const cambiados = (Object.keys(vals) as CampoDespacho[]).filter((k) => vals[k] !== guardados[k]);
+  const pendiente = cambiados.length > 0;
+  const bloquesPendientes = new Set(cambiados.map((k) => BLOQUE_DE[k]));
+  const set = (k: CampoDespacho, v: string) => { setVals((p) => ({ ...p, [k]: v })); setError(''); };
 
-  const save = async () => {
-    if (!nombre.trim()) return;
-    setSaving(true); setError('');
+  // Guardar: siempre todos los valores (el servidor los espera juntos).
+  const valsRef = useRef(vals); valsRef.current = vals;
+  const guardadosRef = useRef(guardados); guardadosRef.current = guardados;
+  const guardar = useCallback(async (v: Record<CampoDespacho, string>) => {
+    if (!v.nombre.trim()) { setError(t('El nombre del despacho no puede quedar vacío.')); return; }
+    const antes = guardadosRef.current;
+    const bloques = new Set((Object.keys(v) as CampoDespacho[]).filter((k) => v[k] !== antes[k]).map((k) => BLOQUE_DE[k]));
+    setGuardando(true);
     try {
       const data = await apiFetch('/api/organizacion', {
         method: 'PUT', getToken,
-        body: JSON.stringify({
-          nombre: nombre.trim(),
-          nifCif: nifCif.trim(),
-          direccionFiscal: direccionFiscal.trim(),
-          telefono: telefono.trim(),
-          emailContacto: emailContacto.trim(),
-          web: web.trim(),
-          textoLegalFacturas: textoLegalFacturas.trim(),
-        }),
+        body: JSON.stringify(Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x.trim()]))),
       });
       if (data?.success === false) throw new Error(data.error);
-      // El selector de organización del sidebar es otra instancia de este
-      // mismo hook (no comparten estado), así que un simple reload() local
-      // no le llega -- recargamos la página, igual que ya hace
-      // switchOrganizacion, para que se vea en todas partes.
-      window.location.reload();
+      setGuardados(v); setError('');
+      setRecien(bloques);
+      window.setTimeout(() => setRecien(new Set()), 2500);
+      // El nombre sale en la barra lateral: que se entere sin recargar.
+      if (v.nombre !== antes.nombre) avisarOrganizacionCambiada();
     } catch (e: any) {
-      setError(e.message || t("No se pudo guardar."));
-      setSaving(false);
+      setError(e?.message || t('No se pudo guardar.'));
+    } finally { setGuardando(false); }
+  }, [getToken]);
+
+  // Se guarda solo, un segundo después de dejar de escribir.
+  useEffect(() => {
+    if (!pendiente || !canEdit || guardando || error) return;
+    const id = window.setTimeout(() => void guardar(vals), 1000);
+    return () => window.clearTimeout(id);
+  }, [vals, pendiente, canEdit, guardando, error, guardar]);
+
+  // Si se sale con algo sin guardar: al cambiar de sección se guarda igual;
+  // al cerrar o recargar la pestaña, el navegador pregunta.
+  useEffect(() => {
+    const antesDeSalir = (e: BeforeUnloadEvent) => {
+      const v = valsRef.current, g = guardadosRef.current;
+      if ((Object.keys(v) as CampoDespacho[]).some((k) => v[k] !== g[k])) { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', antesDeSalir);
+    return () => {
+      window.removeEventListener('beforeunload', antesDeSalir);
+      const v = valsRef.current, g = guardadosRef.current;
+      if (canEdit && v.nombre.trim() && (Object.keys(v) as CampoDespacho[]).some((k) => v[k] !== g[k])) void guardar(v);
+    };
+  }, [canEdit, guardar]);
+
+  const estado = (b: BloqueDespacho) => {
+    if (!canEdit) return null;
+    if (bloquesPendientes.has(b)) {
+      if (error) return (
+        <button type="button" onClick={() => { setError(''); void guardar(vals); }} className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100">
+          {t('No se guardó · Reintentar')}
+        </button>
+      );
+      return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">
+        {guardando && <Loader2 size={11} className="animate-spin" />}{guardando ? t('Guardando…') : t('Cambios sin guardar')}</span>;
     }
+    if (recien.has(b)) return <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700"><Check size={11} />{t('Guardado')}</span>;
+    return null;
   };
 
-  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const subirLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingLogo(true); setError('');
     try {
       const token = await getToken();
-      const formData = new FormData();
-      formData.append('logo', file);
-      const res = await fetch('/api/organizacion/logo', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
+      const fd = new FormData(); fd.append('logo', file);
+      const res = await fetch('/api/organizacion/logo', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo subir el logotipo."));
-      // Mismo motivo que en save(): forzar recarga para que el logotipo
-      // nuevo se vea también en el selector de organización del sidebar.
-      window.location.reload();
-    } catch (e: any) {
-      setError(e.message || t("No se pudo subir el logotipo."));
-      setUploadingLogo(false);
-      if (logoInputRef.current) logoInputRef.current.value = '';
-    }
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t('No se pudo subir el logotipo.'));
+      avisarOrganizacionCambiada();
+    } catch (err: any) { setError(err.message || t('No se pudo subir el logotipo.')); }
+    finally { setUploadingLogo(false); if (logoInputRef.current) logoInputRef.current.value = ''; }
   };
-
-  const removeLogo = async () => {
+  const quitarLogo = async () => {
     setRemovingLogo(true); setError('');
     try {
       const token = await getToken();
-      const res = await fetch('/api/organizacion/logo', {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/organizacion/logo', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data?.error || t("No se pudo quitar el logotipo."));
-      window.location.reload();
-    } catch (e: any) {
-      setError(e.message || t("No se pudo quitar el logotipo."));
-      setRemovingLogo(false);
-    }
+      if (!res.ok || data?.success === false) throw new Error(data?.error || t('No se pudo quitar el logotipo.'));
+      avisarOrganizacionCambiada();
+    } catch (err: any) { setError(err.message || t('No se pudo quitar el logotipo.')); }
+    finally { setRemovingLogo(false); }
   };
 
-  const handleNewLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (newLogoPreview) URL.revokeObjectURL(newLogoPreview);
-    setNewLogoFile(file);
-    setNewLogoPreview(URL.createObjectURL(file));
-  };
+  if (!isLoaded) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-slate-300" size={28} /></div>;
 
-  const clearNewLogo = () => {
-    if (newLogoPreview) URL.revokeObjectURL(newLogoPreview);
-    setNewLogoFile(null);
-    setNewLogoPreview(null);
-    if (newLogoInputRef.current) newLogoInputRef.current.value = '';
-  };
-
-  const createOrg = async () => {
-    if (!newNombre.trim()) return;
-    setCreatingLoading(true); setError('');
-    try {
-      const data = await apiFetch('/api/organizacion', {
-        method: 'POST', getToken,
-        body: JSON.stringify({
-          nombre: newNombre.trim(),
-          nifCif: newNifCif.trim(),
-          direccionFiscal: newDireccionFiscal.trim(),
-          textoLegalFacturas: newTextoLegalFacturas.trim(),
-        }),
-      });
-      if (data?.success === false) throw new Error(data.error);
-      const newOrgId = data.data.id;
-
-      if (newLogoFile) {
-        // La organización aún no es la "activa" -- hay que serlo antes de
-        // subir el logo para que el shim de fetch apunte la cabecera
-        // X-Organizacion-Id a la recién creada y no a la actual.
-        setActiveOrganizacionId(newOrgId);
-        try {
-          const token = await getToken();
-          const formData = new FormData();
-          formData.append('logo', newLogoFile);
-          await fetch('/api/organizacion/logo', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-          });
-        } catch { /* la organización ya se creó bien; el logo se puede añadir luego desde Mi Despacho */ }
-      }
-
-      switchOrganizacion(newOrgId);
-    } catch (e: any) {
-      setError(e.message || t("No se pudo crear la organización."));
-      setCreatingLoading(false);
-    }
-  };
-
-  if (!isLoaded) {
-    return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-slate-300" size={28} /></div>;
-  }
+  const etiqueta = (txt: string) => <span className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">{txt}</span>;
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">{t("Mi Despacho")}</h1>
-        <p className="text-sm text-slate-500">{t("Información de la organización activa y gestión de organizaciones.")}</p>
-      </div>
+      <CabeceraAjuste icon={Building2} titulo={t('Mi Despacho')}
+        descripcion={canEdit ? t('Los datos de la organización activa. Se guardan solos mientras escribes.') : t('Los datos de la organización activa.')} />
 
-      <section className="mb-10 max-w-3xl">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Organización activa")}</h3>
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="relative shrink-0 group">
-              <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
-                {organizacion?.logoUrl ? (
-                  <img src={resolveUploadUrl(organizacion.logoUrl) || ''} alt={t("Logotipo")} className="h-full w-full object-contain" />
-                ) : (
-                  <Building2 size={22} className="text-slate-300" />
+      <div className="space-y-5">
+        <BloqueDespachoCard icono={Building2} titulo={t('Identidad')} desc={t('Nombre y logotipo: salen en la barra lateral, las facturas y los documentos.')} estado={estado('identidad')}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex items-center gap-3 sm:block">
+              <div className="group relative h-16 w-16 shrink-0">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  {organizacion?.logoUrl
+                    ? <img src={resolveUploadUrl(organizacion.logoUrl) || ''} alt={t('Logotipo')} className="h-full w-full object-contain" />
+                    : <Building2 size={22} className="text-slate-300" />}
+                </div>
+                {canEdit && (
+                  <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} title={t('Cambiar logotipo')}
+                    className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 text-white opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100 focus:opacity-100 disabled:cursor-wait">
+                    {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                  </button>
                 )}
+                <input ref={logoInputRef} type="file" accept="image/*" onChange={(e) => void subirLogo(e)} className="hidden" />
               </div>
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={uploadingLogo}
-                  className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
-                  title={t("Cambiar logotipo")}
-                >
-                  {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-                </button>
-              )}
-              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-800">{t("Logotipo")}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{canEdit ? t("Pasa el ratón por encima para cambiarlo. Se usará en facturas y documentos.") : t("Solo el propietario o un administrador pueden cambiarlo.")}</p>
               {canEdit && organizacion?.logoUrl && (
-                <button
-                  type="button"
-                  onClick={removeLogo}
-                  disabled={removingLogo || uploadingLogo}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 mt-1.5"
-                >
-                  {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}{t("Quitar logotipo")}</button>
+                <button type="button" onClick={() => void quitarLogo()} disabled={removingLogo || uploadingLogo}
+                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50">
+                  {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}{t('Quitar')}</button>
               )}
             </div>
+            <label className="block flex-1">
+              {etiqueta(t('Nombre'))}
+              <input value={vals.nombre} onChange={(e) => set('nombre', e.target.value)} disabled={!canEdit} className={inputDespacho} />
+              {canEdit && <span className="mt-1 block text-[11px] text-slate-400">{t('Pasa el ratón por el logotipo para cambiarlo.')}</span>}
+            </label>
           </div>
+        </BloqueDespachoCard>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Nombre")}</label>
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              disabled={!canEdit}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
-            />
-          </div>
-          {canEdit ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("NIF/CIF")}</label>
-                  <input
-                    value={nifCif}
-                    onChange={(e) => setNifCif(e.target.value)}
-                    placeholder="B12345678"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Dirección fiscal")}</label>
-                  <input
-                    value={direccionFiscal}
-                    onChange={(e) => setDireccionFiscal(e.target.value)}
-                    placeholder={t("Calle, número, CP Población (Provincia)")}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
-                  />
-                </div>
+        {canEdit ? (
+          <>
+            <BloqueDespachoCard icono={Gavel} titulo={t('Datos fiscales')} desc={t('Para las facturas y los documentos que se generan.')} estado={estado('fiscal')}>
+              <div className="grid gap-4 sm:grid-cols-[200px_1fr]">
+                <label className="block">{etiqueta(t('NIF/CIF'))}<input value={vals.nifCif} onChange={(e) => set('nifCif', e.target.value)} placeholder="B12345678" className={inputDespacho} /></label>
+                <label className="block">{etiqueta(t('Dirección fiscal'))}<input value={vals.direccionFiscal} onChange={(e) => set('direccionFiscal', e.target.value)} placeholder={t('Calle, número, CP Población (Provincia)')} className={inputDespacho} /></label>
               </div>
-              {/* Contacto del despacho: también sale en las plantillas (teléfono, correo, web) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {([
-                  ['Teléfono', telefono, setTelefono, '971 00 00 00', 'tel'],
-                  ['Correo electrónico', emailContacto, setEmailContacto, 'despacho@ejemplo.es', 'email'],
-                  ['Web', web, setWeb, 'www.despacho.es', 'text'],
-                ] as const).map(([label, valor, set, ph, tipo]) => (
-                  <div key={label}>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t(label)}</label>
-                    <input type={tipo} value={valor} onChange={(e) => set(e.target.value)} placeholder={ph}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300" />
-                  </div>
+            </BloqueDespachoCard>
+
+            <BloqueDespachoCard icono={Phone} titulo={t('Contacto')} desc={t('También salen en las plantillas (teléfono, correo, web).')} estado={estado('contacto')}>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {([['telefono', 'Teléfono', '971 00 00 00', 'tel'], ['emailContacto', 'Correo electrónico', 'despacho@ejemplo.es', 'email'], ['web', 'Web', 'www.despacho.es', 'text']] as const).map(([k, label, ph, tipo]) => (
+                  <label key={k} className="block">{etiqueta(t(label))}<input type={tipo} value={vals[k]} onChange={(e) => set(k, e.target.value)} placeholder={ph} className={inputDespacho} /></label>
                 ))}
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Texto legal para facturas")}</label>
-                <textarea
-                  value={textoLegalFacturas}
-                  onChange={(e) => setTextoLegalFacturas(e.target.value)}
-                  rows={3}
-                  placeholder={t("Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)")}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
-                />
-              </div>
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Correo de bienvenida al cliente")}</p>
-                <p className="text-xs text-slate-500">{t("Ahora se configura con las demás automatizaciones.")}{" "}
-                  <button type="button" onClick={() => navigate('/dashboard/config?section=automatizaciones')} className="font-bold text-red-600 hover:underline">{t("Ir a Automatizaciones →")}</button></p>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3.5 py-3 text-xs text-slate-400">
-              <Lock size={14} className="shrink-0" />{t("Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.")}</div>
-          )}
-          {error && <p className="text-xs text-rose-600">{error}</p>}
-          {canEdit && (
-            <button
-              onClick={save}
-              disabled={saving || !nombre.trim()}
-              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              {saving && <Loader2 size={14} className="animate-spin" />}{t("Guardar cambios")}</button>
-          )}
-        </div>
-      </section>
+            </BloqueDespachoCard>
 
-      {organizaciones.length > 0 && (
-        <section className="mb-10 max-w-3xl">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Tus organizaciones")}</h3>
-          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm overflow-hidden">
-            {organizaciones.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => o.id !== organizacion?.id && switchOrganizacion(o.id)}
-                className={`w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors ${o.id === organizacion?.id ? 'bg-red-50/60' : 'hover:bg-slate-50'}`}
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{o.nombre}</p>
-                  <p className="text-xs text-slate-400 capitalize">{o.rol}</p>
-                </div>
-                {o.id === organizacion?.id && <Check size={16} className="text-red-500" />}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+            <BloqueDespachoCard icono={MailIcon} titulo={t('Facturación')} desc={t('Texto que aparece al pie de las facturas.')} estado={estado('facturacion')}>
+              <textarea value={vals.textoLegalFacturas} onChange={(e) => set('textoLegalFacturas', e.target.value)} rows={3}
+                placeholder={t('Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)')} className={`${inputDespacho} resize-y`} />
+            </BloqueDespachoCard>
 
-      <section className="max-w-3xl">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Crear una nueva organización")}</h3>
-        {!creating ? (
-          <button
-            onClick={() => setCreating(true)}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-red-700 hover:text-red-800"
-          >
-            <Plus size={15} />{" "}{t("Nueva organización")}</button>
+            <BloqueDespachoCard icono={Zap} titulo={t('Comunicaciones con clientes')} desc={t('El correo de bienvenida y los recordatorios de citas se configuran con las demás automatizaciones.')}>
+              <button type="button" onClick={() => navigate('/dashboard/config?section=automatizaciones')}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <Zap size={14} />{t('Ir a Automatizaciones →')}</button>
+            </BloqueDespachoCard>
+          </>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
-            <div className="flex items-center gap-4">
-              <div className="relative shrink-0 group">
-                <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
-                  {newLogoPreview ? (
-                    <img src={newLogoPreview} alt={t("Logotipo")} className="h-full w-full object-contain" />
-                  ) : (
-                    <Building2 size={22} className="text-slate-300" />
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => newLogoInputRef.current?.click()}
-                  className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all"
-                  title={t("Elegir logotipo")}
-                >
-                  <Camera size={16} />
-                </button>
-                <input ref={newLogoInputRef} type="file" accept="image/*" onChange={handleNewLogoChange} className="hidden" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800">{t("Logotipo")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></p>
-                <p className="text-xs text-slate-400 mt-0.5">{t("Pasa el ratón por encima para elegir una imagen. Si no pones ninguna se usará un icono por defecto.")}</p>
-                {newLogoPreview && (
-                  <button type="button" onClick={clearNewLogo} className="peligro inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 mt-1">
-                    <Trash2 size={11} />{" "}{t("Quitar")}</button>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Nombre")}</label>
-              <input
-                value={newNombre}
-                onChange={(e) => setNewNombre(e.target.value)}
-                placeholder={t("Nombre del nuevo despacho")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
-                autoFocus
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("NIF/CIF")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
-                <input
-                  value={newNifCif}
-                  onChange={(e) => setNewNifCif(e.target.value)}
-                  placeholder="B12345678"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Dirección fiscal")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
-                <input
-                  value={newDireccionFiscal}
-                  onChange={(e) => setNewDireccionFiscal(e.target.value)}
-                  placeholder={t("Calle, número, ciudad")}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t("Texto legal para facturas")}{" "}<span className="normal-case font-normal text-slate-300">{t("(opcional)")}</span></label>
-              <textarea
-                value={newTextoLegalFacturas}
-                onChange={(e) => setNewTextoLegalFacturas(e.target.value)}
-                rows={2}
-                placeholder={t("Podrás cambiarlo luego desde Mi Despacho")}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 resize-none"
-              />
-            </div>
-            <div className="flex items-center gap-3 pt-1">
-              <button
-                onClick={createOrg}
-                disabled={creatingLoading || !newNombre.trim()}
-                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
-              >
-                {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : t("Crear")}
-              </button>
-              <button
-                onClick={() => { setCreating(false); setNewNombre(''); setNewNifCif(''); setNewDireccionFiscal(''); setNewTextoLegalFacturas(''); clearNewLogo(); }}
-                className="text-sm text-slate-400 hover:text-slate-600 px-2"
-              >{t("Cancelar")}</button>
-            </div>
-          </div>
+          <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3.5 py-3 text-xs text-slate-500">
+            <Lock size={14} className="shrink-0" />{t('Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.')}</div>
         )}
-      </section>
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+        <p className="text-xs text-slate-500">{t('Para cambiar de organización o crear una nueva, usa el selector de despacho de la barra lateral.')}</p>
+      </div>
+      {/* Plantillas en la nube (Drive/Dropbox) del despacho. */}
+      <div className="mt-5"><PlantillasNubeConfig /></div>
 
       {rol === 'propietario' && organizacion && (
-        <section className="mt-12 max-w-3xl">
-          <h3 className="text-sm font-bold text-red-700 uppercase tracking-wider mb-4 border-b border-red-100 pb-2">{t("Zona de peligro")}</h3>
-          <div className="bg-red-50/50 border border-red-200 rounded-xl p-5 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-800">{t("Eliminar esta organización")}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{t("Borra permanentemente clientes, expedientes y el acceso de todos sus miembros.")}</p>
-            </div>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="inline-flex items-center gap-2 shrink-0 bg-white border border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600 text-red-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-            >
-              <Trash2 size={14} />{" "}{t("Eliminar")}</button>
-          </div>
-        </section>
+        <DespachoZonaPeligro onEliminar={() => setShowDeleteModal(true)} />
       )}
-
       {showDeleteModal && organizacion && (
         <DeleteOrganizacionModal nombre={organizacion.nombre} onClose={() => setShowDeleteModal(false)} />
       )}
     </>
+  );
+}
+
+function DespachoZonaPeligro({ onEliminar }: { onEliminar: () => void }) {
+  return (
+    <section className="mt-10">
+      <h3 className="mb-4 border-b border-red-100 pb-2 text-sm font-bold uppercase tracking-wider text-red-700">{t('Zona de peligro')}</h3>
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50/50 p-5">
+        <div>
+          <p className="text-sm font-semibold text-slate-800">{t('Eliminar esta organización')}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{t('Borra permanentemente clientes, expedientes y el acceso de todos sus miembros.')}</p>
+        </div>
+        <button onClick={onEliminar}
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:border-red-600 hover:bg-red-600 hover:text-white">
+          <Trash2 size={14} />{' '}{t('Eliminar')}</button>
+      </div>
+    </section>
   );
 }
 
@@ -1396,7 +1226,25 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
 
 // Seguridad: ver components/SeguridadPanel.tsx (12/11/2026).
 
+// Estado de cada integración, igual en todas las fichas (12/11/2026).
+type EstadoIntegracion = 'conectado' | 'revisar' | 'caducado' | 'pendiente' | 'cargando';
+function ChipEstado({ estado }: { estado: EstadoIntegracion }) {
+  const v = {
+    conectado: ['bg-emerald-50 text-emerald-600', t("Conectado")],
+    revisar: ['bg-amber-50 text-amber-700', t("Revisar")],
+    caducado: ['bg-red-50 text-red-600', t("Caducado")],
+    pendiente: ['bg-slate-100 text-slate-400', t("Sin conectar")],
+    cargando: ['bg-slate-100 text-slate-400', '…'],
+  }[estado];
+  return <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${v[0]}`}>{v[1]}</span>;
+}
+
 interface WhatsAppIntegrationStatus {
+  salud?: 'ok' | 'caducado' | 'revisar' | null;
+  numero?: string | null;
+  nombreVerificado?: string | null;
+  saludDetalle?: string | null;
+  altaMeta?: { appId: string; configId: string; graphVersion: string } | null;
   configured: boolean;
   phoneNumberIdConfigured: boolean;
   accessTokenConfigured: boolean;
@@ -1415,7 +1263,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   // TikTok: la cuenta se conecta aquí y se usa desde Comunicación Externa.
-  const [tiktok, setTiktok] = useState<{ configured: boolean; connected: boolean; account?: { displayName?: string } } | null>(null);
+  const [tiktok, setTiktok] = useState<{ configured: boolean; connected: boolean; account?: { displayName?: string }; accountError?: string | null } | null>(null);
   const [tiktokConnecting, setTiktokConnecting] = useState(false);
   const [tiktokError, setTiktokError] = useState('');
   useEffect(() => {
@@ -1424,7 +1272,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       .catch(() => { /* sin estado: la tarjeta queda como pendiente */ });
   }, [getToken]);
   // Instagram: se conecta aquí o en Comunicación Externa; mensajes, comentarios y publicaciones van allí.
-  const [instagram, setInstagram] = useState<{ configured: boolean; connected: boolean; account?: { username?: string }; webhookOk?: boolean } | null>(null);
+  const [instagram, setInstagram] = useState<{ configured: boolean; connected: boolean; account?: { username?: string }; webhookOk?: boolean; webhookError?: string | null; accountError?: string | null } | null>(null);
   const [instagramConnecting, setInstagramConnecting] = useState(false);
   const [instagramError, setInstagramError] = useState('');
   useEffect(() => {
@@ -1629,6 +1477,30 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   };
 
   const waConnected = Boolean(status?.configured);
+  const [conectandoMeta, setConectandoMeta] = useState(false);
+  const [avanzado, setAvanzado] = useState(false);
+  const conectarConMeta = async () => {
+    if (!status?.altaMeta) return;
+    setConectandoMeta(true); setError(null); setMessage(null);
+    try {
+      const r = await altaWhatsAppConMeta(status.altaMeta);
+      const data = await apiFetch('/api/whatsapp/alta-meta', { method: 'POST', getToken, body: JSON.stringify(r) });
+      if (data?.success === false) throw new Error(data.error);
+      aviso.ok(t("WhatsApp conectado: {numero}.", { numero: data.data?.nombre || data.data?.numero || t("número validado") }));
+      if (data.data?.pin) setMessage(t("Meta ha registrado el número con este PIN de verificación en dos pasos: {pin}. Guárdalo en lugar seguro.", { pin: data.data.pin }));
+      (data.data?.avisos || []).forEach((a: string) => aviso.error(a));
+      await load();
+    } catch (e: any) {
+      setError(e?.message || t("No se pudo conectar WhatsApp con Meta"));
+      setExpanded(true);
+    } finally { setConectandoMeta(false); }
+  };
+  const estadoWa: EstadoIntegracion = loading ? 'cargando' : !waConnected ? 'pendiente'
+    : status?.salud === 'caducado' ? 'caducado' : status?.salud === 'revisar' ? 'revisar' : 'conectado';
+  const estadoIg: EstadoIntegracion = !instagram ? 'cargando' : !instagram.connected ? 'pendiente'
+    : /caduc|retirado/i.test(instagram.accountError || '') ? 'caducado' : (instagram.accountError || instagram.webhookOk === false) ? 'revisar' : 'conectado';
+  const estadoTk: EstadoIntegracion = !tiktok ? 'cargando' : !tiktok.connected ? 'pendiente'
+    : /caduc|expir|token/i.test(tiktok.accountError || '') ? 'caducado' : tiktok.accountError ? 'revisar' : 'conectado';
 
   return (
     <div>
@@ -1640,7 +1512,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
       {/* Correo y Quipu: se configuran en su módulo; aquí se ve su estado (14/10/2026). */}
       <IntegracionesPropias />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -1649,22 +1521,26 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">{t("WhatsApp")}</p>
-                <p className="text-xs text-slate-400 truncate">{t("WhatsApp Business Cloud API")}</p>
+                <p className="text-xs text-slate-400 truncate">{waConnected && (status?.nombreVerificado || status?.numero) ? [status?.nombreVerificado, status?.numero].filter(Boolean).join(' · ') : t("WhatsApp Business")}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${waConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {loading ? '…' : waConnected ? t("Conectado") : t("Pendiente")}
-            </span>
+            <ChipEstado estado={estadoWa} />
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Habla con tus clientes por WhatsApp desde Comunicación Externa, sin salir del ERP.")}</p>
+          {(estadoWa === 'caducado' || estadoWa === 'revisar') && (
+            <p className="mt-2 text-[11px] leading-4 text-amber-700">{estadoWa === 'caducado' ? t("La conexión con Meta ha caducado: vuelve a conectar el número.") : t("Meta no responde bien con esta conexión: revísala.")}</p>
+          )}
           {canManage ? (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <Link2 size={13} /> {waConnected ? t("Gestionar") : t("Conectar")}
-            </button>
+            !waConnected && status?.altaMeta ? (
+              <button type="button" onClick={() => void conectarConMeta()} disabled={conectandoMeta}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60">
+                {conectandoMeta ? <Loader2 size={13} className="animate-spin" /> : <Link2 size={13} />}{" "}{t("Conectar con Meta")}</button>
+            ) : (
+              <button type="button" onClick={() => setExpanded(true)}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50">
+                <Link2 size={13} /> {waConnected ? t("Gestionar") : t("Conectar")}
+              </button>
+            )
           ) : (
             <p className="mt-4 text-[11px] text-slate-400">{t("Solo el propietario o un administrador pueden configurarlo.")}</p>
           )}
@@ -1681,12 +1557,13 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <p className="text-xs text-slate-400 truncate">{instagram?.connected && instagram.account?.username ? `@${instagram.account.username}` : t("Mensajes, comentarios y publicaciones")}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${instagram?.connected ? (instagram.webhookOk === false ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600') : 'bg-slate-100 text-slate-400'}`}>
-              {!instagram ? '…' : instagram.connected ? (instagram.webhookOk === false ? t("Sin mensajes") : t("Conectado")) : t("Pendiente")}
-            </span>
+            <ChipEstado estado={estadoIg} />
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Recibe y contesta los mensajes directos, responde comentarios y publica reels, fotos e historias desde Comunicación Externa. Hace falta una cuenta profesional (empresa o creador).")}{instagram && !instagram.configured && t(" Falta configurar Instagram en el servidor.")}
           </p>
+          {(estadoIg === 'caducado' || estadoIg === 'revisar') && (
+            <p className="mt-2 text-[11px] leading-4 text-amber-700">{instagram?.accountError || instagram?.webhookError || t("No llegan los mensajes de Instagram: revisa el webhook en Comunicación Externa.")}</p>
+          )}
           {instagramError && <p className="mt-2 text-[11px] text-red-600">{instagramError}</p>}
           {instagram?.connected ? (
             <button type="button" onClick={() => navigate('/dashboard/whatsapp?canal=instagram')} className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50">
@@ -1702,24 +1579,6 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600">
-                <Facebook size={20} className="text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">{t("Facebook")}</p>
-                <p className="text-xs text-slate-400 truncate">{t("Messenger de la Página")}</p>
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">{t("Próximamente")}</span>
-          </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Canal independiente de Instagram: mensajes de Messenger a la Página de Facebook del despacho, dentro de la misma bandeja de Comunicación Externa.")}</p>
-          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} />{" "}{t("Conectar")}</button>
-        </div>
-
-        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black">
                 <TikTokIcon size={20} className="text-white" />
               </div>
@@ -1728,12 +1587,11 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <p className="text-xs text-slate-400 truncate">{tiktok?.connected && tiktok.account?.displayName ? tiktok.account.displayName : t("Vídeos y estadísticas")}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${tiktok?.connected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {!tiktok ? '…' : tiktok.connected ? t("Conectado") : t("Pendiente")}
-            </span>
+            <ChipEstado estado={estadoTk} />
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Conecta la cuenta del despacho para ver tus vídeos con sus visualizaciones y publicar vídeos nuevos desde Comunicación Externa.")}{tiktok && !tiktok.configured && t(" Falta configurar TikTok en el servidor.")}
           </p>
+          {(estadoTk === 'caducado' || estadoTk === 'revisar') && <p className="mt-2 text-[11px] leading-4 text-amber-700">{tiktok?.accountError}</p>}
           {tiktokError && <p className="mt-2 text-[11px] text-red-600">{tiktokError}</p>}
           {tiktok?.connected ? (
             <button
@@ -1766,9 +1624,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <p className="text-xs text-slate-400 truncate">{t("Documentos de expedientes")}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${driveConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {driveConnected ? t("Conectado") : t("Pendiente")}
-            </span>
+            <ChipEstado estado={driveConnected ? 'conectado' : 'pendiente'} />
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("El servidor no guarda los archivos de forma permanente. Con Google Drive, los documentos de cada expediente se guardan en una carpeta propia y no se pierden.")}{driveConnected && organizacion?.googleDriveEmail ? t(" Cuenta: {googleDriveEmail}.", { googleDriveEmail: organizacion.googleDriveEmail }) : ''}
           </p>
@@ -1801,24 +1657,6 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50">
-                <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">{t("OneDrive")}</p>
-                <p className="text-xs text-slate-400 truncate">{t("Documentos de expedientes")}</p>
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">{t("Próximamente")}</span>
-          </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Alternativa a Google Drive para guardar los documentos de cada expediente en tu cuenta de Microsoft.")}</p>
-          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} />{" "}{t("Conectar")}</button>
-        </div>
-
-        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
                 <DropboxLogo size={22} />
               </div>
@@ -1827,9 +1665,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <p className="text-xs text-slate-400 truncate">{t("Vinculación de cuenta")}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${dropboxConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
-              {dropboxConnected ? t("Conectado") : t("Pendiente")}
-            </span>
+            <ChipEstado estado={dropboxConnected ? 'conectado' : 'pendiente'} />
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Vincula tu cuenta de Dropbox. Por ahora solo conecta la cuenta -- todavía no guarda documentos de expedientes ahí (esa parte llega después).")}{dropboxConnected && organizacion?.dropboxEmail ? t(" Cuenta: {dropboxEmail}.", { dropboxEmail: organizacion.dropboxEmail }) : ''}
           </p>
@@ -1904,7 +1740,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                       }`}
                     >
                       <p className="text-sm font-bold text-slate-800">{t("Preguntar cada vez")}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{t("Al subir un documento, elige Drive, Dropbox u OneDrive.")}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{t("Al subir un documento, elige Drive o Dropbox.")}</p>
                     </button>
                   </div>
                   {storageMode === 'auto' && connectedStorageProviders.length > 1 && (
@@ -1979,9 +1815,30 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               <button onClick={() => setExpanded(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-              <p className="mb-4 text-xs text-slate-500">{t("El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app conectada al número Business del despacho.")}</p>
               {error && <p className="mb-3 text-xs font-medium text-rose-600">{error}</p>}
               {message && <p className="mb-3 text-xs font-medium text-emerald-600">{message}</p>}
+              {waConnected && (status?.numero || status?.nombreVerificado) && (
+                <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <p className="font-semibold text-slate-800">{[status?.nombreVerificado, status?.numero].filter(Boolean).join(' · ')}</p>
+                  <div className="mt-1"><ChipEstado estado={estadoWa} /></div>
+                  {status?.saludDetalle && <p className="mt-1 text-xs text-amber-700">{status.saludDetalle}</p>}
+                </div>
+              )}
+              {status?.altaMeta ? (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                  <p className="text-sm font-semibold text-slate-800">{waConnected ? t("Volver a conectar con Meta") : t("Conectar con Meta")}</p>
+                  <p className="mt-1 text-xs text-slate-600">{t("Se abre una ventana de Meta: inicia sesión, elige la cuenta de WhatsApp Business y el número del despacho, y listo. No hay que copiar ningún dato.")}</p>
+                  <button type="button" onClick={() => void conectarConMeta()} disabled={conectandoMeta}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                    {conectandoMeta ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}{waConnected ? t("Volver a conectar con Meta") : t("Conectar con Meta")}</button>
+                </div>
+              ) : (
+                <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">{t("El botón de alta de Meta no está configurado en el servidor todavía. Mientras tanto, se puede conectar con los datos de la app de Meta en «Configuración avanzada».")}</p>
+              )}
+              <button type="button" onClick={() => setAvanzado((v) => !v)} className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+                <ChevronDown size={13} className={`transition-transform ${avanzado || !status?.altaMeta ? 'rotate-180' : ''}`} />{t("Configuración avanzada (para técnicos)")}</button>
+              {(avanzado || !status?.altaMeta) && <>
+              <p className="mb-4 text-xs text-slate-500">{t("El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app conectada al número Business del despacho.")}</p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <ConfigInput label={t("Access token")} value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder={t("EAAG...")} />
                 <ConfigInput label={t("Phone number id")} value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
@@ -1994,8 +1851,10 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 <p className="mt-4 text-[11px] text-slate-400">{t("URL de webhook para pegar en Meta:")}{" "}<code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
                 </p>
               )}
+              </>}
             </div>
             <div className="shrink-0 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+              {(avanzado || !status?.altaMeta) && <>
               <button
                 type="button"
                 onClick={handleTest}
@@ -2010,6 +1869,10 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#92042c] disabled:opacity-50"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}{t("Guardar credenciales")}</button>
+              </>}
+              {status?.altaMeta && !avanzado && (
+                <button type="button" onClick={() => setExpanded(false)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{t("Cerrar")}</button>
+              )}
             </div>
           </div>
         </div>,
@@ -2360,7 +2223,7 @@ export default function Configuracion() {
                 <p className={`hidden md:block px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${gi > 0 ? 'mt-5' : ''}`}>{t(grupo.titulo)}</p>
                 {grupo.items.map((it) => {
                   const Icon = it.icon;
-                  const active = activeSection === it.key;
+                  const active = activeSection === it.key || (it.key === 'ayuda' && activeSection === 'manual');
                   // Para quien no es propietario/admin, Trazabilidad es solo su actividad.
                   const label = t(it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label);
                   return (
@@ -2423,14 +2286,24 @@ export default function Configuracion() {
                   uno con su versión clara y oscura, para que todo se vea siempre bien. */}
               <p className="text-xs text-slate-500">{t("Cada tema tiene su versión clara y oscura: elige el modo arriba y el tema aquí.")}</p>
             </>
-          ) : activeSection === 'manual' ? (
-            <ManualPanel />
+          ) : activeSection === 'manual' || activeSection === 'ayuda' ? (
+            <>
+              <CabeceraAjuste icon={LifeBuoy} titulo={t("Ayuda")}
+                descripcion={t("El manual de Vantia, el Centro de soporte y la versión que usas.")} />
+              <div className="mb-6 flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit" role="tablist">
+                {([['manual', t("Manual de usuario"), BookOpen], ['ayuda', t("Soporte y versión"), Info]] as const).map(([k, label, Ic]) => (
+                  <button key={k} type="button" role="tab" aria-selected={activeSection === k} onClick={() => setActiveSection(k)}
+                    className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${activeSection === k ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    <Ic size={15} />{label}
+                  </button>
+                ))}
+              </div>
+              {activeSection === 'manual' ? <ManualPanel /> : <AyudaPanel />}
+            </>
           ) : activeSection === 'despacho' ? (
-            <><DespachoPanel /><PlantillasNubeConfig /></>
+            <DespachoPanel />
           ) : activeSection === 'misdatos' ? (
             <MisDatosPanel />
-          ) : activeSection === 'ayuda' ? (
-            <AyudaPanel />
           ) : activeSection === 'perfil' ? (
             <PerfilPanel />
           ) : activeSection === 'preferencias' ? (

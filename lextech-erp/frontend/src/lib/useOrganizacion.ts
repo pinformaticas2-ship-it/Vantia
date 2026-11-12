@@ -96,6 +96,13 @@ async function pedirOrganizacion(userId: string, getToken: () => Promise<string 
 // selector "Seleccionar empresa" del sidebar). Mismo patrón que useIsAdmin.ts,
 // pero yendo contra nuestra propia BD (organizacion_miembros) en vez de
 // publicMetadata.role de Clerk -- ver backend/src/controllers/organizacionesController.ts.
+const EVENTO_ORGANIZACION = 'vantia:organizacion-cambiada';
+/** Avisa a todas las pantallas de que los datos del despacho han cambiado. */
+export function avisarOrganizacionCambiada() {
+  compartido = null;
+  window.dispatchEvent(new Event(EVENTO_ORGANIZACION));
+}
+
 export function useOrganizacion() {
   const { getToken, userId } = useAuth();
   const inicial = userId && compartido?.userId === userId ? compartido.datos : null;
@@ -124,6 +131,13 @@ export function useOrganizacion() {
   const reload = useCallback(() => cargar(true), [cargar]);
 
   useEffect(() => { void cargar(false); }, [cargar]);
+  // Cuando alguien cambia los datos del despacho (Mi Despacho guarda solo),
+  // todas las instancias del hook se refrescan sin recargar la página.
+  useEffect(() => {
+    const alCambiar = () => { void cargar(true); };
+    window.addEventListener(EVENTO_ORGANIZACION, alCambiar);
+    return () => window.removeEventListener(EVENTO_ORGANIZACION, alCambiar);
+  }, [cargar]);
 
   // Cambia la organización activa y recarga la app entera -- así todo lo que
   // ya se hubiera cargado (dashboard, listados, Vantia...) se vuelve a pedir

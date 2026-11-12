@@ -3,6 +3,7 @@
 export const SidebarContext = createContext({ isCollapsed: false });
 export function useSidebar() { return useContext(SidebarContext); }
 import { Spinner } from "../components/Spinner";
+import { CrearOrganizacionHost, abrirCrearOrganizacion } from '../components/CrearOrganizacionModal';
 import { createPortal } from "react-dom";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Clock,
@@ -1630,6 +1631,13 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
           >
             <Users size={14} className="om-t4" />{" "}{t("Gestionar miembros")}</button>
         )}
+        {/* 12/11/2026: crear organización, antes al final de Mi Despacho. */}
+        <button
+          type="button"
+          onClick={() => { onClose(); abrirCrearOrganizacion(); }}
+          className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium om-accion transition-colors"
+        >
+          <Plus size={14} className="om-t4" />{" "}{t("Crear organización")}</button>
         {organizaciones.length > 1 && (
           <p className="hidden [@media(hover:hover)]:block px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
             <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd>{" "}{t("para moverte ·")}{" "}<kbd className="font-sans">Intro</kbd>{" "}{t("para entrar")}</p>
@@ -2839,6 +2847,7 @@ export default function DashboardLayout() {
             <kbd className="hidden sm:inline-flex shrink-0 h-6 px-1.5 items-center rounded-md border border-slate-200 bg-white text-[11px] font-sans font-semibold text-slate-400">Ctrl K</kbd>
           </button>
           <PaletaComandos modulos={modulosPaleta} puede={puedeMain} />
+          <CrearOrganizacionHost />
 
           {/* + Nuevo (16/10/2026: sustituye al logo de la organización, que ya
               sale en la barra lateral). El hueco hasta los iconos lo absorbe el

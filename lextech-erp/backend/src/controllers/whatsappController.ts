@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { resolveUserName } from './activityController';
 import { sendPushToOrgModule } from '../utils/webPush';
 import { encryptPassword, decryptPassword } from '../utils/emailCrypto';
+import crypto from 'crypto';
 
 type WhatsAppConfig = {
   accessToken: string;
@@ -185,9 +186,111 @@ async function graphRequest(config: WhatsAppConfig, path: string, init?: Request
   return json;
 }
 
+// ── Alta con Meta (Embedded Signup, 12/11/2026) ──────────────────────────
+// En vez de pedir al despacho el access token, el phone number id y demás,
+// se conecta con el botón de alta de WhatsApp de Meta (igual que Instagram).
+// Hace falta en el entorno: META_APP_ID / META_APP_SECRET (los mismos que
+// Instagram) y WHATSAPP_CONFIG_ID (configuración de Facebook Login for
+// Business para «WhatsApp Embedded Signup»). El webhook de la app de Meta
+// apunta a /api/whatsapp/webhook con WHATSAPP_VERIFY_TOKEN.
+const envTrim = (k: string) => (process.env[k] || '').trim();
+const metaAppId = () => envTrim('META_APP_ID') || envTrim('INSTAGRAM_APP_ID');
+const metaAppSecret = () => envTrim('META_APP_SECRET') || envTrim('INSTAGRAM_APP_SECRET');
+const waConfigId = () => envTrim('WHATSAPP_CONFIG_ID');
+export function altaMetaDisponible(): boolean { return Boolean(metaAppId() && metaAppSecret() && waConfigId()); }
+
+// Estado real de la conexión (¿el token sigue valiendo?), cacheado 5 minutos.
+type SaludWhatsApp = { salud: 'ok' | 'caducado' | 'revisar'; numero?: string | null; nombre?: string | null; detalle?: string | null };
+const saludCache = new Map<string, { at: number; v: SaludWhatsApp }>();
+export function clasificarErrorWhatsApp(msg: string): 'caducado' | 'revisar' {
+  return /expired|has been invalidated|Error validating access token|session is invalid|OAuthException|\b190\b/i.test(msg) ? 'caducado' : 'revisar';
+}
+async function saludWhatsApp(organizacionId: string, config: WhatsAppConfig): Promise<SaludWhatsApp | null> {
+  if (!config.accessToken || !config.phoneNumberId) return null;
+  const c = saludCache.get(organizacionId);
+  if (c && Date.now() - c.at < 5 * 60_000) return c.v;
+  let v: SaludWhatsApp;
+  try {
+    const p = await graphRequest(config, `${config.phoneNumberId}?fields=display_phone_number,verified_name`);
+    v = { salud: 'ok', numero: p?.display_phone_number || null, nombre: p?.verified_name || null };
+  } catch (e: any) {
+    const detalle = String(e?.message || e);
+    v = { salud: clasificarErrorWhatsApp(detalle), detalle };
+  }
+  saludCache.set(organizacionId, { at: Date.now(), v });
+  return v;
+}
+
 export async function getWhatsAppStatus(req: Request, res: Response) {
-  const config = await loadWhatsAppConfig((req as any).organizacionId);
-  res.json({ success: true, data: getConfigStatus(config) });
+  const org = (req as any).organizacionId;
+  const config = await loadWhatsAppConfig(org);
+  const salud = org ? await saludWhatsApp(org, config) : null;
+  res.json({
+    success: true,
+    data: {
+      ...getConfigStatus(config),
+      salud: salud?.salud || null, numero: salud?.numero || null, nombreVerificado: salud?.nombre || null, saludDetalle: salud?.detalle || null,
+      // Datos públicos para abrir el alta de Meta en el navegador.
+      altaMeta: altaMetaDisponible() ? { appId: metaAppId(), configId: waConfigId(), graphVersion: DEFAULT_GRAPH_VERSION } : null,
+    },
+  });
+}
+
+/** POST /api/whatsapp/alta-meta { code, phoneNumberId, wabaId } — fin del alta de Meta. */
+export async function whatsappAltaMeta(req: Request, res: Response) {
+  const organizacionId = (req as any).organizacionId;
+  const orgRol = (req as any).organizacionRol;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa' });
+  if (orgRol !== 'propietario' && orgRol !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador pueden conectar WhatsApp.' });
+  }
+  if (!altaMetaDisponible()) return res.status(503).json({ success: false, error: 'El alta con Meta no está configurada en el servidor (META_APP_ID, META_APP_SECRET y WHATSAPP_CONFIG_ID).' });
+  const code = String(req.body?.code || '').trim();
+  const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
+  const wabaId = String(req.body?.wabaId || '').trim();
+  if (!code || !/^\d{5,30}$/.test(phoneNumberId) || !/^\d{5,30}$/.test(wabaId)) {
+    return res.status(400).json({ success: false, error: 'Meta no ha devuelto los datos del número. Vuelve a intentarlo.' });
+  }
+  try {
+    // 1 · code → token de la empresa del cliente.
+    const q = new URLSearchParams({ client_id: metaAppId(), client_secret: metaAppSecret(), code });
+    const r = await fetch(`https://graph.facebook.com/${DEFAULT_GRAPH_VERSION}/oauth/access_token?${q.toString()}`);
+    const tok: any = await r.json().catch(() => ({}));
+    if (!r.ok || !tok?.access_token) throw new Error(tok?.error?.message || 'Meta no ha devuelto el token.');
+    const tmp: WhatsAppConfig = { accessToken: String(tok.access_token), phoneNumberId, verifyToken: '', graphVersion: DEFAULT_GRAPH_VERSION, webhookBaseUrl: ENV_WEBHOOK_BASE_URL, businessAccountId: wabaId, source: 'database' };
+    // 2 · Que los mensajes de esa cuenta lleguen al webhook de la app.
+    const avisos: string[] = [];
+    await graphRequest(tmp, `${wabaId}/subscribed_apps`, { method: 'POST' }).catch((e: any) => { avisos.push(`No se pudo suscribir la cuenta a los mensajes: ${e?.message || e}`); });
+    // 3 · Registrar el número para la API (si ya lo estaba, Meta lo dice y no pasa nada).
+    const pin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    let pinNuevo: string | null = null;
+    await graphRequest(tmp, `${phoneNumberId}/register`, { method: 'POST', body: JSON.stringify({ messaging_product: 'whatsapp', pin }) })
+      .then(() => { pinNuevo = pin; })
+      .catch(() => { /* ya registrado o con PIN propio */ });
+    const info = await graphRequest(tmp, `${phoneNumberId}?fields=display_phone_number,verified_name`).catch(() => null);
+    // 4 · Guardar (el verify token de siempre, o uno nuevo).
+    const actual = await pool.query(`SELECT verify_token FROM whatsapp_org_settings WHERE organizacion_id = $1`, [organizacionId]);
+    const verifyToken = trimOrNull(actual.rows[0]?.verify_token) || ENV_VERIFY_TOKEN || crypto.randomBytes(16).toString('hex');
+    const uid = userId(req);
+    await pool.query(
+      `INSERT INTO whatsapp_org_settings
+         (organizacion_id, access_token, phone_number_id, verify_token, graph_version, business_account_id, updated_by_user_id, updated_by_user_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (organizacion_id) DO UPDATE SET
+         access_token = EXCLUDED.access_token, phone_number_id = EXCLUDED.phone_number_id, verify_token = EXCLUDED.verify_token,
+         graph_version = EXCLUDED.graph_version, business_account_id = EXCLUDED.business_account_id,
+         updated_by_user_id = EXCLUDED.updated_by_user_id, updated_by_user_name = EXCLUDED.updated_by_user_name, updated_at = NOW()`,
+      [organizacionId, encryptPassword(tmp.accessToken), phoneNumberId, verifyToken, DEFAULT_GRAPH_VERSION, wabaId, uid, uid === 'SYSTEM' ? 'Sistema' : await resolveUserName(uid)],
+    );
+    saludCache.delete(organizacionId);
+    res.json({ success: true, data: { numero: info?.display_phone_number || null, nombre: info?.verified_name || null, pin: pinNuevo, avisos } });
+  } catch (error: any) {
+    const duplicated = error?.code === '23505';
+    res.status(duplicated ? 409 : 502).json({
+      success: false,
+      error: duplicated ? 'Ese número de WhatsApp ya está conectado a otro despacho.' : (error?.message || 'No se pudo conectar WhatsApp con Meta'),
+    });
+  }
 }
 
 export async function getWhatsAppConfig(req: Request, res: Response) {
@@ -245,6 +348,7 @@ export async function saveWhatsAppConfig(req: Request, res: Response) {
     );
 
     const config = await loadWhatsAppConfig(organizacionId);
+    saludCache.delete(organizacionId);
     res.json({ success: true, data: getConfigStatus(config) });
   } catch (error: any) {
     const duplicated = error?.code === '23505';

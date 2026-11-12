@@ -9,4 +9,5 @@ import './servidor';
 import './opciones';
 import './seguridad';
 import './automatizaciones';
+import './despacho';
 import './contextos';
