@@ -6,7 +6,8 @@ import { createPortal } from 'react-dom';
 import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Sparkles, Trash2, UsersRound, Volume2, X, Zap } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth, UserProfile } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
+import { SeguridadPanel } from '../components/SeguridadPanel';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
@@ -112,7 +113,7 @@ const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
   { key: 'preferencias',  label: t("Preferencias de trabajo"),  icon: SlidersHorizontal },
   { key: 'notificaciones', label: t("Notificaciones"),          icon: Bell },
   { key: 'seguridad',     label: t("Seguridad"),                icon: ShieldCheck },
-  { key: 'misdatos',      label: t("Mis datos y privacidad"),   icon: Lock },
+  { key: 'misdatos',      label: t("Mis datos"),   icon: Lock },
   { key: 'manual',        label: t("Manual de usuario"),        icon: BookOpen },
   { key: 'ayuda',         label: t("Ayuda e información"),      icon: Info },
 ];
@@ -122,7 +123,7 @@ const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGesto
   { key: 'automatizaciones', label: t("Automatizaciones"),    icon: Zap, soloGestor: true },
   { key: 'skills',          label: t("Skills de la IA"),      icon: Sparkles },
   { key: 'trazabilidad',    label: t("Trazabilidad"),         icon: History },
-  { key: 'privacidad',      label: t("Datos y privacidad"),   icon: Database, soloGestor: true },
+  { key: 'privacidad',      label: t("Datos del despacho (RGPD)"),   icon: Database, soloGestor: true },
   { key: 'usuarios',        label: t("Gestión de Usuarios"),  icon: UsersRound, soloGestor: true },
 ];
 
@@ -1432,49 +1433,7 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
   );
 }
 
-function SeguridadPanel() {
-  const navigate = useNavigate();
-  const apariencia = useAparienciaClerk({
-    elements: {
-      formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
-      badge: 'bg-red-50 text-[#ab0433]',
-    },
-    variables: { colorPrimary: '#ab0433' },
-  });
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">{t("Cuenta y autenticación")}</h3>
-        <p className="text-xs text-slate-500 max-w-2xl mb-5">{t("Contraseña, verificación en dos pasos (2FA) y sesiones activas se gestionan aquí mismo — es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.")}</p>
-        <div className="mx-auto max-w-3xl flex justify-center">
-          <UserProfile
-            routing="hash"
-            appearance={apariencia}
-          />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">{t("Actividad de la cuenta")}</h3>
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-            <History size={20} className="text-slate-500" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-800">{t("Historial de accesos y acciones")}</p>
-            <p className="text-xs text-slate-500 mt-0.5 max-w-md">{t("Inicios de sesión, IP y dispositivo de cada acceso, y el registro de acciones de todo el despacho, están en Trazabilidad.")}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard/config?section=trazabilidad')}
-            className="shrink-0 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-          >{t("Ver Trazabilidad")}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Seguridad: ver components/SeguridadPanel.tsx (12/11/2026).
 
 interface WhatsAppIntegrationStatus {
   configured: boolean;

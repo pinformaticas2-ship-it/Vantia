@@ -7,4 +7,5 @@ import './listas';
 import './variables';
 import './servidor';
 import './opciones';
+import './seguridad';
 import './contextos';

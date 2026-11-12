@@ -11,7 +11,7 @@ import { aviso, confirmar } from "../lib/avisos";
 // Secciones nuevas de Ajustes (14/10/2026): Mi perfil, Preferencias de trabajo,
 // Datos y privacidad, y el selector de modo claro/oscuro de Apariencia.
 
-const Tarjeta = ({ titulo, children, extra }: { titulo: string; children: React.ReactNode; extra?: React.ReactNode }) => (
+export const Tarjeta = ({ titulo, children, extra }: { titulo: string; children: React.ReactNode; extra?: React.ReactNode }) => (
   <div className="bg-white rounded-2xl border border-slate-200 p-5">
     <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{titulo}</h3>
@@ -480,7 +480,7 @@ export function PreferenciasTrabajoPanel() {
   );
 }
 
-// ── Datos y privacidad (propietario/administradores) ──────────────────────
+// ── Datos del despacho (RGPD) (propietario/administradores; antes «Datos y privacidad») ──────────────────────
 export function PrivacidadPanel() {
   const { getToken } = useAuth();
   const [datos, setDatos] = useState<{ retencionMeses: number | null; desde: string | null; registros: number; opciones: number[] } | null>(null);
@@ -610,7 +610,7 @@ export function IntegracionesPropias() {
   );
 }
 
-// ── Mis datos y privacidad (cada persona, 16/10/2026) ─────────────────────
+// ── Mis datos (cada persona, 16/10/2026; antes «Mis datos y privacidad») ─────────────────────
 // Descargar lo que Vantia guarda de ti (art. 15 RGPD), qué se guarda en el
 // navegador, cerrar sesión y eliminar la cuenta.
 
@@ -675,7 +675,7 @@ export function MisDatosPanel() {
   return (
     <div className="space-y-6">
       <Tarjeta titulo={t("Descargar mis datos")}>
-        <p className="text-sm text-slate-600">{t("Un archivo con lo que Vantia guarda de ti: tu perfil, tus preferencias, los despachos a los que perteneces y tu actividad. Lo que creas dentro de un despacho (clientes, expedientes, documentos) es del despacho: su propietario lo exporta desde Datos y privacidad.")}</p>
+        <p className="text-sm text-slate-600">{t("Un archivo con lo que Vantia guarda de ti: tu perfil, tus preferencias, los despachos a los que perteneces y tu actividad. Lo que creas dentro de un despacho (clientes, expedientes, documentos) es del despacho: su propietario lo exporta desde Datos del despacho (RGPD).")}</p>
         <button type="button" onClick={() => void descargar()} disabled={descargando} className={`mt-4 ${boton}`}>
           {descargando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{" "}{t("Descargar (JSON)")}</button>
       </Tarjeta>

@@ -545,7 +545,7 @@ export default function ManualPanel() {
             ["Integraciones", "Estado de Correo y Quipu, Google Drive, Dropbox y WhatsApp."],
             ["Automatizaciones", "Vistas recibidas por correo (capítulo 16). Solo propietario y administradores."],
             ["Trazabilidad", "Auditoría de accesos y acciones (capítulo 15)."],
-            ["Datos y privacidad", "Cuánto se guarda la trazabilidad y exportación de los datos del despacho. Solo propietario y administradores."],
+            ["Datos del despacho (RGPD)", "Cuánto se guarda la trazabilidad y exportación de los datos del despacho. Solo propietario y administradores."],
             ["Gestión de Usuarios", "Miembros, roles y permisos por módulo y por persona. Solo propietario y administradores."],
           ]}
         />
@@ -566,7 +566,7 @@ export default function ManualPanel() {
             ["Resto de miembros", "Solo su propia actividad («Mi actividad»)."],
           ]}
         />
-        <P>{t("Está en Ajustes → Despacho → Trazabilidad. Cuánto tiempo se guarda se decide en Ajustes → Datos y privacidad (lo habitual, 12 meses).")}</P>
+        <P>{t("Está en Ajustes → Despacho → Trazabilidad. Cuánto tiempo se guarda se decide en Ajustes → Datos del despacho (RGPD) (lo habitual, 12 meses).")}</P>
       </Chapter>
 
       {/* ── 16 Vistas ── */}
