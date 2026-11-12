@@ -51,7 +51,7 @@ after(async () => { if (pool) await pool.end(); });
 test('preferencias personales: por defecto, cambios parciales y valores no válidos', { skip }, async () => {
   const p = await import('../src/controllers/preferencesController');
   const ini = await call(p.getMyExtras, 'aj_miembro');
-  assert.deepEqual(ini.body.data, { modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', letradoNombre: '', colegiado: '', colegio: '' });
+  assert.deepEqual(ini.body.data, { modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', menosAnimaciones: false, letradoNombre: '', colegiado: '', colegio: '' });
   await call(p.updateMyExtras, 'aj_miembro', { body: { modo: 'oscuro', inicio: '/dashboard/agenda' } });
   const r = await call(p.updateMyExtras, 'aj_miembro', { body: { cargo: '  Abogada  ', telefono: '+34 600 <b>11 22 33', inicio: 'https://malo.example', modo: 'neón' } });
   assert.equal(r.body.data.modo, 'oscuro', 'un valor no válido no pisa el guardado');
@@ -64,6 +64,9 @@ test('preferencias personales: por defecto, cambios parciales y valores no váli
   // Datos de letrado (Calculadora de costas): se recortan y no se pierden con otros cambios
   await call(p.updateMyExtras, 'aj_miembro', { body: { letradoNombre: '  Ana Pérez  ', colegiado: ' 2.345 ', colegio: 'ICA Murcia' } });
   const l = (await call(p.updateMyExtras, 'aj_miembro', { body: { texto: 'normal' } })).body.data;
+  // Menos animaciones (12/11/2026): se guarda y un valor raro no lo cambia.
+  assert.equal((await call(p.updateMyExtras, 'aj_miembro', { body: { menosAnimaciones: true } })).body.data.menosAnimaciones, true);
+  assert.equal((await call(p.updateMyExtras, 'aj_miembro', { body: { menosAnimaciones: 'si' } })).body.data.menosAnimaciones, true);
   assert.deepEqual([l.letradoNombre, l.colegiado, l.colegio], ['Ana Pérez', '2.345', 'ICA Murcia']);
 });
 

@@ -1521,6 +1521,19 @@
   }
 }
 
+/* Ajustes → Apariencia → "Menos animaciones" (12/11/2026): lo mismo, elegido
+   en Vantia. Los indicadores de carga siguen girando: dicen que algo pasa. */
+html[data-movimiento="reducido"] *:not(.animate-spin):not(.spinner-bar),
+html[data-movimiento="reducido"] *::before,
+html[data-movimiento="reducido"] *::after {
+  animation-duration: 1ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 1ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Quien tenga activado "reducir movimiento" en el sistema no ve animaciones. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

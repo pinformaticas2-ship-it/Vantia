@@ -17,6 +17,8 @@ export interface Preferencias {
   cargo: string;
   telefono: string;
   texto: TamanoTexto;
+  /** Quitar animaciones y transiciones (accesibilidad, 12/11/2026). */
+  menosAnimaciones: boolean;
   /** Datos de letrado para notas de honorarios y escritos (Calculadora). */
   letradoNombre: string;
   colegiado: string;
@@ -32,7 +34,7 @@ export const TAMANOS_TEXTO: { valor: TamanoTexto; label: string; px: number }[] 
 ];
 
 export const PREFERENCIAS_POR_DEFECTO: Preferencias = {
-  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal',
+  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', menosAnimaciones: false,
   letradoNombre: '', colegiado: '', colegio: '',
 };
 
@@ -60,6 +62,7 @@ function normalizar(raw: any): Preferencias {
     cargo: typeof p.cargo === 'string' ? p.cargo : '',
     telefono: typeof p.telefono === 'string' ? p.telefono : '',
     texto: p.texto === 'grande' || p.texto === 'muy_grande' ? p.texto : 'normal',
+    menosAnimaciones: p.menosAnimaciones === true,
     letradoNombre: typeof p.letradoNombre === 'string' ? p.letradoNombre : '',
     colegiado: typeof p.colegiado === 'string' ? p.colegiado : '',
     colegio: typeof p.colegio === 'string' ? p.colegio : '',
@@ -88,7 +91,8 @@ export function esOscuro(modo: Modo): boolean {
  *  16/10/2026: antes se animaba cada elemento por separado y se notaba lento. */
 export function conFundido(cambio: () => void) {
   const doc = document as any;
-  const sinMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const sinMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    || document.documentElement.getAttribute('data-movimiento') === 'reducido';
   if (typeof doc.startViewTransition !== 'function' || sinMovimiento) { cambio(); return; }
   // Si empieza otro fundido antes de acabar este, el navegador cancela el
   // primero y rechaza sus promesas: no es un error, se ignora.
@@ -112,8 +116,14 @@ export function aplicarTexto(texto: TamanoTexto) {
   document.documentElement.style.setProperty('--escala-texto', String(px / 16));
 }
 
+/** Sin animaciones ni transiciones en toda la app (ver index.css). */
+export function aplicarMovimiento(menos: boolean) {
+  if (menos) document.documentElement.setAttribute('data-movimiento', 'reducido');
+  else document.documentElement.removeAttribute('data-movimiento');
+}
+
 // Lo antes posible (al importar el módulo): el modo y el tamaño guardados, sin parpadeo.
-if (typeof document !== 'undefined') { aplicarModo(leerCache().modo); aplicarTexto(leerCache().texto); }
+if (typeof document !== 'undefined') { const c = leerCache(); aplicarMovimiento(c.menosAnimaciones); aplicarModo(c.modo); aplicarTexto(c.texto); }
 
 /** Primer día de la semana para la Agenda (lectura directa, sin contexto). */
 export function primerDiaSemana(): 'lunes' | 'domingo' {
@@ -140,6 +150,7 @@ export function PreferenciasProvider({ children }: { children: React.ReactNode }
   const fijar = useCallback((p: Preferencias) => {
     setPrefs(p);
     try { localStorage.setItem(CLAVE, JSON.stringify(p)); } catch { /* sin almacenamiento */ }
+    aplicarMovimiento(p.menosAnimaciones);
     aplicarModo(p.modo);
     aplicarTexto(p.texto);
   }, []);

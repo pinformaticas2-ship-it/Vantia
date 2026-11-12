@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Copy, Download, ExternalLink, Keyboard, LifeBuoy, Loader2, LogOut, Moon, Monitor, Sun, Trash2, Type } from 'lucide-react';
+import { BookOpen, Camera, Copy, Download, ExternalLink, Keyboard, LifeBuoy, Loader2, LogOut, Moon, Monitor, Sparkles, Sun, Scale, Trash2, Type, UserRound, type LucideIcon } from 'lucide-react';
 import { apiFetch, resolveApiUrl } from '../lib/api';
 import { PAGINAS_INICIO, TAMANOS_TEXTO, usePreferencias, Modo } from '../lib/preferencias';
 import { AyudaAtajos } from './AtajosTeclado';
-import { confirmar } from "../lib/avisos";
+import { aviso, confirmar } from "../lib/avisos";
 
 // Secciones nuevas de Ajustes (14/10/2026): Mi perfil, Preferencias de trabajo,
 // Datos y privacidad, y el selector de modo claro/oscuro de Apariencia.
@@ -52,7 +52,6 @@ export function SelectorModo() {
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-slate-500">El modo oscuro es nuevo: si ves alguna pantalla con colores raros, avísanos desde el Centro de soporte.</p>
     </section>
   );
 }
@@ -81,51 +80,258 @@ export function SelectorTexto() {
   );
 }
 
-// ── Mi perfil ─────────────────────────────────────────────────────────────
-export function PerfilPanel() {
-  const { user } = useUser();
+// ── Cabecera común de cada sección de Ajustes (12/11/2026) ────────────────
+// Antes cada sección tenía la suya (una oscura enorme en Apariencia, un
+// título suelto en otras, nada en Mi perfil): ahora todas la misma.
+export function CabeceraAjuste({ icon: Icon, titulo, descripcion, extra }: {
+  icon: LucideIcon;
+  titulo: string;
+  descripcion: React.ReactNode;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-8 flex flex-wrap items-start gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-red-600 shadow-sm">
+        <Icon size={20} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h1 className="text-2xl font-extrabold leading-tight text-slate-800">{titulo}</h1>
+        <p className="mt-1 max-w-2xl text-sm text-slate-500">{descripcion}</p>
+      </div>
+      {extra && <div className="shrink-0">{extra}</div>}
+    </div>
+  );
+}
+
+// ── Apariencia: menos animaciones (12/11/2026) ───────────────────────────
+export function SelectorMovimiento() {
   const { prefs, guardar } = usePreferencias();
+  const activo = prefs.menosAnimaciones;
+  return (
+    <section className="mb-10">
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Movimiento</h3>
+      <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <span className="flex min-w-0 items-center gap-3">
+          <Sparkles size={18} className="shrink-0 text-slate-400" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-slate-800">Menos animaciones</span>
+            <span className="block text-xs text-slate-500">Quita los fundidos y desplazamientos: todo aparece al instante. Útil si te marean o en ordenadores lentos.</span>
+          </span>
+        </span>
+        <button type="button" role="switch" aria-checked={activo} aria-label="Menos animaciones"
+          onClick={() => void guardar({ menosAnimaciones: !activo }).catch(() => {})}
+          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${activo ? 'bg-red-600' : 'bg-slate-300'}`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ── Apariencia: muestra en vivo (12/11/2026) ─────────────────────────────
+// Piezas reales de la app (no un dibujo): cambian al momento con el modo,
+// el tema, el tamaño del texto y las animaciones que elijas.
+export function MuestraApariencia() {
+  const [interruptor, setInterruptor] = useState(true);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Así se ve</p>
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600"><Scale size={17} /></div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-slate-800">Exp. 2026/0142 · Reclamación de cantidad</p>
+          <p className="truncate text-xs text-slate-500">Juzgado de 1ª Instancia nº 3 · próxima vista el 18 nov.</p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-slate-600">
+        El texto de toda la aplicación se verá con este tamaño y estos colores, en el modo que hayas elegido.
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700">En plazo</span>
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700">Vence mañana</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">Archivado</span>
+      </div>
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <button type="button" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Botón principal</button>
+        <button type="button" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Secundario</button>
+        <button type="button" role="switch" aria-checked={interruptor} aria-label="Interruptor de ejemplo" onClick={() => setInterruptor((v) => !v)}
+          className={`relative ml-auto inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${interruptor ? 'bg-red-600' : 'bg-slate-300'}`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${interruptor ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Mi perfil ─────────────────────────────────────────────────────────────
+// 12/11/2026: el nombre y la foto se cambian aquí (antes había que ir a
+// Seguridad, a la pantalla de Clerk). El correo de acceso sigue en Seguridad
+// porque hay que verificar el nuevo con un código.
+const FOTO_MAX_MB = 8;
+
+export function PerfilPanel() {
+  const { user, isLoaded } = useUser();
+  const { prefs, guardar } = usePreferencias();
+  const [nombre, setNombre] = useState('');
+  const [apellidos, setApellidos] = useState('');
   const [cargo, setCargo] = useState(prefs.cargo);
   const [telefono, setTelefono] = useState(prefs.telefono);
-  const g = useEstadoGuardado();
+  const [guardando, setGuardando] = useState(false);
+  const [foto, setFoto] = useState<'' | 'subiendo' | 'quitando'>('');
+  const fotoRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setNombre(user.firstName || '');
+    setApellidos(user.lastName || '');
+  }, [user?.id, user?.firstName, user?.lastName]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setCargo(prefs.cargo); setTelefono(prefs.telefono); }, [prefs.cargo, prefs.telefono]);
-  const cambiado = cargo.trim() !== prefs.cargo || telefono.trim() !== prefs.telefono;
+
+  const nombreCambiado = !!user && (nombre.trim() !== (user.firstName || '') || apellidos.trim() !== (user.lastName || ''));
+  const prefsCambiadas = cargo.trim() !== prefs.cargo || telefono.trim() !== prefs.telefono;
+  const cambiado = nombreCambiado || prefsCambiadas;
+  const telefonoValido = !telefono.trim() || /^[+()\d\s-]{6,30}$/.test(telefono.trim());
+  const nombreValido = !!nombre.trim();
+
+  // Si te vas con cambios sin guardar, el navegador avisa.
+  useEffect(() => {
+    if (!cambiado) return;
+    const aviso = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', aviso);
+    return () => window.removeEventListener('beforeunload', aviso);
+  }, [cambiado]);
+
   const onGuardar = async () => {
-    g.setEstado('guardando');
-    try { await guardar({ cargo: cargo.trim(), telefono: telefono.trim() }); g.setEstado('ok'); } catch { g.setEstado('error'); }
+    if (!user || !nombreValido || !telefonoValido) return;
+    setGuardando(true);
+    try {
+      if (nombreCambiado) await user.update({ firstName: nombre.trim(), lastName: apellidos.trim() });
+      if (prefsCambiadas) await guardar({ cargo: cargo.trim(), telefono: telefono.trim() });
+      aviso.ok('Perfil guardado');
+    } catch (e: any) {
+      aviso.error(e?.errors?.[0]?.longMessage || e?.message || 'No se pudo guardar el perfil');
+    } finally { setGuardando(false); }
   };
+  const descartar = () => {
+    setNombre(user?.firstName || ''); setApellidos(user?.lastName || '');
+    setCargo(prefs.cargo); setTelefono(prefs.telefono);
+  };
+
+  const subirFoto = async (file: File | undefined) => {
+    if (!file || !user) return;
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(file.type)) { aviso.error('Elige una imagen JPG, PNG, GIF o WebP.'); return; }
+    if (file.size > FOTO_MAX_MB * 1024 * 1024) { aviso.error(`La foto pesa demasiado (máximo ${FOTO_MAX_MB} MB).`); return; }
+    setFoto('subiendo');
+    try { await user.setProfileImage({ file }); aviso.ok('Foto actualizada'); }
+    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || 'No se pudo cambiar la foto'); }
+    finally { setFoto(''); }
+  };
+  const quitarFoto = async () => {
+    if (!user) return;
+    if (!(await confirmar({ titulo: '¿Quitar tu foto?', mensaje: 'Se verán tus iniciales en su lugar.', confirmar: 'Quitar foto' }))) return;
+    setFoto('quitando');
+    try { await user.setProfileImage({ file: null }); aviso.ok('Foto quitada'); }
+    catch (e: any) { aviso.error(e?.errors?.[0]?.longMessage || 'No se pudo quitar la foto'); }
+    finally { setFoto(''); }
+  };
+
+  if (!isLoaded || !user) {
+    return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-slate-300" size={26} /></div>;
+  }
+
+  const nombreVisible = [nombre.trim(), apellidos.trim()].filter(Boolean).join(' ') || 'Sin nombre';
+  const iniciales = nombreVisible.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('');
+  const input = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-300';
+  const etiqueta = 'mb-1 block text-xs font-semibold text-slate-600';
+
   return (
     <div className="space-y-6">
-      <Tarjeta titulo="Tus datos">
-        <div className="flex items-center gap-4">
-          {user?.imageUrl
-            ? <img src={user.imageUrl} alt="" className="h-14 w-14 rounded-full object-cover" />
-            : <div className="h-14 w-14 rounded-full bg-slate-200" />}
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-slate-800">{user?.fullName || 'Sin nombre'}</p>
-            <p className="truncate text-sm text-slate-500">{user?.primaryEmailAddress?.emailAddress}</p>
-            <p className="mt-1 text-xs text-slate-500">El nombre, la foto y el correo de acceso se cambian en <Link to="/dashboard/config?section=seguridad" className="font-semibold text-red-600 hover:underline">Seguridad</Link>.</p>
+      <CabeceraAjuste icon={UserRound} titulo="Mi perfil"
+        descripcion="Tu nombre, tu foto y cómo te ven tus compañeros del despacho." />
+
+      <Tarjeta titulo="Foto">
+        <div className="flex flex-wrap items-center gap-5">
+          <div className="relative h-20 w-20 shrink-0">
+            {user.hasImage
+              ? <img src={user.imageUrl} alt="Tu foto" className="h-20 w-20 rounded-full object-cover ring-1 ring-slate-200" />
+              : <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-xl font-bold text-slate-500">{iniciales || '?'}</div>}
+            {foto && <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"><Loader2 size={18} className="animate-spin text-white" /></div>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => fotoRef.current?.click()} disabled={!!foto}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                <Camera size={14} /> {user.hasImage ? 'Cambiar foto' : 'Subir foto'}
+              </button>
+              {user.hasImage && (
+                <button type="button" onClick={() => void quitarFoto()} disabled={!!foto}
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60">
+                  <Trash2 size={14} /> Quitar
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">JPG, PNG, GIF o WebP, hasta {FOTO_MAX_MB} MB. Mejor una foto cuadrada de tu cara.</p>
+            <input ref={fotoRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; void subirFoto(f); }} />
           </div>
         </div>
       </Tarjeta>
-      <Tarjeta titulo="Cómo te ven en el despacho" extra={g.etiqueta}>
+
+      <Tarjeta titulo="Tus datos">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Cargo</span>
-            <input value={cargo} onChange={(e) => setCargo(e.target.value)} maxLength={100} placeholder="Ej. Abogada, Procuradora, Administración"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-300" />
+            <span className={etiqueta}>Nombre</span>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={60} autoComplete="given-name" className={input} />
+            {!nombreValido && <span className="peligro mt-1 block text-[11px] text-red-600">El nombre no puede quedar vacío.</span>}
+          </label>
+          <label className="block">
+            <span className={etiqueta}>Apellidos</span>
+            <input value={apellidos} onChange={(e) => setApellidos(e.target.value)} maxLength={80} autoComplete="family-name" className={input} />
+          </label>
+          <label className="block">
+            <span className={etiqueta}>Cargo</span>
+            <input value={cargo} onChange={(e) => setCargo(e.target.value)} maxLength={100} placeholder="Ej. Abogada, Procuradora, Administración" className={input} />
             <span className="mt-1 block text-[11px] text-slate-400">Se ve junto a tu nombre en el chat.</span>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-600">Teléfono de contacto</span>
-            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={30} placeholder="+34 600 000 000"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-300" />
+            <span className={etiqueta}>Teléfono de contacto</span>
+            <input value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={30} placeholder="+34 600 000 000" inputMode="tel" autoComplete="tel" className={input} />
+            {!telefonoValido && <span className="peligro mt-1 block text-[11px] text-red-600">Solo números, espacios, + ( ) y guiones.</span>}
           </label>
+          <div className="sm:col-span-2">
+            <span className={etiqueta}>Correo de acceso</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <span className="truncate text-sm text-slate-600">{user.primaryEmailAddress?.emailAddress || '—'}</span>
+              <Link to="/dashboard/config?section=seguridad" className="text-xs font-semibold text-red-600 hover:underline">Cambiar en Seguridad</Link>
+            </div>
+          </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+
+        {/* Así te ven los demás */}
+        <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Así te ven en el despacho</p>
+          <div className="flex items-center gap-3">
+            {user.hasImage
+              ? <img src={user.imageUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+              : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-slate-500">{iniciales || '?'}</div>}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-800">{nombreVisible}</p>
+              <p className="truncate text-xs text-slate-500">{[cargo.trim() || 'Sin cargo', telefono.trim()].filter(Boolean).join(' · ')}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
           <p className="text-xs text-slate-500">Tu firma de correo se gestiona en <Link to="/dashboard/correo" className="font-semibold text-red-600 hover:underline">Correo → Firmas</Link>.</p>
-          <button type="button" onClick={() => void onGuardar()} disabled={!cambiado || g.estado === 'guardando'}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">Guardar</button>
+          <div className="flex items-center gap-2">
+            {cambiado && !guardando && (
+              <button type="button" onClick={descartar} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100">Descartar</button>
+            )}
+            <button type="button" onClick={() => void onGuardar()} disabled={!cambiado || guardando || !nombreValido || !telefonoValido}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+              {guardando && <Loader2 size={14} className="animate-spin" />} {cambiado ? 'Guardar cambios' : 'Guardado'}
+            </button>
+          </div>
         </div>
       </Tarjeta>
     </div>

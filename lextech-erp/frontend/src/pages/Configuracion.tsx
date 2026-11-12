@@ -17,7 +17,7 @@ import SkillsPanel from './SkillsPanel';
 import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
-import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
+import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, SelectorMovimiento, MuestraApariencia, CabeceraAjuste, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
 import { usePreferencias, esOscuro, useAparienciaClerk } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
 import { TikTokIcon } from '../components/TikTokPanel';
@@ -2462,7 +2462,6 @@ export default function Configuracion() {
     (s) => (s.key !== 'usuarios' && s.key !== 'automatizaciones') || myRol === 'propietario' || myRol === 'admin',
   );
   const { theme, setTheme } = useTheme();
-  const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   // Permite enlazar directamente a una sección concreta (p.ej. desde el aviso
   // de "conéctalo desde Configuración → Integraciones" en Comunicación Externa)
   // con ?section=integraciones, en vez de dejar siempre a quien llega en Apariencia.
@@ -2525,35 +2524,21 @@ export default function Configuracion() {
 
           {activeSection === 'apariencia' ? (
             <>
-              {/* ── Cabecera ── */}
-              <div className="relative mb-9 overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-sm">
-                <div
-                  className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-30 blur-3xl transition-colors duration-500"
-                  style={{ backgroundColor: currentAccent }}
-                />
-                <div
-                  className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full opacity-20 blur-3xl transition-colors duration-500"
-                  style={{ backgroundColor: currentAccent }}
-                />
-                <div className="relative flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
-                    <Palette size={22} />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-extrabold">Apariencia</h1>
-                    <p className="mt-1 text-sm text-slate-300">
-                      Personaliza la paleta de colores y el comportamiento visual del sistema para adaptarlo a tus
-                      preferencias.
-                    </p>
-                  </div>
+              <CabeceraAjuste icon={Palette} titulo="Apariencia"
+                descripcion="Modo claro u oscuro, tema de color, tamaño del texto y animaciones. Se guarda en tu cuenta y se aplica en todos tus dispositivos." />
+
+              {/* Ajustes a la izquierda y, a la derecha, una muestra en vivo
+                  con piezas reales de la app (cambia al momento). */}
+              <div className="mb-2 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div className="min-w-0">
+                  <SelectorModo />
+                  <SelectorTexto />
+                  <SelectorMovimiento />
+                </div>
+                <div className="min-w-0 lg:sticky lg:top-0 lg:self-start">
+                  <MuestraApariencia />
                 </div>
               </div>
-
-              {/* Claro / oscuro / como el sistema */}
-              <SelectorModo />
-
-              {/* Tamaño del texto (accesibilidad) */}
-              <SelectorTexto />
 
               {/* Tema del sistema */}
               <section className="mb-10">

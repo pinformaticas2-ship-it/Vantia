@@ -103,6 +103,8 @@ export interface PrefsExtras {
   telefono: string;
   /** Tamaño del texto de toda la app (accesibilidad, 16/10/2026). */
   texto: 'normal' | 'grande' | 'muy_grande';
+  /** Quitar animaciones y transiciones (accesibilidad, 12/11/2026). */
+  menosAnimaciones: boolean;
   /** Datos de letrado para notas de honorarios y escritos (Calculadora). */
   letradoNombre: string;
   colegiado: string;
@@ -110,7 +112,7 @@ export interface PrefsExtras {
 }
 
 export const EXTRAS_POR_DEFECTO: PrefsExtras = {
-  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal',
+  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '', texto: 'normal', menosAnimaciones: false,
   letradoNombre: '', colegiado: '', colegio: '',
 };
 
@@ -124,6 +126,7 @@ export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECT
     cargo: typeof r.cargo === 'string' ? r.cargo.trim().slice(0, 100) : base.cargo,
     telefono: typeof r.telefono === 'string' ? r.telefono.replace(/[^\d+()\s-]/g, '').trim().slice(0, 30) : base.telefono,
     texto: ['normal', 'grande', 'muy_grande'].includes(r.texto) ? r.texto : base.texto,
+    menosAnimaciones: typeof r.menosAnimaciones === 'boolean' ? r.menosAnimaciones : base.menosAnimaciones,
     letradoNombre: typeof r.letradoNombre === 'string' ? r.letradoNombre.trim().slice(0, 150) : base.letradoNombre,
     colegiado: typeof r.colegiado === 'string' ? r.colegiado.trim().slice(0, 30) : base.colegiado,
     colegio: typeof r.colegio === 'string' ? r.colegio.trim().slice(0, 200) : base.colegio,
