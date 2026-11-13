@@ -3,7 +3,7 @@ import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Database, SlidersHorizontal, UserRound } from 'lucide-react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Info, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Sparkles, Trash2, UsersRound, Volume2, X, Zap } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
@@ -2200,38 +2200,49 @@ export default function Configuracion() {
   // Si cambia ?section= estando ya aquí (p.ej. "Ver Trazabilidad" desde Seguridad).
   useEffect(() => {
     const requested = searchParams.get('section') as SectionKey | null;
-    if (requested && SECCIONES_VALIDAS.includes(requested)) setActiveSection(requested);
+    if (requested && SECCIONES_VALIDAS.includes(requested)) { setActiveSection(requested); setEnMenuMovil(false); }
   }, [searchParams]);
+  // Móvil (13/11/2026): como los ajustes del teléfono, primero la lista de
+  // secciones y, al tocar una, la sección a pantalla completa con «‹ Ajustes».
+  const [enMenuMovil, setEnMenuMovil] = useState(() => !searchParams.get('section'));
+  const contenidoRef = useRef<HTMLDivElement>(null);
+  const elegirSeccion = (k: SectionKey) => { setActiveSection(k); setEnMenuMovil(false); contenidoRef.current?.scrollTo({ top: 0 }); };
+  const etiquetaSeccion = (() => {
+    const k = activeSection === 'manual' ? 'ayuda' : activeSection;
+    const it = [...SECCIONES_CUENTA, ...SECCIONES_DESPACHO].find((x) => x.key === k);
+    return it ? t(it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label) : '';
+  })();
   const activeOther = visibleOtherSections.find((s) => s.key === activeSection);
 
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
 
       {/* ── Sub-navegación de Ajustes ── */}
-      <aside className="w-full md:w-64 flex-shrink-0 flex flex-col bg-white border-b md:border-b-0 md:border-r border-slate-200 z-10">
-        <div className="px-4 pt-4 pb-1 md:p-6 md:pb-2">
-          <h2 className="text-lg font-extrabold text-slate-800">{t("Ajustes")}</h2>
+      <aside className={`${enMenuMovil ? 'flex' : 'hidden'} min-h-0 w-full flex-1 flex-col bg-[#f4f6f8] md:flex md:w-64 md:flex-none md:flex-shrink-0 md:border-r md:border-slate-200 md:bg-white z-10`}>
+        <div className="px-4 pt-5 pb-2 md:p-6 md:pb-2">
+          <h2 className="text-2xl font-extrabold text-slate-800 md:text-lg">{t("Ajustes")}</h2>
         </div>
-        <div className="md:flex-1 md:overflow-y-auto modules-scrollbar p-3">
-          <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar md:flex-col md:overflow-visible md:pb-0">
+        <div className="min-h-0 flex-1 overflow-y-auto modules-scrollbar p-3 md:p-3">
+          <nav className="flex flex-col gap-1">
             {[
               { titulo: t("Mi cuenta"), items: SECCIONES_CUENTA },
               { titulo: t("Despacho"), items: SECCIONES_DESPACHO.filter((x) => !x.soloGestor || esGestor) },
             ].map((grupo, gi) => (
               <React.Fragment key={grupo.titulo}>
-                {gi > 0 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
-                <p className={`hidden md:block px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${gi > 0 ? 'mt-5' : ''}`}>{t(grupo.titulo)}</p>
+                <p className={`px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 md:text-[10px] ${gi > 0 ? 'mt-5' : 'mt-1 md:mt-0'}`}>{t(grupo.titulo)}</p>
                 {grupo.items.map((it) => {
                   const Icon = it.icon;
                   const active = activeSection === it.key || (it.key === 'ayuda' && activeSection === 'manual');
                   // Para quien no es propietario/admin, Trazabilidad es solo su actividad.
                   const label = t(it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label);
                   return (
-                    <button key={it.key} type="button" onClick={() => setActiveSection(it.key)}
-                      className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left group ${
-                        active ? 'bg-red-50 text-red-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                    <button key={it.key} type="button" onClick={() => elegirSeccion(it.key)}
+                      className={`w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-left text-[15px] transition-colors group md:rounded-lg md:border-0 md:bg-transparent md:px-3 md:py-2 md:text-sm ${
+                        active ? 'md:bg-red-50 md:text-red-700 md:font-semibold text-slate-800 font-medium' : 'text-slate-800 md:text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
                       }`}>
-                      <Icon size={16} className={active ? 'text-red-500' : 'text-slate-400 group-hover:text-slate-600'} /> {label}
+                      <Icon size={16} className={active ? 'text-red-500' : 'text-slate-400 group-hover:text-slate-600'} />
+                      <span className="min-w-0 flex-1 truncate md:whitespace-normal md:leading-snug">{label}</span>
+                      <ChevronRight size={16} className="shrink-0 text-slate-300 md:hidden" />
                     </button>
                   );
                 })}
@@ -2244,9 +2255,13 @@ export default function Configuracion() {
       {/* ── Contenido del ajuste ── */}
       {/* Trazabilidad ocupa todo el hueco (lista + detalle, como su propia
           pantalla); el resto de secciones van centradas con ancho de lectura. */}
-      <div className={activeSection === 'trazabilidad'
-        ? 'flex-1 min-h-0 overflow-hidden bg-[#f4f6f8]'
-        : 'flex-1 overflow-y-auto modules-scrollbar p-4 sm:p-8 lg:p-12 bg-[#f4f6f8]'}>
+      <div ref={contenidoRef} className={`${enMenuMovil ? 'hidden md:flex' : 'flex'} min-h-0 flex-1 flex-col bg-[#f4f6f8] ${activeSection === 'trazabilidad' ? 'overflow-hidden' : 'overflow-y-auto modules-scrollbar'}`}>
+        <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
+          <button type="button" onClick={() => setEnMenuMovil(true)} className="inline-flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-red-600 active:bg-red-50">
+            <ChevronLeft size={18} />{t("Ajustes")}</button>
+          <span className="min-w-0 flex-1 truncate pr-10 text-center text-sm font-bold text-slate-800">{etiquetaSeccion}</span>
+        </div>
+        <div className={activeSection === 'trazabilidad' ? 'min-h-0 flex-1' : 'p-4 sm:p-8 lg:p-12'}>
         <div className={activeSection === 'trazabilidad' ? 'h-full' : `mx-auto ${activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}`}>
 
           {activeSection === 'apariencia' ? (
@@ -2311,7 +2326,11 @@ export default function Configuracion() {
           ) : activeSection === 'privacidad' && esGestor ? (
             <PrivacidadPanel />
           ) : activeSection === 'notificaciones' ? (
-            <NotificacionesPanel />
+            <>
+              <CabeceraAjuste icon={Bell} titulo={t('Notificaciones')}
+                descripcion={t('Qué te avisa y cómo: en este dispositivo, por correo y en qué horario.')} />
+              <NotificacionesPanel />
+            </>
           ) : activeSection === 'seguridad' ? (
             <SeguridadPanel />
           ) : activeSection === 'integraciones' ? (
@@ -2337,6 +2356,7 @@ export default function Configuracion() {
             </div>
           )}
 
+        </div>
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { registrarEn } from '../../lib/i18n';
 
 registrarEn({
   // Móvil
+  "{n} usuario": "{n} user", "{n} usuarios": "{n} users",
+  "Qué te avisa y cómo: en este dispositivo, por correo y en qué horario.": "What notifies you and how: on this device, by email and at what times.",
   "Información": "Information",
   "Arrastra con un dedo para moverte; pellizca para acercar o alejar.": "Drag with one finger to move around; pinch to zoom in or out.",
   "Para añadir un paso, toca su icono arriba; se engancha al paso que tengas seleccionado.": "To add a step, tap its icon at the top; it attaches to the step you have selected.",

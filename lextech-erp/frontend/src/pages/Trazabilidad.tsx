@@ -13,7 +13,7 @@ import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import ComoFunciona from "../components/ComoFunciona";
-import { t } from '../lib/i18n';
+import { t, tn } from '../lib/i18n';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -394,7 +394,7 @@ export default function Trazabilidad() {
             </div>
           )}
           <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-600 flex items-center gap-2">
-            <Users size={13} /> {users.length}{" "}{t("usuarios")}</div>
+            <Users size={13} /> {tn(users.length, "{n} usuario", "{n} usuarios")}</div>
           <button
             onClick={fetchUsers}
             className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
