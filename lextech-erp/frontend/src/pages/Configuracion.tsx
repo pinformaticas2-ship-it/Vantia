@@ -2219,17 +2219,17 @@ export default function Configuracion() {
 
       {/* ── Sub-navegación de Ajustes ── */}
       <aside className={`${enMenuMovil ? 'flex' : 'hidden'} min-h-0 w-full flex-1 flex-col bg-[#f4f6f8] md:flex md:w-64 md:flex-none md:flex-shrink-0 md:border-r md:border-slate-200 md:bg-white z-10`}>
-        <div className="px-4 pt-5 pb-2 md:p-6 md:pb-2">
+        <div className="px-4 pt-5 pb-2 md:px-6 md:pt-5 md:pb-1">
           <h2 className="text-2xl font-extrabold text-slate-800 md:text-lg">{t("Ajustes")}</h2>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto modules-scrollbar p-3 md:p-3">
-          <nav className="flex flex-col gap-1">
+          <nav className="flex flex-col gap-1 md:gap-0">
             {[
               { titulo: t("Mi cuenta"), items: SECCIONES_CUENTA },
               { titulo: t("Despacho"), items: SECCIONES_DESPACHO.filter((x) => !x.soloGestor || esGestor) },
             ].map((grupo, gi) => (
               <React.Fragment key={grupo.titulo}>
-                <p className={`px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 md:text-[10px] ${gi > 0 ? 'mt-5' : 'mt-1 md:mt-0'}`}>{t(grupo.titulo)}</p>
+                <p className={`px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 md:text-[10px] ${gi > 0 ? 'mt-5 md:mt-3' : 'mt-1 md:mt-0'}`}>{t(grupo.titulo)}</p>
                 {grupo.items.map((it) => {
                   const Icon = it.icon;
                   const active = activeSection === it.key || (it.key === 'ayuda' && activeSection === 'manual');
@@ -2237,7 +2237,7 @@ export default function Configuracion() {
                   const label = t(it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label);
                   return (
                     <button key={it.key} type="button" onClick={() => elegirSeccion(it.key)}
-                      className={`w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-left text-[15px] transition-colors group md:rounded-lg md:border-0 md:bg-transparent md:px-3 md:py-2 md:text-sm ${
+                      className={`w-full flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-left text-[15px] transition-colors group md:rounded-lg md:border-0 md:bg-transparent md:px-3 md:py-[7px] md:text-sm ${
                         active ? 'md:bg-red-50 md:text-red-700 md:font-semibold text-slate-800 font-medium' : 'text-slate-800 md:text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
                       }`}>
                       <Icon size={16} className={active ? 'text-red-500' : 'text-slate-400 group-hover:text-slate-600'} />
