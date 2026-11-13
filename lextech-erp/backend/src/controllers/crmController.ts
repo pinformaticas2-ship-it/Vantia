@@ -4,6 +4,7 @@ import { logActivityForReq, resolveUserName } from './activityController';
 import { resolveNextInternalNumber } from './entities';
 import { sendPushToUser } from '../utils/webPush';
 import { tomarTurno, soltarTurno } from '../utils/turnos';
+import { emitirConCliente } from '../services/motorAutomatizaciones';
 
 // ── CRM: oportunidades (23/10/2026) ──────────────────────────────────────────
 // Cada persona o empresa que contacta con el despacho y aún no es cliente es
@@ -439,6 +440,7 @@ export async function crearOportunidad(req: Request, res: Response) {
     o = await guardarCambios(org, o.id, auto);
     await apuntar(org, o.id, 'etapa', `Oportunidad creada en «${etapa.nombre}» (origen: ${o.origen}).`, { userId, nombre: autor });
     avisarResponsable(o, etapa);
+    emitirOportunidad(org, 'oportunidad.creada', o, etapa.nombre, null, (req as any).auth?.userId);
     void logActivityForReq(req, `CRM: nueva oportunidad «${nombre}»`, 'CRM', o.id, nombre).catch(() => {});
     return ok(res, o, 201);
   } catch (e: any) { return fallo(res, e.message); }
@@ -496,7 +498,11 @@ export async function actualizarOportunidad(req: Request, res: Response) {
       await apuntar(org, o.id, 'etapa', avisos.join('. '), yo);
       void logActivityForReq(req, `CRM: «${nueva.nombre}» ${avisos.join('. ')}`, 'CRM', o.id, nueva.nombre).catch(() => {});
     }
-    if (etapaNueva) avisarResponsable(nueva, etapaNueva);
+    if (etapaNueva) {
+      avisarResponsable(nueva, etapaNueva);
+      const anterior = await etapaDelDespacho(org, o.etapa_id);
+      emitirOportunidad(org, 'crm.etapa', nueva, etapaNueva.nombre, anterior?.nombre || null, (req as any).auth?.userId);
+    }
     return ok(res, nueva);
   } catch (e: any) { return fallo(res, e.message); }
 }
@@ -559,6 +565,35 @@ export async function borrarOportunidad(req: Request, res: Response) {
 
 /** Mueve las oportunidades abiertas que llevan en su etapa más horas de las
  *  que dice la regla. Devuelve cuántas ha movido. */
+/** Datos de una oportunidad para las automatizaciones (12/11/2026). */
+function emitirOportunidad(org: string, evento: string, o: any, etapa: string, anterior: string | null, actor?: string | null, profundidad = 0) {
+  emitirConCliente(org, evento, {
+    oportunidad: {
+      id: o.id, nombre: o.nombre, email: o.email || '', telefono: o.telefono || '', asunto: o.asunto || '', etapa, etapa_anterior: anterior || '',
+      valor: o.valor_estimado != null ? String(o.valor_estimado) : '', estado: o.estado || '', origen: o.origen || '',
+    },
+    responsable: { id: o.responsable_user_id || null, nombre: o.responsable_nombre || '' },
+    _profundidad: profundidad,
+  }, { clienteId: o.cliente_id }, actor);
+}
+
+/** Mover una oportunidad de etapa desde una automatización. */
+export async function moverOportunidadAEtapa(org: string, id: string, etapaId: string, profundidad = 0): Promise<{ antes: string; despues: string }> {
+  const { rows } = await pool.query(`SELECT * FROM crm_oportunidades WHERE id = $1 AND organizacion_id = $2`, [id, org]);
+  const o = rows[0];
+  if (!o) throw new Error('La oportunidad ya no existe.');
+  const etapa = await etapaDelDespacho(org, etapaId);
+  if (!etapa) throw new Error('Esa etapa ya no existe.');
+  if (etapa.tipo === 'perdida') throw new Error('Para marcarla como perdida hace falta un motivo: hazlo a mano.');
+  const anterior = await etapaDelDespacho(org, o.etapa_id);
+  if (o.etapa_id === etapa.id) return { antes: anterior?.nombre || '', despues: etapa.nombre };
+  const nueva = await guardarCambios(org, id, alEntrarEn(etapa));
+  await apuntar(org, id, 'etapa', `Automatización: ${anterior?.nombre || 'Sin etapa'} → ${etapa.nombre}`, { userId: null, nombre: 'Vantia' });
+  avisarResponsable(nueva, etapa);
+  emitirOportunidad(org, 'crm.etapa', nueva, etapa.nombre, anterior?.nombre || null, null, profundidad + 1);
+  return { antes: anterior?.nombre || '', despues: etapa.nombre };
+}
+
 export async function aplicarReglasDeTiempo(): Promise<number> {
   const { rows } = await pool.query(
     `SELECT o.*, s.nombre AS etapa_nombre, d.id AS destino_id
@@ -576,6 +611,7 @@ export async function aplicarReglasDeTiempo(): Promise<number> {
     const nueva = await guardarCambios(o.organizacion_id, o.id, alEntrarEn(destino));
     await apuntar(o.organizacion_id, o.id, 'etapa', `Automático: sin cambios en «${o.etapa_nombre}» → ${destino.nombre}`, { userId: null, nombre: 'Vantia' });
     avisarResponsable(nueva, destino);
+    emitirOportunidad(o.organizacion_id, 'crm.etapa', nueva, destino.nombre, o.etapa_nombre, null);
     movidas++;
   }
   return movidas;

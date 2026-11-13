@@ -5,7 +5,7 @@ import { logActivityForReq } from '../controllers/activityController';
 import { docsBaseConfig } from '../services/docsBaseExpediente';
 import { normalizarRecordatorios, rellenarRecordatorio, TIPOS_RECORDABLES, varsDe } from '../services/recordatoriosClientes';
 import { ultimasEjecuciones } from '../utils/automatizacionesRegistro';
-import { DISPARADORES, EVENTO_DE_SERIE, ejecutarFlujo, probarFlujo, proximaEjecucion, validarFlujo } from '../services/motorAutomatizaciones';
+import { DISPARADORES, ESTADOS_EXPEDIENTE, EVENTO_DE_SERIE, TIPOS_CITA, ejecutarFlujo, muestrasDe, probarFlujo, proximaEjecucion, validarFlujo } from '../services/motorAutomatizaciones';
 
 // Ajustes → Automatizaciones (12/11/2026): resumen de todas (estado, cifras
 // y últimas ejecuciones) y los ajustes de las que no tienen ruta propia
@@ -160,9 +160,13 @@ router.post('/recordatorios/preview', requireAuth, async (req: any, res: Respons
 // ejecutarlas: propietario y administradores.
 
 router.get('/catalogo', requireAuth, async (req: any, res: Response) => {
-  const [miembros, canales] = await Promise.all([
+  const [miembros, canales, etapas] = await Promise.all([
     pool.query(`SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1 ORDER BY created_at`, [req.organizacionId]),
     pool.query(`SELECT id, nombre FROM chat_canales WHERE organizacion_id = $1 AND COALESCE(tipo, '') <> 'directo' ORDER BY nombre`, [req.organizacionId]).catch(() => ({ rows: [] as any[] })),
+    pool.query(
+      `SELECT s.id, s.nombre, e.nombre AS embudo FROM crm_etapas s JOIN crm_embudos e ON e.id = s.embudo_id
+        WHERE s.organizacion_id = $1 AND s.tipo <> 'perdida' ORDER BY e.nombre, s.orden NULLS LAST, s.nombre`, [req.organizacionId],
+    ).catch(() => ({ rows: [] as any[] })),
   ]);
   const { resolveUserName } = await import('../controllers/activityController');
   res.json({
@@ -171,6 +175,10 @@ router.get('/catalogo', requireAuth, async (req: any, res: Response) => {
       disparadores: Object.entries(DISPARADORES).map(([clave, d]) => ({ clave, etiqueta: d.etiqueta, descripcion: d.descripcion, variables: d.variables })),
       miembros: await Promise.all(miembros.rows.map(async (m: any) => ({ userId: m.user_id, nombre: await resolveUserName(m.user_id) }))),
       canales: canales.rows,
+      etapasCrm: etapas.rows,
+      estadosExpediente: ESTADOS_EXPEDIENTE,
+      tiposCita: TIPOS_CITA,
+      conMuestras: Object.entries(DISPARADORES).filter(([, d]) => d.muestra).map(([k]) => k),
       eventoDeSerie: EVENTO_DE_SERIE,
     },
   });
@@ -216,7 +224,8 @@ async function guardarFlujo(req: any, res: Response, id: string | null) {
       ));
     } else if (id) {
       ({ rows: [fila] } = await pool.query(
-        `UPDATE automatizaciones_flujos SET nombre = $3, descripcion = $4, activo = $5, evento = $6, flujo = $7, proxima_at = $8, updated_at = NOW()
+        `UPDATE automatizaciones_flujos SET nombre = $3, descripcion = $4, evento = $6, flujo = $7, proxima_at = $8, updated_at = NOW(),
+                cursor_at = CASE WHEN $5 AND NOT automatizaciones_flujos.activo THEN NOW() ELSE COALESCE(cursor_at, NOW()) END, activo = $5
           WHERE id = $1 AND organizacion_id = $2 AND vinculada IS NULL RETURNING ${FILA}`,
         [id, req.organizacionId, nombre, descripcion, activo, evento || 'manual', JSON.stringify(flujo), proxima],
       ));
@@ -225,8 +234,8 @@ async function guardarFlujo(req: any, res: Response, id: string | null) {
       const { rows: n } = await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_flujos WHERE organizacion_id = $1`, [req.organizacionId]);
       if (n[0].n >= 50) return fallo(res, 'Máximo de 50 automatizaciones por despacho.', 400);
       ({ rows: [fila] } = await pool.query(
-        `INSERT INTO automatizaciones_flujos (organizacion_id, nombre, descripcion, activo, evento, flujo, proxima_at, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${FILA}`,
+        `INSERT INTO automatizaciones_flujos (organizacion_id, nombre, descripcion, activo, evento, flujo, proxima_at, created_by, cursor_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW()) RETURNING ${FILA}`,
         [req.organizacionId, nombre, descripcion, activo, evento || 'manual', JSON.stringify(flujo), proxima, req.auth?.userId || null],
       ));
     }
@@ -255,11 +264,32 @@ router.post('/probar', requireAuth, async (req: any, res: Response) => {
   if (typeof req.body?.vinculada === 'string' && EVENTO_DE_SERIE[req.body.vinculada]) {
     const d = flujo.nodos.find((n) => n.tipo === 'disparador'); if (d) d.config = { ...(d.config || {}), evento: EVENTO_DE_SERIE[req.body.vinculada] };
   }
-  try { res.json({ success: true, data: await probarFlujo(req.organizacionId, flujo) }); }
+  const muestra = typeof req.body?.muestraId === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.muestraId) ? req.body.muestraId : null;
+  try { res.json({ success: true, data: await probarFlujo(req.organizacionId, flujo, muestra) }); }
   catch (e: any) { fallo(res, e?.message || 'No se pudo probar', 500); }
 });
 
 // Ejecutar de verdad (los de disparador manual).
+// Registros reales recientes para «Probar con…».
+router.get('/muestras', requireAuth, async (req: any, res: Response) => {
+  res.json({ success: true, data: await muestrasDe(req.organizacionId, String(req.query.evento || '')) });
+});
+
+router.post('/flujos/:id/duplicar', requireAuth, async (req: any, res: Response) => {
+  if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
+  if (!/^[0-9a-f-]{36}$/i.test(String(req.params.id))) return fallo(res, 'Automatización no encontrada', 404);
+  const { rows: n } = await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_flujos WHERE organizacion_id = $1`, [req.organizacionId]);
+  if (n[0].n >= 50) return fallo(res, 'Máximo de 50 automatizaciones por despacho.', 400);
+  const { rows } = await pool.query(
+    `INSERT INTO automatizaciones_flujos (organizacion_id, nombre, descripcion, activo, evento, flujo, created_by, cursor_at)
+     SELECT organizacion_id, LEFT(nombre || ' (copia)', 120), descripcion, false, evento, flujo, $3, NOW()
+       FROM automatizaciones_flujos WHERE id = $1 AND organizacion_id = $2 AND vinculada IS NULL RETURNING ${FILA}`,
+    [req.params.id, req.organizacionId, req.auth?.userId || null],
+  );
+  if (!rows.length) return fallo(res, 'Automatización no encontrada', 404);
+  res.json({ success: true, data: rows[0] });
+});
+
 router.post('/flujos/:id/ejecutar', requireAuth, async (req: any, res: Response) => {
   if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
   const { rows } = await pool.query(`SELECT id, organizacion_id, nombre, flujo, evento FROM automatizaciones_flujos WHERE id = $1 AND organizacion_id = $2`, [req.params.id, req.organizacionId]).catch(() => ({ rows: [] as any[] }));

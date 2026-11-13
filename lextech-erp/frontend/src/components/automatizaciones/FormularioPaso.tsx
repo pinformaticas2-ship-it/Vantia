@@ -1,8 +1,8 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { t } from '../../lib/i18n';
 import { Campo, CampoCorreo, campoCls } from './campos';
-import { OPERADORES, type Catalogo, type TipoNodo, type Variable } from './tipos';
+import { OPERADORES, reglasDe, type Catalogo, type TipoNodo, type Variable } from './tipos';
 
 // Ajustes de cada tipo de paso, en el panel derecho del lienzo.
 
@@ -31,6 +31,13 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
               </button>
             ))}
           </div>
+          {c.evento === 'tarea.vence' && (
+            <Campo etiqueta={t('¿Cuántos días antes del plazo?')}>
+              <select className={campoCls} value={c.diasAntes ?? 2} onChange={(e) => set('diasAntes', Number(e.target.value))}>
+                {[0, 1, 2, 3, 5, 7, 10, 15].map((d) => <option key={d} value={d}>{d === 0 ? t('El mismo día') : t('{n} días antes', { n: d })}</option>)}
+              </select>
+            </Campo>
+          )}
           {c.evento === 'programado' && (
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta={t('Frecuencia')}>
@@ -54,22 +61,41 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
         </>
       );
     case 'condicion': {
-      const op = OPERADORES.find((o) => o.v === c.operador);
+      const reglas = reglasDe(c);
+      const setRegla = (i: number, k: string, v: string) => set('reglas', reglas.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
       return (
         <>
-          <Campo etiqueta={t('¿Qué se comprueba?')}>
-            <select className={campoCls} value={c.campo || ''} onChange={(e) => set('campo', e.target.value)}>
-              <option value="">{t('Elige un dato…')}</option>
-              {variables.map((v) => <option key={v.clave} value={v.clave}>{t(v.etiqueta)}</option>)}
-            </select>
-          </Campo>
-          <Campo etiqueta={t('Condición')}>
-            <select className={campoCls} value={c.operador || 'igual'} onChange={(e) => set('operador', e.target.value)}>
-              {OPERADORES.map((o) => <option key={o.v} value={o.v}>{t(o.l)}</option>)}
-            </select>
-          </Campo>
-          {!op?.sinValor && <Campo etiqueta={t('Valor')} ayuda={t('Sin distinguir mayúsculas.')}><input className={campoCls} value={c.valor || ''} onChange={(e) => set('valor', e.target.value)} /></Campo>}
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{t('Conecta la salida verde («Sí») y la roja («No») con lo que debe pasar en cada caso.')}</p>
+          {reglas.length > 1 && (
+            <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+              {[['y', t('Se cumplen todas')], ['o', t('Se cumple alguna')]].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => set('modo', v)} className={`flex-1 rounded-md px-2 py-1.5 ${(c.modo || 'y') === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{l}</button>
+              ))}
+            </div>
+          )}
+          {reglas.map((x, i) => {
+            const op = OPERADORES.find((o) => o.v === x.operador);
+            return (
+              <div key={i} className="space-y-2 rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-slate-400">{i === 0 ? t('Regla') : (c.modo === 'o' ? t('o') : t('y'))}</span>
+                  {reglas.length > 1 && <button type="button" onClick={() => set('reglas', reglas.filter((_, j) => j !== i))} className="rounded p-0.5 text-slate-400 hover:text-red-600"><X size={13} /></button>}
+                </div>
+                <select className={campoCls} value={x.campo || ''} onChange={(e) => setRegla(i, 'campo', e.target.value)}>
+                  <option value="">{t('Elige un dato…')}</option>
+                  {variables.map((v) => <option key={v.clave} value={v.clave}>{t(v.etiqueta)}</option>)}
+                </select>
+                <select className={campoCls} value={x.operador || 'igual'} onChange={(e) => setRegla(i, 'operador', e.target.value)}>
+                  {OPERADORES.map((o) => <option key={o.v} value={o.v}>{t(o.l)}</option>)}
+                </select>
+                {!op?.sinValor && <input className={campoCls} value={x.valor || ''} placeholder={t('Valor')} onChange={(e) => setRegla(i, 'valor', e.target.value)} />}
+              </div>
+            );
+          })}
+          {reglas.length < 10 && (
+            <button type="button" onClick={() => set('reglas', [...reglas, { campo: '', operador: 'no_vacio', valor: '' }])}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:underline"><Plus size={13} />{t('Añadir regla')}</button>
+          )}
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{t('Conecta la salida verde («Sí») y la roja («No») con lo que debe pasar en cada caso. Sin distinguir mayúsculas.')}</p>
         </>
       );
     }
@@ -159,6 +185,64 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
           </Campo>
           <Campo etiqueta={t('Mensaje')}><textarea rows={4} className={campoCls} value={c.texto || ''} onChange={(e) => set('texto', e.target.value)} /></Campo>
           <Variables vars={vars} />
+        </>
+      );
+    case 'crear_cita':
+      return (
+        <>
+          <Campo etiqueta={t('Título')}><input className={campoCls} value={c.titulo || ''} onChange={(e) => set('titulo', e.target.value)} /></Campo>
+          <div className="grid grid-cols-3 gap-2">
+            <Campo etiqueta={t('Dentro de (días)')}><input type="number" min={0} max={365} className={campoCls} value={c.dias ?? 1} onChange={(e) => set('dias', Math.max(0, Number(e.target.value) || 0))} /></Campo>
+            <Campo etiqueta={t('Hora')}><input type="time" className={campoCls} value={c.hora || '10:00'} onChange={(e) => set('hora', e.target.value || '10:00')} /></Campo>
+            <Campo etiqueta={t('Minutos')}><input type="number" min={15} max={600} step={15} className={campoCls} value={c.duracion ?? 60} onChange={(e) => set('duracion', Number(e.target.value) || 60)} /></Campo>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta={t('Tipo')}>
+              <select className={campoCls} value={c.tipo || 'cita'} onChange={(e) => set('tipo', e.target.value)}>
+                {(catalogo?.tiposCita || ['cita']).map((x) => <option key={x} value={x}>{t({ cita: 'Cita', reunion: 'Reunión', llamada: 'Llamada', video: 'Videollamada', vista: 'Vista oral', otro: 'Otro' }[x] || x)}</option>)}
+              </select>
+            </Campo>
+            <Campo etiqueta={t('En la agenda de')}>
+              <select className={campoCls} value={c.asignar || 'responsable'} onChange={(e) => set('asignar', e.target.value)}>
+                <option value="responsable">{t('El responsable')}</option><option value="usuario">{t('Quien lo hizo')}</option>
+                {(catalogo?.miembros || []).map((m) => <option key={m.userId} value={m.userId}>{m.nombre}</option>)}
+              </select>
+            </Campo>
+          </div>
+          <Campo etiqueta={t('Descripción')}><textarea rows={2} className={campoCls} value={c.descripcion || ''} onChange={(e) => set('descripcion', e.target.value)} /></Campo>
+          <Variables vars={vars} />
+        </>
+      );
+    case 'enviar_whatsapp':
+      return (
+        <>
+          <Campo etiqueta={t('Mensaje')}><textarea rows={4} className={campoCls} value={c.texto || ''} onChange={(e) => set('texto', e.target.value)} /></Campo>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{t('WhatsApp solo deja escribir texto libre si el cliente te escribió en las últimas 24 horas. Si no, el paso falla y queda en el historial.')}</p>
+          <p className="text-[11px] text-slate-400">{t('Se envía al teléfono del cliente o de la oportunidad, desde el número de WhatsApp conectado en Integraciones.')}</p>
+          <Variables vars={vars} />
+        </>
+      );
+    case 'mover_crm':
+      return (
+        <>
+          <Campo etiqueta={t('Mover a la etapa')}>
+            <select className={campoCls} value={c.etapaId || ''} onChange={(e) => set('etapaId', e.target.value)}>
+              <option value="">{t('Elige una etapa…')}</option>
+              {(catalogo?.etapasCrm || []).map((e) => <option key={e.id} value={e.id}>{e.embudo} · {e.nombre}</option>)}
+            </select>
+          </Campo>
+          <p className="text-[11px] text-slate-400">{t('Solo funciona con disparadores del CRM. Para marcar una oportunidad como perdida hace falta un motivo: eso se hace a mano.')}</p>
+        </>
+      );
+    case 'estado_expediente':
+      return (
+        <>
+          <Campo etiqueta={t('Nuevo estado')}>
+            <select className={campoCls} value={c.estado || 'cerrado'} onChange={(e) => set('estado', e.target.value)}>
+              {(catalogo?.estadosExpediente || ['abierto', 'suspendido', 'cerrado', 'archivado']).map((x) => <option key={x} value={x}>{t(x)}</option>)}
+            </select>
+          </Campo>
+          <p className="text-[11px] text-slate-400">{t('Solo funciona con disparadores que tengan expediente.')}</p>
         </>
       );
     case 'webhook':

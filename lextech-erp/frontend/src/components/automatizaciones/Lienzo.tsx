@@ -25,6 +25,10 @@ import { FormularioPaso } from './FormularioPaso';
 // añaden pasos propios.
 
 /** Paso fijo de una automatización de serie (lo que antes era el editor vertical). */
+export interface ResultadoPaso { nodo: string; ok: boolean; detalle: string; clave?: string; vars?: Record<string, string | number> }
+/** Texto de un resultado del servidor en el idioma de la app. */
+export const textoPaso = (x: { detalle: string; clave?: string; vars?: Record<string, string | number> }) => (x.clave ? t(x.clave, x.vars as any) : x.detalle);
+
 export interface PasoFijo {
   id: string;
   clase: 'disparador' | 'condicion' | 'accion';
@@ -200,7 +204,9 @@ export interface PropsLienzo {
   guardando: boolean;
   error?: string;
   onGuardar: (f: FlujoDatos) => Promise<void> | void;
-  onProbar: (f: FlujoDatos) => Promise<{ nodo: string; ok: boolean; detalle: string }[]>;
+  onProbar: (f: FlujoDatos, muestraId?: string | null) => Promise<ResultadoPaso[]>;
+  /** Registros reales con los que probar (según el disparador). */
+  onMuestras?: (evento: string) => Promise<{ id: string; etiqueta: string }[]>;
   onCerrar: () => void;
 }
 
@@ -251,7 +257,10 @@ function LienzoInterno(p: PropsLienzo) {
   const [sel, setSel] = useState<string | null>(null);
   const [resultados, setResultados] = useState<Map<string, { ok: boolean; detalle: string }>>(new Map());
   const [probando, setProbando] = useState(false);
-  const [listaPrueba, setListaPrueba] = useState<{ nodo: string; ok: boolean; detalle: string }[] | null>(null);
+  const [listaPrueba, setListaPrueba] = useState<ResultadoPaso[] | null>(null);
+  const [muestra, setMuestra] = useState('');
+  const [muestras, setMuestras] = useState<{ id: string; etiqueta: string }[]>([]);
+  const portapapeles = useRef<{ nodos: NodoLienzo[]; aristas: AristaLienzo[] } | null>(null);
 
   // ── Serializar (lo que se guarda) ──
   const serializar = useCallback((ns: NodoLienzo[], es: AristaLienzo[]): FlujoDatos => {
@@ -364,12 +373,41 @@ function LienzoInterno(p: PropsLienzo) {
     setNodos((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, config: { ...n.data.config, [k]: v } } } : n)));
   }, [apuntar]);
 
+  // ── Copiar / pegar / duplicar (solo pasos propios) ──
+  const copiar = useCallback(() => {
+    const elegidos = nodos.filter((n) => n.selected && !n.data.fijoId && !n.data.ancla && n.data.tipo !== 'disparador');
+    if (!elegidos.length) return false;
+    const ids = new Set(elegidos.map((n) => n.id));
+    portapapeles.current = { nodos: elegidos, aristas: aristas.filter((e) => ids.has(e.source) && ids.has(e.target)) };
+    return true;
+  }, [nodos, aristas]);
+  const pegar = useCallback(() => {
+    const pp = portapapeles.current;
+    if (!pp || !p.puedeEditar) return;
+    apuntar();
+    const mapa = new Map<string, string>();
+    const nuevos = pp.nodos.map((n) => { const id = nuevoId(String(n.data.tipo)); mapa.set(n.id, id); return { ...n, id, selected: true, position: { x: n.position.x + 48, y: n.position.y + 48 }, data: { ...n.data, config: JSON.parse(JSON.stringify(n.data.config)) } }; });
+    const nuevasAristas = pp.aristas.map((e) => aArista({ id: `${mapa.get(e.source)}-${mapa.get(e.target)}-${e.sourceHandle || ''}`, de: mapa.get(e.source)!, a: mapa.get(e.target)!, rama: (e.sourceHandle as any) || null }));
+    setNodos((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...nuevos]);
+    setAristas((es) => [...es, ...nuevasAristas]);
+    portapapeles.current = { nodos: nuevos, aristas: nuevasAristas };
+    setSel(nuevos.length === 1 ? nuevos[0].id : null);
+  }, [p.puedeEditar, apuntar]);
+
+  // Registros reales para «Probar con…».
+  const eventoDisparo = p.vinculada ? p.catalogo?.eventoDeSerie[p.vinculada] : nodos.find((n) => n.data.tipo === 'disparador' && !n.data.ancla)?.data.config.evento;
+  useEffect(() => {
+    setMuestra(''); setMuestras([]);
+    if (!eventoDisparo || !p.onMuestras || !p.catalogo?.conMuestras?.includes(eventoDisparo)) return;
+    p.onMuestras(eventoDisparo).then(setMuestras).catch(() => {});
+  }, [eventoDisparo]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Probar ──
   const probar = async () => {
     setProbando(true);
     try {
-      const r = await p.onProbar(actual);
-      setResultados(new Map(r.map((x) => [x.nodo, { ok: x.ok, detalle: x.detalle }])));
+      const r = await p.onProbar(actual, muestra || null);
+      setResultados(new Map(r.map((x) => [x.nodo, { ok: x.ok, detalle: textoPaso(x) }])));
       setListaPrueba(r);
     } finally { setProbando(false); }
   };
@@ -396,11 +434,14 @@ function LienzoInterno(p: PropsLienzo) {
       if (escribiendo) return;
       if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); deshacer(); }
       else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); rehacer(); }
+      else if (mod && e.key.toLowerCase() === 'c') { if (copiar()) e.preventDefault(); }
+      else if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); pegar(); }
+      else if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); if (copiar()) pegar(); }
       else if (e.key === 'Escape') { if (sel) setSel(null); else void cerrar(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [guardar, deshacer, rehacer, cerrar, sel]);
+  }, [guardar, deshacer, rehacer, cerrar, sel, copiar, pegar]);
 
   // Variables disponibles según el disparador.
   const evento = p.vinculada ? p.catalogo?.eventoDeSerie[p.vinculada] : nodos.find((n) => n.data.tipo === 'disparador' && !n.data.ancla)?.data.config.evento;
@@ -433,6 +474,13 @@ function LienzoInterno(p: PropsLienzo) {
             <button type="button" className={btn} onClick={deshacer} disabled={!pasado.current.length} title={t('Deshacer (Ctrl+Z)')}><Undo2 size={14} /></button>
             <button type="button" className={btn} onClick={rehacer} disabled={!futuro.current.length} title={t('Rehacer (Ctrl+Y)')}><Redo2 size={14} /></button>
             {!p.fijos && <button type="button" className={btn} onClick={() => { apuntar(); setNodos((ns) => ordenar(ns, aristas)); window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 400 }), 50); }} title={t('Ordenar los pasos')}><LayoutGrid size={14} /><span className="hidden md:inline">{t('Ordenar')}</span></button>}
+            {muestras.length > 0 && (
+              <select value={muestra} onChange={(e) => setMuestra(e.target.value)} title={t('Probar con datos reales')}
+                className="hidden max-w-[11rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 md:block">
+                <option value="">{t('Con datos de ejemplo')}</option>
+                {muestras.map((m) => <option key={m.id} value={m.id}>{m.etiqueta}</option>)}
+              </select>
+            )}
             <button type="button" className={btn} onClick={() => void probar()} disabled={probando} title={t('Probar sin enviar nada')}>
               {probando ? <Loader2 size={14} className="animate-spin" /> : <FlaskConical size={14} />}<span className="hidden md:inline">{t('Probar')}</span></button>
           </div>
@@ -495,7 +543,7 @@ function LienzoInterno(p: PropsLienzo) {
                 nodeColor={(n) => { const d = n.data as DatosNodo; const f = d.fijoId ? fijosMap.get(d.fijoId) : null; return f ? COLOR_CLASE[f.clase] : d.ancla ? '#f59e0b' : META[d.tipo as TipoNodo]?.color || '#94a3b8'; }} />
             </ReactFlow>
             {(avisos > 0 || sueltos > 0) && (
-              <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1">
+              <div className="pointer-events-none absolute left-3 top-14 flex flex-col gap-1 lg:top-3">
                 {avisos > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 shadow-sm">{t('{n} paso(s) por completar', { n: avisos })}</span>}
                 {sueltos > 0 && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">{t('{n} paso(s) sin conectar: no se ejecutarán', { n: sueltos })}</span>}
               </div>
@@ -510,20 +558,20 @@ function LienzoInterno(p: PropsLienzo) {
           </div>
 
           {/* Panel */}
-          <aside className="min-h-0 overflow-y-auto border-t border-slate-200 bg-white lg:border-l lg:border-t-0">
+          <aside className={`min-h-0 overflow-y-auto border-slate-200 bg-white lg:static lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none ${elegido || listaPrueba ? 'fixed inset-x-0 bottom-0 z-20 max-h-[62vh] rounded-t-2xl border-t shadow-2xl' : 'hidden lg:block'}`}>
             {listaPrueba && (
               <div className="border-b border-slate-100 bg-slate-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="flex items-center gap-1.5 text-sm font-bold text-slate-800"><FlaskConical size={14} />{t('Resultado de la prueba')}</p>
                   <button type="button" onClick={() => { setListaPrueba(null); setResultados(new Map()); }} className="text-xs font-semibold text-slate-500 hover:text-slate-700">{t('Limpiar')}</button>
                 </div>
-                <p className="mb-2 text-[11px] text-slate-500">{t('Con datos de ejemplo y sin enviar ni crear nada.')}</p>
+                <p className="mb-2 text-[11px] text-slate-500">{muestra ? t('Con datos reales y sin enviar ni crear nada.') : t('Con datos de ejemplo y sin enviar ni crear nada.')}</p>
                 {!listaPrueba.length && <p className="text-xs text-slate-500">{t('No se ha ejecutado ningún paso: conecta los pasos al disparador.')}</p>}
                 <ul className="space-y-1">
                   {listaPrueba.map((r, i) => (
                     <li key={i} className="flex items-start gap-1.5 text-xs">
                       {r.ok ? <CheckCircle2 size={13} className="mt-px shrink-0 text-emerald-500" /> : <XCircle size={13} className="mt-px shrink-0 text-red-500" />}
-                      <button type="button" className="text-left text-slate-700 hover:underline" onClick={() => { setSel(r.nodo); const n = rf.getNode(r.nodo); if (n) rf.setCenter(n.position.x + 140, n.position.y + 40, { zoom: 1, duration: 400 }); }}>{r.detalle}</button>
+                      <button type="button" className="text-left text-slate-700 hover:underline" onClick={() => { setSel(r.nodo); const n = rf.getNode(r.nodo); if (n) rf.setCenter(n.position.x + 140, n.position.y + 40, { zoom: 1, duration: 400 }); }}>{textoPaso(r)}</button>
                     </li>
                   ))}
                 </ul>

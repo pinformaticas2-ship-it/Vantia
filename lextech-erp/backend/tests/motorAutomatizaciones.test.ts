@@ -127,3 +127,49 @@ test('prueba sin efectos y webhook bloqueado a direcciones internas', { skip }, 
   assert.match(c.detalle, /Se enviaría «Hola María López» a maria@example.com/);
   assert.equal((await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_ejecuciones`)).rows[0].n, antes, 'probar no deja ejecuciones');
 });
+
+test('condiciones con varias reglas: «y» y «o»', { skip }, async () => {
+  const { cumpleCondicion } = await m();
+  const ctx = { cliente: { email: 'a@example.com', telefono: '' }, oportunidad: { valor: '2.500,00' } };
+  const reglas = [{ campo: 'cliente.email', operador: 'no_vacio', valor: '' }, { campo: 'cliente.telefono', operador: 'no_vacio', valor: '' }];
+  assert.equal(cumpleCondicion(ctx, { modo: 'y', reglas }), false);
+  assert.equal(cumpleCondicion(ctx, { modo: 'o', reglas }), true);
+  assert.equal(cumpleCondicion(ctx, { reglas: [{ campo: 'oportunidad.valor', operador: 'mayor', valor: '2000' }] }), true, 'importes con formato español');
+});
+
+test('se buscan: plazo que se acerca (una sola vez) y correo recibido desde que se activó', { skip }, async () => {
+  const { validarFlujo, forzarBusqueda } = await m();
+  const plazo = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+  await pool.query(`INSERT INTO client_tasks (client_id, client_name, titulo, plazo, estado, organizacion_id) VALUES ($1,'Lucía','Recurso de apelación',$2,'pendiente',$3)`, [cliente, plazo, orgA]);
+  const crear = async (evento: string, config: any, titulo: string) => {
+    const { flujo } = validarFlujo({ nodos: [{ id: 'd', tipo: 'disparador', config: { evento, ...config } }, { id: 't', tipo: 'crear_tarea', config: { titulo } }], aristas: [{ de: 'd', a: 't' }] });
+    return (await pool.query(`INSERT INTO automatizaciones_flujos (organizacion_id, nombre, activo, evento, flujo, cursor_at) VALUES ($1,'B',true,$2,$3, NOW() - INTERVAL '1 minute') RETURNING id`, [orgA, evento, JSON.stringify(flujo)])).rows[0].id;
+  };
+  const fv = await crear('tarea.vence', { diasAntes: 2 }, 'Preparar: {tarea.titulo}');
+  // Correo: sin cliente, la tarea no se puede crear → queda registrado el fallo (la ejecución existe).
+  const fc = await crear('correo.recibido', {}, 'x');
+  const acc = (await pool.query(`INSERT INTO email_accounts (organizacion_id, user_id, email, label, imap_host, imap_port, smtp_host, smtp_port, username, password_enc, active)
+     VALUES ($1,'mo_ana','buzon@example.test','B','h',993,'h',465,'u','x',true) RETURNING id`, [orgA]).catch(() => ({ rows: [] as any[] }))).rows[0]?.id;
+  if (acc) await pool.query(`INSERT INTO emails (account_id, user_id, folder, from_email, subject) VALUES ($1,'mo_ana','INBOX','juzgado@example.test','Notificación')`, [acc]);
+  await forzarBusqueda();
+  await forzarBusqueda();
+  const tareas = (await pool.query(`SELECT titulo FROM client_tasks WHERE organizacion_id = $1 AND titulo LIKE 'Preparar:%'`, [orgA])).rows;
+  assert.deepEqual(tareas.map((r: any) => r.titulo).sort(), ['Preparar: Llamar a Lucía', 'Preparar: Recurso de apelación'], 'cada tarea que vence en 2 días, una sola vez aunque se busque dos veces');
+  if (acc) {
+    const ej = (await pool.query(`SELECT pasos FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [fc])).rows;
+    assert.equal(ej.length, 1, 'un correo, una ejecución');
+    assert.match(ej[0].pasos[0].detalle, /cliente/);
+  }
+  assert.equal((await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [fv])).rows[0].n, 2);
+});
+
+test('probar con un registro real y resultados traducibles', { skip }, async () => {
+  const { probarFlujo, validarFlujo, muestrasDe } = await m();
+  const muestras = await muestrasDe(orgA, 'cliente.creado');
+  assert.ok(muestras.some((x) => x.id === cliente));
+  const { flujo } = validarFlujo({ nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'cliente.creado' } }, { id: 'c', tipo: 'enviar_correo', config: { asunto: 'Hola {cliente.nombre}', cuerpo: 'x' } }], aristas: [{ de: 'd', a: 'c' }] });
+  const [p] = await probarFlujo(orgA, flujo, cliente);
+  assert.equal(p.detalle, 'Se enviaría «Hola Lucía» a lucia@example.test');
+  assert.equal(p.clave, 'Se enviaría «{asunto}» a {para}');
+  assert.deepEqual(p.vars, { asunto: 'Hola Lucía', para: 'lucia@example.test' });
+});

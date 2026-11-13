@@ -3546,6 +3546,17 @@ export async function runMigrations(): Promise<void> {
           created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
         )`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_autom_esperas_at ON automatizaciones_esperas (reanudar_at)`);
+      // Disparadores que se buscan (plazos, facturas vencidas, correo
+      // recibido): cada cosa dispara una sola vez por flujo; el correo, desde
+      // que se activó (cursor).
+      await client.query(`ALTER TABLE automatizaciones_flujos ADD COLUMN IF NOT EXISTS cursor_at TIMESTAMPTZ`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS automatizaciones_disparos (
+          flujo_id   UUID         NOT NULL REFERENCES automatizaciones_flujos(id) ON DELETE CASCADE,
+          clave      VARCHAR(120) NOT NULL,
+          created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (flujo_id, clave)
+        )`);
     } catch (e: any) {
       console.warn('⚠️  automatizaciones_flujos:', e?.message || e);
     }

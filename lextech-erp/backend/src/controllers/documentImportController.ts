@@ -22,6 +22,7 @@ import { UPLOADS_ROOT, UPLOADS_CLIENTS_ROOT } from '../config/paths';
 import { ensureExpedienteFolder, uploadFileToDrive } from '../utils/googleDrive';
 import { ensureExpedienteFolder as ensureDropboxExpedienteFolder, uploadFileToDropbox } from '../utils/dropboxStorage';
 import { resolveUploadProvider } from './filesController';
+import { emitirConCliente } from '../services/motorAutomatizaciones';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
@@ -569,6 +570,7 @@ async function persistImportedDeadlineFollowUps(
     );
 
     const task = taskResult.rows[0];
+    emitirConCliente(organizacionId, 'tarea.creada', { tarea: { id: task.id, titulo: task.titulo, tipo: task.tipo || '', prioridad: task.prioridad || '', plazo: task.plazo ? new Date(task.plazo).toLocaleDateString('es-ES', { timeZone: 'UTC' }) : '' }, responsable: { id: task.user_id || null } }, { clienteId: task.client_id }, null);
     const reminderAgenda = await pool.query(
       `INSERT INTO agenda_events
          (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
@@ -1407,6 +1409,7 @@ async function createExpediente(
     console.warn('[createExpediente] No se pudieron guardar abogado/procurador demandante y demandado:', String(updateErr?.message || updateErr));
   }
 
+  emitirConCliente(organizacionId, 'expediente.creado', { expediente: { id: expediente.id, ref: `${expediente.anio}/${expediente.num_exp}`, descripcion: data.descripcion?.trim() || '', tipo: data.tipo || 'judicial' } }, { clienteId }, null);
   return expediente;
 }
 

@@ -83,8 +83,12 @@ export default function FlujoEditor({
     } finally { setGuardandoExtra(false); }
   };
 
-  const probar = async (f: FlujoDatos) => {
-    const r = await apiFetch('/api/automatizaciones/probar', { method: 'POST', getToken, body: JSON.stringify({ flujo: f, vinculada }) });
+  const probar = async (f: FlujoDatos, muestraId?: string | null) => {
+    const r = await apiFetch('/api/automatizaciones/probar', { method: 'POST', getToken, body: JSON.stringify({ flujo: f, vinculada, muestraId }) });
+    return r?.success ? r.data : [];
+  };
+  const muestras = async (evento: string) => {
+    const r = await apiFetch(`/api/automatizaciones/muestras?evento=${encodeURIComponent(evento)}`, { getToken });
     return r?.success ? r.data : [];
   };
 
@@ -101,7 +105,7 @@ export default function FlujoEditor({
       inicial={inicial} fijos={{ pasos, ramas, etiquetaFin: t(FIN[vinculada] || 'Al terminar') }} vinculada={vinculada}
       panelGeneral={descripcion ? <div className="text-sm leading-6 text-slate-600">{descripcion}</div> : undefined}
       puedeEditar={puedeEditar} sucioExterno={sucio} guardando={guardando || guardandoExtra} error={error || errorExtra}
-      onGuardar={guardar} onProbar={probar} onCerrar={onCerrar}
+      onGuardar={guardar} onProbar={probar} onMuestras={muestras} onCerrar={onCerrar}
     />
   );
 }

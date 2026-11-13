@@ -543,7 +543,7 @@ export default function ManualPanel() {
             ["Seguridad", "Contraseña, verificación en dos pasos y sesiones activas."],
             ["Mi Despacho", "Datos fiscales, logotipo, textos de facturas y correo de bienvenida al cliente."],
             ["Integraciones", "Estado de Correo y Quipu, Google Drive, Dropbox y WhatsApp."],
-            ["Automatizaciones", "Vistas recibidas por correo (capítulo 16). Solo propietario y administradores."],
+            ["Automatizaciones", "Las de serie y las propias del despacho, en un lienzo (capítulos 16 y 22). Solo propietario y administradores."],
             ["Trazabilidad", "Auditoría de accesos y acciones (capítulo 15)."],
             ["Datos del despacho (RGPD)", "Cuánto se guarda la trazabilidad y exportación de los datos del despacho. Solo propietario y administradores."],
             ["Gestión de Usuarios", "Miembros, roles y permisos por módulo y por persona. Solo propietario y administradores."],
@@ -651,6 +651,27 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 17 Glosario ── */}
+      {/* ── 22 Automatizaciones ── */}
+      <Chapter n="22" title={t("Automatizaciones")}>
+        <P>{t("En Ajustes → Automatizaciones están las que trae Vantia (vistas por correo, documentos de cada expediente, bienvenida al cliente y recordatorios a clientes) y las que cree el despacho. Cada una se abre en un lienzo donde se ve el flujo paso a paso.")}</P>
+        <SubHeading>{t("22.1 El lienzo")}</SubHeading>
+        <Bullets
+          items={[
+            <>{t("Arrastre el fondo para moverse y use la rueda para acercar o alejar. Los pasos se colocan arrastrándolos.")}</>,
+            <>{t("Para unir dos pasos, arrastre desde el punto de abajo de uno al de arriba del otro. Las condiciones tienen dos salidas: verde («Sí») y roja («No»).")}</>,
+            <>{t("Añada pasos desde la paleta de la izquierda, arrastrándolos o pulsándolos. Pulse un paso para ajustarlo a la derecha.")}</>,
+            <>{t("Atajos: Ctrl+Z deshace, Ctrl+Y rehace, Ctrl+C / Ctrl+V copian y pegan pasos, Ctrl+D duplica, Supr borra y Ctrl+S guarda. Con Mayúsculas y arrastrando se seleccionan varios pasos.")}</>,
+            <>{t("«Probar» ejecuta el flujo sin enviar ni crear nada, con datos de ejemplo o con un registro real que elija, y marca en cada paso lo que habría hecho.")}</>,
+          ]}
+        />
+        <SubHeading>{t("22.2 Crear una automatización")}</SubHeading>
+        <P>{t("Pulse «Crear automatización» y empiece en blanco o desde una plantilla. Elija qué la pone en marcha (cliente, expediente, cita o tarea nuevos; plazo que se acerca o vencido; oportunidad del CRM nueva o que cambia de etapa; factura vencida; correo recibido; vista aceptada; a una hora fija o a mano) y qué pasos siguen: condiciones, esperas, correos, WhatsApp, avisos al equipo, mensajes en el chat, tareas, citas, mover en el CRM, cambiar el estado del expediente o enviar los datos a otra herramienta (webhook).")}</P>
+        <P>{t("En los textos puede usar datos que se rellenan solos, como {cliente.nombre} o {cita.fecha}. Si le falta algún paso, se guarda como borrador y no se activa. Cada ejecución queda en el historial, paso a paso.")}</P>
+        <Callout tone="amber" label={t("Límites")}>{t("Como mucho 100 correos al día entre todas las automatizaciones; WhatsApp solo deja escribir texto libre si el cliente escribió en las últimas 24 horas; los webhooks solo van a direcciones públicas con https.")}</Callout>
+        <SubHeading>{t("22.3 Pasos añadidos a las de serie")}</SubHeading>
+        <P>{t("Las automatizaciones de serie tienen un punto «Al terminar»: lo que conecte ahí se ejecuta cada vez que terminan (por ejemplo, al aceptar una vista, avisar al equipo y crear una tarea). Sus pasos opcionales se pueden quitar del flujo.")}</P>
+      </Chapter>
+
       <Chapter n="21" title={t("Glosario")}>
         <InfoTable
           headers={["Término", "Significado en Vantia"]}

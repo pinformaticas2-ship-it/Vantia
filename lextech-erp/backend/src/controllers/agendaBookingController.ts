@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { randomBytes } from 'crypto';
 import pool from '../config/database';
 import { resolveUserOrgMemberships } from './organizacionesController';
+import { emitirConCliente } from '../services/motorAutomatizaciones';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ` | code: ${e.code}` : ''}`;
 
@@ -256,6 +257,17 @@ export const createPublicBooking = async (req: any, res: Response) => {
       ]
     );
 
+    if (organizacionId) {
+      const ev = result.rows[0];
+      const ini = new Date(ev.start_at);
+      emitirConCliente(organizacionId, 'cita.creada', {
+        cita: { id: ev.id, titulo: `Cita: ${sanitizeText(name)}`, tipo: 'cita', lugar: '', reserva: 'sí',
+          fecha: ini.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long' }),
+          hora: ini.toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' }) },
+        cliente: { nombre: sanitizeText(name) || '', email: String(email || '').trim().toLowerCase(), telefono: '' },
+        responsable: { id: page.user_id, nombre: page.user_name || '' },
+      }, {}, null);
+    }
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     console.error('createPublicBooking:', pgErr(error));

@@ -1,10 +1,11 @@
-import { Bell, Clock, GitBranch, Globe, ListChecks, Mail, MessageSquare, Zap, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarPlus, Clock, FolderCog, GitBranch, Globe, ListChecks, Mail, MessageCircle, MessageSquare, MoveRight, Zap, type LucideIcon } from 'lucide-react';
 import { t } from '../../lib/i18n';
 
 // Tipos de paso del editor de automatizaciones (12/11/2026). Lo mismo que
 // ejecuta el servidor (services/motorAutomatizaciones.ts).
 
-export type TipoNodo = 'disparador' | 'condicion' | 'enviar_correo' | 'aviso_equipo' | 'crear_tarea' | 'mensaje_chat' | 'esperar' | 'webhook';
+export type TipoNodo = 'disparador' | 'condicion' | 'enviar_correo' | 'aviso_equipo' | 'crear_tarea' | 'mensaje_chat' | 'esperar' | 'webhook'
+  | 'mover_crm' | 'estado_expediente' | 'crear_cita' | 'enviar_whatsapp';
 export interface NodoFlujo { id: string; tipo: TipoNodo; config: Record<string, any>; x: number; y: number }
 export interface AristaFlujo { id: string; de: string; a: string; rama?: 'si' | 'no' | null }
 export interface FlujoDatos { nodos: NodoFlujo[]; aristas: AristaFlujo[]; layout?: Record<string, { x: number; y: number }> }
@@ -14,6 +15,10 @@ export interface Catalogo {
   disparadores: { clave: string; etiqueta: string; descripcion: string; variables: Variable[] }[];
   miembros: { userId: string; nombre: string }[];
   canales: { id: string; nombre: string }[];
+  etapasCrm?: { id: string; nombre: string; embudo: string }[];
+  estadosExpediente?: string[];
+  tiposCita?: string[];
+  conMuestras?: string[];
   eventoDeSerie: Record<string, string>;
 }
 
@@ -27,26 +32,40 @@ export const META: Record<TipoNodo, { etiqueta: string; desc: string; icono: Luc
   crear_tarea: { etiqueta: 'Crear tarea', desc: 'Tarea con plazo para alguien', icono: ListChecks, clase: 'accion', color: '#16a34a' },
   mensaje_chat: { etiqueta: 'Escribir en el chat', desc: 'Mensaje en un canal', icono: MessageSquare, clase: 'accion', color: '#4f46e5' },
   webhook: { etiqueta: 'Webhook', desc: 'Enviar los datos a otra herramienta', icono: Globe, clase: 'accion', color: '#475569' },
+  crear_cita: { etiqueta: 'Crear cita', desc: 'En la agenda de alguien', icono: CalendarPlus, clase: 'accion', color: '#0891b2' },
+  enviar_whatsapp: { etiqueta: 'Enviar WhatsApp', desc: 'Al cliente (si escribió en 24 h)', icono: MessageCircle, clase: 'accion', color: '#16a34a' },
+  mover_crm: { etiqueta: 'Mover en el CRM', desc: 'Cambiar de etapa la oportunidad', icono: MoveRight, clase: 'accion', color: '#db2777' },
+  estado_expediente: { etiqueta: 'Estado del expediente', desc: 'Abrir, suspender, cerrar o archivar', icono: FolderCog, clase: 'accion', color: '#7c3aed' },
 };
 export const PALETA: { titulo: string; tipos: TipoNodo[] }[] = [
   { titulo: 'Lógica', tipos: ['condicion', 'esperar'] },
-  { titulo: 'Acciones', tipos: ['enviar_correo', 'aviso_equipo', 'crear_tarea', 'mensaje_chat', 'webhook'] },
+  { titulo: 'Comunicar', tipos: ['enviar_correo', 'enviar_whatsapp', 'aviso_equipo', 'mensaje_chat'] },
+  { titulo: 'Hacer', tipos: ['crear_tarea', 'crear_cita', 'mover_crm', 'estado_expediente', 'webhook'] },
 ];
 
 export const CONFIG_INICIAL: Record<TipoNodo, Record<string, any>> = {
   disparador: { evento: '' },
-  condicion: { campo: '', operador: 'no_vacio', valor: '' },
+  condicion: { modo: 'y', reglas: [{ campo: '', operador: 'no_vacio', valor: '' }] },
   esperar: { cantidad: 1, unidad: 'dias' },
   enviar_correo: { para: 'cliente', direcciones: '', asunto: '', cuerpo: '' },
   aviso_equipo: { a: 'usuario', personas: [], titulo: '', mensaje: '' },
   crear_tarea: { titulo: '', descripcion: '', dias: 1, prioridad: 'media', asignar: 'usuario' },
   mensaje_chat: { canalId: '', texto: '' },
   webhook: { url: '' },
+  crear_cita: { titulo: '', descripcion: '', dias: 1, hora: '10:00', duracion: 60, tipo: 'cita', asignar: 'responsable' },
+  enviar_whatsapp: { texto: '' },
+  mover_crm: { etapaId: '' },
+  estado_expediente: { estado: 'cerrado' },
 };
+
+/** Reglas de una condición (las antiguas tenían una sola, sin lista). */
+export function reglasDe(c: Record<string, any>): { campo: string; operador: string; valor: string }[] {
+  return Array.isArray(c?.reglas) && c.reglas.length ? c.reglas : [{ campo: c?.campo || '', operador: c?.operador || 'igual', valor: c?.valor || '' }];
+}
 
 export const OPERADORES: { v: string; l: string; sinValor?: boolean }[] = [
   { v: 'igual', l: 'es igual a' }, { v: 'distinto', l: 'no es igual a' }, { v: 'contiene', l: 'contiene' },
-  { v: 'no_contiene', l: 'no contiene' }, { v: 'vacio', l: 'está vacío', sinValor: true }, { v: 'no_vacio', l: 'no está vacío', sinValor: true },
+  { v: 'no_contiene', l: 'no contiene' }, { v: 'empieza', l: 'empieza por' }, { v: 'vacio', l: 'está vacío', sinValor: true }, { v: 'no_vacio', l: 'no está vacío', sinValor: true },
   { v: 'mayor', l: 'es mayor que' }, { v: 'menor', l: 'es menor que' },
 ];
 const DIAS_SEMANA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
@@ -71,10 +90,15 @@ export function resumen(n: { tipo: TipoNodo; config: Record<string, any> }, cat:
       return t(d.etiqueta);
     }
     case 'condicion': {
-      if (!c.campo) return t('Elige qué comprobar');
-      const op = OPERADORES.find((o) => o.v === c.operador);
-      return `${etiquetaVariable(cat, c.campo)} ${t(op?.l || '')}${op?.sinValor ? '' : ` «${c.valor || ''}»`}`;
+      const reglas = reglasDe(c);
+      if (!reglas.every((x) => x.campo)) return t('Elige qué comprobar');
+      return reglas.map((x) => { const op = OPERADORES.find((o) => o.v === x.operador); return `${etiquetaVariable(cat, x.campo)} ${t(op?.l || '')}${op?.sinValor ? '' : ` «${x.valor || ''}»`}`; })
+        .join(c.modo === 'o' ? ` ${t('o')} ` : ` ${t('y')} `);
     }
+    case 'crear_cita': return c.titulo ? `${c.titulo} · ${(Number(c.dias) || 0) === 0 ? t('hoy, {hora}', { hora: c.hora || '10:00' }) : (Number(c.dias) === 1 ? t('mañana, {hora}', { hora: c.hora || '10:00' }) : t('en {n} días, {hora}', { n: Number(c.dias), hora: c.hora || '10:00' }))}` : t('Escribe la cita');
+    case 'enviar_whatsapp': return c.texto ? String(c.texto).slice(0, 60) : t('Escribe el mensaje');
+    case 'mover_crm': { const e = cat?.etapasCrm?.find((x) => x.id === c.etapaId); return e ? t('A «{etapa}»', { etapa: e.nombre }) : t('Elige la etapa'); }
+    case 'estado_expediente': return c.estado ? t('A «{estado}»', { estado: t(c.estado) }) : t('Elige el estado');
     case 'esperar': return tn2(Number(c.cantidad) || 1, c.unidad);
     case 'enviar_correo': return c.asunto ? `${c.para === 'otro' ? (c.direcciones || '…') : t('Al cliente')} · ${c.asunto}` : t('Escribe el correo');
     case 'aviso_equipo': return c.titulo ? `${{ usuario: t('A quien lo hizo'), responsable: t('Al responsable'), todos: t('A todo el despacho'), personas: t('A personas concretas') }[c.a as string] || ''} · ${c.titulo}` : t('Escribe el aviso');
@@ -94,7 +118,11 @@ export function faltaAlgo(n: { tipo: TipoNodo; config: Record<string, any> }, fi
   const c = n.config || {};
   switch (n.tipo) {
     case 'disparador': return fijo || c.evento ? null : t('Elige qué lo pone en marcha');
-    case 'condicion': return c.campo ? null : t('Elige qué comprobar');
+    case 'condicion': return reglasDe(c).every((x) => x.campo) ? null : t('Elige qué comprobar');
+    case 'crear_cita': return String(c.titulo || '').trim() ? null : t('Falta el título');
+    case 'enviar_whatsapp': return String(c.texto || '').trim() ? null : t('Falta el mensaje');
+    case 'mover_crm': return c.etapaId ? null : t('Elige la etapa');
+    case 'estado_expediente': return c.estado ? null : t('Elige el estado');
     case 'enviar_correo': return !String(c.asunto || '').trim() || !String(c.cuerpo || '').trim() ? t('Falta el asunto o el mensaje')
       : c.para === 'otro' && !String(c.direcciones || '').includes('@') ? t('Falta a quién enviarlo') : null;
     case 'aviso_equipo': return String(c.titulo || '').trim() ? (c.a === 'personas' && !(c.personas || []).length ? t('Elige a quién avisar') : null) : t('Falta el título');
@@ -145,6 +173,31 @@ export const PLANTILLAS: Plantilla[] = [
       nodos: [n('d', 'disparador', 0, 0, { evento: 'programado', frecuencia: 'semanal', dia: 1, hora: '09:00' }),
         n('m', 'mensaje_chat', 0, 160, { texto: 'Buenos días equipo 👋 Recordad revisar los plazos de esta semana en Tareas.' })],
       aristas: [a('d', 'm')],
+    }),
+  },
+  {
+    id: 'plazos', nombre: 'Aviso de plazos que vencen', desc: '2 días antes del plazo de una tarea, aviso a su responsable.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'tarea.vence', diasAntes: 2 }),
+        n('v', 'aviso_equipo', 0, 160, { a: 'responsable', titulo: 'Vence en 2 días: {tarea.titulo}', mensaje: '{cliente.nombre} · plazo {tarea.plazo}' })],
+      aristas: [a('d', 'v')],
+    }),
+  },
+  {
+    id: 'crm', nombre: 'Lead nuevo: llamada en 24 h', desc: 'Al entrar una oportunidad, una cita para llamarla mañana y aviso al responsable.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'oportunidad.creada' }),
+        n('c', 'crear_cita', -180, 170, { titulo: 'Llamar a {oportunidad.nombre}', dias: 1, hora: '10:00', duracion: 15, tipo: 'llamada', asignar: 'responsable' }),
+        n('v', 'aviso_equipo', 200, 170, { a: 'responsable', titulo: 'Nuevo lead: {oportunidad.nombre}', mensaje: '{oportunidad.asunto}' })],
+      aristas: [a('d', 'c'), a('d', 'v')],
+    }),
+  },
+  {
+    id: 'facturas', nombre: 'Facturas vencidas', desc: 'Cuando vence una factura sin cobrar, aviso a todo el despacho.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'factura.vencida' }),
+        n('v', 'aviso_equipo', 0, 160, { a: 'todos', titulo: 'Factura vencida {factura.numero}', mensaje: '{factura.contacto} · {factura.total} · vencía el {factura.vencimiento}' })],
+      aristas: [a('d', 'v')],
     }),
   },
   {

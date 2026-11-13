@@ -11,4 +11,5 @@ import './seguridad';
 import './automatizaciones';
 import './despacho';
 import './lienzo';
+import './motor';
 import './contextos';

@@ -293,6 +293,31 @@ export async function whatsappAltaMeta(req: Request, res: Response) {
   }
 }
 
+/** Texto por WhatsApp desde una automatización. Solo funciona dentro de las
+ *  24 h desde el último mensaje del cliente (fuera de eso Meta exige plantillas). */
+export async function enviarWhatsAppTexto(org: string, telefono: string, texto: string, clientId?: string | null): Promise<string> {
+  const to = normalizePhone(telefono);
+  if (!to) throw new Error('No hay un teléfono válido.');
+  const config = await loadWhatsAppConfig(org);
+  if (!getConfigStatus(config).configured) throw new Error('WhatsApp no está conectado en Integraciones.');
+  try {
+    const provider = await graphRequest(config, `${config.phoneNumberId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'text', text: { preview_url: false, body: texto.slice(0, 4000) } }),
+    });
+    await pool.query(
+      `INSERT INTO whatsapp_messages (wa_message_id, client_id, direction, message_type, to_phone, body, status, sent_by_user_id, sent_by_user_name, organizacion_id, channel)
+       VALUES ($1,$2,'outbound','text',$3,$4,'sent','vantia-automatizaciones','Vantia · Automatización',$5,'whatsapp')`,
+      [provider?.messages?.[0]?.id || null, clientId || null, to, texto, org],
+    ).catch(() => {});
+    return to;
+  } catch (e: any) {
+    const m = String(e?.message || e);
+    if (/131047|re-engagement|24 hours|outside the allowed window/i.test(m)) throw new Error('Han pasado más de 24 h desde el último mensaje del cliente: WhatsApp solo deja escribir primero con plantillas aprobadas.');
+    throw new Error(m);
+  }
+}
+
 export async function getWhatsAppConfig(req: Request, res: Response) {
   const config = await loadWhatsAppConfig((req as any).organizacionId);
   res.json({

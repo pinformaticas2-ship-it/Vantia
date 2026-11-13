@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@clerk/clerk-react';
-import { CheckCircle2, Clock, History, Loader2, Play, Plus, Sparkles, Trash2, Workflow, X, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Copy, History, Loader2, Play, Plus, Sparkles, Trash2, Workflow, X, XCircle } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
 import { locale, t, tn } from '../lib/i18n';
-import Lienzo from '../components/automatizaciones/Lienzo';
+import Lienzo, { textoPaso } from '../components/automatizaciones/Lienzo';
 import { campoCls } from '../components/automatizaciones/campos';
 import { META, PLANTILLAS, faltaAlgo, type Catalogo, type FlujoDatos, type Plantilla } from '../components/automatizaciones/tipos';
 
@@ -50,6 +50,10 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
     if (!(await confirmar({ titulo: t('¿Eliminar «{nombre}»?', { nombre: f.nombre }), mensaje: t('Se borra la automatización y su historial. No se puede deshacer.'), confirmar: t('Eliminar'), peligro: true }))) return;
     const r = await apiFetch(`/api/automatizaciones/flujos/${f.id}`, { method: 'DELETE', getToken });
     if (r?.success === false) aviso.error(r.error); else { aviso.ok(t('Automatización eliminada.')); await cargar(); }
+  };
+  const duplicar = async (f: FilaFlujo) => {
+    const r = await apiFetch(`/api/automatizaciones/flujos/${f.id}/duplicar`, { method: 'POST', getToken });
+    if (r?.success === false) aviso.error(r.error); else { aviso.ok(t('Copia creada (desactivada).')); await cargar(); }
   };
   const ejecutar = async (f: FilaFlujo) => {
     const r = await apiFetch(`/api/automatizaciones/flujos/${f.id}/ejecutar`, { method: 'POST', getToken });
@@ -121,6 +125,7 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
                     <Workflow size={13} />{puedeEditar ? t('Editar flujo') : t('Ver flujo')}</button>
                   <button type="button" onClick={() => setHistorial(f)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><History size={13} />{t('Historial')}</button>
                   {puedeEditar && f.evento === 'manual' && <button type="button" onClick={() => void ejecutar(f)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Play size={13} />{t('Ejecutar ahora')}</button>}
+                  {puedeEditar && <button type="button" onClick={() => void duplicar(f)} title={t('Duplicar')} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><Copy size={14} /></button>}
                   {puedeEditar && <button type="button" onClick={() => void borrar(f)} title={t('Eliminar')} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>}
                   <button type="button" role="switch" aria-checked={f.activo} disabled={!puedeEditar || cambiando === f.id || (falta && !f.activo)} onClick={() => void cambiarActivo(f)}
                     title={falta && !f.activo ? t('Completa los pasos antes de activarla') : f.activo ? t('Desactivar') : t('Activar')}
@@ -207,8 +212,12 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
       await onGuardado(r.data);
     } catch (e: any) { setError(e?.message || t('No se pudo guardar')); throw e; } finally { setGuardando(false); }
   };
-  const probar = async (f: FlujoDatos) => {
-    const r = await apiFetch('/api/automatizaciones/probar', { method: 'POST', getToken, body: JSON.stringify({ flujo: f }) });
+  const probar = async (f: FlujoDatos, muestraId?: string | null) => {
+    const r = await apiFetch('/api/automatizaciones/probar', { method: 'POST', getToken, body: JSON.stringify({ flujo: f, muestraId }) });
+    return r?.success ? r.data : [];
+  };
+  const muestras = async (evento: string) => {
+    const r = await apiFetch(`/api/automatizaciones/muestras?evento=${encodeURIComponent(evento)}`, { getToken });
     return r?.success ? r.data : [];
   };
 
@@ -216,7 +225,7 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
     <Lienzo
       titulo={nombre.trim() || t('Nueva automatización')} subtitulo={t('Automatización propia')} icono={Workflow} catalogo={catalogo}
       inicial={flujo} puedeEditar={puedeEditar} sucioExterno={metaSucia} guardando={guardando} error={error}
-      onGuardar={guardar} onProbar={probar} onCerrar={onCerrar}
+      onGuardar={guardar} onProbar={probar} onMuestras={muestras} onCerrar={onCerrar}
       cabecera={puedeEditar ? (
         <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
           {activo ? t('Activa') : t('Desactivada')}
@@ -272,7 +281,7 @@ function Historial({ fila, onCerrar }: { fila: FilaFlujo; onCerrar: () => void }
                         {(e.pasos || []).map((p: any, i: number) => (
                           <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
                             {p.ok ? <CheckCircle2 size={12} className="mt-px shrink-0 text-emerald-500" /> : <XCircle size={12} className="mt-px shrink-0 text-red-500" />}
-                            <span data-sin-traducir>{p.detalle}</span>
+                            <span data-sin-traducir>{textoPaso(p)}</span>
                           </li>
                         ))}
                         {!(e.pasos || []).length && <li className="text-xs text-slate-400">{t('Sin pasos ejecutados.')}</li>}
