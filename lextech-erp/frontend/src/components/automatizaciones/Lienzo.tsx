@@ -417,8 +417,20 @@ function LienzoInterno(p: PropsLienzo) {
     try {
       const r = await p.onGenerar(iaTexto.trim(), actual);
       apuntar();
-      setNodos(r.flujo.nodos.map(aNodo));
-      setAristas(r.flujo.aristas.map((a) => aArista(a)));
+      if (p.fijos) {
+        // Los pasos de serie se quedan; el disparador que devuelve la IA es el «Al terminar».
+        const ancla = nodos.find((n) => n.data.ancla)!;
+        const disp = r.flujo.nodos.find((n) => n.tipo === 'disparador');
+        const base = disp ? { x: disp.x || 0, y: disp.y || 0 } : { x: 0, y: 0 };
+        const nuevos = r.flujo.nodos.filter((n) => n.tipo !== 'disparador')
+          .map((n) => aNodo({ ...n, x: ancla.position.x + (n.x || 0) - base.x, y: ancla.position.y + (n.y || 0) - base.y }));
+        const remap = (id: string) => (disp && id === disp.id ? ancla.id : id);
+        setNodos((ns) => [...ns.filter((n) => n.data.fijoId || n.data.ancla), ...nuevos]);
+        setAristas((es) => [...es.filter((e) => e.data?.fija), ...r.flujo.aristas.map((a) => aArista({ ...a, de: remap(a.de), a: remap(a.a), id: `${remap(a.de)}-${remap(a.a)}-${a.rama || ''}` }))]);
+      } else {
+        setNodos(r.flujo.nodos.map(aNodo));
+        setAristas(r.flujo.aristas.map((a) => aArista(a)));
+      }
       setSel(null); setIaAbierta(false); setIaTexto('');
       window.setTimeout(() => rf.fitView({ padding: 0.25, duration: 500, maxZoom: 1 }), 80);
     } catch (e: any) { setIaError(e?.message || t('La IA no ha podido cambiar el flujo')); } finally { setIaPensando(false); }
@@ -581,7 +593,16 @@ function LienzoInterno(p: PropsLienzo) {
               onPaneClick={() => setSel(null)}
               nodesDraggable nodesConnectable={p.puedeEditar} elementsSelectable
               deleteKeyCode={p.puedeEditar ? ['Delete', 'Backspace'] : null}
-              snapToGrid snapGrid={[16, 16]} fitView fitViewOptions={{ padding: 0.2, maxZoom: 1, minZoom: 0.75 }} minZoom={0.2} maxZoom={1.8}
+              snapToGrid snapGrid={[16, 16]} minZoom={0.2} maxZoom={1.8}
+              onInit={(inst) => {
+                const caja = document.querySelector('.react-flow')?.getBoundingClientRect();
+                const ns = inst.getNodes();
+                if (!caja || !ns.length) return;
+                const minX = Math.min(...ns.map((n) => n.position.x)), maxX = Math.max(...ns.map((n) => n.position.x)) + 280;
+                const minY = Math.min(...ns.map((n) => n.position.y)), maxY = Math.max(...ns.map((n) => n.position.y)) + 110;
+                const zoom = Math.max(0.8, Math.min(1, (caja.width - 80) / (maxX - minX), (caja.height - 80) / (maxY - minY)));
+                inst.setViewport({ x: caja.width / 2 - ((minX + maxX) / 2) * zoom, y: 40 - minY * zoom, zoom });
+              }}
               defaultEdgeOptions={{ type: 'arista', markerEnd: marcador }} connectionLineStyle={{ stroke: '#dc2626', strokeWidth: 2 }}
               colorMode={oscuro ? 'dark' : 'light'} proOptions={{ hideAttribution: true }} panOnScroll={false} zoomOnScroll selectionOnDrag={false}
             >

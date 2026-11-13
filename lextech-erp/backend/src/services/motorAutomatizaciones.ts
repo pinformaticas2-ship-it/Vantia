@@ -725,7 +725,7 @@ function colocar(flujo: Flujo): Flujo {
   return { ...flujo, nodos: flujo.nodos.map((n) => ({ ...n, ...pos.get(n.id) })) };
 }
 
-export async function generarFlujoConIA(org: string, descripcion: string, opts: { modelo?: string; actual?: Flujo | null; extra?: { miembros: any[]; canales: any[]; etapas: any[] } }): Promise<{ nombre: string; descripcion: string; flujo: Flujo; avisos: string[] }> {
+export async function generarFlujoConIA(org: string, descripcion: string, opts: { modelo?: string; actual?: Flujo | null; eventoFijo?: string | null; extra?: { miembros: any[]; canales: any[]; etapas: any[] } }): Promise<{ nombre: string; descripcion: string; flujo: Flujo; avisos: string[] }> {
   const disp = Object.entries(DISPARADORES).map(([k, d]) => `- ${k}: ${d.etiqueta}. Datos: ${d.variables.map((v) => '{' + v.clave + '}').join(' ')}`).join('\n');
   const sistema = `Diseñas automatizaciones para Vantia, el programa de gestión de un despacho de abogados español. Devuelves SOLO un JSON:
 { "nombre": "...", "descripcion": "...", "nodos": [{ "id": "corto", "tipo": "...", "config": {...} }], "aristas": [{ "de": "id", "a": "id", "rama": "si"|"no"|null }] }
@@ -742,10 +742,13 @@ Etapas del CRM (etapaId · nombre): ${(opts.extra?.etapas || []).map((e: any) =>
   const prompt = opts.actual
     ? `Esta es la automatización actual (JSON):\n${JSON.stringify({ nodos: opts.actual.nodos.map(({ id, tipo, config }) => ({ id, tipo, config })), aristas: opts.actual.aristas })}\n\nCámbiala así: ${descripcion}\nDevuelve la automatización completa ya cambiada, conservando los ids de los pasos que no cambien.`
     : `Crea esta automatización: ${descripcion}`;
-  const texto = await preguntarIA({ prompt, sistema, modelo: opts.modelo, json: true, maxTokens: 6000, temperatura: 0.2 });
+  const fijo = opts.eventoFijo && DISPARADORES[opts.eventoFijo]
+    ? `\n\nIMPORTANTE: el disparador es fijo (evento "${opts.eventoFijo}": ${DISPARADORES[opts.eventoFijo].etiqueta}); no lo cambies, solo los pasos que cuelgan de él.` : '';
+  const texto = await preguntarIA({ prompt: prompt + fijo, sistema, modelo: opts.modelo, json: true, maxTokens: 6000, temperatura: 0.2 });
   let bruto: any;
   try { bruto = JSON.parse(texto.replace(/^```(json)?/i, '').replace(/```$/, '')); } catch { throw new Error('La IA no ha devuelto un flujo válido. Prueba a describirlo de otra forma.'); }
   const { flujo, errores } = validarFlujo({ nodos: bruto?.nodos, aristas: bruto?.aristas });
+  if (opts.eventoFijo) { const d = flujo.nodos.find((n) => n.tipo === 'disparador'); if (d) d.config = { ...(d.config || {}), evento: opts.eventoFijo }; }
   if (!flujo.nodos.some((n) => n.tipo === 'disparador')) throw new Error('La IA no ha sabido qué la pone en marcha. Dilo en la descripción (por ejemplo, «cuando entra un cliente nuevo…»).');
   // Nada puede volver al disparador (rompería el flujo y la colocación).
   const ids = new Set(flujo.nodos.filter((n) => n.tipo === 'disparador').map((n) => n.id));

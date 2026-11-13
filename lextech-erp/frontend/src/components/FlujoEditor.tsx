@@ -106,6 +106,11 @@ export default function FlujoEditor({
       panelGeneral={descripcion ? <div className="text-sm leading-6 text-slate-600">{descripcion}</div> : undefined}
       puedeEditar={puedeEditar} sucioExterno={sucio} guardando={guardando || guardandoExtra} error={error || errorExtra}
       onGuardar={guardar} onProbar={probar} onMuestras={muestras} onCerrar={onCerrar}
+      onGenerar={catalogo?.iaDisponible === false ? undefined : async (descripcion, actual) => {
+        const r = await apiFetch('/api/automatizaciones/generar', { method: 'POST', getToken, body: JSON.stringify({ descripcion, flujo: actual, vinculada }) });
+        if (r?.success === false) throw new Error(r.error);
+        return r.data;
+      }}
     />
   );
 }

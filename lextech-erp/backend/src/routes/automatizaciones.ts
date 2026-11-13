@@ -286,6 +286,9 @@ router.post('/generar', requireAuth, async (req: any, res: Response) => {
   const descripcion = String(req.body?.descripcion || '').trim().slice(0, 3000);
   if (descripcion.length < 8) return fallo(res, 'Describe un poco más lo que quieres que haga.', 400);
   const actual = req.body?.flujo ? validarFlujo(req.body.flujo).flujo : null;
+  const vinculada = typeof req.body?.vinculada === 'string' && EVENTO_DE_SERIE[req.body.vinculada] ? req.body.vinculada : null;
+  const eventoFijo = vinculada ? EVENTO_DE_SERIE[vinculada] : null;
+  if (actual && eventoFijo) { const d = actual.nodos.find((n) => n.tipo === 'disparador'); if (d) d.config = { ...(d.config || {}), evento: eventoFijo }; }
   try {
     const org = req.organizacionId;
     const [m, c, e] = await Promise.all([
@@ -295,7 +298,7 @@ router.post('/generar', requireAuth, async (req: any, res: Response) => {
     ]);
     const { resolveUserName } = await import('../controllers/activityController');
     const miembros = await Promise.all(m.rows.map(async (x: any) => ({ userId: x.user_id, nombre: await resolveUserName(x.user_id) })));
-    const r = await generarFlujoConIA(org, descripcion, { modelo: req.body?.modelo, actual, extra: { miembros, canales: c.rows, etapas: e.rows } });
+    const r = await generarFlujoConIA(org, descripcion, { modelo: req.body?.modelo, actual, eventoFijo, extra: { miembros, canales: c.rows, etapas: e.rows } });
     res.json({ success: true, data: r });
   } catch (err: any) { fallo(res, err?.message || 'La IA no ha podido crear el flujo', 502); }
 });
