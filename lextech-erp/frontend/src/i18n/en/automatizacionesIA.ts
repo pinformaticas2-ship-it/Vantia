@@ -2,6 +2,12 @@
 import { registrarEn } from '../../lib/i18n';
 
 registrarEn({
+  // Móvil
+  "Información": "Information",
+  "Arrastra con un dedo para moverte; pellizca para acercar o alejar.": "Drag with one finger to move around; pinch to zoom in or out.",
+  "Para añadir un paso, toca su icono arriba; se engancha al paso que tengas seleccionado.": "To add a step, tap its icon at the top; it attaches to the step you have selected.",
+  "El flujo no puede volver a un paso anterior (daría vueltas sin fin).": "The flow can't go back to an earlier step (it would loop forever).",
+
   // Paleta y pasos
   "Inteligencia artificial": "Artificial intelligence",
   "IA de Vantia": "Vantia AI", "Redacta, resume, clasifica o decide": "Drafts, summarises, classifies or decides",

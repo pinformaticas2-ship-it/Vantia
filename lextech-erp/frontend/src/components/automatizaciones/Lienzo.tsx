@@ -7,7 +7,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  AlertTriangle, ArrowLeft, Sparkles, Check, CheckCircle2, FlaskConical, GripVertical, LayoutGrid, Loader2, Lock, MousePointerClick, Plus, Redo2, Trash2, Undo2, X, XCircle, type LucideIcon,
+  AlertTriangle, ArrowLeft, Info, Sparkles, Check, CheckCircle2, FlaskConical, GripVertical, LayoutGrid, Loader2, Lock, MousePointerClick, Plus, Redo2, Trash2, Undo2, X, XCircle, type LucideIcon,
 } from 'lucide-react';
 import { t } from '../../lib/i18n';
 import { confirmar } from '../../lib/avisos';
@@ -408,6 +408,8 @@ function LienzoInterno(p: PropsLienzo) {
 
   // ── Pedir a la IA que cambie el flujo ──
   const [iaAbierta, setIaAbierta] = useState(false);
+  const [verInfo, setVerInfo] = useState(false);
+  const tactil = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
   const [iaTexto, setIaTexto] = useState('');
   const [iaPensando, setIaPensando] = useState(false);
   const [iaError, setIaError] = useState('');
@@ -504,13 +506,15 @@ function LienzoInterno(p: PropsLienzo) {
         {/* Cabecera */}
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
           <button type="button" onClick={() => void cerrar()} aria-label={t('Cerrar')} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><ArrowLeft size={18} /></button>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600"><Ico size={18} /></div>
+          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 sm:flex"><Ico size={18} /></div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-slate-800 sm:text-base">{p.titulo}</p>
             {p.subtitulo && <p className="truncate text-xs text-slate-500">{p.subtitulo}</p>}
           </div>
+          <div className="order-3 flex w-full items-center gap-1.5 overflow-x-auto pb-0.5 lg:order-none lg:w-auto lg:overflow-visible lg:pb-0">
           {p.cabecera}
-          <div className="flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+            <button type="button" className={`${btn} lg:hidden`} onClick={() => { setSel(null); setVerInfo((v) => !v); }} title={t('Información')}><Info size={14} /></button>
             <button type="button" className={btn} onClick={deshacer} disabled={!pasado.current.length} title={t('Deshacer (Ctrl+Z)')}><Undo2 size={14} /></button>
             <button type="button" className={btn} onClick={rehacer} disabled={!futuro.current.length} title={t('Rehacer (Ctrl+Y)')}><Redo2 size={14} /></button>
             {p.onGenerar && p.puedeEditar && (
@@ -544,12 +548,13 @@ function LienzoInterno(p: PropsLienzo) {
             <button type="button" className={btn} onClick={() => void probar()} disabled={probando} title={t('Probar sin enviar nada')}>
               {probando ? <Loader2 size={14} className="animate-spin" /> : <FlaskConical size={14} />}<span className="hidden md:inline">{t('Probar')}</span></button>
           </div>
+          </div>
           {p.puedeEditar ? (
             <button type="button" onClick={() => void guardar()} disabled={!sucio || p.guardando}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3.5 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
+              className="order-2 inline-flex items-center gap-2 rounded-lg bg-red-600 px-3.5 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50 lg:order-none">
               {p.guardando ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}{sucio ? t('Guardar') : t('Guardado')}
             </button>
-          ) : <span className="text-xs text-slate-500">{t('Solo lectura')}</span>}
+          ) : <span className="order-2 text-xs text-slate-500 lg:order-none">{t('Solo lectura')}</span>}
         </div>
         {p.error && <p className="border-b border-red-100 bg-red-50 px-5 py-2 text-sm text-red-700">{p.error}</p>}
 
@@ -600,8 +605,9 @@ function LienzoInterno(p: PropsLienzo) {
                 if (!caja || !ns.length) return;
                 const minX = Math.min(...ns.map((n) => n.position.x)), maxX = Math.max(...ns.map((n) => n.position.x)) + 280;
                 const minY = Math.min(...ns.map((n) => n.position.y)), maxY = Math.max(...ns.map((n) => n.position.y)) + 110;
-                const zoom = Math.max(0.8, Math.min(1, (caja.width - 80) / (maxX - minX), (caja.height - 80) / (maxY - minY)));
-                inst.setViewport({ x: caja.width / 2 - ((minX + maxX) / 2) * zoom, y: 40 - minY * zoom, zoom });
+                const movil = caja.width < 640;
+                const zoom = Math.max(movil ? 0.6 : 0.8, Math.min(1, (caja.width - 80) / (maxX - minX), (caja.height - 80) / (maxY - minY)));
+                inst.setViewport({ x: caja.width / 2 - ((minX + maxX) / 2) * zoom, y: (movil ? 64 : 40) - minY * zoom, zoom });
               }}
               defaultEdgeOptions={{ type: 'arista', markerEnd: marcador }} connectionLineStyle={{ stroke: '#dc2626', strokeWidth: 2 }}
               colorMode={oscuro ? 'dark' : 'light'} proOptions={{ hideAttribution: true }} panOnScroll={false} zoomOnScroll selectionOnDrag={false}
@@ -612,22 +618,26 @@ function LienzoInterno(p: PropsLienzo) {
                 nodeColor={(n) => { const d = n.data as DatosNodo; const f = d.fijoId ? fijosMap.get(d.fijoId) : null; return f ? COLOR_CLASE[f.clase] : d.ancla ? '#f59e0b' : META[d.tipo as TipoNodo]?.color || '#94a3b8'; }} />
             </ReactFlow>
             {(avisos > 0 || sueltos > 0) && (
-              <div className="pointer-events-none absolute left-3 top-14 flex flex-col gap-1 lg:top-3">
+              <div className="pointer-events-none absolute bottom-32 left-3 z-10 flex flex-col gap-1 lg:bottom-auto lg:top-3">
                 {avisos > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 shadow-sm">{t('{n} paso(s) por completar', { n: avisos })}</span>}
                 {sueltos > 0 && <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">{t('{n} paso(s) sin conectar: no se ejecutarán', { n: sueltos })}</span>}
               </div>
             )}
             {p.puedeEditar && (
-              <div className="absolute right-3 top-3 flex gap-1 lg:hidden">
+              <div className="absolute inset-x-2 top-2 z-10 flex gap-1 overflow-x-auto pb-1 lg:hidden">
                 {PALETA.flatMap((g) => g.tipos).map((tp) => { const I = META[tp].icono; return (
-                  <button key={tp} type="button" onClick={() => anadir(tp)} title={t(META[tp].etiqueta)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm" style={{ color: META[tp].color }}><I size={14} /></button>
+                  <button key={tp} type="button" onClick={() => anadir(tp)} title={t(META[tp].etiqueta)} aria-label={t(META[tp].etiqueta)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm" style={{ color: META[tp].color }}><I size={15} /></button>
                 ); })}
               </div>
             )}
           </div>
 
           {/* Panel */}
-          <aside className={`min-h-0 overflow-y-auto border-slate-200 bg-white lg:static lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none ${elegido || listaPrueba ? 'fixed inset-x-0 bottom-0 z-20 max-h-[62vh] rounded-t-2xl border-t shadow-2xl' : 'border-t lg:block'}`}>
+          <aside className={`min-h-0 overflow-y-auto border-slate-200 bg-white lg:static lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none ${elegido || listaPrueba || verInfo ? 'fixed inset-x-0 bottom-0 z-20 max-h-[65vh] rounded-t-2xl border-t shadow-2xl' : 'hidden lg:block'}`}>
+            <div className="sticky top-0 z-10 flex items-center justify-center bg-white pb-1 pt-2 lg:hidden">
+              <span className="h-1 w-10 rounded-full bg-slate-300" />
+              <button type="button" onClick={() => { setSel(null); setVerInfo(false); setListaPrueba(null); }} aria-label={t('Cerrar')} className="absolute right-3 top-1.5 rounded-lg p-1 text-slate-400"><X size={16} /></button>
+            </div>
             {listaPrueba && (
               <div className="border-b border-slate-100 bg-slate-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -651,10 +661,11 @@ function LienzoInterno(p: PropsLienzo) {
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><MousePointerClick size={16} className="text-slate-400" />{t('Pulsa un paso para verlo y ajustarlo')}</div>
                 {p.panelGeneral && <div className="mt-4">{p.panelGeneral}</div>}
                 <ul className="mt-5 space-y-1.5 text-xs text-slate-500">
-                  <li>· {t('Arrastra el fondo para moverte; la rueda acerca y aleja.')}</li>
+                  <li>· {tactil ? t('Arrastra con un dedo para moverte; pellizca para acercar o alejar.') : t('Arrastra el fondo para moverte; la rueda acerca y aleja.')}</li>
                   <li>· {t('Arrastra los pasos para colocarlos donde quieras.')}</li>
                   {p.puedeEditar && <li>· {t('Une dos pasos arrastrando desde el punto de abajo de uno hasta el de arriba del otro.')}</li>}
-                  {p.puedeEditar && <li>· {t('Supr borra lo seleccionado · Ctrl+Z deshace · Ctrl+S guarda.')}</li>}
+                  {p.puedeEditar && !tactil && <li>· {t('Supr borra lo seleccionado · Ctrl+Z deshace · Ctrl+S guarda.')}</li>}
+                  {p.puedeEditar && tactil && <li>· {t('Para añadir un paso, toca su icono arriba; se engancha al paso que tengas seleccionado.')}</li>}
                 </ul>
               </div>
             ) : fijo ? (
