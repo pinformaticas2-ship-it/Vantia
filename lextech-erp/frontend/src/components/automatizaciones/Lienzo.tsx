@@ -7,7 +7,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  AlertTriangle, ArrowLeft, Check, CheckCircle2, FlaskConical, GripVertical, LayoutGrid, Loader2, Lock, MousePointerClick, Plus, Redo2, Trash2, Undo2, X, XCircle, type LucideIcon,
+  AlertTriangle, ArrowLeft, Sparkles, Check, CheckCircle2, FlaskConical, GripVertical, LayoutGrid, Loader2, Lock, MousePointerClick, Plus, Redo2, Trash2, Undo2, X, XCircle, type LucideIcon,
 } from 'lucide-react';
 import { t } from '../../lib/i18n';
 import { confirmar } from '../../lib/avisos';
@@ -207,6 +207,10 @@ export interface PropsLienzo {
   onProbar: (f: FlujoDatos, muestraId?: string | null) => Promise<ResultadoPaso[]>;
   /** Registros reales con los que probar (según el disparador). */
   onMuestras?: (evento: string) => Promise<{ id: string; etiqueta: string }[]>;
+  /** «Pedir a la IA»: cambia el flujo según una descripción. */
+  onGenerar?: (descripcion: string, actual: FlujoDatos, modelo?: string) => Promise<{ flujo: FlujoDatos; avisos?: string[] }>;
+  /** Dirección pública del webhook entrante (si ya está guardada). */
+  urlEntrada?: string | null;
   onCerrar: () => void;
 }
 
@@ -402,6 +406,24 @@ function LienzoInterno(p: PropsLienzo) {
     p.onMuestras(eventoDisparo).then(setMuestras).catch(() => {});
   }, [eventoDisparo]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Pedir a la IA que cambie el flujo ──
+  const [iaAbierta, setIaAbierta] = useState(false);
+  const [iaTexto, setIaTexto] = useState('');
+  const [iaPensando, setIaPensando] = useState(false);
+  const [iaError, setIaError] = useState('');
+  const pedirIA = async () => {
+    if (!p.onGenerar || iaTexto.trim().length < 5) return;
+    setIaPensando(true); setIaError('');
+    try {
+      const r = await p.onGenerar(iaTexto.trim(), actual);
+      apuntar();
+      setNodos(r.flujo.nodos.map(aNodo));
+      setAristas(r.flujo.aristas.map((a) => aArista(a)));
+      setSel(null); setIaAbierta(false); setIaTexto('');
+      window.setTimeout(() => rf.fitView({ padding: 0.25, duration: 500, maxZoom: 1 }), 80);
+    } catch (e: any) { setIaError(e?.message || t('La IA no ha podido cambiar el flujo')); } finally { setIaPensando(false); }
+  };
+
   // ── Probar ──
   const probar = async () => {
     setProbando(true);
@@ -445,7 +467,13 @@ function LienzoInterno(p: PropsLienzo) {
 
   // Variables disponibles según el disparador.
   const evento = p.vinculada ? p.catalogo?.eventoDeSerie[p.vinculada] : nodos.find((n) => n.data.tipo === 'disparador' && !n.data.ancla)?.data.config.evento;
-  const variables = p.catalogo?.disparadores.find((d) => d.clave === evento)?.variables || [];
+  const variablesBase = p.catalogo?.disparadores.find((d) => d.clave === evento)?.variables || [];
+  // Lo que guarda cada paso de IA de este flujo, para usarlo en los siguientes.
+  const variables = [
+    ...variablesBase.filter((v) => v.clave !== 'ia.respuesta'),
+    ...Array.from(new Set(nodos.filter((n) => n.data.tipo === 'ia').map((n) => String(n.data.config.variable || 'respuesta'))))
+      .map((v) => ({ clave: `ia.${v}`, etiqueta: t('Respuesta de la IA ({v})', { v }) })),
+  ];
 
   const elegido = nodos.find((n) => n.id === sel) || null;
   const fijo = elegido?.data.fijoId ? fijosMap.get(elegido.data.fijoId) : null;
@@ -473,6 +501,26 @@ function LienzoInterno(p: PropsLienzo) {
           <div className="flex items-center gap-1.5">
             <button type="button" className={btn} onClick={deshacer} disabled={!pasado.current.length} title={t('Deshacer (Ctrl+Z)')}><Undo2 size={14} /></button>
             <button type="button" className={btn} onClick={rehacer} disabled={!futuro.current.length} title={t('Rehacer (Ctrl+Y)')}><Redo2 size={14} /></button>
+            {p.onGenerar && p.puedeEditar && (
+              <div className="relative">
+                <button type="button" className={`${btn} border-violet-200 text-violet-700 hover:bg-violet-50`} onClick={() => setIaAbierta((v) => !v)} title={t('Pedir cambios a la IA')}>
+                  <Sparkles size={14} /><span className="hidden md:inline">{t('Pedir a la IA')}</span></button>
+                {iaAbierta && (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-[min(92vw,380px)] rounded-xl border border-slate-200 bg-white p-3 shadow-2xl">
+                    <p className="text-sm font-bold text-slate-800">{t('¿Qué quieres cambiar?')}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{t('Por ejemplo: «añade una espera de 2 días antes del correo» o «si el cliente no tiene correo, avisa al responsable». Podrás deshacerlo con Ctrl+Z.')}</p>
+                    <textarea autoFocus rows={4} value={iaTexto} onChange={(e) => setIaTexto(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-400" />
+                    {iaError && <p className="mt-1 text-xs text-red-600">{iaError}</p>}
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button type="button" className={btn} onClick={() => setIaAbierta(false)}>{t('Cancelar')}</button>
+                      <button type="button" disabled={iaPensando || iaTexto.trim().length < 5} onClick={() => void pedirIA()}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+                        {iaPensando ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}{t('Aplicar')}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {!p.fijos && <button type="button" className={btn} onClick={() => { apuntar(); setNodos((ns) => ordenar(ns, aristas)); window.setTimeout(() => rf.fitView({ padding: 0.2, duration: 400 }), 50); }} title={t('Ordenar los pasos')}><LayoutGrid size={14} /><span className="hidden md:inline">{t('Ordenar')}</span></button>}
             {muestras.length > 0 && (
               <select value={muestra} onChange={(e) => setMuestra(e.target.value)} title={t('Probar con datos reales')}
@@ -621,7 +669,7 @@ function LienzoInterno(p: PropsLienzo) {
                 )}
                 <fieldset disabled={!p.puedeEditar} className="mt-4 space-y-4">
                   <FormularioPaso tipo={elegido.data.tipo as TipoNodo} config={elegido.data.config} set={(k, v) => setConfig(elegido.id, k, v)}
-                    catalogo={p.catalogo} variables={variables} vinculada={Boolean(p.vinculada)} />
+                    catalogo={p.catalogo} variables={variables} vinculada={Boolean(p.vinculada)} urlEntrada={p.urlEntrada} />
                 </fieldset>
               </div>
             )}

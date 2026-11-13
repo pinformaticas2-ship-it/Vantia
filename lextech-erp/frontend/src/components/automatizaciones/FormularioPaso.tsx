@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Plus, X } from 'lucide-react';
+import { Check, Copy, Plus, Sparkles, X } from 'lucide-react';
 import { t } from '../../lib/i18n';
 import { Campo, CampoCorreo, campoCls } from './campos';
 import { OPERADORES, reglasDe, type Catalogo, type TipoNodo, type Variable } from './tipos';
@@ -8,9 +8,9 @@ import { OPERADORES, reglasDe, type Catalogo, type TipoNodo, type Variable } fro
 
 const DIAS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
-export function FormularioPaso({ tipo, config, set, catalogo, variables, vinculada }: {
+export function FormularioPaso({ tipo, config, set, catalogo, variables, vinculada, urlEntrada }: {
   tipo: TipoNodo; config: Record<string, any>; set: (k: string, v: any) => void;
-  catalogo: Catalogo | null; variables: Variable[]; vinculada?: boolean;
+  catalogo: Catalogo | null; variables: Variable[]; vinculada?: boolean; urlEntrada?: string | null;
 }) {
   const vars = variables.map((v) => ({ clave: v.clave, desc: t(v.etiqueta) }));
   const c = config;
@@ -31,6 +31,18 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
               </button>
             ))}
           </div>
+          {c.evento === 'webhook.entrante' && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <p className="font-semibold text-slate-700">{t('Dirección para enviar los datos')}</p>
+              {urlEntrada ? (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <code className="min-w-0 flex-1 break-all rounded bg-white px-2 py-1 text-[11px] text-slate-800" data-sin-traducir>{urlEntrada}</code>
+                  <button type="button" onClick={() => void navigator.clipboard?.writeText(urlEntrada)} title={t('Copiar')} className="rounded-md border border-slate-200 bg-white p-1.5 hover:bg-slate-100"><Copy size={12} /></button>
+                </div>
+              ) : <p className="mt-1">{t('Guarda la automatización para obtener su dirección.')}</p>}
+              <p className="mt-2">{t('Envía un POST con JSON o formulario (por ejemplo nombre, email, telefono, mensaje). Cada campo queda como {entrada.campo}. Trátala como una contraseña: quien la tenga puede lanzar la automatización.')}</p>
+            </div>
+          )}
           {c.evento === 'tarea.vence' && (
             <Campo etiqueta={t('¿Cuántos días antes del plazo?')}>
               <select className={campoCls} value={c.diasAntes ?? 2} onChange={(e) => set('diasAntes', Number(e.target.value))}>
@@ -245,6 +257,61 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
           <p className="text-[11px] text-slate-400">{t('Solo funciona con disparadores que tengan expediente.')}</p>
         </>
       );
+    case 'ia': {
+      const modelos = catalogo?.modelosIA || [{ id: 'gemini-2.5-flash', etiqueta: 'Gemini 2.5 Flash', disponible: true }];
+      return (
+        <>
+          {catalogo && catalogo.iaDisponible === false && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-800">{t('La IA de Vantia no está configurada en el servidor: este paso fallará hasta que lo esté.')}</p>}
+          <Campo etiqueta={t('¿Qué tiene que hacer la IA?')} ayuda={t('Por ejemplo: «Resume este correo en una frase», «¿Es urgente?», «Redacta una respuesta amable». Recibe todos los datos del disparador.')}>
+            <textarea rows={5} className={campoCls} value={c.instrucciones || ''} onChange={(e) => set('instrucciones', e.target.value)} />
+          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo etiqueta={t('Modelo')}>
+              <select className={campoCls} value={c.modelo || modelos[0].id} onChange={(e) => set('modelo', e.target.value)}>
+                {modelos.map((m) => <option key={m.id} value={m.id} disabled={!m.disponible}>{m.etiqueta}{m.disponible ? '' : ` · ${t('Próximamente')}`}</option>)}
+              </select>
+            </Campo>
+            <Campo etiqueta={t('Skill (opcional)')}>
+              <select className={campoCls} value={c.skillId || ''} onChange={(e) => set('skillId', e.target.value)}>
+                <option value="">{t('Ninguna')}</option>
+                {(catalogo?.skills || []).map((k) => <option key={k.id} value={k.id}>{k.nombre}</option>)}
+              </select>
+            </Campo>
+          </div>
+          <Campo etiqueta={t('Qué devuelve')}>
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+              {[['texto', t('Texto')], ['si_no', t('Sí o no')], ['opciones', t('Una opción')]].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => set('formato', v)} className={`rounded-md px-2 py-1.5 ${(c.formato || 'texto') === v ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>{l}</button>
+              ))}
+            </div>
+          </Campo>
+          {c.formato === 'opciones' && <Campo etiqueta={t('Opciones')} ayuda={t('Separadas por comas. Úsalas luego en una condición.')}><input className={campoCls} value={c.opciones || ''} onChange={(e) => set('opciones', e.target.value)} placeholder={t('laboral, familia, penal, otro')} /></Campo>}
+          <Campo etiqueta={t('Guardar la respuesta como')} ayuda={<>{t('Los pasos siguientes la usan con')} <code data-sin-traducir>{`{ia.${c.variable || 'respuesta'}}`}</code></>}>
+            <input className={campoCls} value={c.variable ?? 'respuesta'} onChange={(e) => set('variable', e.target.value.toLowerCase().replace(/[^a-z_]/g, '_').slice(0, 30))} />
+          </Campo>
+          <label className="flex items-start gap-2 rounded-lg border border-slate-200 p-3 text-xs text-slate-600">
+            <input type="checkbox" className="mt-0.5 accent-red-600" checked={Boolean(c.conDatos)} onChange={(e) => set('conDatos', e.target.checked)} />
+            <span><b className="text-slate-800">{t('Dejar que consulte los datos del despacho')}</b><br />{t('Como en el chat: puede buscar clientes, expedientes, tareas, agenda o facturas para responder. Solo lee; nunca cambia nada.')}</span>
+          </label>
+          <p className="flex items-center gap-1.5 text-[11px] text-slate-400"><Sparkles size={11} />{t('Cada ejecución cuenta en el uso diario de la IA, como el chat.')}</p>
+          <Variables vars={vars} />
+        </>
+      );
+    }
+    case 'nota':
+      return (
+        <>
+          <Campo etiqueta={t('Dónde')}>
+            <select className={campoCls} value={c.sobre || 'expediente'} onChange={(e) => set('sobre', e.target.value)}>
+              <option value="expediente">{t('En el expediente (o en el cliente si no hay expediente)')}</option><option value="cliente">{t('En el cliente')}</option>
+            </select>
+          </Campo>
+          <Campo etiqueta={t('Texto')}><textarea rows={4} className={campoCls} value={c.texto || ''} onChange={(e) => set('texto', e.target.value)} /></Campo>
+          <Variables vars={vars} />
+        </>
+      );
+    case 'completar_tarea':
+      return <p className="text-sm text-slate-600">{t('Marca como completada la tarea del disparador (plazo que se acerca, tarea vencida o tarea nueva).')}</p>;
     case 'webhook':
       return (
         <>

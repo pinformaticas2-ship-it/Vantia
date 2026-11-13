@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { CheckCircle2, Clock, Copy, History, Loader2, Play, Plus, Sparkles, Trash2, Workflow, X, XCircle } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, resolveApiUrl } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
 import { locale, t, tn } from '../lib/i18n';
 import Lienzo, { textoPaso } from '../components/automatizaciones/Lienzo';
@@ -61,6 +61,7 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
     else { const mal = (r.data?.pasos || []).filter((p: any) => !p.ok).length; mal ? aviso.error(t('Ejecutada con {n} paso(s) con error.', { n: mal })) : aviso.ok(t('Ejecutada.')); await cargar(); }
   };
   const desdePlantilla = (pl: Plantilla) => { setEligiendo(false); setEditando({ fila: null, flujo: pl.flujo(), nombre: pl.id === 'blanco' ? '' : t(pl.nombre) }); };
+  const desdeIA = (nombre: string, flujo: FlujoDatos) => { setEligiendo(false); setEditando({ fila: null, flujo, nombre }); };
 
   return (
     <section className="mt-10">
@@ -139,7 +140,7 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
         </div>
       )}
 
-      {eligiendo && <ElegirPlantilla onElegir={desdePlantilla} onCerrar={() => setEligiendo(false)} />}
+      {eligiendo && <ElegirPlantilla catalogo={catalogo} onElegir={desdePlantilla} onIA={desdeIA} onCerrar={() => setEligiendo(false)} />}
       {editando && <EditorPropio catalogo={catalogo} fila={editando.fila} flujo={editando.flujo} nombreInicial={editando.nombre} puedeEditar={puedeEditar}
         onCerrar={() => setEditando(null)} onGuardado={async (fila) => { setEditando((e) => (e ? { ...e, fila } : e)); await cargar(); }} />}
       {historial && <Historial fila={historial} onCerrar={() => setHistorial(null)} />}
@@ -147,7 +148,21 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
   );
 }
 
-function ElegirPlantilla({ onElegir, onCerrar }: { onElegir: (p: Plantilla) => void; onCerrar: () => void }) {
+function ElegirPlantilla({ catalogo, onElegir, onIA, onCerrar }: { catalogo: Catalogo | null; onElegir: (p: Plantilla) => void; onIA: (nombre: string, f: FlujoDatos) => void; onCerrar: () => void }) {
+  const { getToken } = useAuth();
+  const [texto, setTexto] = useState('');
+  const modelos = catalogo?.modelosIA || [{ id: 'gemini-2.5-flash', etiqueta: 'Gemini 2.5 Flash', disponible: true }];
+  const [modelo, setModelo] = useState(modelos.find((m) => m.disponible)?.id || modelos[0].id);
+  const [creando, setCreando] = useState(false);
+  const [error, setError] = useState('');
+  const crearConIA = async () => {
+    setCreando(true); setError('');
+    try {
+      const r = await apiFetch('/api/automatizaciones/generar', { method: 'POST', getToken, body: JSON.stringify({ descripcion: texto, modelo }) });
+      if (r?.success === false) throw new Error(r.error);
+      onIA(r.data.nombre, r.data.flujo);
+    } catch (e: any) { setError(e?.message || t('La IA no ha podido crear el flujo')); } finally { setCreando(false); }
+  };
   return createPortal(
     <div className="fixed inset-0 z-[140] flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
       <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:max-w-3xl sm:rounded-2xl">
@@ -158,6 +173,24 @@ function ElegirPlantilla({ onElegir, onCerrar }: { onElegir: (p: Plantilla) => v
           </div>
           <button type="button" onClick={onCerrar} aria-label={t('Cerrar')} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X size={18} /></button>
         </div>
+        <div className="border-b border-slate-100 bg-gradient-to-br from-violet-50 to-white p-5">
+          <p className="flex items-center gap-2 text-sm font-bold text-slate-800"><Sparkles size={15} className="text-violet-600" />{t('Créala con IA: descríbela con tus palabras')}</p>
+          <textarea rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus
+            placeholder={t('Por ejemplo: «Cuando entre un cliente nuevo, espera 2 días, y si tiene correo mándale uno preguntando qué tal; si no, crea una tarea para llamarle»')}
+            className="mt-2 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400" />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <select value={modelo} onChange={(e) => setModelo(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+              {modelos.map((m) => <option key={m.id} value={m.id} disabled={!m.disponible}>{m.etiqueta}{m.disponible ? '' : ` · ${t('Próximamente')}`}</option>)}
+            </select>
+            <button type="button" onClick={() => void crearConIA()} disabled={creando || texto.trim().length < 8 || catalogo?.iaDisponible === false}
+              className="ml-auto inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50">
+              {creando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}{creando ? t('Creando…') : t('Crear con IA')}</button>
+          </div>
+          {catalogo?.iaDisponible === false && <p className="mt-2 text-xs text-amber-700">{t('La IA de Vantia no está configurada en el servidor.')}</p>}
+          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          <p className="mt-2 text-[11px] text-slate-500">{t('Se abre en el lienzo para que la revises antes de guardarla; nada se activa solo.')}</p>
+        </div>
+        <p className="px-5 pt-4 text-xs font-bold uppercase tracking-wider text-slate-400">{t('O empieza desde una plantilla')}</p>
         <div className="grid gap-3 p-5 sm:grid-cols-2">
           {PLANTILLAS.map((p) => {
             const f = p.flujo();
@@ -190,6 +223,8 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
   const [descripcion, setDescripcion] = useState(fila?.descripcion || '');
   const [activo, setActivo] = useState(fila?.activo ?? false);
   const [id, setId] = useState(fila?.id || null);
+  const tokenDe = (f?: FlujoDatos | null) => (f?.nodos || []).find((n) => n.tipo === 'disparador')?.config?.token as string | undefined;
+  const [token, setToken] = useState<string | undefined>(tokenDe(fila?.flujo));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
   const [base, setBase] = useState(JSON.stringify({ nombre: nombreInicial, descripcion: fila?.descripcion || '', activo: fila?.activo ?? false }));
@@ -206,6 +241,7 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
       });
       if (r?.success === false) throw new Error(r.error);
       setId(r.data.id);
+      setToken(tokenDe(r.data.flujo));
       if (activo && !quiereActiva) { setActivo(false); aviso.info(t('Guardada como borrador: hay pasos por completar.')); }
       else aviso.ok(quiereActiva ? t('Automatización guardada y activa.') : t('Automatización guardada.'));
       setBase(JSON.stringify({ nombre, descripcion, activo: quiereActiva }));
@@ -226,6 +262,12 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
       titulo={nombre.trim() || t('Nueva automatización')} subtitulo={t('Automatización propia')} icono={Workflow} catalogo={catalogo}
       inicial={flujo} puedeEditar={puedeEditar} sucioExterno={metaSucia} guardando={guardando} error={error}
       onGuardar={guardar} onProbar={probar} onMuestras={muestras} onCerrar={onCerrar}
+      urlEntrada={token ? new URL(resolveApiUrl(`/api/automatizaciones/entrada/${token}`), window.location.origin).href : null}
+      onGenerar={catalogo?.iaDisponible === false ? undefined : async (descripcion, actual) => {
+        const r = await apiFetch('/api/automatizaciones/generar', { method: 'POST', getToken, body: JSON.stringify({ descripcion, flujo: actual }) });
+        if (r?.success === false) throw new Error(r.error);
+        return r.data;
+      }}
       cabecera={puedeEditar ? (
         <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600">
           {activo ? t('Activa') : t('Desactivada')}

@@ -5,7 +5,8 @@ import { logActivityForReq } from '../controllers/activityController';
 import { docsBaseConfig } from '../services/docsBaseExpediente';
 import { normalizarRecordatorios, rellenarRecordatorio, TIPOS_RECORDABLES, varsDe } from '../services/recordatoriosClientes';
 import { ultimasEjecuciones } from '../utils/automatizacionesRegistro';
-import { DISPARADORES, ESTADOS_EXPEDIENTE, EVENTO_DE_SERIE, TIPOS_CITA, ejecutarFlujo, muestrasDe, probarFlujo, proximaEjecucion, validarFlujo } from '../services/motorAutomatizaciones';
+import { DISPARADORES, ESTADOS_EXPEDIENTE, EVENTO_DE_SERIE, MODELOS_IA, TIPOS_CITA, ejecutarFlujo, generarFlujoConIA, muestrasDe, probarFlujo, proximaEjecucion, recibirWebhook, validarFlujo } from '../services/motorAutomatizaciones';
+import { iaDisponible } from '../utils/iaVantia';
 
 // Ajustes → Automatizaciones (12/11/2026): resumen de todas (estado, cifras
 // y últimas ejecuciones) y los ajustes de las que no tienen ruta propia
@@ -160,13 +161,14 @@ router.post('/recordatorios/preview', requireAuth, async (req: any, res: Respons
 // ejecutarlas: propietario y administradores.
 
 router.get('/catalogo', requireAuth, async (req: any, res: Response) => {
-  const [miembros, canales, etapas] = await Promise.all([
+  const [miembros, canales, etapas, skills] = await Promise.all([
     pool.query(`SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1 ORDER BY created_at`, [req.organizacionId]),
     pool.query(`SELECT id, nombre FROM chat_canales WHERE organizacion_id = $1 AND COALESCE(tipo, '') <> 'directo' ORDER BY nombre`, [req.organizacionId]).catch(() => ({ rows: [] as any[] })),
     pool.query(
       `SELECT s.id, s.nombre, e.nombre AS embudo FROM crm_etapas s JOIN crm_embudos e ON e.id = s.embudo_id
         WHERE s.organizacion_id = $1 AND s.tipo <> 'perdida' ORDER BY e.nombre, s.orden NULLS LAST, s.nombre`, [req.organizacionId],
     ).catch(() => ({ rows: [] as any[] })),
+    pool.query(`SELECT id, nombre FROM ia_skills WHERE organizacion_id = $1 AND activa ORDER BY nombre`, [req.organizacionId]).catch(() => ({ rows: [] as any[] })),
   ]);
   const { resolveUserName } = await import('../controllers/activityController');
   res.json({
@@ -176,6 +178,9 @@ router.get('/catalogo', requireAuth, async (req: any, res: Response) => {
       miembros: await Promise.all(miembros.rows.map(async (m: any) => ({ userId: m.user_id, nombre: await resolveUserName(m.user_id) }))),
       canales: canales.rows,
       etapasCrm: etapas.rows,
+      skills: skills.rows,
+      modelosIA: MODELOS_IA,
+      iaDisponible: iaDisponible(),
       estadosExpediente: ESTADOS_EXPEDIENTE,
       tiposCita: TIPOS_CITA,
       conMuestras: Object.entries(DISPARADORES).filter(([, d]) => d.muestra).map(([k]) => k),
@@ -210,6 +215,11 @@ async function guardarFlujo(req: any, res: Response, id: string | null) {
   const nombre = String(b.nombre || '').trim().slice(0, 120) || 'Automatización sin nombre';
   const descripcion = String(b.descripcion || '').trim().slice(0, 500) || null;
   const disp = flujo.nodos.find((n) => n.tipo === 'disparador');
+  if (id && disp?.config?.evento === 'webhook.entrante') {
+    const { rows: prev } = await pool.query(`SELECT flujo FROM automatizaciones_flujos WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
+    const t = (prev[0]?.flujo?.nodos || []).find((n: any) => n.tipo === 'disparador')?.config?.token;
+    if (t && !b.flujo?.nodos?.find?.((n: any) => n.tipo === 'disparador')?.config?.token) disp.config = { ...disp.config, token: t };
+  }
   const proxima = eventoFinal === 'programado' ? proximaEjecucion(disp?.config || {}) : null;
   try {
     let fila;
@@ -270,6 +280,33 @@ router.post('/probar', requireAuth, async (req: any, res: Response) => {
 });
 
 // Ejecutar de verdad (los de disparador manual).
+// «Créalo con IA»: una descripción (o un cambio sobre el flujo actual) → flujo.
+router.post('/generar', requireAuth, async (req: any, res: Response) => {
+  if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
+  const descripcion = String(req.body?.descripcion || '').trim().slice(0, 3000);
+  if (descripcion.length < 8) return fallo(res, 'Describe un poco más lo que quieres que haga.', 400);
+  const actual = req.body?.flujo ? validarFlujo(req.body.flujo).flujo : null;
+  try {
+    const org = req.organizacionId;
+    const [m, c, e] = await Promise.all([
+      pool.query(`SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1`, [org]),
+      pool.query(`SELECT id, nombre FROM chat_canales WHERE organizacion_id = $1 AND COALESCE(tipo, '') <> 'directo'`, [org]).catch(() => ({ rows: [] as any[] })),
+      pool.query(`SELECT id, nombre FROM crm_etapas WHERE organizacion_id = $1 AND tipo <> 'perdida'`, [org]).catch(() => ({ rows: [] as any[] })),
+    ]);
+    const { resolveUserName } = await import('../controllers/activityController');
+    const miembros = await Promise.all(m.rows.map(async (x: any) => ({ userId: x.user_id, nombre: await resolveUserName(x.user_id) })));
+    const r = await generarFlujoConIA(org, descripcion, { modelo: req.body?.modelo, actual, extra: { miembros, canales: c.rows, etapas: e.rows } });
+    res.json({ success: true, data: r });
+  } catch (err: any) { fallo(res, err?.message || 'La IA no ha podido crear el flujo', 502); }
+});
+
+// Webhook entrante (público: la seguridad es el token de 32 caracteres de cada automatización).
+router.post('/entrada/:token', async (req: any, res: Response) => {
+  const r = await recibirWebhook(String(req.params.token || ''), req.body || {}).catch(() => ({ ok: false, status: 500 } as any));
+  if (!r.ok) return res.status(r.status).json({ success: false, error: r.error || (r.status === 404 ? 'No existe o no está activa' : 'Error') });
+  res.status(202).json({ success: true });
+});
+
 // Registros reales recientes para «Probar con…».
 router.get('/muestras', requireAuth, async (req: any, res: Response) => {
   res.json({ success: true, data: await muestrasDe(req.organizacionId, String(req.query.evento || '')) });

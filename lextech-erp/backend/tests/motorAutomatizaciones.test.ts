@@ -173,3 +173,67 @@ test('probar con un registro real y resultados traducibles', { skip }, async () 
   assert.equal(p.clave, 'Se enviaría «{asunto}» a {para}');
   assert.deepEqual(p.vars, { asunto: 'Hola Lucía', para: 'lucia@example.test' });
 });
+
+// IA simulada: nunca se llama a Google en las pruebas.
+function simularIA(respuesta: (cuerpo: any) => string) {
+  const real = globalThis.fetch;
+  process.env.GEMINI_API_KEY = 'prueba';
+  (globalThis as any).fetch = async (url: any, init: any) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) {
+      const cuerpo = JSON.parse(init.body);
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: respuesta(cuerpo) }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 } }), { status: 200 });
+    }
+    return real(url, init);
+  };
+  return () => { globalThis.fetch = real; delete process.env.GEMINI_API_KEY; };
+}
+
+test('paso de IA: su respuesta (sí/no) decide la condición siguiente', { skip }, async () => {
+  const { probarFlujo, validarFlujo } = await m();
+  const deshacer = simularIA((c) => (JSON.stringify(c).includes('María López') ? 'Sí, es urgente.' : 'no'));
+  try {
+    const { flujo } = validarFlujo({
+      nodos: [
+        { id: 'd', tipo: 'disparador', config: { evento: 'cliente.creado' } },
+        { id: 'i', tipo: 'ia', config: { instrucciones: '¿Es urgente el caso de {cliente.nombre}?', formato: 'si_no', variable: 'urgente' } },
+        { id: 'c', tipo: 'condicion', config: { reglas: [{ campo: 'ia.urgente', operador: 'igual', valor: 'sí' }] } },
+        { id: 'a', tipo: 'aviso_equipo', config: { a: 'todos', titulo: 'Urgente: {cliente.nombre}' } },
+      ],
+      aristas: [{ de: 'd', a: 'i' }, { de: 'i', a: 'c' }, { de: 'c', a: 'a', rama: 'si' }],
+    });
+    const pasos = await probarFlujo(orgA, flujo);
+    assert.equal(pasos[0].detalle, 'La IA respondería: «sí»');
+    assert.equal(pasos[1].detalle, 'Se cumple → «Sí»');
+    assert.match(pasos[2].detalle, /Urgente: María López/);
+  } finally { deshacer(); }
+});
+
+test('«Créalo con IA»: lo que devuelve la IA se valida, se coloca y no inventa nada peligroso', { skip }, async () => {
+  const { generarFlujoConIA } = await m();
+  const deshacer = simularIA(() => JSON.stringify({
+    nombre: 'Seguimiento', descripcion: 'x',
+    nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'cliente.creado' } }, { id: 'e', tipo: 'esperar', config: { cantidad: 2, unidad: 'dias' } },
+      { id: 't', tipo: 'crear_tarea', config: { titulo: 'Llamar a {cliente.nombre}' } }, { id: 'x', tipo: 'borrar_todo', config: {} }],
+    aristas: [{ de: 'd', a: 'e' }, { de: 'e', a: 't' }, { de: 't', a: 'd' }],
+  }));
+  try {
+    const r = await generarFlujoConIA(orgA, 'Cuando entre un cliente, espera 2 días y crea una tarea para llamarle', {});
+    assert.equal(r.nombre, 'Seguimiento');
+    assert.deepEqual(r.flujo.nodos.map((n) => n.tipo), ['disparador', 'esperar', 'crear_tarea'], 'tipos desconocidos, fuera');
+    assert.ok(r.avisos.some((a) => /hacia el disparador/.test(a)));
+    assert.ok(r.flujo.nodos.find((n) => n.id === 't')!.y! > r.flujo.nodos.find((n) => n.id === 'd')!.y!, 'colocado de arriba abajo');
+  } finally { deshacer(); }
+});
+
+test('webhook entrante: con su token activa el flujo; sin él, nada', { skip }, async () => {
+  const { validarFlujo, recibirWebhook } = await m();
+  const { flujo } = validarFlujo({ nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'webhook.entrante' } }, { id: 'n', tipo: 'aviso_equipo', config: { a: 'todos', titulo: 'Formulario de {entrada.nombre}' } }], aristas: [{ de: 'd', a: 'n' }] });
+  const token = flujo.nodos[0].config!.token;
+  assert.match(token, /^[a-f0-9]{32}$/, 'se genera un token al guardar');
+  const id = (await pool.query(`INSERT INTO automatizaciones_flujos (organizacion_id, nombre, activo, evento, flujo) VALUES ($1,'W',true,'webhook.entrante',$2) RETURNING id`, [orgA, JSON.stringify(flujo)])).rows[0].id;
+  assert.equal((await recibirWebhook('0'.repeat(32), { nombre: 'X' })).status, 404);
+  assert.equal((await recibirWebhook(token, { Nombre: '<b>Laura</b>', extra: { a: 1 } })).status, 202);
+  for (let i = 0; i < 40; i++) { const { rows } = await pool.query(`SELECT pasos FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [id]); if (rows[0]?.pasos?.length) break; await esperar(100); }
+  const { rows } = await pool.query(`SELECT pasos FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [id]);
+  assert.match(rows[0].pasos[0].detalle, /Formulario de <b>Laura<\/b>/, 'los datos llegan como texto (el aviso no interpreta HTML)');
+});

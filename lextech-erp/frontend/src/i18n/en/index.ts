@@ -12,4 +12,5 @@ import './automatizaciones';
 import './despacho';
 import './lienzo';
 import './motor';
+import './automatizacionesIA';
 import './contextos';

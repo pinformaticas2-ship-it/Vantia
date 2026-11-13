@@ -1,11 +1,11 @@
-import { Bell, CalendarPlus, Clock, FolderCog, GitBranch, Globe, ListChecks, Mail, MessageCircle, MessageSquare, MoveRight, Zap, type LucideIcon } from 'lucide-react';
+import { Bell, CalendarPlus, CheckSquare, Clock, StickyNote, Sparkles, FolderCog, GitBranch, Globe, ListChecks, Mail, MessageCircle, MessageSquare, MoveRight, Zap, type LucideIcon } from 'lucide-react';
 import { t } from '../../lib/i18n';
 
 // Tipos de paso del editor de automatizaciones (12/11/2026). Lo mismo que
 // ejecuta el servidor (services/motorAutomatizaciones.ts).
 
 export type TipoNodo = 'disparador' | 'condicion' | 'enviar_correo' | 'aviso_equipo' | 'crear_tarea' | 'mensaje_chat' | 'esperar' | 'webhook'
-  | 'mover_crm' | 'estado_expediente' | 'crear_cita' | 'enviar_whatsapp';
+  | 'mover_crm' | 'estado_expediente' | 'crear_cita' | 'enviar_whatsapp' | 'ia' | 'nota' | 'completar_tarea';
 export interface NodoFlujo { id: string; tipo: TipoNodo; config: Record<string, any>; x: number; y: number }
 export interface AristaFlujo { id: string; de: string; a: string; rama?: 'si' | 'no' | null }
 export interface FlujoDatos { nodos: NodoFlujo[]; aristas: AristaFlujo[]; layout?: Record<string, { x: number; y: number }> }
@@ -19,6 +19,9 @@ export interface Catalogo {
   estadosExpediente?: string[];
   tiposCita?: string[];
   conMuestras?: string[];
+  skills?: { id: string; nombre: string }[];
+  modelosIA?: { id: string; etiqueta: string; disponible: boolean }[];
+  iaDisponible?: boolean;
   eventoDeSerie: Record<string, string>;
 }
 
@@ -35,12 +38,16 @@ export const META: Record<TipoNodo, { etiqueta: string; desc: string; icono: Luc
   crear_cita: { etiqueta: 'Crear cita', desc: 'En la agenda de alguien', icono: CalendarPlus, clase: 'accion', color: '#0891b2' },
   enviar_whatsapp: { etiqueta: 'Enviar WhatsApp', desc: 'Al cliente (si escribió en 24 h)', icono: MessageCircle, clase: 'accion', color: '#16a34a' },
   mover_crm: { etiqueta: 'Mover en el CRM', desc: 'Cambiar de etapa la oportunidad', icono: MoveRight, clase: 'accion', color: '#db2777' },
+  ia: { etiqueta: 'IA de Vantia', desc: 'Redacta, resume, clasifica o decide', icono: Sparkles, clase: 'accion', color: '#9333ea' },
+  nota: { etiqueta: 'Añadir nota', desc: 'En el expediente o el cliente', icono: StickyNote, clase: 'accion', color: '#ca8a04' },
+  completar_tarea: { etiqueta: 'Completar tarea', desc: 'Marcar la tarea como hecha', icono: CheckSquare, clase: 'accion', color: '#059669' },
   estado_expediente: { etiqueta: 'Estado del expediente', desc: 'Abrir, suspender, cerrar o archivar', icono: FolderCog, clase: 'accion', color: '#7c3aed' },
 };
 export const PALETA: { titulo: string; tipos: TipoNodo[] }[] = [
+  { titulo: 'Inteligencia artificial', tipos: ['ia'] },
   { titulo: 'Lógica', tipos: ['condicion', 'esperar'] },
   { titulo: 'Comunicar', tipos: ['enviar_correo', 'enviar_whatsapp', 'aviso_equipo', 'mensaje_chat'] },
-  { titulo: 'Hacer', tipos: ['crear_tarea', 'crear_cita', 'mover_crm', 'estado_expediente', 'webhook'] },
+  { titulo: 'Hacer', tipos: ['crear_tarea', 'completar_tarea', 'crear_cita', 'nota', 'mover_crm', 'estado_expediente', 'webhook'] },
 ];
 
 export const CONFIG_INICIAL: Record<TipoNodo, Record<string, any>> = {
@@ -54,6 +61,9 @@ export const CONFIG_INICIAL: Record<TipoNodo, Record<string, any>> = {
   webhook: { url: '' },
   crear_cita: { titulo: '', descripcion: '', dias: 1, hora: '10:00', duracion: 60, tipo: 'cita', asignar: 'responsable' },
   enviar_whatsapp: { texto: '' },
+  ia: { instrucciones: '', modelo: 'gemini-2.5-flash', formato: 'texto', opciones: '', variable: 'respuesta', conDatos: false, skillId: '' },
+  nota: { sobre: 'expediente', texto: '' },
+  completar_tarea: {},
   mover_crm: { etapaId: '' },
   estado_expediente: { estado: 'cerrado' },
 };
@@ -97,6 +107,9 @@ export function resumen(n: { tipo: TipoNodo; config: Record<string, any> }, cat:
     }
     case 'crear_cita': return c.titulo ? `${c.titulo} · ${(Number(c.dias) || 0) === 0 ? t('hoy, {hora}', { hora: c.hora || '10:00' }) : (Number(c.dias) === 1 ? t('mañana, {hora}', { hora: c.hora || '10:00' }) : t('en {n} días, {hora}', { n: Number(c.dias), hora: c.hora || '10:00' }))}` : t('Escribe la cita');
     case 'enviar_whatsapp': return c.texto ? String(c.texto).slice(0, 60) : t('Escribe el mensaje');
+    case 'ia': return c.instrucciones ? `${String(c.instrucciones).slice(0, 60)} → {ia.${c.variable || 'respuesta'}}` : t('Escribe qué debe hacer');
+    case 'nota': return c.texto ? `${c.sobre === 'cliente' ? t('En el cliente') : t('En el expediente')} · ${String(c.texto).slice(0, 50)}` : t('Escribe la nota');
+    case 'completar_tarea': return t('La tarea del disparador');
     case 'mover_crm': { const e = cat?.etapasCrm?.find((x) => x.id === c.etapaId); return e ? t('A «{etapa}»', { etapa: e.nombre }) : t('Elige la etapa'); }
     case 'estado_expediente': return c.estado ? t('A «{estado}»', { estado: t(c.estado) }) : t('Elige el estado');
     case 'esperar': return tn2(Number(c.cantidad) || 1, c.unidad);
@@ -121,6 +134,8 @@ export function faltaAlgo(n: { tipo: TipoNodo; config: Record<string, any> }, fi
     case 'condicion': return reglasDe(c).every((x) => x.campo) ? null : t('Elige qué comprobar');
     case 'crear_cita': return String(c.titulo || '').trim() ? null : t('Falta el título');
     case 'enviar_whatsapp': return String(c.texto || '').trim() ? null : t('Falta el mensaje');
+    case 'ia': return String(c.instrucciones || '').trim() ? null : t('Faltan las instrucciones');
+    case 'nota': return String(c.texto || '').trim() ? null : t('Falta el texto');
     case 'mover_crm': return c.etapaId ? null : t('Elige la etapa');
     case 'estado_expediente': return c.estado ? null : t('Elige el estado');
     case 'enviar_correo': return !String(c.asunto || '').trim() || !String(c.cuerpo || '').trim() ? t('Falta el asunto o el mensaje')
@@ -198,6 +213,34 @@ export const PLANTILLAS: Plantilla[] = [
       nodos: [n('d', 'disparador', 0, 0, { evento: 'factura.vencida' }),
         n('v', 'aviso_equipo', 0, 160, { a: 'todos', titulo: 'Factura vencida {factura.numero}', mensaje: '{factura.contacto} · {factura.total} · vencía el {factura.vencimiento}' })],
       aristas: [a('d', 'v')],
+    }),
+  },
+  {
+    id: 'ia-correos', nombre: 'Clasificar correos con IA', desc: 'La IA lee cada correo que llega y, si es urgente, avisa a todo el despacho.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'correo.recibido' }),
+        n('i', 'ia', 0, 170, { instrucciones: 'Lee este correo (de {correo.de}, asunto «{correo.asunto}»: {correo.extracto}) y di si es urgente para un despacho de abogados: plazos, notificaciones judiciales o un cliente con un problema grave.', formato: 'si_no', variable: 'urgente' }),
+        n('c', 'condicion', 0, 340, { modo: 'y', reglas: [{ campo: 'ia.urgente', operador: 'igual', valor: 'sí' }] }),
+        n('v', 'aviso_equipo', -180, 510, { a: 'todos', titulo: 'Correo urgente: {correo.asunto}', mensaje: 'De {correo.nombre} <{correo.de}>' })],
+      aristas: [a('d', 'i'), a('i', 'c'), a('c', 'v', 'si')],
+    }),
+  },
+  {
+    id: 'ia-bienvenida', nombre: 'Bienvenida personalizada con IA', desc: 'La IA redacta un correo de bienvenida a la medida de cada cliente nuevo.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'cliente.creado' }),
+        n('i', 'ia', 0, 170, { instrucciones: 'Redacta un correo breve, cercano y profesional dando la bienvenida a {cliente.nombre} al despacho {despacho.nombre}. Sin asunto, solo el cuerpo, firmado por el despacho.', variable: 'correo' }),
+        n('m', 'enviar_correo', 0, 340, { asunto: 'Bienvenido/a a {despacho.nombre}', cuerpo: '{ia.correo}' })],
+      aristas: [a('d', 'i'), a('i', 'm')],
+    }),
+  },
+  {
+    id: 'formulario', nombre: 'Formulario web → CRM', desc: 'Tu web envía el formulario a Vantia y entra como aviso con un resumen hecho por la IA.',
+    flujo: () => ({
+      nodos: [n('d', 'disparador', 0, 0, { evento: 'webhook.entrante' }),
+        n('i', 'ia', 0, 170, { instrucciones: 'Resume en una frase qué necesita esta persona y qué área del derecho es: {entrada.mensaje}', variable: 'resumen' }),
+        n('v', 'aviso_equipo', 0, 340, { a: 'todos', titulo: 'Nueva consulta web: {entrada.nombre}', mensaje: '{ia.resumen} · {entrada.email} · {entrada.telefono}' })],
+      aristas: [a('d', 'i'), a('i', 'v')],
     }),
   },
   {

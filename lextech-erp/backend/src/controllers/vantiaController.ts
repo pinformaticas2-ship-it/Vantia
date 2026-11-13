@@ -229,7 +229,7 @@ Asistente: ${assistantReply.slice(0, 500)}`;
 }
 
 // ── Herramientas disponibles ──────────────────────────────────────────────────
-const TOOLS = [{
+export const TOOLS = [{
   function_declarations: [
     {
       name: 'estadisticas_generales',
@@ -750,7 +750,7 @@ async function logVantiaToolCall(organizacionId: string, userId: string, name: s
 // registrar aquí (un único punto de paso para las dos formas de chatear,
 // chatVantia y chatVantiaStream) cualquier herramienta nueva queda trazada
 // sin tener que tocar este código de nuevo.
-async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
+export async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
   const result = await callToolInner(name, args, userId, organizacionId);
   void logVantiaToolCall(organizacionId, userId, name, args, result);
   return result;

@@ -5,6 +5,8 @@ import { enviarCorreoDelDespacho, escaparHtml, SinCuentaCorreo } from '../utils/
 import { sendPushToUsers } from '../utils/webPush';
 import { tomarTurno } from '../utils/turnos';
 import { formatMadrid, madridLocalToDate, madridYmd } from './vistasAutomation';
+import { MODELOS_IA, preguntarIA } from '../utils/iaVantia';
+import crypto from 'crypto';
 
 // ── Motor de automatizaciones propias (12/11/2026; ampliado 13/11/2026) ─────
 // Un flujo es un grafo: un nodo «disparador» (cuándo empieza), nodos
@@ -21,17 +23,18 @@ import { formatMadrid, madridLocalToDate, madridYmd } from './vistasAutomation';
 // para que la pantalla lo traduzca.
 
 export type TipoNodo = 'disparador' | 'condicion' | 'enviar_correo' | 'aviso_equipo' | 'crear_tarea' | 'mensaje_chat' | 'esperar' | 'webhook'
-  | 'mover_crm' | 'estado_expediente' | 'crear_cita' | 'enviar_whatsapp';
+  | 'mover_crm' | 'estado_expediente' | 'crear_cita' | 'enviar_whatsapp' | 'ia' | 'nota' | 'completar_tarea';
 export interface Nodo { id: string; tipo: TipoNodo; config?: Record<string, any>; x?: number; y?: number }
 export interface Arista { id?: string; de: string; a: string; rama?: 'si' | 'no' | null }
 export interface Flujo { nodos: Nodo[]; aristas: Arista[]; layout?: Record<string, { x: number; y: number }> }
 
 // ── Catálogo: disparadores y sus datos ──────────────────────────────────────
 const V = (clave: string, etiqueta: string) => ({ clave, etiqueta });
-const COMUNES = [V('despacho.nombre', 'Nombre del despacho'), V('fecha.hoy', 'Fecha de hoy'), V('usuario.nombre', 'Quién lo hizo')];
+const COMUNES = [V('despacho.nombre', 'Nombre del despacho'), V('fecha.hoy', 'Fecha de hoy'), V('fecha.dia_semana', 'Día de la semana'), V('fecha.hora', 'Hora actual'), V('usuario.nombre', 'Quién lo hizo')];
 /** Lo que dejan los pasos anteriores del mismo flujo. */
 const SALIDAS = [V('tarea_creada.titulo', 'Tarea creada en un paso anterior'), V('tarea_creada.plazo', 'Plazo de esa tarea'),
-  V('cita_creada.fecha', 'Fecha de la cita creada en un paso anterior'), V('cita_creada.hora', 'Hora de esa cita')];
+  V('cita_creada.fecha', 'Fecha de la cita creada en un paso anterior'), V('cita_creada.hora', 'Hora de esa cita'),
+  V('ia.respuesta', 'Respuesta de la IA en un paso anterior')];
 const CLIENTE = [V('cliente.nombre', 'Nombre del cliente'), V('cliente.email', 'Correo del cliente'), V('cliente.telefono', 'Teléfono del cliente'), V('cliente.nif', 'NIF del cliente')];
 const OPORTUNIDAD = [V('oportunidad.nombre', 'Nombre de la oportunidad'), V('oportunidad.email', 'Correo de la oportunidad'), V('oportunidad.telefono', 'Teléfono de la oportunidad'),
   V('oportunidad.asunto', 'Asunto de la oportunidad'), V('oportunidad.etapa', 'Etapa'), V('oportunidad.valor', 'Valor estimado'), V('oportunidad.origen', 'Origen'), V('responsable.nombre', 'Responsable')];
@@ -98,6 +101,11 @@ export const DISPARADORES: Record<string, { etiqueta: string; descripcion: strin
     variables: [V('cita.titulo', 'Título de la cita'), V('cita.fecha', 'Fecha'), V('cita.hora', 'Hora'), ...CLIENTE, ...COMUNES],
     ejemplo: { cita: { titulo: 'Reunión', fecha: 'jueves, 19 de noviembre', hora: '10:00' }, cliente: { nombre: 'María López', email: 'maria@example.com' } },
   },
+  'webhook.entrante': {
+    etiqueta: 'Llega una petición de otra herramienta', descripcion: 'Un formulario web, Zapier, Make… envía datos a una dirección propia de esta automatización.',
+    variables: [V('entrada.nombre', 'Dato «nombre» recibido'), V('entrada.email', 'Dato «email» recibido'), V('entrada.telefono', 'Dato «telefono» recibido'), V('entrada.mensaje', 'Dato «mensaje» recibido'), ...COMUNES],
+    ejemplo: { entrada: { nombre: 'Laura Gil', email: 'laura@example.com', telefono: '600 33 44 55', mensaje: 'Quiero información sobre un despido.' } },
+  },
   'programado': { etiqueta: 'A una hora fija', descripcion: 'Cada día, cada semana o cada mes, a la hora que elijas.', variables: [...COMUNES], ejemplo: {} },
   'manual': { etiqueta: 'Al pulsar «Ejecutar ahora»', descripcion: 'Solo cuando lo lances tú desde el editor.', variables: [...COMUNES], ejemplo: {} },
 };
@@ -111,7 +119,7 @@ export const ESTADOS_EXPEDIENTE = ['abierto', 'suspendido', 'cerrado', 'archivad
 export const TIPOS_CITA = ['cita', 'reunion', 'llamada', 'video', 'vista', 'otro'];
 
 export const TIPOS_NODO: TipoNodo[] = ['disparador', 'condicion', 'enviar_correo', 'aviso_equipo', 'crear_tarea', 'mensaje_chat', 'esperar', 'webhook',
-  'mover_crm', 'estado_expediente', 'crear_cita', 'enviar_whatsapp'];
+  'mover_crm', 'estado_expediente', 'crear_cita', 'enviar_whatsapp', 'ia', 'nota', 'completar_tarea'];
 const MAX_NODOS = 60;
 const MAX_PASOS_EJECUCION = 80;
 const MAX_CORREOS_DIA = 100;
@@ -161,6 +169,10 @@ export function validarFlujo(raw: any): { flujo: Flujo; evento: string; errores:
     if (n.tipo === 'mover_crm' && !c.etapaId) errores.push('Un «Mover en el CRM» no tiene etapa.');
     if (n.tipo === 'estado_expediente' && !ESTADOS_EXPEDIENTE.includes(c.estado)) errores.push('Un «Cambiar estado del expediente» no tiene estado.');
     if (n.tipo === 'condicion' && !reglasDe(c).every((r) => r.campo)) errores.push('Una condición no tiene qué comprobar.');
+    if (n.tipo === 'ia' && !String(c.instrucciones || '').trim()) errores.push('Un paso de IA no tiene instrucciones.');
+    if (n.tipo === 'ia' && c.variable && !/^[a-z_]{1,30}$/.test(String(c.variable))) errores.push('El nombre del resultado de la IA solo puede llevar letras minúsculas y guiones bajos.');
+    if (n.tipo === 'nota' && !String(c.texto || '').trim()) errores.push('Un «Añadir nota» no tiene texto.');
+    if (n.tipo === 'disparador' && c.evento === 'webhook.entrante' && !/^[a-f0-9]{32}$/.test(String(c.token || ''))) c.token = crypto.randomBytes(16).toString('hex');
   }
   return { flujo: { nodos, aristas, layout }, evento, errores: Array.from(new Set(errores)) };
 }
@@ -378,6 +390,58 @@ async function ejecutarNodo(org: string, flujoId: string, n: Nodo, ctx: any, pru
       if (!r.ok) throw F('El webhook respondió {status}', { status: r.status });
       return R('Datos enviados a {host} ({status})', { host, status: r.status });
     }
+    case 'ia': {
+      const variable = /^[a-z_]{1,30}$/.test(String(c.variable || '')) ? c.variable : 'respuesta';
+      let skill = '';
+      if (c.skillId) {
+        const { rows } = await pool.query(`SELECT instrucciones FROM ia_skills WHERE id = $1 AND organizacion_id = $2 AND activa`, [c.skillId, org]).catch(() => ({ rows: [] as any[] }));
+        skill = rows[0]?.instrucciones || '';
+      }
+      const formato = c.formato === 'si_no' ? 'Responde SOLO «sí» o «no», sin nada más.'
+        : c.formato === 'opciones' ? `Responde SOLO con una de estas opciones, escrita igual: ${String(c.opciones || '').split(',').map((x: string) => x.trim()).filter(Boolean).join(' | ')}.`
+        : 'Responde solo con el resultado pedido, sin saludos ni explicaciones.';
+      const datos = JSON.stringify(Object.fromEntries(Object.entries(ctx || {}).filter(([k]) => !k.startsWith('_'))), null, 1).slice(0, 6000);
+      const sistema = `Eres Vantia, la IA del despacho «${valorDe(ctx, 'despacho.nombre')}». Trabajas dentro de una automatización: tu respuesta se usará tal cual en los pasos siguientes. ${formato} Responde en español salvo que te pidan otro idioma.${skill ? `\n\nInstrucciones del despacho:\n${skill}` : ''}`;
+      const prompt = `${rellenar(c.instrucciones, ctx)}\n\nDatos de lo que ha pasado (JSON):\n${datos}`;
+      let autor: string | null = null;
+      if (c.conDatos) { const { rows } = await pool.query(`SELECT created_by FROM automatizaciones_flujos WHERE id = $1`, [flujoId]).catch(() => ({ rows: [] as any[] })); autor = rows[0]?.created_by || null; }
+      let texto: string;
+      try {
+        texto = await preguntarIA({ prompt, sistema, modelo: c.modelo, maxTokens: 1500, conDatos: c.conDatos && autor ? { organizacionId: org, userId: autor } : null });
+      } catch (e: any) { throw F('{error}', { error: e?.message || String(e) }); }
+      texto = texto.slice(0, 4000);
+      if (c.formato === 'si_no') texto = /^\s*s[ií]/i.test(texto) ? 'sí' : 'no';
+      if (c.formato === 'opciones') {
+        const ops = String(c.opciones || '').split(',').map((x: string) => x.trim()).filter(Boolean);
+        texto = ops.find((o) => texto.toLowerCase().includes(o.toLowerCase())) || texto;
+      }
+      ctx.ia = { ...(ctx.ia || {}), [variable]: texto };
+      return R(prueba ? 'La IA respondería: «{texto}»' : 'La IA ha respondido: «{texto}»', { texto: texto.slice(0, 160) });
+    }
+    case 'nota': {
+      const texto = rellenar(c.texto, ctx).slice(0, 5000);
+      const expId = c.sobre !== 'cliente' ? ctx?.expediente?.id : null;
+      const cliId = c.sobre === 'cliente' || !expId ? ctx?.cliente?.id : null;
+      if (!expId && !cliId) throw F('Aquí no hay expediente ni cliente donde dejar la nota.');
+      if (prueba) return R('Se añadiría una nota al {donde}', { donde: expId ? 'expediente' : 'cliente' });
+      if (expId) {
+        const { rowCount } = await pool.query(`SELECT 1 FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expId, org]);
+        if (!rowCount) throw F('El expediente ya no existe.');
+      } else {
+        const { rowCount } = await pool.query(`SELECT 1 FROM entities WHERE id = $1 AND organizacion_id = $2`, [cliId, org]);
+        if (!rowCount) throw F('El cliente ya no existe.');
+      }
+      await pool.query(`INSERT INTO notes (client_id, expediente_id, content, category, priority, created_by) VALUES ($1,$2,$3,'general','normal','Automatización')`, [expId ? null : cliId, expId || null, texto]);
+      return R('Nota añadida al {donde}', { donde: expId ? 'expediente' : 'cliente' });
+    }
+    case 'completar_tarea': {
+      const id = ctx?.tarea?.id;
+      if (!id) throw F('Aquí no hay ninguna tarea.');
+      if (prueba) return R('Se marcaría como completada la tarea «{titulo}»', { titulo: valorDe(ctx, 'tarea.titulo') });
+      const { rowCount } = await pool.query(`UPDATE client_tasks SET estado = 'completada', updated_at = NOW() WHERE id = $1 AND organizacion_id = $2`, [id, org]);
+      if (!rowCount) throw F('La tarea ya no existe.');
+      return R('Tarea «{titulo}» completada', { titulo: valorDe(ctx, 'tarea.titulo') });
+    }
     default: return R('');
   }
 }
@@ -444,7 +508,11 @@ async function contextoBase(org: string, evento: string, datos: any, actorId?: s
     ...datos,
     usuario: datos?.usuario || usuario || {},
     despacho: { nombre: rows[0]?.nombre || '' },
-    fecha: { hoy: formatMadrid(new Date(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) },
+    fecha: {
+      hoy: formatMadrid(new Date(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+      dia_semana: formatMadrid(new Date(), { weekday: 'long' }),
+      hora: formatMadrid(new Date(), { hour: '2-digit', minute: '2-digit' }),
+    },
     _evento: evento,
   };
 }
@@ -587,6 +655,116 @@ export function emitirConCliente(org: string | null | undefined, evento: string,
     emitirEvento(org, evento, { ...datos, cliente: cliente || datos?.cliente || {} }, actorId);
   })();
 }
+
+// ── Webhook entrante ────────────────────────────────────────────────────────
+/** Datos recibidos → texto plano de hasta dos niveles (nada ejecutable). */
+function aplanarEntrada(body: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (!body || typeof body !== 'object') return out;
+  for (const [k, v] of Object.entries(body).slice(0, 60)) {
+    const clave = String(k).toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 40);
+    if (!clave) continue;
+    if (v && typeof v === 'object' && !Array.isArray(v)) out[clave] = aplanarEntrada(v);
+    else out[clave] = Array.isArray(v) ? v.map((x) => String(x)).join(', ').slice(0, 2000) : String(v ?? '').slice(0, 2000);
+  }
+  return out;
+}
+const usosEntrada = new Map<string, number[]>();
+export async function recibirWebhook(token: string, body: any): Promise<{ ok: boolean; status: number; error?: string }> {
+  if (!/^[a-f0-9]{32}$/.test(token)) return { ok: false, status: 404 };
+  const ahora = Date.now();
+  const usos = (usosEntrada.get(token) || []).filter((x) => ahora - x < 60_000);
+  if (usos.length >= 30) return { ok: false, status: 429, error: 'Demasiadas peticiones; espera un minuto.' };
+  usos.push(ahora); usosEntrada.set(token, usos);
+  const { rows } = await pool.query(
+    `SELECT id, organizacion_id, nombre, flujo FROM automatizaciones_flujos
+      WHERE activo AND evento = 'webhook.entrante' AND flujo @> $1::jsonb LIMIT 1`,
+    [JSON.stringify({ nodos: [{ tipo: 'disparador', config: { token } }] })],
+  );
+  if (!rows.length) return { ok: false, status: 404 };
+  const f = rows[0];
+  const ctx = await contextoBase(f.organizacion_id, 'webhook.entrante', { entrada: aplanarEntrada(body) }, null);
+  void ejecutarFlujo(f, ctx, DISPARADORES['webhook.entrante'].etiqueta).catch((e) => console.error('[automatizaciones] webhook', f.id, e?.message || e));
+  return { ok: true, status: 202 };
+}
+
+// ── «Créalo con IA»: de una descripción a un flujo ──────────────────────────
+const CONFIG_PASOS = `
+- condicion: { modo: "y"|"o", reglas: [{ campo: "<variable del disparador>", operador: "igual"|"distinto"|"contiene"|"no_contiene"|"empieza"|"vacio"|"no_vacio"|"mayor"|"menor", valor: "..." }] } — tiene dos salidas: aristas con rama "si" y rama "no".
+- esperar: { cantidad: número, unidad: "minutos"|"horas"|"dias" }
+- enviar_correo: { para: "cliente"|"otro", direcciones: "a@b.es, c@d.es" (si para=otro), asunto, cuerpo }
+- enviar_whatsapp: { texto }
+- aviso_equipo: { a: "usuario"|"responsable"|"todos"|"personas", personas: [userId], titulo, mensaje }
+- mensaje_chat: { canalId, texto }
+- crear_tarea: { titulo, descripcion, dias: plazo en días, prioridad: "alta"|"media"|"baja", asignar: "usuario"|"responsable"|userId }
+- crear_cita: { titulo, descripcion, dias, hora: "HH:MM", duracion: minutos, tipo: "cita"|"reunion"|"llamada"|"video"|"otro", asignar: "responsable"|"usuario"|userId }
+- mover_crm: { etapaId }
+- estado_expediente: { estado: "abierto"|"suspendido"|"cerrado"|"archivado" }
+- nota: { sobre: "expediente"|"cliente", texto }
+- completar_tarea: {}
+- webhook: { url: "https://..." }
+- ia: { instrucciones, formato: "texto"|"si_no"|"opciones", opciones: "a, b, c", variable: "respuesta" } — su respuesta queda en {ia.<variable>} para los pasos siguientes (por ejemplo, una condición sobre ia.respuesta).
+- disparador: { evento, ... } — para "programado": { frecuencia: "diaria"|"semanal"|"mensual", dia: 1-7 o 1-28, hora: "HH:MM" }; para "tarea.vence": { diasAntes }.`;
+
+function colocar(flujo: Flujo): Flujo {
+  const entra = new Set(flujo.aristas.map((a) => a.a));
+  const capa = new Map<string, number>();
+  const cola = flujo.nodos.filter((n) => !entra.has(n.id)).map((n) => n.id);
+  cola.forEach((id) => capa.set(id, 0));
+  while (cola.length) {
+    const id = cola.shift()!;
+    for (const a of flujo.aristas.filter((x) => x.de === id).sort((x, y) => (x.rama === 'no' ? 1 : 0) - (y.rama === 'no' ? 1 : 0))) {
+      const c = (capa.get(id) || 0) + 1;
+      if ((capa.get(a.a) ?? -1) < c && c < 40) { capa.set(a.a, c); cola.push(a.a); }
+    }
+  }
+  const porCapa = new Map<number, string[]>();
+  for (const n of flujo.nodos) { const c = capa.get(n.id) ?? 0; porCapa.set(c, [...(porCapa.get(c) || []), n.id]); }
+  const pos = new Map<string, { x: number; y: number }>();
+  for (const [c, ids] of porCapa) ids.forEach((id, i) => pos.set(id, { x: Math.round((i - (ids.length - 1) / 2) * 330), y: c * 170 }));
+  return { ...flujo, nodos: flujo.nodos.map((n) => ({ ...n, ...pos.get(n.id) })) };
+}
+
+export async function generarFlujoConIA(org: string, descripcion: string, opts: { modelo?: string; actual?: Flujo | null; extra?: { miembros: any[]; canales: any[]; etapas: any[] } }): Promise<{ nombre: string; descripcion: string; flujo: Flujo; avisos: string[] }> {
+  const disp = Object.entries(DISPARADORES).map(([k, d]) => `- ${k}: ${d.etiqueta}. Datos: ${d.variables.map((v) => '{' + v.clave + '}').join(' ')}`).join('\n');
+  const sistema = `Diseñas automatizaciones para Vantia, el programa de gestión de un despacho de abogados español. Devuelves SOLO un JSON:
+{ "nombre": "...", "descripcion": "...", "nodos": [{ "id": "corto", "tipo": "...", "config": {...} }], "aristas": [{ "de": "id", "a": "id", "rama": "si"|"no"|null }] }
+Reglas: exactamente un nodo "disparador" (el primero); nada apunta al disparador; ids cortos y únicos; textos en español, claros y profesionales; en los textos puedes usar los datos del disparador entre llaves, solo los de su lista; no inventes ids de personas, canales ni etapas: usa solo los de las listas de abajo (si falta uno, deja ese campo vacío).
+
+Disparadores (evento):
+${disp}
+
+Tipos de paso y su config:${CONFIG_PASOS}
+
+Personas del despacho (userId · nombre): ${(opts.extra?.miembros || []).map((m: any) => `${m.userId} · ${m.nombre}`).join('; ') || 'ninguna'}
+Canales del chat (canalId · nombre): ${(opts.extra?.canales || []).map((c: any) => `${c.id} · ${c.nombre}`).join('; ') || 'ninguno'}
+Etapas del CRM (etapaId · nombre): ${(opts.extra?.etapas || []).map((e: any) => `${e.id} · ${e.nombre}`).join('; ') || 'ninguna'}`;
+  const prompt = opts.actual
+    ? `Esta es la automatización actual (JSON):\n${JSON.stringify({ nodos: opts.actual.nodos.map(({ id, tipo, config }) => ({ id, tipo, config })), aristas: opts.actual.aristas })}\n\nCámbiala así: ${descripcion}\nDevuelve la automatización completa ya cambiada, conservando los ids de los pasos que no cambien.`
+    : `Crea esta automatización: ${descripcion}`;
+  const texto = await preguntarIA({ prompt, sistema, modelo: opts.modelo, json: true, maxTokens: 6000, temperatura: 0.2 });
+  let bruto: any;
+  try { bruto = JSON.parse(texto.replace(/^```(json)?/i, '').replace(/```$/, '')); } catch { throw new Error('La IA no ha devuelto un flujo válido. Prueba a describirlo de otra forma.'); }
+  const { flujo, errores } = validarFlujo({ nodos: bruto?.nodos, aristas: bruto?.aristas });
+  if (!flujo.nodos.some((n) => n.tipo === 'disparador')) throw new Error('La IA no ha sabido qué la pone en marcha. Dilo en la descripción (por ejemplo, «cuando entra un cliente nuevo…»).');
+  // Nada puede volver al disparador (rompería el flujo y la colocación).
+  const ids = new Set(flujo.nodos.filter((n) => n.tipo === 'disparador').map((n) => n.id));
+  flujo.aristas = flujo.aristas.filter((x) => !ids.has(x.a));
+  // Si cambia uno existente, los pasos que siguen se quedan donde estaban.
+  const colocado = colocar(flujo);
+  if (opts.actual) {
+    const antes = new Map(opts.actual.nodos.map((n) => [n.id, n]));
+    colocado.nodos = colocado.nodos.map((n) => (antes.has(n.id) ? { ...n, x: antes.get(n.id)!.x, y: antes.get(n.id)!.y } : n));
+    colocado.layout = opts.actual.layout;
+  }
+  return {
+    nombre: String(bruto?.nombre || '').slice(0, 120) || 'Automatización creada con IA',
+    descripcion: String(bruto?.descripcion || '').slice(0, 500),
+    flujo: colocado,
+    avisos: errores,
+  };
+}
+export { MODELOS_IA };
 
 // ── Disparadores que se buscan (plazos, facturas, correo) ───────────────────
 async function primeraVez(flujoId: string, clave: string): Promise<boolean> {
