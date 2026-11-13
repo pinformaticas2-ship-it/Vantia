@@ -237,3 +237,10 @@ test('webhook entrante: con su token activa el flujo; sin él, nada', { skip }, 
   const { rows } = await pool.query(`SELECT pasos FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [id]);
   assert.match(rows[0].pasos[0].detalle, /Formulario de <b>Laura<\/b>/, 'los datos llegan como texto (el aviso no interpreta HTML)');
 });
+
+test('un flujo no puede dar vueltas (con una espera dentro, sería infinito)', { skip }, async () => {
+  const { validarFlujo } = await m();
+  const r = validarFlujo({ nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'manual' } }, { id: 'e', tipo: 'esperar', config: {} }, { id: 'v', tipo: 'aviso_equipo', config: { titulo: 'x' } }],
+    aristas: [{ de: 'd', a: 'e' }, { de: 'e', a: 'v' }, { de: 'v', a: 'e' }] });
+  assert.match(r.errores.join(' '), /volver a un paso anterior/);
+});

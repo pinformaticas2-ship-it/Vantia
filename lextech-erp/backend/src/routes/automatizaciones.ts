@@ -192,12 +192,15 @@ router.get('/catalogo', requireAuth, async (req: any, res: Response) => {
 const FILA = `id, nombre, descripcion, activo, evento, flujo, vinculada, proxima_at, ultima_at, ejecuciones, created_at, updated_at`;
 
 router.get('/flujos', requireAuth, async (req: any, res: Response) => {
+  const gestor = esGestor(req);
   const { rows } = await pool.query(
     `SELECT ${FILA},
             (SELECT estado FROM automatizaciones_ejecuciones e WHERE e.flujo_id = f.id ORDER BY created_at DESC LIMIT 1) AS ultimo_estado
        FROM automatizaciones_flujos f WHERE organizacion_id = $1 ORDER BY vinculada NULLS FIRST, created_at DESC`,
     [req.organizacionId],
   );
+  // La dirección del webhook entrante es como una contraseña: solo para quien gestiona.
+  if (!gestor) for (const r of rows) for (const n of r.flujo?.nodos || []) if (n?.config?.token) delete n.config.token;
   res.json({ success: true, data: rows });
 });
 
@@ -270,6 +273,7 @@ router.delete('/flujos/:id', requireAuth, async (req: any, res: Response) => {
 
 // Prueba sin efectos: con el flujo que se está editando (aún sin guardar).
 router.post('/probar', requireAuth, async (req: any, res: Response) => {
+  if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
   const { flujo } = validarFlujo(req.body?.flujo || {});
   if (typeof req.body?.vinculada === 'string' && EVENTO_DE_SERIE[req.body.vinculada]) {
     const d = flujo.nodos.find((n) => n.tipo === 'disparador'); if (d) d.config = { ...(d.config || {}), evento: EVENTO_DE_SERIE[req.body.vinculada] };
@@ -312,6 +316,7 @@ router.post('/entrada/:token', async (req: any, res: Response) => {
 
 // Registros reales recientes para «Probar con…».
 router.get('/muestras', requireAuth, async (req: any, res: Response) => {
+  if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
   res.json({ success: true, data: await muestrasDe(req.organizacionId, String(req.query.evento || '')) });
 });
 
@@ -343,6 +348,7 @@ router.post('/flujos/:id/ejecutar', requireAuth, async (req: any, res: Response)
 });
 
 router.get('/flujos/:id/ejecuciones', requireAuth, async (req: any, res: Response) => {
+  if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
   if (!/^[0-9a-f-]{36}$/i.test(String(req.params.id))) return fallo(res, 'Automatización no encontrada', 404);
   const { rows } = await pool.query(
     `SELECT id, estado, disparo, pasos, created_at FROM automatizaciones_ejecuciones WHERE flujo_id = $1 AND organizacion_id = $2 ORDER BY created_at DESC LIMIT 20`,

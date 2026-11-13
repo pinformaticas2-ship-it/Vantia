@@ -627,7 +627,7 @@ function LienzoInterno(p: PropsLienzo) {
           </div>
 
           {/* Panel */}
-          <aside className={`min-h-0 overflow-y-auto border-slate-200 bg-white lg:static lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none ${elegido || listaPrueba ? 'fixed inset-x-0 bottom-0 z-20 max-h-[62vh] rounded-t-2xl border-t shadow-2xl' : 'hidden lg:block'}`}>
+          <aside className={`min-h-0 overflow-y-auto border-slate-200 bg-white lg:static lg:max-h-none lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none ${elegido || listaPrueba ? 'fixed inset-x-0 bottom-0 z-20 max-h-[62vh] rounded-t-2xl border-t shadow-2xl' : 'border-t lg:block'}`}>
             {listaPrueba && (
               <div className="border-b border-slate-100 bg-slate-50 p-4">
                 <div className="mb-2 flex items-center justify-between">

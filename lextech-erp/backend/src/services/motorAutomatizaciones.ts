@@ -131,6 +131,19 @@ export function reglasDe(c: any): { campo: string; operador: string; valor: stri
   return lista.slice(0, 10).map((r: any) => ({ campo: String(r?.campo || ''), operador: String(r?.operador || 'igual'), valor: String(r?.valor ?? '') }));
 }
 
+function hayVuelta(nodos: Nodo[], aristas: Arista[]): boolean {
+  const estado = new Map<string, number>(); // 1 = visitando, 2 = hecho
+  const visitar = (id: string): boolean => {
+    if (estado.get(id) === 1) return true;
+    if (estado.get(id) === 2) return false;
+    estado.set(id, 1);
+    for (const a of aristas) if (a.de === id && visitar(a.a)) return true;
+    estado.set(id, 2);
+    return false;
+  };
+  return nodos.some((n) => visitar(n.id));
+}
+
 export function validarFlujo(raw: any): { flujo: Flujo; evento: string; errores: string[] } {
   const errores: string[] = [];
   const nodos: Nodo[] = (Array.isArray(raw?.nodos) ? raw.nodos : []).slice(0, MAX_NODOS)
@@ -156,6 +169,7 @@ export function validarFlujo(raw: any): { flujo: Flujo; evento: string; errores:
   const evento = String(disparadores[0]?.config?.evento || '');
   if (disparadores.length === 1 && !DISPARADORES[evento]) errores.push('Elige qué pone en marcha el flujo.');
   if (aristas.some((a) => a.a === disparadores[0]?.id)) errores.push('Nada puede ir hacia el disparador: es el primer paso.');
+  if (hayVuelta(nodos, aristas)) errores.push('El flujo no puede volver a un paso anterior (daría vueltas sin fin).');
   for (const n of nodos) {
     const c = n.config || {};
     if (n.tipo === 'enviar_correo' && (!String(c.asunto || '').trim() || !String(c.cuerpo || '').trim())) errores.push('Un «Enviar correo» no tiene asunto o mensaje.');
