@@ -9,7 +9,7 @@ import Lienzo, { textoPaso } from '../components/automatizaciones/Lienzo';
 import { campoCls } from '../components/automatizaciones/campos';
 import { META, PLANTILLAS, faltaAlgo, type Catalogo, type FlujoDatos, type Plantilla } from '../components/automatizaciones/tipos';
 
-// «Mis automatizaciones» (12/11/2026): las que crea cada despacho con el
+// «Creadas por el despacho» (12/11/2026; antes «Mis automatizaciones»): las que crea cada despacho con el
 // lienzo, desde cero o desde una plantilla. Backend: /api/automatizaciones/flujos
 // y services/motorAutomatizaciones.ts.
 
@@ -67,8 +67,8 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
     <section className="mt-10">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-lg font-extrabold text-slate-800">{t('Mis automatizaciones')}</h2>
-          <p className="text-sm text-slate-500">{t('Las que crea el despacho: elige qué las pone en marcha y qué pasos siguen, en un lienzo libre.')}</p>
+          <h2 className="text-lg font-extrabold text-slate-800">{t('Creadas por el despacho')}</h2>
+          <p className="text-sm text-slate-500">{t('Valen para todo el despacho. Las crean y gestionan el propietario y los administradores: eligen qué las pone en marcha y qué pasos siguen, en un lienzo libre.')}</p>
         </div>
         {puedeEditar && (
           <button type="button" onClick={() => setEligiendo(true)} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">
@@ -82,7 +82,7 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
         <button type="button" disabled={!puedeEditar} onClick={() => setEligiendo(true)}
           className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 bg-white px-6 py-10 text-center hover:border-red-200 hover:bg-red-50/30 disabled:cursor-default disabled:hover:border-slate-200 disabled:hover:bg-white">
           <Workflow size={28} className="text-slate-300" />
-          <p className="text-sm font-semibold text-slate-700">{t('Todavía no hay automatizaciones propias')}</p>
+          <p className="text-sm font-semibold text-slate-700">{t('El despacho todavía no ha creado ninguna')}</p>
           <p className="max-w-md text-xs text-slate-500">{t('Por ejemplo: «cuando se da de alta un cliente, espera 3 días y crea una tarea para llamarle», o «cada lunes, recuerda los plazos en el chat».')}</p>
         </button>
       ) : (
@@ -259,7 +259,7 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
 
   return (
     <Lienzo
-      titulo={nombre.trim() || t('Nueva automatización')} subtitulo={t('Automatización propia')} icono={Workflow} catalogo={catalogo}
+      titulo={nombre.trim() || t('Nueva automatización')} subtitulo={t('Creada por el despacho')} icono={Workflow} catalogo={catalogo}
       inicial={flujo} puedeEditar={puedeEditar} sucioExterno={metaSucia} guardando={guardando} error={error}
       onGuardar={guardar} onProbar={probar} onMuestras={muestras} onCerrar={onCerrar}
       urlEntrada={token ? new URL(resolveApiUrl(`/api/automatizaciones/entrada/${token}`), window.location.origin).href : null}

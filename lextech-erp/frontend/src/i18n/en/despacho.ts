@@ -57,4 +57,7 @@ registrarEn({
   // Ayuda
   "El manual de Vantia, el Centro de soporte y la versión que usas.": "The Vantia manual, the Support centre and the version you're using.",
   "Soporte y versión": "Support and version",
+  "Creadas por el despacho": "Created by the firm", "Creada por el despacho": "Created by the firm",
+  "Valen para todo el despacho. Las crean y gestionan el propietario y los administradores: eligen qué las pone en marcha y qué pasos siguen, en un lienzo libre.": "They apply to the whole firm. The owner and admins create and manage them: they choose what starts them and which steps follow, on a free canvas.",
+  "El despacho todavía no ha creado ninguna": "The firm hasn't created any yet",
 });
