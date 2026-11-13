@@ -1662,12 +1662,12 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">{t("Dropbox")}</p>
-                <p className="text-xs text-slate-400 truncate">{t("Vinculación de cuenta")}</p>
+                <p className="text-xs text-slate-400 truncate">{t("Documentos de expedientes")}</p>
               </div>
             </div>
             <ChipEstado estado={dropboxConnected ? 'conectado' : 'pendiente'} />
           </div>
-          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Vincula tu cuenta de Dropbox. Por ahora solo conecta la cuenta -- todavía no guarda documentos de expedientes ahí (esa parte llega después).")}{dropboxConnected && organizacion?.dropboxEmail ? t(" Cuenta: {dropboxEmail}.", { dropboxEmail: organizacion.dropboxEmail }) : ''}
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">{t("Alternativa a Google Drive: los documentos de cada expediente se guardan en una carpeta propia de tu Dropbox y no se pierden.")}{dropboxConnected && organizacion?.dropboxEmail ? t(" Cuenta: {dropboxEmail}.", { dropboxEmail: organizacion.dropboxEmail }) : ''}
           </p>
           {canManage ? (
             dropboxConnected ? (

@@ -2,6 +2,10 @@
 import { registrarEn } from '../../lib/i18n';
 
 registrarEn({
+  // Nube
+  "No hay ninguna nube vinculada. Sin ella, los documentos de los expedientes se guardan solo en el servidor y pueden perderse con una actualización de la app. Vincula Google Drive o Dropbox para que cada expediente tenga su carpeta en tu nube.": "No cloud is linked. Without one, case documents are stored only on the server and can be lost in an app update. Link Google Drive or Dropbox so each case has its folder in your cloud.",
+  "Alternativa a Google Drive: los documentos de cada expediente se guardan en una carpeta propia de tu Dropbox y no se pierden.": "An alternative to Google Drive: each case's documents are kept in its own folder in your Dropbox and aren't lost.",
+
   // Móvil
   "{n} usuario": "{n} user", "{n} usuarios": "{n} users",
   "Qué te avisa y cómo: en este dispositivo, por correo y en qué horario.": "What notifies you and how: on this device, by email and at what times.",
