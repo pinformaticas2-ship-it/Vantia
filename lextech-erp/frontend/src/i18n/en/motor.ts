@@ -112,4 +112,6 @@ registrarEn({
   "22.3 Pasos añadidos a las de serie": "22.3 Steps added to built-in automations",
   "Las automatizaciones de serie tienen un punto «Al terminar»: lo que conecte ahí se ejecuta cada vez que terminan (por ejemplo, al aceptar una vista, avisar al equipo y crear una tarea). Sus pasos opcionales se pueden quitar del flujo.":
     "Built-in automations have an «On finish» point: whatever you connect there runs every time they finish (for example, when a hearing is accepted, notify the team and create a task). Their optional steps can be removed from the flow.",
+  "Otra persona ha guardado cambios en esta automatización mientras la tenías abierta. Tus cambios no se han guardado: ciérrala y vuelve a abrirla para ver la versión actual.":
+    "Someone else saved changes to this automation while you had it open. Your changes were not saved: close it and open it again to see the current version.",
 });

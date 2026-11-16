@@ -204,7 +204,7 @@ router.get('/flujos', requireAuth, async (req: any, res: Response) => {
   res.json({ success: true, data: rows });
 });
 
-async function guardarFlujo(req: any, res: Response, id: string | null) {
+export async function guardarFlujo(req: any, res: Response, id: string | null) {
   if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);
   const b = req.body || {};
   const vinculada = typeof b.vinculada === 'string' && EVENTO_DE_SERIE[b.vinculada] ? b.vinculada : null;
@@ -224,6 +224,13 @@ async function guardarFlujo(req: any, res: Response, id: string | null) {
     if (t && !b.flujo?.nodos?.find?.((n: any) => n.tipo === 'disparador')?.config?.token) disp.config = { ...disp.config, token: t };
   }
   const proxima = eventoFinal === 'programado' ? proximaEjecucion(disp?.config || {}) : null;
+  // Varias personas pueden tener la misma automatización abierta: quien guarda
+  // manda la versión que cargó y, si otra ya guardó encima, se avisa en vez de
+  // pisar su trabajo. Sin «version» (clientes antiguos) se guarda como antes.
+  const comprobar = Object.prototype.hasOwnProperty.call(b, 'version');
+  const fecha = b.version instanceof Date ? b.version : b.version ? new Date(String(b.version)) : null;
+  const version = comprobar && fecha && !Number.isNaN(fecha.getTime()) ? fecha.toISOString() : null;
+  const MISMA = (t: string) => `(NOT $9::boolean OR ($10::timestamptz IS NOT NULL AND abs(extract(epoch FROM ${t}.updated_at - $10::timestamptz)) < 0.001))`;
   try {
     let fila;
     if (vinculada) {
@@ -232,17 +239,22 @@ async function guardarFlujo(req: any, res: Response, id: string | null) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT (organizacion_id, vinculada) WHERE vinculada IS NOT NULL
          DO UPDATE SET flujo = EXCLUDED.flujo, activo = EXCLUDED.activo, evento = EXCLUDED.evento, updated_at = NOW()
+           WHERE ${MISMA('automatizaciones_flujos')}
          RETURNING ${FILA}`,
-        [req.organizacionId, nombre, descripcion, activo, eventoFinal, JSON.stringify(flujo), vinculada, req.auth?.userId || null],
+        [req.organizacionId, nombre, descripcion, activo, eventoFinal, JSON.stringify(flujo), vinculada, req.auth?.userId || null, comprobar, version],
       ));
+      if (!fila) return fallo(res, "Otra persona ha guardado cambios en esta automatización mientras la tenías abierta. Tus cambios no se han guardado: ciérrala y vuelve a abrirla para ver la versión actual.", 409);
     } else if (id) {
       ({ rows: [fila] } = await pool.query(
         `UPDATE automatizaciones_flujos SET nombre = $3, descripcion = $4, evento = $6, flujo = $7, proxima_at = $8, updated_at = NOW(),
                 cursor_at = CASE WHEN $5 AND NOT automatizaciones_flujos.activo THEN NOW() ELSE COALESCE(cursor_at, NOW()) END, activo = $5
-          WHERE id = $1 AND organizacion_id = $2 AND vinculada IS NULL RETURNING ${FILA}`,
-        [id, req.organizacionId, nombre, descripcion, activo, evento || 'manual', JSON.stringify(flujo), proxima],
+          WHERE id = $1 AND organizacion_id = $2 AND vinculada IS NULL AND ${MISMA('automatizaciones_flujos')} RETURNING ${FILA}`,
+        [id, req.organizacionId, nombre, descripcion, activo, evento || 'manual', JSON.stringify(flujo), proxima, comprobar, version],
       ));
-      if (!fila) return fallo(res, 'Automatización no encontrada', 404);
+      if (!fila) {
+        const { rowCount } = await pool.query(`SELECT 1 FROM automatizaciones_flujos WHERE id = $1 AND organizacion_id = $2 AND vinculada IS NULL`, [id, req.organizacionId]);
+        return rowCount ? fallo(res, "Otra persona ha guardado cambios en esta automatización mientras la tenías abierta. Tus cambios no se han guardado: ciérrala y vuelve a abrirla para ver la versión actual.", 409) : fallo(res, 'Automatización no encontrada', 404);
+      }
     } else {
       const { rows: n } = await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_flujos WHERE organizacion_id = $1`, [req.organizacionId]);
       if (n[0].n >= 50) return fallo(res, 'Máximo de 50 automatizaciones por despacho.', 400);

@@ -41,10 +41,10 @@ export default function MisAutomatizaciones({ puedeEditar }: { puedeEditar: bool
   const cambiarActivo = async (f: FilaFlujo) => {
     setCambiando(f.id);
     try {
-      const r = await apiFetch(`/api/automatizaciones/flujos/${f.id}`, { method: 'PUT', getToken, body: JSON.stringify({ nombre: f.nombre, descripcion: f.descripcion, flujo: f.flujo, activo: !f.activo }) });
+      const r = await apiFetch(`/api/automatizaciones/flujos/${f.id}`, { method: 'PUT', getToken, body: JSON.stringify({ nombre: f.nombre, descripcion: f.descripcion, flujo: f.flujo, activo: !f.activo, version: f.updated_at }) });
       if (r?.success === false) throw new Error(r.error);
       await cargar();
-    } catch (e: any) { aviso.error(e?.message || t('No se pudo cambiar')); } finally { setCambiando(null); }
+    } catch (e: any) { aviso.error(e?.message || t('No se pudo cambiar')); void cargar(); } finally { setCambiando(null); }
   };
   const borrar = async (f: FilaFlujo) => {
     if (!(await confirmar({ titulo: t('¿Eliminar «{nombre}»?', { nombre: f.nombre }), mensaje: t('Se borra la automatización y su historial. No se puede deshacer.'), confirmar: t('Eliminar'), peligro: true }))) return;
@@ -223,6 +223,8 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
   const [descripcion, setDescripcion] = useState(fila?.descripcion || '');
   const [activo, setActivo] = useState(fila?.activo ?? false);
   const [id, setId] = useState(fila?.id || null);
+  // Versión cargada: si otra persona guarda encima, el servidor avisa en vez de pisarla.
+  const [version, setVersion] = useState<string | null>(fila?.updated_at || null);
   const tokenDe = (f?: FlujoDatos | null) => (f?.nodos || []).find((n) => n.tipo === 'disparador')?.config?.token as string | undefined;
   const [token, setToken] = useState<string | undefined>(tokenDe(fila?.flujo));
   const [guardando, setGuardando] = useState(false);
@@ -237,10 +239,11 @@ function EditorPropio({ catalogo, fila, flujo, nombreInicial, puedeEditar, onCer
       const quiereActiva = activo && !incompleto;
       const r = await apiFetch(id ? `/api/automatizaciones/flujos/${id}` : '/api/automatizaciones/flujos', {
         method: id ? 'PUT' : 'POST', getToken,
-        body: JSON.stringify({ nombre: nombre.trim() || t('Automatización sin nombre'), descripcion, flujo: f, activo: quiereActiva }),
+        body: JSON.stringify({ nombre: nombre.trim() || t('Automatización sin nombre'), descripcion, flujo: f, activo: quiereActiva, ...(id ? { version } : {}) }),
       });
       if (r?.success === false) throw new Error(r.error);
       setId(r.data.id);
+      setVersion(r.data.updated_at || null);
       setToken(tokenDe(r.data.flujo));
       if (activo && !quiereActiva) { setActivo(false); aviso.info(t('Guardada como borrador: hay pasos por completar.')); }
       else aviso.ok(quiereActiva ? t('Automatización guardada y activa.') : t('Automatización guardada.'));

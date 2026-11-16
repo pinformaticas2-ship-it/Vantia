@@ -3,7 +3,7 @@ import net from 'net';
 import pool from '../config/database';
 import { enviarCorreoDelDespacho, escaparHtml, SinCuentaCorreo } from '../utils/correoDespacho';
 import { sendPushToUsers } from '../utils/webPush';
-import { tomarTurno } from '../utils/turnos';
+import { renovarTurno, tomarTurno } from '../utils/turnos';
 import { formatMadrid, madridLocalToDate, madridYmd } from './vistasAutomation';
 import { MODELOS_IA, preguntarIA } from '../utils/iaVantia';
 import crypto from 'crypto';
@@ -808,6 +808,7 @@ async function buscarDisparos(): Promise<void> {
   ).catch(() => ({ rows: [] as any[] }));
   const hoy = madridYmd(new Date());
   for (const f of flujos) {
+    await renovarTurno(TURNO, 120_000);
     const org = f.organizacion_id;
     const cfg = (f.flujo?.nodos || []).find((n: Nodo) => n.tipo === 'disparador')?.config || {};
     try {
@@ -867,14 +868,25 @@ async function buscarDisparos(): Promise<void> {
 
 // ── Programador: esperas, programados y búsquedas ───────────────────────────
 let ultimaBusqueda = 0;
+let ultimaLimpieza = 0;
+let enCurso = false;
+const TURNO = 'automatizaciones-motor';
+// Con varias instancias del backend solo una hace cada pasada (turno en la BD),
+// y en la misma instancia una pasada larga no se solapa con la siguiente.
 export async function tickAutomatizaciones(): Promise<void> {
-  if (!(await tomarTurno('automatizaciones-motor', 50_000).catch(() => false))) return;
+  if (enCurso) return;
+  enCurso = true;
+  try { await pasada(); } finally { enCurso = false; }
+}
+async function pasada(): Promise<void> {
+  if (!(await tomarTurno(TURNO, 120_000).catch(() => false))) return;
   // Esperas cumplidas.
   const { rows: esperas } = await pool.query(
     `DELETE FROM automatizaciones_esperas WHERE id IN (SELECT id FROM automatizaciones_esperas WHERE reanudar_at <= NOW() ORDER BY reanudar_at LIMIT 30)
      RETURNING ejecucion_id, flujo_id, organizacion_id, nodos, contexto`,
   ).catch(() => ({ rows: [] as any[] }));
   for (const e of esperas) {
+    await renovarTurno(TURNO, 120_000);
     try {
       const { rows } = await pool.query(`SELECT flujo, activo FROM automatizaciones_flujos WHERE id = $1`, [e.flujo_id]);
       if (!rows.length || !rows[0].activo) continue;
@@ -893,13 +905,28 @@ export async function tickAutomatizaciones(): Promise<void> {
     `SELECT id, organizacion_id, nombre, flujo FROM automatizaciones_flujos WHERE activo AND evento = 'programado' AND proxima_at <= NOW() LIMIT 20`,
   ).catch(() => ({ rows: [] as any[] }));
   for (const f of prog) {
+    await renovarTurno(TURNO, 120_000);
     const cfg = (f.flujo?.nodos || []).find((n: Nodo) => n.tipo === 'disparador')?.config || {};
-    await pool.query(`UPDATE automatizaciones_flujos SET proxima_at = $2 WHERE id = $1`, [f.id, proximaEjecucion(cfg)]);
+    const { rowCount } = await pool.query(`UPDATE automatizaciones_flujos SET proxima_at = $2 WHERE id = $1 AND activo AND proxima_at <= NOW()`, [f.id, proximaEjecucion(cfg)]);
+    if (!rowCount) continue;
     const ctx = await contextoBase(f.organizacion_id, 'programado', {}, null);
     await ejecutarFlujo(f, ctx, 'A una hora fija').catch((e) => console.error('[automatizaciones] programado', f.id, e?.message || e));
   }
   // Plazos, facturas y correo: cada 3 minutos.
   if (Date.now() - ultimaBusqueda > 3 * 60_000) { ultimaBusqueda = Date.now(); await buscarDisparos(); }
+  // Limpieza (cada 6 h): con mucha gente, avisos e historial crecen sin parar.
+  if (Date.now() - ultimaLimpieza > 6 * 3600_000) { ultimaLimpieza = Date.now(); await limpiarAntiguos(); }
+}
+
+/** Borra lo que ya no se muestra: avisos > 30 días, historial > 90 días, marcas de disparo > 180 días. */
+export async function limpiarAntiguos(): Promise<void> {
+  await pool.query(`DELETE FROM avisos_internos WHERE created_at < NOW() - INTERVAL '30 days'`).catch(() => {});
+  await pool.query(
+    `DELETE FROM automatizaciones_ejecuciones WHERE created_at < NOW() - INTERVAL '90 days'
+       AND NOT EXISTS (SELECT 1 FROM automatizaciones_esperas s WHERE s.ejecucion_id = automatizaciones_ejecuciones.id)`,
+  ).catch(() => {});
+  // Las búsquedas miran como mucho 60 días atrás, así que borrar marcas de 180 días no repite nada.
+  await pool.query(`DELETE FROM automatizaciones_disparos WHERE created_at < NOW() - INTERVAL '180 days'`).catch(() => {});
 }
 export async function forzarBusqueda(): Promise<void> { ultimaBusqueda = 0; await buscarDisparos(); }
 

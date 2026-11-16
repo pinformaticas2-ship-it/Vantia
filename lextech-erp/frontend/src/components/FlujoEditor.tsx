@@ -48,6 +48,8 @@ export default function FlujoEditor({
   const [guardandoExtra, setGuardandoExtra] = useState(false);
   const [errorExtra, setErrorExtra] = useState('');
   const [baseExtra, setBaseExtra] = useState('');
+  // Versión de los pasos añadidos que se cargó (null = aún no existían).
+  const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -57,6 +59,7 @@ export default function FlujoEditor({
       ]);
       if (c?.success) setCatalogo(c.data);
       const fila = (f?.data || []).find((x: any) => x.vinculada === vinculada);
+      setVersion(fila?.updated_at || null);
       const datos: FlujoDatos = fila?.flujo?.nodos?.length ? fila.flujo : { nodos: [{ id: 'ancla', tipo: 'disparador', config: {}, x: 0, y: 0 }], aristas: [], layout: fila?.flujo?.layout || {} };
       setInicial(datos);
       setBaseExtra(JSON.stringify({ nodos: datos.nodos, aristas: datos.aristas, layout: datos.layout || {} }));
@@ -73,9 +76,10 @@ export default function FlujoEditor({
       const propios = f.nodos.filter((n) => n.tipo !== 'disparador').length;
       const r = await apiFetch('/api/automatizaciones/flujos', {
         method: 'POST', getToken,
-        body: JSON.stringify({ vinculada, nombre: t('Pasos añadidos a «{nombre}»', { nombre: titulo }), flujo: f, activo: propios > 0 }),
+        body: JSON.stringify({ vinculada, nombre: t('Pasos añadidos a «{nombre}»', { nombre: titulo }), flujo: f, activo: propios > 0, version }),
       });
       if (r?.success === false) throw new Error(r.error);
+      setVersion(r.data?.updated_at || null);
       setBaseExtra(nuevo);
     } catch (e: any) {
       setErrorExtra(e?.message || t('No se pudo guardar'));

@@ -267,3 +267,38 @@ test('«Avisar al equipo» queda en la campana y una tarea puede no tener client
   assert.equal(sinNadie.ok, false);
   assert.match(sinNadie.detalle, /necesita a alguien/);
 });
+
+test('varias personas a la vez: guardar encima de otra avisa, y una hora fija no se ejecuta dos veces', { skip }, async () => {
+  const { guardarFlujo } = await import('../src/routes/automatizaciones');
+  const llamar = (body: any, id: string | null) => new Promise<{ status: number; body: any }>((resolve) => {
+    let status = 200;
+    const res: any = { status(s: number) { status = s; return res; }, json(b: any) { resolve({ status, body: b }); return res; } };
+    Promise.resolve(guardarFlujo({ auth: { userId: 'mo_ana' }, organizacionId: orgA, organizacionRol: 'propietario', body }, res, id));
+  });
+  const flujo = { nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'manual' } }], aristas: [] };
+  const creada = await llamar({ nombre: 'Compartida', flujo, activo: false }, null);
+  assert.equal(creada.status, 200);
+  const { id, updated_at } = creada.body.data;
+  // Ana y Luis la abren a la vez; guarda Ana; luego Luis con la versión vieja.
+  const ana = await llamar({ nombre: 'De Ana', flujo, activo: false, version: updated_at }, id);
+  assert.equal(ana.status, 200);
+  const luis = await llamar({ nombre: 'De Luis', flujo, activo: false, version: updated_at }, id);
+  assert.equal(luis.status, 409);
+  assert.match(luis.body.error, /Otra persona/);
+  assert.equal((await pool.query(`SELECT nombre FROM automatizaciones_flujos WHERE id = $1`, [id])).rows[0].nombre, 'De Ana', 'lo de Ana no se pisa');
+  // Con la versión nueva, sí.
+  assert.equal((await llamar({ nombre: 'De Luis', flujo, activo: false, version: new Date(ana.body.data.updated_at).toISOString() }, id)).status, 200, 'como llega del navegador (texto ISO)');
+  // Pasos añadidos a una de serie: dos personas los crean a la vez sin saberlo.
+  const v1 = await llamar({ vinculada: 'bienvenida', flujo, activo: false, version: null }, null);
+  assert.equal(v1.status, 200);
+  assert.equal((await llamar({ vinculada: 'bienvenida', flujo, activo: false, version: null }, null)).status, 409);
+
+  // Programador: dos pasadas a la vez (dos instancias) solo ejecutan una vez.
+  const { tickAutomatizaciones } = await m();
+  const prog = { nodos: [{ id: 'd', tipo: 'disparador', config: { evento: 'programado', frecuencia: 'diaria', hora: '09:00' } }], aristas: [] };
+  const pid = (await pool.query(`INSERT INTO automatizaciones_flujos (organizacion_id, nombre, activo, evento, flujo, proxima_at) VALUES ($1,'Hora fija',true,'programado',$2, NOW() - INTERVAL '1 minute') RETURNING id`, [orgA, JSON.stringify(prog)])).rows[0].id;
+  await pool.query(`DELETE FROM tareas_turnos WHERE nombre = 'automatizaciones-motor'`).catch(() => {});
+  await Promise.all([tickAutomatizaciones(), tickAutomatizaciones(), tickAutomatizaciones()]);
+  const n = (await pool.query(`SELECT COUNT(*)::int AS n FROM automatizaciones_ejecuciones WHERE flujo_id = $1`, [pid])).rows[0].n;
+  assert.equal(n, 1);
+});
