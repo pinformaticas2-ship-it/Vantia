@@ -175,3 +175,12 @@ test('documentos: la IA recibe skill, estilo y datos del expediente', { skip }, 
     (global as any).fetch = realFetch;
   }
 });
+
+test('IA: sabe la fecha de hoy (hora de Madrid) y una negativa no se escribe en el documento', async () => {
+  const { fechaDeHoy, motivoNegativa } = await import('../src/controllers/documentosController');
+  // 23:30 UTC del 15/11 ya es lunes 16 en Madrid.
+  assert.equal(fechaDeHoy(new Date('2026-11-15T23:30:00Z')), 'lunes, 16 de noviembre de 2026');
+  assert.equal(motivoNegativa('NO_PUEDO: no redacto amenazas.'), 'no redacto amenazas.');
+  assert.equal(motivoNegativa('```html\n<p>NO_PUEDO: eso no.</p>\n```'), 'eso no.');
+  assert.equal(motivoNegativa('<h1>Resumen de la película</h1><p>Thanos reúne las gemas…</p>'), null);
+});

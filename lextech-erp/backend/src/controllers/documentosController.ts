@@ -231,8 +231,20 @@ const valor = (v: any) => {
 };
 
 /** Datos reales del despacho, del expediente y de su cliente para la IA. */
+/** «lunes, 16 de noviembre de 2026», en hora de Madrid: la IA no sabe qué día es. */
+export function fechaDeHoy(d = new Date()): string {
+  return d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** Si la IA dice que no puede, devuelve el motivo (para el panel, no para el documento). */
+export function motivoNegativa(texto: string): string | null {
+  const m = /^\s*(?:```\w*\s*)?(?:<p>)?\s*NO_PUEDO:\s*([\s\S]*)/i.exec(String(texto || ''));
+  if (!m) return null;
+  return m[1].replace(/<[^>]+>/g, ' ').replace(/```/g, '').replace(/\s+/g, ' ').trim().slice(0, 400) || 'La IA no puede redactar eso.';
+}
+
 export async function contextoParaRedactar(org: string, expedienteId: string | null): Promise<string> {
-  const lineas: string[] = [];
+  const lineas: string[] = [`FECHA DE HOY: ${fechaDeHoy()}`];
   const { rows: o } = await pool.query(
     `SELECT nombre, nif_cif, direccion_fiscal, telefono, email_contacto, web FROM organizaciones WHERE id=$1`, [org],
   );
@@ -352,12 +364,17 @@ export async function generarConIa(req: Request, res: Response) {
     if (modo === 'nuevo' && !instrucciones && !elegida) return fallo(res, 'Dile a la IA qué quieres redactar o elige una skill.', 400);
 
     const partes: string[] = [
-      'Eres el redactor jurídico del despacho dentro de Vantia, un ERP para despachos de abogados en España. Redactas con calidad profesional, listo para revisar y firmar.',
+      `Eres el asistente de redacción del despacho dentro de Vantia, un ERP para despachos de abogados en España. Escribes directamente en el documento lo que te piden.
+- Si es un escrito jurídico (demanda, recurso, contrato, burofax, carta a un cliente…), con calidad profesional, listo para revisar y firmar.
+- Si es otra cosa (un resumen, una explicación, un correo, unas notas, un acta…), hazlo igualmente, bien y con el formato que le corresponde: sin convertirlo en un escrito jurídico, sin encabezados de carta ni firma si no los pide.
+- Nunca escribas sobre la propia petición (cartas, notas o memorandos diciendo qué te han pedido o si te corresponde). El documento es el resultado, no una conversación.
+- Si de verdad no puedes hacerlo (algo ilegal o dañino), responde solo con una línea: «NO_PUEDO: » y el motivo en una frase para el usuario.
+- Fechas: usa la FECHA DE HOY cuando el documento lleve fecha. No inventes nunca otra fecha.`,
     ];
-    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo siempre):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
+    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo a los escritos del despacho):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
     if (elegida) partes.push(`SKILL ELEGIDA — «${elegida.nombre}». Síguela al pie de la letra:\n${elegida.instrucciones}`);
     const contexto = await contextoParaRedactar(org, expedienteId);
-    if (contexto) partes.push(`DATOS REALES (úsalos; lo que no esté aquí, déjalo como [●]):\n${contexto}`);
+    if (contexto) partes.push(`DATOS REALES (úsalos; en un escrito, los datos del despacho, cliente o asunto que no estén aquí déjalos como [●]):\n${contexto}`);
 
     const documentoTexto = textoPlano(b.documentoHtml || '').slice(0, 60_000);
     if (modo === 'nuevo') {
@@ -374,6 +391,8 @@ export async function generarConIa(req: Request, res: Response) {
     partes.push(INSTRUCCIONES_FORMATO);
 
     const { texto, uso } = await llamarGemini(partes.join('\n\n'));
+    const negativa = motivoNegativa(texto);
+    if (negativa) return fallo(res, negativa, 422);
     const html = htmlDeRespuesta(texto);
     if (!textoPlano(html)) return fallo(res, 'La IA no ha devuelto texto. Prueba a darle más detalles.', 502);
 
