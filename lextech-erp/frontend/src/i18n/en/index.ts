@@ -13,4 +13,5 @@ import './despacho';
 import './lienzo';
 import './motor';
 import './automatizacionesIA';
+import './pendientes3';
 import './contextos';

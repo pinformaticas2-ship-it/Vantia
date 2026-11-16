@@ -35,6 +35,7 @@ import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccoun
 import { confirmar } from "../lib/avisos";
 import { confirmarAntesDeEnviar } from "../lib/preferencias";
 import { t } from '../lib/i18n';
+import { avisoSyncCorreo } from '../lib/avisoSyncCorreo';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -5563,7 +5564,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               en vez de varias cajas amarillas encima de la lista. */}
           {(() => {
             const avisos = [
-              currentImapAccount?.sync_warning ? { clave: 'sync', texto: t("Problema al actualizar el correo: {aviso}", { aviso: currentImapAccount.sync_warning }), diagnosticar: true } : null,
+              currentImapAccount?.sync_warning ? { clave: 'sync', texto: t("Problema al actualizar el correo: {aviso}", { aviso: avisoSyncCorreo(currentImapAccount.sync_warning) }), diagnosticar: true } : null,
               currentImapAccount?.envio_warning ? { clave: 'envio', texto: currentImapAccount.envio_warning, diagnosticar: false } : null,
             ].filter(Boolean) as { clave: string; texto: string; diagnosticar: boolean }[];
             if (!avisos.length) return null;

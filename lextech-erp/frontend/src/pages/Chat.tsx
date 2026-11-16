@@ -24,6 +24,7 @@ import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import { TarjetaPersonaChat, abrirPerfilChat } from "../components/TarjetaPersonaChat";
 import { aviso, confirmar } from "../lib/avisos";
 import { abrirPaleta } from "../components/PaletaComandos";
 import { t, t as tr } from '../lib/i18n';
@@ -2659,7 +2660,7 @@ function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserI
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-slate-800 text-sm font-semibold truncate">{m.user_name}</p>
+          <button type="button" onClick={() => abrirPerfilChat({ userId: m.user_id, nombre: m.user_name, avatar: m.avatar_url })} className="text-slate-800 text-sm font-semibold truncate hover:underline text-left">{m.user_name}</button>
           {m.role==="admin"&&<Crown size={11} className="text-yellow-500 shrink-0"/>}
         </div>
         <p className="text-slate-400 text-xs truncate">{m.role_label} · {st.label}</p>
@@ -2969,11 +2970,14 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
         {/* Avatar o timestamp compacto */}
         <div className="w-9 shrink-0 flex items-start justify-center pt-0.5">
           {!sameAuthor ? (
-            <Av
-              url={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
-              name={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
-              size={9}
-            />
+            <button type="button" className="rounded-full" title={t("Ver perfil")}
+              onClick={() => abrirPerfilChat({ userId: msg.user_id, nombre: resolveDisplayName(msg.user_id, msg.user_name, false), avatar: resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url })}>
+              <Av
+                url={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
+                name={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
+                size={9}
+              />
+            </button>
           ) : (
             <span className={`text-[10px] text-slate-400 leading-none mt-1.5 transition-opacity ${hover ? "opacity-100" : "opacity-0"}`}>
               {fmtTime(msg.created_at)}
@@ -2986,7 +2990,8 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
           {/* Fila autor */}
           {!sameAuthor && (
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-bold text-slate-800 text-[15px]">{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</span>
+              <button type="button" className="font-bold text-slate-800 text-[15px] hover:underline" title={t("Ver perfil")}
+                onClick={() => abrirPerfilChat({ userId: msg.user_id, nombre: resolveDisplayName(msg.user_id, msg.user_name, false), avatar: resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url })}>{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</button>
               {isMe&&<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">{t("Tú")}</span>}
               <span className="text-xs text-slate-400">{fmtTime(msg.created_at)}</span>
               {isMe && showReadReceipt && (
@@ -6722,6 +6727,7 @@ export default function Chat() {
         />
       )}
       {ayudaAtajos && <AyudaAtajosChat onClose={() => setAyudaAtajos(false)} />}
+      <TarjetaPersonaChat currentUserId={currentUserId} onDM={(pp) => void openDM(pp.userId, pp.nombre, pp.avatar || null)} />
     </div>
     </ContextoTextoChat.Provider>
   );

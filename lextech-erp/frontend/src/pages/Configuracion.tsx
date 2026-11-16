@@ -13,7 +13,7 @@ import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/th
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, avisarOrganizacionCambiada, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import { altaWhatsAppConMeta } from '../lib/altaWhatsAppMeta';
-import { aviso } from '../lib/avisos';
+import { aviso, confirmar } from '../lib/avisos';
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
 import SkillsPanel from './SkillsPanel';
@@ -764,11 +764,22 @@ function UsuariosPanel() {
     } finally { setBusyId(null); }
   };
 
-  const remove = async (id: string) => {
-    setBusyId(id);
+  const remove = async (m: Miembro) => {
+    const quien = m.nombre || m.email || t('esta persona');
+    if (!(await confirmar({
+      titulo: t('¿Quitar a {nombre} del despacho?', { nombre: quien }),
+      mensaje: t('Dejará de ver los clientes, expedientes y todo lo de este despacho. Lo que hizo se queda. Se le puede volver a añadir cuando quieras.'),
+      confirmar: t('Quitar del despacho'),
+      peligro: true,
+    }))) return;
+    setBusyId(m.id);
     try {
-      await apiFetch(`/api/organizacion/miembros/${id}`, { method: 'DELETE', getToken });
+      const r = await apiFetch(`/api/organizacion/miembros/${m.id}`, { method: 'DELETE', getToken });
+      if (r?.success === false) throw new Error(r.error);
+      aviso.ok(t('{nombre} ya no está en el despacho.', { nombre: quien }));
       await load();
+    } catch (e: any) {
+      aviso.error(e?.message || t('No se pudo quitar.'));
     } finally { setBusyId(null); }
   };
 
@@ -890,7 +901,7 @@ function UsuariosPanel() {
                       solo para no ofrecer un botón que luego el servidor rechace). */}
                   {m.rol !== 'propietario' && (myRol === 'propietario' || (myRol === 'admin' && m.rol !== 'admin')) && (
                     <button
-                      onClick={() => remove(m.id)}
+                      onClick={() => void remove(m)}
                       disabled={busyId === m.id}
                       className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                       title={t("Quitar de la organización")}
@@ -2192,7 +2203,7 @@ export default function Configuracion() {
   // Permite enlazar directamente a una sección concreta (p.ej. desde el aviso
   // de "conéctalo desde Configuración → Integraciones" en Comunicación Externa)
   // con ?section=integraciones, en vez de dejar siempre a quien llega en Apariencia.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SectionKey>(() => {
     const requested = searchParams.get('section') as SectionKey | null;
     return requested && SECCIONES_VALIDAS.includes(requested) ? requested : 'apariencia';
@@ -2201,12 +2212,17 @@ export default function Configuracion() {
   useEffect(() => {
     const requested = searchParams.get('section') as SectionKey | null;
     if (requested && SECCIONES_VALIDAS.includes(requested)) { setActiveSection(requested); setEnMenuMovil(false); }
+    else if (!requested) setEnMenuMovil(true); // «atrás» hasta la lista (en el móvil)
   }, [searchParams]);
   // Móvil (13/11/2026): como los ajustes del teléfono, primero la lista de
   // secciones y, al tocar una, la sección a pantalla completa con «‹ Ajustes».
   const [enMenuMovil, setEnMenuMovil] = useState(() => !searchParams.get('section'));
   const contenidoRef = useRef<HTMLDivElement>(null);
-  const elegirSeccion = (k: SectionKey) => { setActiveSection(k); setEnMenuMovil(false); contenidoRef.current?.scrollTo({ top: 0 }); };
+  // Cada sección tiene su dirección (?section=…): se puede compartir el enlace y «atrás» vuelve a la anterior.
+  const elegirSeccion = (k: SectionKey) => {
+    setActiveSection(k); setEnMenuMovil(false); contenidoRef.current?.scrollTo({ top: 0 });
+    if (searchParams.get('section') !== k) setSearchParams((prev) => { const n = new URLSearchParams(prev); n.set('section', k); return n; });
+  };
   const etiquetaSeccion = (() => {
     const k = activeSection === 'manual' ? 'ayuda' : activeSection;
     const it = [...SECCIONES_CUENTA, ...SECCIONES_DESPACHO].find((x) => x.key === k);
@@ -2257,7 +2273,7 @@ export default function Configuracion() {
           pantalla); el resto de secciones van centradas con ancho de lectura. */}
       <div ref={contenidoRef} className={`${enMenuMovil ? 'hidden md:flex' : 'flex'} min-h-0 flex-1 flex-col bg-[#f4f6f8] ${activeSection === 'trazabilidad' ? 'overflow-hidden' : 'overflow-y-auto modules-scrollbar'}`}>
         <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur md:hidden">
-          <button type="button" onClick={() => setEnMenuMovil(true)} className="inline-flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-red-600 active:bg-red-50">
+          <button type="button" onClick={() => { setEnMenuMovil(true); setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('section'); return n; }); }} className="inline-flex items-center gap-0.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-red-600 active:bg-red-50">
             <ChevronLeft size={18} />{t("Ajustes")}</button>
           <span className="min-w-0 flex-1 truncate pr-10 text-center text-sm font-bold text-slate-800">{etiquetaSeccion}</span>
         </div>
@@ -2307,7 +2323,7 @@ export default function Configuracion() {
                 descripcion={t("El manual de Vantia, el Centro de soporte y la versión que usas.")} />
               <div className="mb-6 flex gap-1 rounded-xl border border-slate-200 bg-white p-1 w-fit" role="tablist">
                 {([['manual', t("Manual de usuario"), BookOpen], ['ayuda', t("Soporte y versión"), Info]] as const).map(([k, label, Ic]) => (
-                  <button key={k} type="button" role="tab" aria-selected={activeSection === k} onClick={() => setActiveSection(k)}
+                  <button key={k} type="button" role="tab" aria-selected={activeSection === k} onClick={() => elegirSeccion(k)}
                     className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${activeSection === k ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50'}`}>
                     <Ic size={15} />{label}
                   </button>

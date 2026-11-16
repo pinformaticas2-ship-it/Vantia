@@ -275,6 +275,26 @@ export async function getCanalMiembros(req: Request, res: Response) {
   }
 }
 
+/** GET /api/chat/perfil/:userId — tarjeta de una persona del despacho
+ *  (16/11/2026): cargo y teléfono que puso en Ajustes → Mi perfil. Solo entre
+ *  miembros del mismo despacho. */
+export async function getPerfilPersona(req: Request, res: Response) {
+  const yo = (req as any).auth?.userId;
+  const org = (req as any).organizacionId;
+  const otro = String(req.params.userId || '').slice(0, 150);
+  if (!yo) return err(res, 'No autenticado', 401);
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.rol, p.extras->>'cargo' AS cargo, p.extras->>'telefono' AS telefono
+         FROM organizacion_miembros m LEFT JOIN user_preferences p ON p.user_id = m.user_id
+        WHERE m.organizacion_id = $1 AND m.user_id = $2`,
+      [org, otro],
+    );
+    if (!rows.length) return err(res, 'Esa persona no está en este despacho', 404);
+    return ok(res, { userId: otro, nombre: await resolveUserName(otro), rol: rows[0].rol, cargo: rows[0].cargo || '', telefono: rows[0].telefono || '' });
+  } catch (e: any) { return err(res, e.message); }
+}
+
 // ── Status y Rol ──────────────────────────────────────────────────────────────
 
 /** PUT /api/chat/me/status */

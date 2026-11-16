@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
-  getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
+  getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros, getPerfilPersona,
   getMensajes, sendMensaje, editMensaje, deleteMensaje, getCambiosMensajes, getHilo, silenciarCanal,
   toggleReaccion,
   getFijados, fijarMensaje, desfijarMensaje, getFavoritos, toggleFavorito,
@@ -75,6 +75,7 @@ router.delete('/canales/:id/leave',              requireAuth, leaveCanal);
 
 // Miembros del canal
 router.get   ('/canales/:id/miembros',           requireAuth, getCanalMiembros);
+router.get   ('/perfil/:userId',                  requireAuth, getPerfilPersona);
 router.post  ('/canales/:id/miembros',           requireAuth, addMiembro);
 router.delete('/canales/:id/miembros/:uid',      requireAuth, removeMiembro);
 router.put   ('/canales/:id/miembros/:uid/role', requireAuth, updateMiembroRole);
