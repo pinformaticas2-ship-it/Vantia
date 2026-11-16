@@ -182,7 +182,7 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
               {(catalogo?.miembros || []).map((m) => <option key={m.userId} value={m.userId}>{m.nombre}</option>)}
             </select>
           </Campo>
-          <p className="text-[11px] text-slate-400">{t('Las tareas van ligadas a un cliente: solo funciona con disparadores que tengan cliente.')}</p>
+          <p className="text-[11px] text-slate-400">{t('Si lo que la pone en marcha no tiene cliente (hora fija, correo, webhook…), la tarea queda sin cliente y va a la persona elegida.')}</p>
           <Variables vars={vars} />
         </>
       );

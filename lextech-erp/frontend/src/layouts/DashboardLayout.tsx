@@ -47,7 +47,7 @@ function diasHastaMadrid(fecha: string | Date): number {
 const fuenteDeAviso = (id: string) =>
   id.startsWith("chat-") ? "chat" : id.startsWith("email-") ? "email" : id.startsWith("wa-") ? "wa"
   : id.startsWith("plazo-exp-") ? "exp" : id.startsWith("plazo-") ? "tareas" : id.startsWith("soporte-") ? "soporte"
-  : id.startsWith("vista-") ? "vistas" : "otro";
+  : id.startsWith("vista-") ? "vistas" : id.startsWith("auto-") ? "auto" : "otro";
 import type { Modulo } from "../lib/useOrganizacion";
 import { t, t as tr, tn, idioma } from '../lib/i18n';
 
@@ -1044,7 +1044,7 @@ function WhatsAppWidget() {
 // ── Notifications Panel ──────────────────────────────────────────────────────
 type UnifiedNotification = {
   id: string;
-  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte" | "vista";
+  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte" | "vista" | "auto";
   title: string;
   subtitle?: string;
   meta?: string;
@@ -1054,6 +1054,7 @@ type UnifiedNotification = {
 };
 
 function notificationIcon(kind: UnifiedNotification["kind"]) {
+  if (kind === "auto") return "⚡";
   if (kind === "chat") return "💬";
   if (kind === "email") return "✉️";
   if (kind === "plazo") return "⏰";
@@ -2410,7 +2411,7 @@ export default function DashboardLayout() {
       const token = await getToken();
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes, vistasRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes, vistasRes, autoRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
@@ -2418,9 +2419,10 @@ export default function DashboardLayout() {
         fetch("/api/expedientes/notificaciones/pendientes", { headers }),
         fetch("/api/soporte/notificaciones", { headers }),
         fetch("/api/vistas/avisos", { headers }),
+        fetch("/api/automatizaciones/avisos", { headers }),
       ]);
 
-      const [chatData, emailData, waData, tasksData, expNotifData, soporteData, vistasData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData, expNotifData, soporteData, vistasData, autoData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
@@ -2428,6 +2430,7 @@ export default function DashboardLayout() {
         safeJson(expNotifRes),
         safeJson(soporteRes),
         vistasRes.ok ? safeJson(vistasRes) : Promise.resolve(null),
+        autoRes.ok ? safeJson(autoRes) : Promise.resolve(null),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -2437,7 +2440,7 @@ export default function DashboardLayout() {
       // momentáneo de una fuente hacía reaparecer todo lo descartado).
       const fuentesOk = new Set<string>([
         chatRes.ok && "chat", emailRes.ok && "email", waRes.ok && "wa", tasksRes.ok && "tareas",
-        expNotifRes.ok && "exp", soporteRes.ok && "soporte", vistasRes.ok && "vistas",
+        expNotifRes.ok && "exp", soporteRes.ok && "soporte", vistasRes.ok && "vistas", autoRes.ok && "auto",
       ].filter(Boolean) as string[]);
 
       if (chatRes.ok) {
@@ -2608,6 +2611,23 @@ export default function DashboardLayout() {
             meta: s.resumen || `Estado: ${s.estadoLabel}`,
             created_at: s.actualizadoAt || new Date().toISOString(),
             onClick: () => navigate(`/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`),
+          });
+        }
+      }
+
+      // Avisos de las automatizaciones («Avisar al equipo»), 16/11/2026: llegan
+      // aquí aunque la persona no tenga activadas las notificaciones push.
+      if (autoRes.ok) {
+        for (const a of (Array.isArray(autoData?.data) ? autoData.data : [])) {
+          if (!a?.id) continue;
+          next.push({
+            id: `auto-${a.id}`,
+            kind: "auto",
+            title: a.titulo,
+            subtitle: a.cuerpo || undefined,
+            meta: t("Automatización"),
+            created_at: a.created_at || new Date().toISOString(),
+            onClick: () => navigate(typeof a.url === "string" && a.url.startsWith("/") ? a.url : "/dashboard"),
           });
         }
       }

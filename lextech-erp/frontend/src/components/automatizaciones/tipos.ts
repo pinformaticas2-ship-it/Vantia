@@ -81,6 +81,7 @@ export const OPERADORES: { v: string; l: string; sinValor?: boolean }[] = [
 const DIAS_SEMANA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
 export function etiquetaVariable(cat: Catalogo | null, clave: string): string {
+  if (clave.startsWith('ia.')) return t('Respuesta de la IA ({v})', { v: clave.slice(3) });
   for (const d of cat?.disparadores || []) { const v = d.variables.find((x) => x.clave === clave); if (v) return t(v.etiqueta); }
   return clave;
 }

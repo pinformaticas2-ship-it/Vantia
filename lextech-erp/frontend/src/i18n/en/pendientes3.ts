@@ -10,6 +10,8 @@ registrarEn({
   "{nombre} ya no está en el despacho.": "{nombre} is no longer in the firm.",
   "No se pudo quitar.": "Couldn't remove them.",
   "Ver perfil": "View profile",
+  "Si lo que la pone en marcha no tiene cliente (hora fija, correo, webhook…), la tarea queda sin cliente y va a la persona elegida.": "If whatever starts it has no client (set time, email, webhook…), the task has no client and goes to the chosen person.",
+  "Automatización": "Automation",
   "Teléfono copiado.": "Phone number copied.",
   "Sin teléfono": "No phone",
   "Puedes poner tu cargo y tu teléfono en Ajustes → Mi perfil.": "You can add your job title and phone in Settings → My profile.",

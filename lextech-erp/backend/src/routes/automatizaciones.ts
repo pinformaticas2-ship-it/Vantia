@@ -314,6 +314,17 @@ router.post('/entrada/:token', async (req: any, res: Response) => {
   res.status(202).json({ success: true });
 });
 
+// Avisos de «Avisar al equipo» para la campana de cada persona (14 días).
+router.get('/avisos', requireAuth, async (req: any, res: Response) => {
+  const { rows } = await pool.query(
+    `SELECT id, titulo, cuerpo, url, created_at FROM avisos_internos
+      WHERE user_id = $1 AND organizacion_id = $2 AND created_at > NOW() - INTERVAL '14 days'
+      ORDER BY created_at DESC LIMIT 30`,
+    [req.auth?.userId, req.organizacionId],
+  ).catch(() => ({ rows: [] as any[] }));
+  res.json({ success: true, data: rows });
+});
+
 // Registros reales recientes para «Probar con…».
 router.get('/muestras', requireAuth, async (req: any, res: Response) => {
   if (!esGestor(req)) return fallo(res, 'Solo el propietario o un administrador.', 403);

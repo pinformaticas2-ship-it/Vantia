@@ -309,25 +309,37 @@ async function ejecutarNodo(org: string, flujoId: string, n: Nodo, ctx: any, pru
       if (prueba && !ids.length) return R('Se avisaría al responsable o a quien lo hizo: «{titulo}»', { titulo });
       if (!ids.length) throw F('No hay a quién avisar.');
       if (prueba) return R('Se avisaría a {n} persona(s): «{titulo}»', { n: ids.length, titulo });
-      await sendPushToUsers(ids, { title: titulo, body: rellenar(c.mensaje || '', ctx), url: /^\/[a-z]/i.test(String(c.enlace || '')) ? String(c.enlace) : '/dashboard', tag: `autom-${flujoId}-${Date.now()}` });
+      const cuerpo = rellenar(c.mensaje || '', ctx);
+      const url = /^\/[a-z]/i.test(String(c.enlace || '')) ? String(c.enlace) : '/dashboard';
+      // En la campana de Vantia siempre; además, push a quien lo tenga activado.
+      await pool.query(
+        `INSERT INTO avisos_internos (organizacion_id, user_id, titulo, cuerpo, url) SELECT $1, u, $3, $4, $5 FROM unnest($2::text[]) AS u`,
+        [org, ids, titulo.slice(0, 300), cuerpo.slice(0, 2000) || null, url],
+      );
+      await sendPushToUsers(ids, { title: titulo, body: cuerpo, url, tag: `autom-${flujoId}-${Date.now()}` });
       return R('Aviso «{titulo}» a {n} persona(s)', { titulo, n: ids.length });
     }
     case 'crear_tarea': {
-      const clienteId = ctx?.cliente?.id;
-      if (!clienteId) throw F('Las tareas van ligadas a un cliente y aquí no hay cliente.');
+      const clienteId = ctx?.cliente?.id || null;
       const titulo = rellenar(c.titulo, ctx).slice(0, 300);
       const dias = Math.max(0, Math.min(365, Number(c.dias) || 0));
       const plazo = sumarDias(madridYmd(new Date()), dias);
       const plazoTxt = plazo.split('-').reverse().join('/');
       ctx.tarea_creada = { titulo, plazo: plazoTxt };
       if (prueba) return R('Se crearía la tarea «{titulo}» con plazo {plazo}', { titulo, plazo: plazoTxt });
-      const { rows: cli } = await pool.query(`SELECT COALESCE(NULLIF(commercial_name, ''), TRIM(first_name || ' ' || COALESCE(last_name,''))) AS nombre FROM entities WHERE id = $1 AND organizacion_id = $2`, [clienteId, org]);
-      if (!cli.length) throw F('El cliente ya no existe.');
+      // Sin cliente (hora fija, correo, webhook…), la tarea va a una persona: si no, se perdería.
+      const asignada = await miembro(org, persona(c, ctx));
+      if (!clienteId && !asignada) throw F('Sin cliente, la tarea necesita a alguien: elige a quién se asigna.');
+      let cli: any[] = [{ nombre: null }];
+      if (clienteId) {
+        ({ rows: cli } = await pool.query(`SELECT COALESCE(NULLIF(commercial_name, ''), TRIM(first_name || ' ' || COALESCE(last_name,''))) AS nombre FROM entities WHERE id = $1 AND organizacion_id = $2`, [clienteId, org]));
+        if (!cli.length) throw F('El cliente ya no existe.');
+      }
       await pool.query(
         `INSERT INTO client_tasks (client_id, client_name, titulo, descripcion, plazo, estado, prioridad, expediente_id, created_by, user_id, organizacion_id)
          VALUES ($1,$2,$3,$4,$5,'pendiente',$6,$7,'Automatización',$8,$9)`,
         [clienteId, cli[0].nombre, titulo, rellenar(c.descripcion || '', ctx) || null, plazo,
-          ['alta', 'media', 'baja'].includes(c.prioridad) ? c.prioridad : 'media', ctx?.expediente?.id || null, await miembro(org, persona(c, ctx)), org],
+          ['alta', 'media', 'baja'].includes(c.prioridad) ? c.prioridad : 'media', ctx?.expediente?.id || null, asignada, org],
       );
       return R('Tarea «{titulo}» creada (plazo {plazo})', { titulo, plazo: plazoTxt });
     }
@@ -823,10 +835,20 @@ async function buscarDisparos(): Promise<void> {
         }
       } else if (f.evento === 'correo.recibido') {
         const desde = f.cursor_at || new Date();
+        // Gmail no se guarda solo (se lee de Google): se trae lo nuevo de sus buzones antes de mirar.
+        try {
+          const { rows: gm } = await pool.query(`SELECT id, user_id FROM email_oauth_profiles WHERE organizacion_id = $1 AND refresh_token_enc IS NOT NULL`, [org]);
+          if (gm.length) {
+            const { syncGmailProfileRecord } = await import('../controllers/emailController');
+            for (const g of gm) await syncGmailProfileRecord(g.id, g.user_id, org, 'INBOX', 20).catch(() => {});
+          }
+        } catch { /* sin Gmail */ }
         const { rows } = await pool.query(
-          `SELECT e.id, e.from_email, e.from_name, e.subject, e.snippet, e.created_at, a.email AS buzon
-             FROM emails e JOIN email_accounts a ON a.id = e.account_id
-            WHERE a.organizacion_id = $1 AND upper(e.folder) = 'INBOX' AND e.created_at > $2
+          `SELECT e.id, e.from_email, e.from_name, e.subject, e.snippet, e.created_at, COALESCE(a.email, g.email) AS buzon
+             FROM emails e
+             LEFT JOIN email_accounts a ON a.id = e.account_id
+             LEFT JOIN email_oauth_profiles g ON g.id = e.gmail_profile_id
+            WHERE (a.organizacion_id = $1 OR g.organizacion_id = $1) AND upper(e.folder) = 'INBOX' AND e.created_at > $2
             ORDER BY e.created_at LIMIT 30`,
           [org, desde],
         );

@@ -244,3 +244,26 @@ test('un flujo no puede dar vueltas (con una espera dentro, sería infinito)', {
     aristas: [{ de: 'd', a: 'e' }, { de: 'e', a: 'v' }, { de: 'v', a: 'e' }] });
   assert.match(r.errores.join(' '), /volver a un paso anterior/);
 });
+
+test('«Avisar al equipo» queda en la campana y una tarea puede no tener cliente si va a alguien', { skip }, async () => {
+  const { validarFlujo, ejecutarFlujo } = await m();
+  const { flujo } = validarFlujo({
+    nodos: [
+      { id: 'd', tipo: 'disparador', config: { evento: 'manual' } },
+      { id: 'v', tipo: 'aviso_equipo', config: { a: 'todos', titulo: 'Revisad los plazos', mensaje: 'Es lunes' } },
+      { id: 't', tipo: 'crear_tarea', config: { titulo: 'Repasar agenda semanal', asignar: 'mo_ana' } },
+      { id: 'n', tipo: 'crear_tarea', config: { titulo: 'Sin nadie', asignar: 'usuario' } },
+    ],
+    aristas: [{ de: 'd', a: 'v' }, { de: 'd', a: 't' }, { de: 'd', a: 'n' }],
+  });
+  const id = (await pool.query(`INSERT INTO automatizaciones_flujos (organizacion_id, nombre, activo, evento, flujo) VALUES ($1,'Lunes',true,'manual',$2) RETURNING id`, [orgA, JSON.stringify(flujo)])).rows[0].id;
+  const { pasos } = await ejecutarFlujo({ id, organizacion_id: orgA, flujo }, { _evento: 'manual' }, 'A mano');
+  const campana = (await pool.query(`SELECT user_id, titulo FROM avisos_internos WHERE organizacion_id = $1 AND titulo = 'Revisad los plazos'`, [orgA])).rows;
+  assert.deepEqual(campana, [{ user_id: 'mo_ana', titulo: 'Revisad los plazos' }]);
+  const tarea = (await pool.query(`SELECT client_id, user_id FROM client_tasks WHERE titulo = 'Repasar agenda semanal' AND organizacion_id = $1`, [orgA])).rows[0];
+  assert.equal(tarea.client_id, null);
+  assert.equal(tarea.user_id, 'mo_ana');
+  const sinNadie = pasos.find((p) => p.nodo === 'n')!;
+  assert.equal(sinNadie.ok, false);
+  assert.match(sinNadie.detalle, /necesita a alguien/);
+});

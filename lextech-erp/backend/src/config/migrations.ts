@@ -3550,6 +3550,20 @@ export async function runMigrations(): Promise<void> {
       // recibido): cada cosa dispara una sola vez por flujo; el correo, desde
       // que se activó (cursor).
       await client.query(`ALTER TABLE automatizaciones_flujos ADD COLUMN IF NOT EXISTS cursor_at TIMESTAMPTZ`);
+      // 16/11/2026: los avisos de «Avisar al equipo» quedan en la campana (no
+      // solo como push), y las tareas de una automatización pueden no tener cliente.
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS avisos_internos (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          user_id         VARCHAR(150) NOT NULL,
+          titulo          VARCHAR(300) NOT NULL,
+          cuerpo          TEXT,
+          url             VARCHAR(300),
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_avisos_internos_user ON avisos_internos (user_id, organizacion_id, created_at DESC)`);
+      await client.query(`ALTER TABLE client_tasks ALTER COLUMN client_id DROP NOT NULL`);
       await client.query(`
         CREATE TABLE IF NOT EXISTS automatizaciones_disparos (
           flujo_id   UUID         NOT NULL REFERENCES automatizaciones_flujos(id) ON DELETE CASCADE,
