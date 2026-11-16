@@ -60,12 +60,16 @@ function recargarUnaVez() {
   return true;
 }
 
-interface Props { children: React.ReactNode; completa?: boolean }
+interface Props { children: React.ReactNode; completa?: boolean; reinicio?: string }
 interface Estado { error: Error | null; copiado: boolean }
 
 class Barrera extends React.Component<Props, Estado> {
   state: Estado = { error: null, copiado: false };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  // Al ir a otra dirección dentro de la misma pantalla, el error se olvida sin desmontarla.
+  componentDidUpdate(prev: Props) {
+    if (prev.reinicio !== this.props.reinicio && this.state.error) this.setState({ error: null });
+  }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     if (esVersionAntigua(error) && recargarUnaVez()) return;
     reportarError(error, { tipo: this.props.completa ? 'app' : 'pantalla', componentStack: info.componentStack || '' });
@@ -115,8 +119,10 @@ class Barrera extends React.Component<Props, Estado> {
 }
 
 /** Para una página: el resto de la app (barra lateral, cabecera) sigue funcionando. */
-export function PantallaSegura({ children, clave }: { children: React.ReactNode; clave?: string }) {
-  return <Barrera key={clave}>{children}</Barrera>;
+// `clave` distinta = la pantalla se monta de cero. Las que cambian de registro
+// sin recargar (Documentos) pasan la misma clave para todos sus registros.
+export function PantallaSegura({ children, clave, reinicio }: { children: React.ReactNode; clave?: string; reinicio?: string }) {
+  return <Barrera key={clave} reinicio={reinicio ?? clave}>{children}</Barrera>;
 }
 
 /** Para la app entera. */

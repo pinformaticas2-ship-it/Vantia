@@ -2936,7 +2936,8 @@ export default function DashboardLayout() {
               : location.pathname === '/dashboard/tareas' ? 'w-full p-4 md:p-8 module-page'
               : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>
-            <PantallaSegura clave={location.pathname}><Outlet /></PantallaSegura>
+            {/* Documentos cambia de documento sin desmontar la pantalla (antes parpadeaba entera). */}
+            <PantallaSegura clave={location.pathname.startsWith('/dashboard/documentos') ? '/dashboard/documentos' : location.pathname} reinicio={location.pathname}><Outlet /></PantallaSegura>
           </div>
         </div>
       </main>
