@@ -114,4 +114,6 @@ registrarEn({
     "Built-in automations have an «On finish» point: whatever you connect there runs every time they finish (for example, when a hearing is accepted, notify the team and create a task). Their optional steps can be removed from the flow.",
   "Otra persona ha guardado cambios en esta automatización mientras la tenías abierta. Tus cambios no se han guardado: ciérrala y vuelve a abrirla para ver la versión actual.":
     "Someone else saved changes to this automation while you had it open. Your changes were not saved: close it and open it again to see the current version.",
+  "No se ha podido conectar con el servidor de Vantia. Si se está actualizando, vuelve a intentarlo en un minuto.":
+    "Could not connect to the Vantia server. If it is being updated, try again in a minute.",
 });

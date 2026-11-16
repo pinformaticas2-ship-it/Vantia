@@ -292,7 +292,20 @@ export async function apiFetch(
         }
       }
 
-      const res = await fetch(resolveApiUrl(url), { ...init, headers });
+      let res: Response;
+      try {
+        res = await fetch(resolveApiUrl(url), { ...init, headers });
+      } catch (e: any) {
+        if (e?.name === 'AbortError') throw e;
+        // Sin respuesta (servidor actualizándose, sin conexión…). El navegador
+        // solo dice «Failed to fetch»: una consulta se reintenta una vez; lo
+        // que cambia datos no, para no hacerlo dos veces.
+        if (method === 'GET' && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2500));
+          continue;
+        }
+        throw new Error(t("No se ha podido conectar con el servidor de Vantia. Si se está actualizando, vuelve a intentarlo en un minuto."));
+      }
 
       if (res.status === 401 && attempt === 0) continue;
 
