@@ -307,27 +307,60 @@ const INSTRUCCIONES_FORMATO = `FORMATO DE LA RESPUESTA (obligatorio):
 - Etiquetas permitidas: h1, h2, h3, p, strong, em, u, ul, ol, li, blockquote, table, thead, tbody, tr, th, td, br, hr. Alineación con style="text-align: center|right|justify" en p y h1-h3. Nada de <html>, <head>, <body>, clases ni otros estilos.
 - Párrafos de cuerpo justificados (style="text-align: justify") en escritos jurídicos.`;
 
-async function llamarGemini(prompt: string): Promise<{ texto: string; uso: any }> {
+// Reserva (17/11/2026): con el plan gratuito, gemini-2.5-flash solo admite 20
+// peticiones al día; el modelo ligero tiene su propio cupo y sigue respondiendo.
+export const MODELO_RESERVA = 'gemini-3.5-flash-lite';
+const INTENTOS = [GEMINI_MODEL, MODELO_RESERVA];
+async function llamarGemini(
+  prompt: string,
+  opts: { json?: boolean; maxTokens?: number; temperatura?: number } = {},
+): Promise<{ texto: string; uso: any }> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) throw Object.assign(new Error('La IA no está configurada (falta GEMINI_API_KEY en el servidor).'), { status: 503 });
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 16384 },
-      }),
-    },
-  );
-  const data: any = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const msg = data?.error?.message || `HTTP ${r.status}`;
-    throw Object.assign(new Error(r.status === 429 ? 'La IA ha alcanzado su límite de uso por ahora. Prueba en un minuto.' : `Error de la IA: ${msg}`), { status: r.status === 429 ? 429 : 502 });
+  let ultimo = '';
+  let sinCupo = false;
+  // Saturado (500/503) o sin cupo (429): se prueba con el modelo de reserva.
+  for (const [intento, modelo] of INTENTOS.entries()) {
+    if (intento > 0) await new Promise((r) => setTimeout(r, 800));
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: opts.temperatura ?? 0.4, maxOutputTokens: opts.maxTokens ?? 16384,
+            ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+          },
+        }),
+      },
+    );
+    const data: any = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const texto = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('');
+      return { texto, uso: data?.usageMetadata };
+    }
+    ultimo = data?.error?.message || `HTTP ${r.status}`;
+    sinCupo = r.status === 429;
+    if (![429, 500, 503].includes(r.status)) break;
   }
-  const texto = (data?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('');
-  return { texto, uso: data?.usageMetadata };
+  if (sinCupo) throw Object.assign(new Error('La IA ha alcanzado su límite de uso por ahora. Prueba más tarde.'), { status: 429 });
+  throw Object.assign(new Error(/high demand|overloaded|unavailable/i.test(ultimo)
+    ? 'La IA está saturada en este momento. Vuelve a intentarlo en unos segundos.'
+    : `Error de la IA: ${ultimo}`), { status: 502 });
+}
+
+/** Respuesta en JSON {skill, documento}: qué skill usó (solo si existe) y el documento. Si no es JSON, todo es documento. */
+export function leerRespuestaConSkill<T extends { nombre: string }>(texto: string, candidatas: T[]): { texto: string; skill: T | null } {
+  try {
+    const j = JSON.parse(String(texto || '').trim().replace(/^```(json)?/i, '').replace(/```$/, ''));
+    if (j && typeof j === 'object' && typeof j.documento === 'string') {
+      const n = Number(j.skill);
+      return { texto: j.documento, skill: Number.isInteger(n) && n >= 1 ? candidatas[n - 1] || null : null };
+    }
+  } catch { /* no era JSON */ }
+  return { texto, skill: null };
 }
 
 /** Quita los ``` y lo que no sea el cuerpo, por si la IA no obedece del todo. */
@@ -359,6 +392,8 @@ export async function generarConIa(req: Request, res: Response) {
     const estilo = skills.filter((s) => s.categoria === 'estilo');
     const elegida = b.skillId ? skills.find((s) => s.id === b.skillId) : null;
     if (b.skillId && !elegida) return fallo(res, 'Esa skill no existe o está desactivada.', 404);
+    // Sin skill elegida, la IA ve las del despacho y usa la que encaje (17/11/2026).
+    const candidatas = !elegida && modo !== 'reescribir' && instrucciones ? skills.filter((s) => s.categoria !== 'estilo') : [];
     if (modo === 'nuevo' && !instrucciones && !elegida) return fallo(res, 'Dile a la IA qué quieres redactar o elige una skill.', 400);
 
     const partes: string[] = [
@@ -371,6 +406,16 @@ export async function generarConIa(req: Request, res: Response) {
     ];
     if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo siempre que redactes; en textos informales, solo lo que encaje: tono, fechas, ortografía…):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
     if (elegida) partes.push(`SKILL ELEGIDA — «${elegida.nombre}». Síguela al pie de la letra:\n${elegida.instrucciones}`);
+    if (candidatas.length) {
+      const bloques: string[] = [];
+      let total = 0;
+      for (const [i, s] of candidatas.entries()) {
+        const t = `### ${i + 1}. ${s.nombre}${s.descripcion ? `\n${s.descripcion}` : ''}\n${s.instrucciones}`;
+        if (total + t.length > 14_000) break;
+        bloques.push(t); total += t.length;
+      }
+      partes.push(`SKILLS DEL DESPACHO (instrucciones propias para tipos de escrito o tareas). Si lo que se pide ES el tipo de escrito o tarea de una de ellas, síguela al pie de la letra. Encaja solo si coincide de verdad lo que se va a producir y su contexto; no basta con compartir una palabra («resume una película» no es «Resumen del expediente»; «un correo al equipo» no es «Correo al cliente»). Si dudas, ninguna.\n\n${bloques.join('\n\n')}`);
+    }
     const contexto = await contextoParaRedactar(org, expedienteId);
     if (contexto) partes.push(`DATOS REALES (úsalos; en un escrito, los datos del despacho, cliente o asunto que no estén aquí déjalos como [●]):\n${contexto}`);
 
@@ -387,8 +432,13 @@ export async function generarConIa(req: Request, res: Response) {
       partes.push(`TAREA: continúa el documento desde donde termina, sin repetir lo que ya está. Devuelve solo lo nuevo.${instrucciones ? `\nIndicaciones: ${instrucciones}` : ''}`);
     }
     partes.push(INSTRUCCIONES_FORMATO);
+    if (candidatas.length) partes.push('ENTREGA: responde SOLO con JSON {"skill": número de la skill que has seguido o null, "documento": "el HTML del documento (o la línea NO_PUEDO)"}.');
 
-    const { texto, uso } = await llamarGemini(partes.join('\n\n'));
+    const bruto = await llamarGemini(partes.join('\n\n'), candidatas.length ? { json: true } : {});
+    const uso = bruto.uso;
+    const leido = candidatas.length ? leerRespuestaConSkill(bruto.texto, candidatas) : { texto: bruto.texto, skill: null };
+    const texto = leido.texto;
+    const automatica = leido.skill;
     const negativa = motivoNegativa(texto);
     if (negativa) return fallo(res, negativa, 422);
     const html = htmlDeRespuesta(texto);
@@ -408,7 +458,7 @@ export async function generarConIa(req: Request, res: Response) {
     // Título sugerido para documentos nuevos: el primer encabezado.
     const h = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i.exec(html);
     const tituloSugerido = modo === 'nuevo' ? (textoPlano(h?.[1] || '') || elegida?.nombre || '').slice(0, 300) : null;
-    return ok(res, { html, tituloSugerido, skill: elegida?.nombre || null });
+    return ok(res, { html, tituloSugerido, skill: elegida?.nombre || automatica?.nombre || null, skillAutomatica: Boolean(automatica) });
   } catch (e: any) {
     return fallo(res, e?.message || 'No se pudo generar con la IA', e?.status || 500);
   }

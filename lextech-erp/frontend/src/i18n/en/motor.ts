@@ -116,4 +116,6 @@ registrarEn({
     "Someone else saved changes to this automation while you had it open. Your changes were not saved: close it and open it again to see the current version.",
   "No se ha podido conectar con el servidor de Vantia. Si se está actualizando, vuelve a intentarlo en un minuto.":
     "Could not connect to the Vantia server. If it is being updated, try again in a minute.",
+  "Ha usado la skill «{nombre}».": "Used the «{nombre}» skill.",
+  "Automática (la IA elige si alguna encaja)": "Automatic (the AI picks one if it fits)",
 });

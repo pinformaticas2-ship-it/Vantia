@@ -451,6 +451,7 @@ function PanelIa({ skills, skillInicial, expediente, expedienteId, onVincular, o
         editor.chain().focus("end").insertContent(html).run();
         setHecho(modo === "continuar" ? "Añadido al final del documento." : "Añadido al final. Si no lo quieres, deshazlo con Ctrl+Z.");
       }
+      if (r.data.skillAutomatica && r.data.skill) setHecho((h) => `${h || ""} ${t("Ha usado la skill «{nombre}».", { nombre: r.data.skill })}`.trim());
       if (modo !== "reescribir") setInstrucciones("");
     } catch (e: any) {
       setError(e.message || t("No se pudo generar."));
@@ -487,7 +488,7 @@ function PanelIa({ skills, skillInicial, expediente, expedienteId, onVincular, o
         <div>
           <label className="text-xs font-semibold text-slate-500">{t("Skill")}</label>
           <select value={skillId} onChange={(e) => setSkillId(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-            <option value="">{t("Ninguna (solo mis indicaciones)")}</option>
+            <option value="">{t("Automática (la IA elige si alguna encaja)")}</option>
             {usables.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
           </select>
           {skill?.descripcion && <p className="mt-1 text-[11px] text-slate-400">{skill.descripcion}</p>}

@@ -190,3 +190,33 @@ test('IA: la línea de fecha lleva día, hora y AAAA-MM-DD de Madrid', async () 
   const l = lineaFechaIA(new Date('2026-11-17T22:30:00Z')); // 23:30 del martes en Madrid
   assert.match(l, /martes, 17 de noviembre de 2026, 23:30 \(2026-11-17\)/);
 });
+
+test('IA: dice qué skill ha seguido (solo si existe) y, sin cupo o saturada, usa el modelo de reserva', { skip }, async () => {
+  const { leerRespuestaConSkill, generarConIa, MODELO_RESERVA } = await import('../src/controllers/documentosController');
+  const skills = [{ nombre: 'Burofax' }, { nombre: 'Hoja de encargo' }];
+  assert.deepEqual(leerRespuestaConSkill('{"skill": 2, "documento": "<h1>Hoja</h1>"}', skills), { texto: '<h1>Hoja</h1>', skill: skills[1] });
+  assert.equal(leerRespuestaConSkill('{"skill": null, "documento": "<p>x</p>"}', skills).skill, null);
+  assert.equal(leerRespuestaConSkill('{"skill": 7, "documento": "<p>x</p>"}', skills).skill, null, 'un número que no está, ninguna');
+  assert.deepEqual(leerRespuestaConSkill('<p>no es JSON</p>', skills), { texto: '<p>no es JSON</p>', skill: null });
+
+  const original = globalThis.fetch;
+  process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'clave-de-prueba';
+  const modelos: string[] = [];
+  const respuesta = (status: number, cuerpo: any) => ({ ok: status === 200, status, json: async () => cuerpo }) as any;
+  try {
+    globalThis.fetch = (async (url: string, init: any) => {
+      if (!String(url).includes('generativelanguage')) return original(url as any, init);
+      modelos.push(String(url).split('/models/')[1].split(':')[0]);
+      return modelos.length === 1
+        ? respuesta(429, { error: { message: 'Quota exceeded' } })
+        : respuesta(200, { candidates: [{ content: { parts: [{ text: '<h1>Resumen</h1><p>Thanos…</p>' }] } }] });
+    }) as any;
+    const r: any = await new Promise((resolve) => {
+      let status = 200;
+      const res: any = { status(x: number) { status = x; return res; }, json(b: any) { resolve({ status, b }); return res; } };
+      generarConIa({ auth: { userId: 'doc_ia' }, organizacionId: org, body: { modo: 'nuevo', instrucciones: 'resume una película' } } as any, res);
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.b));
+    assert.deepEqual(modelos, ['gemini-2.5-flash', MODELO_RESERVA]);
+  } finally { globalThis.fetch = original; }
+});
