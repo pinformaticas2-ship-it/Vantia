@@ -3931,7 +3931,7 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0, borrador = false }
       {borrador && !activo && <span title={t("Tienes un borrador sin enviar")} className="shrink-0 text-slate-400"><Pencil size={12}/></span>}
       {canal.silenciado && <span title={t("Silenciado")} className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
-        <span className="shrink-0 bg-[#dc2626] text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold">
+        <span className="shrink-0 bg-red-600 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold">
           {unreadCount>99?"99+":unreadCount}
         </span>
       )}
@@ -3957,7 +3957,7 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
         hasUnread ? "bg-white text-slate-800 border border-slate-200 shadow-sm" :
         "text-slate-500 hover:bg-white hover:text-slate-800 border border-transparent hover:border-slate-200"
       }`}>
-      {activo && <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-[#dc2626]" />}
+      {activo && <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-red-600" />}
       <div className="relative shrink-0">
         <Av url={u.avatar_url} name={displayName} size={6}/>
         <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${activo ? "border-white" : "border-slate-50"} ${st.color}`}/>
@@ -3971,7 +3971,7 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
       {dmCanal?.silenciado && <span title={t("Silenciado")} className="shrink-0 text-slate-300"><BellOff size={12}/></span>}
       {hasUnread && (
         <div className="shrink-0 flex items-center gap-1">
-          <span className="rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-[#dc2626] text-white">
+          <span className="rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-red-600 text-white">
             {safeUnreadCount>99?"99+":safeUnreadCount}
           </span>
         </div>
@@ -4175,7 +4175,7 @@ function SaltarA({ destinos, onElegir, onClose, onBuscarEnApp }: {
                 {d.detalle && <span className="block truncate text-[11px] text-slate-400">{d.detalle}</span>}
               </span>
               {d.noLeidos > 0 && (
-                <span className="shrink-0 rounded-full bg-[#dc2626] px-1.5 text-[10px] font-bold leading-[18px] text-white">{d.noLeidos > 99 ? "99+" : d.noLeidos}</span>
+                <span className="shrink-0 rounded-full bg-red-600 px-1.5 text-[10px] font-bold leading-[18px] text-white">{d.noLeidos > 99 ? "99+" : d.noLeidos}</span>
               )}
               {foco === i && <CornerDownRight size={13} className="shrink-0 text-slate-400"/>}
             </button>
@@ -6079,7 +6079,7 @@ export default function Chat() {
           <div className="relative min-w-0 flex-1">
           <button type="button" onClick={() => setMenuEspacio((v) => !v)} aria-expanded={menuEspacio}
             className="flex w-full items-center gap-2 min-w-0 hover:bg-slate-100 rounded-xl px-2.5 py-2 transition-all duration-200 group">
-            <div className="w-8 h-8 rounded-xl bg-[#dc2626] flex items-center justify-center shrink-0 text-white font-bold text-sm">
+            <div className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center shrink-0 text-white font-bold text-sm">
               {(organizacion?.nombre || "V").trim().charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0 text-left">
@@ -6144,7 +6144,7 @@ export default function Chat() {
               {canalQ&&<button onClick={()=>{setCanalQ("");setCanalResults([]);}} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={11}/></button>}
             </div>
             <button onClick={()=>setShowCrear(true)} title={t("Crear canal")}
-              className="w-9 h-9 flex items-center justify-center bg-[#dc2626] hover:bg-[#b91c1c] text-white rounded-md transition-all duration-200 shrink-0 shadow-sm">
+              className="w-9 h-9 flex items-center justify-center bg-red-600 hover:bg-red-700 text-white rounded-md transition-all duration-200 shrink-0 shadow-sm">
               <Plus size={14}/>
             </button>
           </div>

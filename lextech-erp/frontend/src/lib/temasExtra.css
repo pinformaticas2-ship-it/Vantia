@@ -32,6 +32,84 @@
 [data-theme]:not([data-theme="rojo"]) .focus-within\:border-red-300:focus-within:not(.peligro):not(.peligro *) { border-color: var(--tema-300) !important; }
 [data-theme]:not([data-theme="rojo"]) .focus-within\:ring-red-100:focus-within:not(.peligro):not(.peligro *) { --tw-ring-color: var(--tema-100) !important; }
 
+/* ── 1b. Variantes de acento que se escapaban del tema (17/11/2026) ──────────
+   Una revisión de toda la app encontró ~55 clases de rojo/granate de marca
+   (hover más oscuro, iconos activos del menú, bordes de color con opacidad,
+   checkboxes, sombras…) sin regla de tema: con el tema azul, un botón azul
+   se volvía rojo al pasar el ratón. Las reglas usan la rampa de cada tema. */
+[data-theme="azul"]    { --tema-500: #3b82f6; --tema-600: #2563eb; --tema-700: #1d4ed8; --tema-800: #1e40af; --tema-900: #1e3a8a; --tema-400-rgb: 96 165 250;  --tema-500-rgb: 59 130 246;  --tema-600-rgb: 37 99 235;  --tema-700-rgb: 29 78 216; }
+[data-theme="verde"]   { --tema-500: #10b981; --tema-600: #059669; --tema-700: #047857; --tema-800: #065f46; --tema-900: #064e3b; --tema-400-rgb: 52 211 153;  --tema-500-rgb: 16 185 129;  --tema-600-rgb: 5 150 105;  --tema-700-rgb: 4 120 87; }
+[data-theme="violeta"] { --tema-500: #8b5cf6; --tema-600: #7c3aed; --tema-700: #6d28d9; --tema-800: #5b21b6; --tema-900: #4c1d95; --tema-400-rgb: 167 139 250; --tema-500-rgb: 139 92 246;  --tema-600-rgb: 124 58 237; --tema-700-rgb: 109 40 217; }
+[data-theme="grafito"] { --tema-500: #14b8a6; --tema-600: #0d9488; --tema-700: #0f766e; --tema-800: #115e59; --tema-900: #134e4a; --tema-400-rgb: 45 212 191;  --tema-500-rgb: 20 184 166;  --tema-600-rgb: 13 148 136; --tema-700-rgb: 15 118 110; }
+[data-theme="indigo"]  { --tema-500: #6366f1; --tema-600: #4f46e5; --tema-700: #4338ca; --tema-800: #3730a3; --tema-900: #312e81; --tema-400-rgb: 129 140 248; --tema-500-rgb: 99 102 241;  --tema-600-rgb: 79 70 229;  --tema-700-rgb: 67 56 202; }
+
+/* Texto */
+:where([data-theme]:not([data-theme="rojo"])) .text-red-400:where(:not(.peligro):not(.peligro *)) { color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .text-red-900:where(:not(.peligro):not(.peligro *)) { color: var(--tema-900) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .text-red-400\/80:where(:not(.peligro):not(.peligro *)) { color: rgb(var(--tema-400-rgb) / 0.8) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .text-red-600\/80:where(:not(.peligro):not(.peligro *)) { color: rgb(var(--tema-600-rgb) / 0.8) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:text-red-400:hover:where(:not(.peligro):not(.peligro *)) { color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:text-red-800:hover:where(:not(.peligro):not(.peligro *)) { color: var(--tema-800) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:text-\[\#92042c\]:hover:where(:not(.peligro):not(.peligro *)) { color: var(--tema-700) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:text-red-400:where(:not(.peligro):not(.peligro *)) { color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:text-red-500:where(:not(.peligro):not(.peligro *)) { color: var(--tema-500) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:text-red-600:where(:not(.peligro):not(.peligro *)) { color: var(--tema-600) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:text-red-700:where(:not(.peligro):not(.peligro *)) { color: var(--tema-700) !important; }
+@media (min-width: 768px) {
+  :where([data-theme]:not([data-theme="rojo"])) .md\:text-red-700:where(:not(.peligro):not(.peligro *)) { color: var(--tema-700) !important; }
+  /* Sección activa del menú de Ajustes */
+  :where([data-theme]:not([data-theme="rojo"])) .md\:bg-red-50:where(:not(.peligro):not(.peligro *)) { background-color: var(--tema-50) !important; }
+  html[data-modo="oscuro"]:where([data-theme]:not([data-theme="rojo"])) .md\:bg-red-50:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-500-rgb) / 0.15) !important; }
+}
+
+/* Fondos */
+:where([data-theme]:not([data-theme="rojo"])) .bg-red-400:where(:not(.peligro):not(.peligro *)) { background-color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .bg-red-500\/40:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-500-rgb) / 0.4) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .bg-\[\#ab0433\]\/10:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-600-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .bg-\[\#ab0433\]\/90:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-600-rgb) / 0.9) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:bg-red-800:hover:where(:not(.peligro):not(.peligro *)) { background-color: var(--tema-800) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:bg-red-400\/10:hover:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-400-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:bg-red-500\/10:hover:where(:not(.peligro):not(.peligro *)) { background-color: rgb(var(--tema-500-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:bg-\[\#ab0433\]:hover:where(:not(.peligro):not(.peligro *)) { background-color: var(--tema-600) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:from-red-700:hover:where(:not(.peligro):not(.peligro *)) { --tw-gradient-from: var(--tema-700) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:to-red-800:hover:where(:not(.peligro):not(.peligro *)) { --tw-gradient-to: var(--tema-800) !important; }
+
+/* Bordes */
+:where([data-theme]:not([data-theme="rojo"])) .border-red-400:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-red-800:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-800) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/20:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.2) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/25:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.25) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/30:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.3) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/35:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.35) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/40:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.4) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .border-\[\#ab0433\]\/45:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.45) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-red-400:hover:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-400) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-red-600:hover:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-600) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-red-700:hover:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-700) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-red-400\/40:hover:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-400-rgb) / 0.4) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-\[\#ab0433\]:hover:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-600) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-\[\#ab0433\]\/20:hover:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.2) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-\[\#ab0433\]\/30:hover:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.3) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-\[\#ab0433\]\/35:hover:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.35) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .hover\:border-\[\#ab0433\]\/40:hover:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.4) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus\:border-\[\#ab0433\]\/35:focus:where(:not(.peligro):not(.peligro *)) { border-color: rgb(var(--tema-600-rgb) / 0.35) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus-within\:border-red-400:focus-within:where(:not(.peligro):not(.peligro *)) { border-color: var(--tema-400) !important; }
+
+/* Anillos, sombras y casillas */
+:where([data-theme]:not([data-theme="rojo"])) .ring-red-700:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: var(--tema-700) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .ring-red-500\/70:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-500-rgb) / 0.7) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .ring-\[\#ab0433\]\/10:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-600-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus\:ring-red-500\/10:focus:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-500-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus\:ring-red-500\/50:focus:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-500-rgb) / 0.5) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus\:ring-red-600\/15:focus:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-600-rgb) / 0.15) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .focus\:ring-\[\#ab0433\]\/10:focus:where(:not(.peligro):not(.peligro *)) { --tw-ring-color: rgb(var(--tema-600-rgb) / 0.1) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .shadow-red-500\/30:where(:not(.peligro):not(.peligro *)) { --tw-shadow-color: rgb(var(--tema-500-rgb) / 0.3) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .shadow-red-600\/20:where(:not(.peligro):not(.peligro *)) { --tw-shadow-color: rgb(var(--tema-600-rgb) / 0.2) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .shadow-red-600\/30:where(:not(.peligro):not(.peligro *)) { --tw-shadow-color: rgb(var(--tema-600-rgb) / 0.3) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:shadow-red-700\/50:where(:not(.peligro):not(.peligro *)) { --tw-shadow-color: rgb(var(--tema-700-rgb) / 0.5) !important; }
+:where([data-theme]:not([data-theme="rojo"])) .accent-red-600:where(:not(.peligro):not(.peligro *)),
+:where([data-theme]:not([data-theme="rojo"])) .accent-\[\#ab0433\]:where(:not(.peligro):not(.peligro *)) { accent-color: var(--tema-600) !important; }
+
 /* ── 2. Peligro: el rojo de siempre, con cualquier tema ── */
 [data-theme] .peligro.bg-red-500, [data-theme] .peligro .bg-red-500 { background-color: #ef4444 !important; }
 [data-theme] .peligro.bg-red-600, [data-theme] .peligro .bg-red-600 { background-color: #dc2626 !important; }

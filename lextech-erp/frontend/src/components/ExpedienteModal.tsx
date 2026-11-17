@@ -493,7 +493,7 @@ function IndicadoresModal({ expedienteId }: { expedienteId: string }) {
     return () => { vivo = false; };
   }, [expedienteId, getToken]);
 
-  if (error) return <p className="px-4 py-3 text-xs text-red-400">{error}</p>;
+  if (error) return <p className="peligro px-4 py-3 text-xs text-red-400">{error}</p>;
   if (!ind) return <div className="px-4 py-4 flex justify-center"><Spinner size="sm" /></div>;
 
   const euros = (v: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(v ?? 0);
