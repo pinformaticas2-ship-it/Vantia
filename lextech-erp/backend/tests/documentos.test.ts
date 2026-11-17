@@ -184,3 +184,9 @@ test('IA: sabe la fecha de hoy (hora de Madrid) y una negativa no se escribe en 
   assert.equal(motivoNegativa('```html\n<p>NO_PUEDO: eso no.</p>\n```'), 'eso no.');
   assert.equal(motivoNegativa('<h1>Resumen de la película</h1><p>Thanos reúne las gemas…</p>'), null);
 });
+
+test('IA: la línea de fecha lleva día, hora y AAAA-MM-DD de Madrid', async () => {
+  const { lineaFechaIA } = await import('../src/utils/fechaIA');
+  const l = lineaFechaIA(new Date('2026-11-17T22:30:00Z')); // 23:30 del martes en Madrid
+  assert.match(l, /martes, 17 de noviembre de 2026, 23:30 \(2026-11-17\)/);
+});

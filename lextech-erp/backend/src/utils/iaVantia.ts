@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { lineaFechaIA } from './fechaIA';
 
 // IA de Vantia fuera del chat (13/11/2026): para el paso «IA de Vantia» de las
 // automatizaciones y para «Créalo con IA». Mismo proveedor y modelos que el
@@ -63,7 +64,7 @@ export async function preguntarIA(opts: {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(60_000),
         body: JSON.stringify({
           contents,
-          ...(opts.sistema ? { systemInstruction: { parts: [{ text: opts.sistema }] } } : {}),
+          systemInstruction: { parts: [{ text: `${opts.sistema ? `${opts.sistema}\n\n` : ''}${lineaFechaIA()}` }] },
           ...(herramientas && !opts.json ? { tools: herramientas } : {}),
           generationConfig: {
             temperature: opts.temperatura ?? 0.4, maxOutputTokens: opts.maxTokens ?? 2048,

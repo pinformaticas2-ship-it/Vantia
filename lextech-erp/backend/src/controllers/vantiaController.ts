@@ -6,6 +6,7 @@ import { performDeleteFile, performRenameFile, performMoveFile, ensureFileOnDisk
 import { logActivityForReq, resolveUserName } from './activityController';
 import { extractTextFromFile, type DocFile } from '../utils/docExtract';
 import { bloqueSkillsParaChat } from './skillsController';
+import { lineaFechaIA } from '../utils/fechaIA';
 import { crearDocumentoDesdeChat } from './documentosController';
 
 const GEMINI_MODEL   = 'gemini-2.5-flash';
@@ -1579,7 +1580,7 @@ export const chatVantia = async (req: any, res: Response) => {
     ]);
 
     const fullSystemPrompt =
-      BASE_PROMPT + await instruccionIdioma(userId) +
+      BASE_PROMPT + '\n\n' + lineaFechaIA() + await instruccionIdioma(userId) +
       '\n\n' + moduleInstructions(moduleId) +
       entityCtx +
       await bloqueSkillsParaChat(req.organizacionId);
@@ -1791,7 +1792,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
   try {
     const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
-    const fullSystemPrompt = BASE_PROMPT + await instruccionIdioma(userId) + '\n\n' + moduleInstructions(moduleId) + entityCtx
+    const fullSystemPrompt = BASE_PROMPT + '\n\n' + lineaFechaIA() + await instruccionIdioma(userId) + '\n\n' + moduleInstructions(moduleId) + entityCtx
       + await bloqueSkillsParaChat(req.organizacionId);
 
     const cleanHistory: any[] = [...history];

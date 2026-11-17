@@ -231,10 +231,8 @@ const valor = (v: any) => {
 };
 
 /** Datos reales del despacho, del expediente y de su cliente para la IA. */
-/** «lunes, 16 de noviembre de 2026», en hora de Madrid: la IA no sabe qué día es. */
-export function fechaDeHoy(d = new Date()): string {
-  return d.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-}
+export { fechaDeHoy } from '../utils/fechaIA';
+import { fechaDeHoy } from '../utils/fechaIA';
 
 /** Si la IA dice que no puede, devuelve el motivo (para el panel, no para el documento). */
 export function motivoNegativa(texto: string): string | null {
@@ -371,7 +369,7 @@ export async function generarConIa(req: Request, res: Response) {
 - Si de verdad no puedes hacerlo (algo ilegal o dañino), responde solo con una línea: «NO_PUEDO: » y el motivo en una frase para el usuario.
 - Fechas: usa la FECHA DE HOY cuando el documento lleve fecha. No inventes nunca otra fecha.`,
     ];
-    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo a los escritos del despacho):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
+    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo siempre que redactes; en textos informales, solo lo que encaje: tono, fechas, ortografía…):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
     if (elegida) partes.push(`SKILL ELEGIDA — «${elegida.nombre}». Síguela al pie de la letra:\n${elegida.instrucciones}`);
     const contexto = await contextoParaRedactar(org, expedienteId);
     if (contexto) partes.push(`DATOS REALES (úsalos; en un escrito, los datos del despacho, cliente o asunto que no estén aquí déjalos como [●]):\n${contexto}`);
