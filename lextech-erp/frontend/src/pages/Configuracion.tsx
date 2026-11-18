@@ -565,7 +565,7 @@ function DespachoPanel() {
               </div>
               {canEdit && organizacion?.logoUrl && (
                 <button type="button" onClick={() => void quitarLogo()} disabled={removingLogo || uploadingLogo}
-                  className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50">
+                  className="peligro mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50">
                   {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}{t('Quitar')}</button>
               )}
             </div>
@@ -903,7 +903,7 @@ function UsuariosPanel() {
                     <button
                       onClick={() => void remove(m)}
                       disabled={busyId === m.id}
-                      className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      className="peligro p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                       title={t("Quitar de la organización")}
                     >
                       {busyId === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -1645,7 +1645,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 type="button"
                 onClick={disconnectDrive}
                 disabled={disconnectingDrive}
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                className="peligro mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
               >
                 {disconnectingDrive ? t("Desconectando…") : t("Desconectar")}
               </button>
@@ -1686,7 +1686,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                 type="button"
                 onClick={disconnectDropbox}
                 disabled={disconnectingDropbox}
-                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+                className="peligro mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
               >
                 {disconnectingDropbox ? t("Desconectando…") : t("Desconectar")}
               </button>

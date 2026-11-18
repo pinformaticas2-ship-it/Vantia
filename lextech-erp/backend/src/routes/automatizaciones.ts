@@ -74,7 +74,8 @@ router.get('/', requireAuth, async (req: any, res: Response) => {
           ultimaRevision: o.vistas_auto_last_run_at,
           error: o.vistas_auto_last_error,
           recibidas30: vistasRecibidas, aceptadas30: vistasAceptadas, pendientes: vistasPendientes,
-          ultimas: ultVistas.rows.map((r: any) => ({ ok: r.estado !== 'error', detalle: `${r.subject || '(Sin asunto)'} · ${r.estado}`, created_at: r.created_at })),
+          // asunto y estado aparte: la pantalla traduce el estado al idioma del usuario.
+          ultimas: ultVistas.rows.map((r: any) => ({ ok: r.estado !== 'error', detalle: `${r.subject || '(Sin asunto)'} · ${r.estado}`, asunto: r.subject || null, estado: r.estado, created_at: r.created_at })),
         },
         docsBase: { ...docs, generados30: docsGenerados },
         bienvenida: {

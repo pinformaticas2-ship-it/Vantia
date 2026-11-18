@@ -22,7 +22,9 @@ import { locale, t, tn } from '../lib/i18n';
 // /api/vistas/config (vistas por correo) y /api/docs-base/config.
 
 type Clave = 'vistas' | 'docsBase' | 'bienvenida' | 'recordatorios';
-interface Ejecucion { ok: boolean; detalle: string; created_at: string }
+interface Ejecucion { ok: boolean; detalle: string; created_at: string; asunto?: string | null; estado?: string }
+/** El asunto del correo tal cual; el estado, en el idioma del usuario. */
+const textoEjecucion = (u: Ejecucion) => (u.estado ? `${u.asunto || t('(Sin asunto)')} · ${t(u.estado)}` : u.detalle);
 interface Resumen {
   canManage: boolean;
   cuentaCorreo: string | null;
@@ -109,7 +111,7 @@ function Ficha({ icono: Icono, fondo, titulo, subtitulo, activo, revisar, descri
             {ultimas.slice(0, 3).map((u, i) => (
               <li key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
                 {u.ok ? <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald-500" /> : <XCircle size={13} className="mt-0.5 shrink-0 text-red-500" />}
-                <span className="min-w-0 flex-1 truncate" title={u.detalle} data-sin-traducir>{u.detalle}</span>
+                <span className="min-w-0 flex-1 truncate" title={textoEjecucion(u)} data-sin-traducir>{textoEjecucion(u)}</span>
                 <span className="shrink-0 text-slate-400">{fmt(u.created_at)}</span>
               </li>
             ))}

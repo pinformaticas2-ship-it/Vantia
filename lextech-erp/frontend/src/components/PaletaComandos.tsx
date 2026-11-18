@@ -225,7 +225,7 @@ export default function PaletaComandos({ modulos, puede }: { modulos: ModuloPale
         </div>
         <div className="hidden sm:flex items-center gap-4 border-t border-slate-100 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
           <span><kbd className="font-sans font-semibold">↑↓</kbd>{" "}{t("moverse")}</span>
-          <span><kbd className="font-sans font-semibold">Intro</kbd>{" "}{t("abrir")}</span>
+          <span><kbd className="font-sans font-semibold">{t("Intro")}</kbd>{" "}{t("abrir")}</span>
           <span><kbd className="font-sans font-semibold">Esc</kbd>{" "}{t("cerrar")}</span>
           <span className="ml-auto"><kbd className="font-sans font-semibold">Ctrl K</kbd>{" "}{t("desde cualquier sitio")}</span>
         </div>

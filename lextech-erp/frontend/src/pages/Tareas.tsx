@@ -1527,10 +1527,10 @@ export default function Tareas() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {([
-          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-rose-600",    labelCls: "text-rose-400",    bg: "bg-rose-50/70",    border: "border-rose-100",    Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "URGENTES",    val: stats.urgentes,    cls: "text-orange-500",  labelCls: "text-orange-400",  bg: "bg-orange-50/70",  border: "border-orange-100",  Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "PENDIENTES",  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50/70",   border: "border-amber-100",   Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "COMPLETADAS", val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50/70", border: "border-emerald-100", Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: t("Vencidas"),    val: stats.vencidas,    cls: "text-rose-600",    labelCls: "text-rose-400",    bg: "bg-rose-50/70",    border: "border-rose-100",    Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: t("Urgentes"),    val: stats.urgentes,    cls: "text-orange-500",  labelCls: "text-orange-400",  bg: "bg-orange-50/70",  border: "border-orange-100",  Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: t("Pendientes"),  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50/70",   border: "border-amber-100",   Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: t("Completadas"), val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50/70", border: "border-emerald-100", Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
         ] as const).map(s => (
           <div key={s.label} className={`group relative overflow-hidden rounded-xl border shadow-sm hover:shadow-md transition-shadow cursor-pointer ${s.bg} ${s.border} px-5 py-5`}>
             <div className={`absolute -right-4 -bottom-4 opacity-50 group-hover:scale-110 transition-transform ${s.labelCls}`}>

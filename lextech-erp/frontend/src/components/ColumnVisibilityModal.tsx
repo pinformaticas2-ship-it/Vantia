@@ -156,7 +156,7 @@ export default function ColumnVisibilityModal({
                   onMoveToAvailable(selectedVisible);
                   setSelectedVisible([]);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                className="peligro flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                 title={t("Quitar seleccionados")}
               >
                 <ArrowLeft size={18} />
@@ -181,7 +181,7 @@ export default function ColumnVisibilityModal({
                   setSelectedAvailable([]);
                   setSelectedVisible([]);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+                className="peligro flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-700"
                 title={t("Quitar todos")}
               >
                 <ChevronsLeft size={18} />

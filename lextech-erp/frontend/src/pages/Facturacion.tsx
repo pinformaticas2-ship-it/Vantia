@@ -1160,9 +1160,9 @@ function FacturaWorkspacePage({
   const selectedExpediente = useMemo(() => expedientes.find((item) => item.id === form.expedienteId) || null, [expedientes, form.expedienteId]);
   const canSubmit = Boolean(form.num.trim() && form.clientId && form.contacto.trim() && Number(form.total) > 0);
   const missingFields = [
-    !form.num.trim() && "número de factura",
-    !form.clientId && "cliente",
-    !(Number(form.total) > 0) && "importe total",
+    !form.num.trim() && t("número de factura"),
+    !form.clientId && t("cliente"),
+    !(Number(form.total) > 0) && t("importe total"),
   ].filter(Boolean) as string[];
   const displayNumber = form.serie.trim() ? `${form.serie.trim()}-${form.num.trim() || "..."}` : form.num.trim() || "Borrador";
   const baseUnitariaNum = Number(form.baseUnitaria || 0);
@@ -2335,7 +2335,7 @@ function FacturacionContent() {
   const clientesFacturables = new Set([...filteredFacturas, ...filteredPresupuestos].map((row) => row.clientId).filter(Boolean)).size;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(248,113,113,0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
+    <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(var(--accent-glow),0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
       <div className="flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
         <div className="flex flex-col gap-6 px-6 py-6">
           {errorMsg && (

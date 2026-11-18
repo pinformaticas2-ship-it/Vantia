@@ -394,7 +394,7 @@ export function ListadoAtajosModal({
             <button
               disabled={!selectedAtajo}
               onClick={() => selectedAtajo && setConfirmDeleteId(selectedAtajo.id)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="peligro inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Trash2 size={11} />{" "}{t("Eliminar")}</button>
             {filtrados.length > 0 && (

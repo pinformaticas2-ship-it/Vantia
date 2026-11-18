@@ -2458,7 +2458,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                       <span key={u.user_id} className="flex items-center gap-1.5 bg-slate-100 text-slate-700 text-xs px-2.5 py-1.5 rounded-full">
                         <Av url={u.avatar_url} name={u.user_name} size={4}/>
                         {u.user_name}
-                        <button onClick={()=>toggle(u)} className="hover:text-red-600 ml-0.5"><X size={10}/></button>
+                        <button onClick={()=>toggle(u)} className="peligro hover:text-red-600 ml-0.5"><X size={10}/></button>
                       </span>
                     ))}
                   </div>
@@ -3715,7 +3715,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
           {editingMsg ? <Edit3 size={12} className="shrink-0"/> : <CornerDownRight size={12} className="shrink-0"/>}
           {replyTo && !editingMsg && <span className="min-w-0 truncate">{t("Citando a")}{" "}<strong>{resolveDisplayName(replyTo.user_id, replyTo.user_name, replyTo.user_id === currentUserId)}</strong>: <span className="opacity-70">{replyTo.contenido.slice(0,80)}{replyTo.contenido.length>80?"…":""}</span></span>}
           {editingMsg && <span><span className="font-semibold">{t("Editando mensaje")}</span> <span className="opacity-70">{t("· Intro para guardar · Esc para cancelar")}</span></span>}
-          <button type="button" onClick={()=>{ if (editingMsg) onCancelEdit(); else onCancelReply(); }} title={t("Cancelar (Esc)")} className="ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/70 hover:text-red-500"><X size={12}/></button>
+          <button type="button" onClick={()=>{ if (editingMsg) onCancelEdit(); else onCancelReply(); }} title={t("Cancelar (Esc)")} className="peligro ml-auto shrink-0 rounded p-0.5 transition-colors hover:bg-white/70 hover:text-red-500"><X size={12}/></button>
         </div>
       )}
       <div
@@ -3725,7 +3725,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
         onDrop={handleDrop}
         className={`relative bg-white rounded-[1.1rem] border focus-within:border-slate-300 focus-within:shadow-[0_10px_34px_-18px_rgba(15,23,42,0.35)] transition-all shadow-sm ${
           isDraggingImage
-            ? "border-red-300 bg-red-50/80 shadow-[0_18px_50px_-22px_rgba(220,38,38,0.45)]"
+            ? "border-red-300 bg-red-50/80 shadow-[0_18px_50px_-22px_rgba(var(--accent-glow),0.45)]"
             : editingMsg ? "border-amber-300" : "border-slate-200"
         }`}
       >
@@ -6342,7 +6342,7 @@ export default function Chat() {
       {/* ══ MAIN AREA ════════════════════════════════════════════════════════ */}
       <div className={`${isMobile && !canalActivo ? "hidden" : "flex"} flex-1 flex-col min-w-0 overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(248,250,252,0.96)_100%)]`}>
         {!canalActivo?(
-          <div className="flex flex-col items-center justify-center flex-1 gap-5 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.15),_transparent_30%),linear-gradient(180deg,_rgba(248,250,252,0.95),_rgba(241,245,249,0.9))]">
+          <div className="flex flex-col items-center justify-center flex-1 gap-5 bg-[radial-gradient(circle_at_top,_rgba(var(--accent-glow),0.15),_transparent_30%),linear-gradient(180deg,_rgba(248,250,252,0.95),_rgba(241,245,249,0.9))]">
             <div className="w-20 h-20 rounded-[1.7rem] bg-white shadow-lg border border-slate-200 flex items-center justify-center">
               <MessageSquare size={30} className="text-[#ab0433]"/>
             </div>

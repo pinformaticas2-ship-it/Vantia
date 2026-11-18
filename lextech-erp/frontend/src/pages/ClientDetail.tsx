@@ -25,6 +25,7 @@ import { Spinner } from "../components/Spinner";
 import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
 import { t, t as tr } from '../lib/i18n';
+import { estadoCliente } from '../lib/estadoCliente';
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -167,7 +168,7 @@ function TabPerfil({ client, formatDate, age }: any) {
       </Section>
 
       <Section title={t("Administración")} icon={Shield}>
-        <Field label={t("Estado")}                     value={client.client_status} />
+        <Field label={t("Estado")}                     value={client.client_status ? estadoCliente(client.client_status) : client.client_status} />
         <Field label={t("Fecha alta")}                 value={formatDate(client.date_alta)} />
         <Field label={t("Fecha baja")}                 value={formatDate(client.date_baja)} />
         <Field label={t("LOPD")}                       value={client.lopd} />
@@ -1020,7 +1021,7 @@ function TabNotas({ clientId }: { clientId: string }) {
                       </button>
                       <button
                         onClick={() => deleteNota(n.id)}
-                        className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                        className="peligro p-1 text-slate-300 hover:text-red-500 transition-colors"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -3001,7 +3002,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                   onClick={() => {
                     setPreview(null);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title={t("Cerrar vista previa")}
                 >
                   <X size={14} />
@@ -3560,10 +3561,10 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
             color={ind?.total_actuaciones > 0 ? "text-blue-600" : "text-slate-700"} />
           <Indicador label={t("Expedientes")}        value={fmt(ind?.total_expedientes)}
             color={ind?.total_expedientes > 0 ? "text-indigo-600" : "text-slate-700"} />
-          <Indicador label={t("Días sin actuac.")}  value={fmt(ind?.dias_sin_actuacion, " días")}
+          <Indicador label={t("Días sin actuac.")}  value={fmt(ind?.dias_sin_actuacion, ` ${t("días")}`)}
             color={ind?.dias_sin_actuacion > 30 ? "text-amber-600" : "text-slate-700"} />
-          <Indicador label={t("Días desde alta")}   value={fmt(ind?.dias_desde_alta, " días")} />
-          <Indicador label={t("Estado")}            value={ind?.client_status || "—"}
+          <Indicador label={t("Días desde alta")}   value={fmt(ind?.dias_desde_alta, ` ${t("días")}`)} />
+          <Indicador label={t("Estado")}            value={ind?.client_status ? estadoCliente(ind.client_status) : "—"}
             color={ind?.client_status === "Alta" ? "text-emerald-600" :
                    ind?.client_status === "Baja" ? "text-red-600" : "text-slate-700"} />
           <Indicador label={t("Domicilio")}
@@ -4070,7 +4071,7 @@ export default function ClientDetail() {
                 {client.first_name} {client.last_name}
               </h1>
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
-                {client.client_status || t("Alta")}
+                {estadoCliente(client.client_status || "Alta")}
               </span>
               <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>
                 {client.type || t("Cliente")}
@@ -4129,7 +4130,7 @@ export default function ClientDetail() {
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(var(--accent-glow),0.7)]" />}
                   </button>
                 );
               })}

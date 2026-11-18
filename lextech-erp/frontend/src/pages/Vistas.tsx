@@ -784,7 +784,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <div className="mt-4 border-t border-slate-100 pt-3">
               {!confirmarCancelar ? (
                 <button type="button" onClick={() => setConfirmarCancelar(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                  className="peligro inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
                   <X size={13} />{" "}{t("Cancelar esta vista")}</button>
               ) : (
                 <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/60 p-3">

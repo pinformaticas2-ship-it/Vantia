@@ -104,7 +104,7 @@ function NodoPaso({ id, data, selected }: NodeProps<NodoLienzo>) {
         </div>
         {borrable && (
           <button type="button" onClick={(e) => { e.stopPropagation(); ctx.borrarNodo(id); }} title={t('Borrar paso')}
-            className="nodrag -mr-1 -mt-1 rounded-md p-1 text-slate-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"><Trash2 size={13} /></button>
+            className="peligro nodrag -mr-1 -mt-1 rounded-md p-1 text-slate-300 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"><Trash2 size={13} /></button>
         )}
       </div>
       {esCondicion ? (
@@ -135,7 +135,7 @@ function Arista({ id, sourceX, sourceY, targetX, targetY, sourcePosition, target
           {etiqueta && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white shadow-sm" style={{ background: color }}>{etiqueta}</span>}
           {selected && !data?.fija && ctx.puedeEditar && (
             <button type="button" onClick={() => ctx.borrarArista(id)} title={t('Quitar conexión')}
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50"><X size={11} /></button>
+              className="peligro flex h-5 w-5 items-center justify-center rounded-full border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50"><X size={11} /></button>
           )}
         </div>
       </EdgeLabelRenderer>
@@ -723,7 +723,7 @@ function PanelTitulo({ color, icono: I, chip, titulo, onCerrar, onBorrar, deSeri
         </div>
         <p className="mt-1 text-base font-bold text-slate-800">{titulo}</p>
       </div>
-      {onBorrar && <button type="button" onClick={onBorrar} title={t('Borrar paso')} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>}
+      {onBorrar && <button type="button" onClick={onBorrar} title={t('Borrar paso')} className="peligro rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>}
       <button type="button" onClick={onCerrar} aria-label={t('Cerrar')} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={16} /></button>
     </div>
   );

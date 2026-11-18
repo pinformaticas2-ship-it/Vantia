@@ -855,7 +855,7 @@ function EventModal({
                     type="button"
                     onClick={() => onDelete(event.id)}
                     disabled={saving}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                    className="peligro flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                   >
                     <Trash2 size={14} />{" "}{t("Eliminar evento")}</button>
                 ) : null}
@@ -1491,7 +1491,7 @@ function QuickEventPopover({
                     {guestsList.map(g => (
                       <span key={g} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
                         {g}
-                        <button type="button" onClick={() => removeGuest(g)} className="text-slate-400 hover:text-red-500">
+                        <button type="button" onClick={() => removeGuest(g)} className="peligro text-slate-400 hover:text-red-500">
                           <X size={10} />
                         </button>
                       </span>
@@ -3894,7 +3894,7 @@ export default function Agenda() {
               <button
                 key={tipo}
                 onClick={() => alternarTipo(tipo)}
-                title={oculto ? t("Mostrar {toLowerCase}", { toLowerCase: conf.label.toLowerCase() }) : t("Ocultar {toLowerCase}", { toLowerCase: conf.label.toLowerCase() })}
+                title={oculto ? t("Mostrar {toLowerCase}", { toLowerCase: t(conf.label).toLowerCase() }) : t("Ocultar {toLowerCase}", { toLowerCase: t(conf.label).toLowerCase() })}
                 aria-pressed={!oculto}
                 className={`agenda-tipo ${oculto ? "apagado" : ""} shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition-colors`}
                 style={{ "--ev": conf.hex } as React.CSSProperties}
@@ -4023,7 +4023,7 @@ export default function Agenda() {
                                 title={t("Doble clic para crear un evento")}
                                 className={`border-b border-r border-slate-200/70 min-h-[96px] p-1.5 cursor-pointer transition-all ${
                                   dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
-                                  : isSel   ? "bg-red-50/60 ring-1 ring-inset ring-red-200"
+                                  : isSel   ? "bg-[rgba(var(--accent-glow),0.06)] ring-1 ring-inset ring-[rgba(var(--accent-glow),0.25)]"
                                   : isToday ? "agenda-col-hoy"
                                   : date.getDay() === 0 || date.getDay() === 6 ? "agenda-col-finde hover:bg-slate-50"
                                   : "hover:bg-slate-50"

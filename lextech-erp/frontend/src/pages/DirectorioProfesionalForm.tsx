@@ -212,7 +212,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
 
   if (loadingData) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
-      <Spinner size="xl" label={t("Cargando {toLowerCase}...", { toLowerCase: singular.toLowerCase() })} />
+      <Spinner size="xl" label={t("Cargando {toLowerCase}...", { toLowerCase: t(singular).toLowerCase() })} />
     </div>
   );
 
@@ -245,10 +245,10 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           </div>
           <div className="flex flex-col justify-center">
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-0.5">
-              {isEdit ? t("Editar {toLowerCase}", { toLowerCase: singular.toLowerCase() }) : `${esContrario ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}`}
+              {isEdit ? t("Editar {toLowerCase}", { toLowerCase: t(singular).toLowerCase() }) : (esContrario ? t("Nueva {x}", { x: t(singular).toLowerCase() }) : t("Nuevo {x}", { x: t(singular).toLowerCase() }))}
             </h1>
             <p className="text-[11px] font-medium text-slate-500">
-              {isEdit ? t("Modifica los datos y pulsa Guardar cambios") : t("Rellena la ficha de alta {v} {toLowerCase}", { v: esContrario ? "de la" : "del", toLowerCase: singular.toLowerCase() })}
+              {isEdit ? t("Modifica los datos y pulsa Guardar cambios") : (esContrario ? t("Rellena la ficha de alta de la {x}", { x: t(singular).toLowerCase() }) : t("Rellena la ficha de alta del {x}", { x: t(singular).toLowerCase() }))}
             </p>
           </div>
         </div>

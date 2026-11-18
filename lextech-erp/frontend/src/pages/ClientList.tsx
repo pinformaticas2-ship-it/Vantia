@@ -33,6 +33,7 @@ import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { aviso, proximamente } from "../lib/avisos";
 import { t } from '../lib/i18n';
+import { estadoCliente } from '../lib/estadoCliente';
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -1316,7 +1317,7 @@ function FilterRow({
         <button
           onClick={() => onRemove(filter.id)}
           title={t("Quitar este filtro")}
-          className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
+          className="peligro flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
         >
           −
         </button>
@@ -2681,7 +2682,7 @@ export default function ClientList() {
                       <button
                         onClick={() => removeFilter(filter.id)}
                         title={t("Quitar este filtro")}
-                        className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
+                        className="peligro flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold"
                       >
                         −
                       </button>
@@ -2691,7 +2692,7 @@ export default function ClientList() {
                     <button
                       onClick={clearAllFilters}
                       title={t("Quitar todos los filtros")}
-                      className={`flex items-center justify-center w-6 h-6 rounded-md border transition-colors
+                      className={`peligro flex items-center justify-center w-6 h-6 rounded-md border transition-colors
                         ${hasActiveFilters || filters.length > 1
                           ? "border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400"
                           : "border-slate-200 text-slate-300 cursor-default"
@@ -2784,7 +2785,7 @@ export default function ClientList() {
                 <FileSpreadsheet size={11} />{" "}{t("Exportar seleccionados")}</button>
               <button
                 onClick={() => setBulkDeleteConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-white text-red-600 border border-red-200 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+                className="peligro flex items-center gap-1.5 px-3 py-1 bg-white text-red-600 border border-red-200 rounded-lg font-semibold hover:bg-red-50 transition-colors"
               >
                 <Trash2 size={11} />{" "}{t("Eliminar seleccionados")}</button>
               <button
@@ -2917,7 +2918,7 @@ export default function ClientList() {
                       {visibleColumns.center && <td className="px-3 py-3 text-slate-500 hidden xl:table-cell">{client.center || <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.commercial_communications && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell">{client.commercial_communications || <span className="text-slate-300">—</span>}</td>}
                       {visibleColumns.client_status && <td className="px-3 py-3">
-                        {client.client_status ? <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status}</span> : <span className="text-slate-300">—</span>}
+                        {client.client_status ? <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{estadoCliente(client.client_status)}</span> : <span className="text-slate-300">—</span>}
                       </td>}
                       {visibleColumns.total_actuaciones && <td className="px-3 py-3 hidden xl:table-cell text-center">
                         {(client.total_actuaciones ?? 0) > 0
@@ -3025,7 +3026,7 @@ export default function ClientList() {
                       <div className="hidden lg:flex flex-col items-end gap-1.5 shrink-0 w-44">
                         <div className="flex items-center gap-1.5">
                           {client.type && <span className={`text-[10px] font-bold ${tipoColor[client.type] || "text-slate-500"}`}>{client.type}</span>}
-                          {client.client_status && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status}</span>}
+                          {client.client_status && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{estadoCliente(client.client_status)}</span>}
                         </div>
                         {client.lopd && <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${lopdColor[client.lopd] || "bg-slate-50 text-slate-500"}`}>{client.lopd}</span>}
                         <div className="flex items-center gap-2">
@@ -3146,7 +3147,7 @@ export default function ClientList() {
                       <div className="flex flex-col items-center gap-1 w-full">
                         {client.client_status && (
                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold w-full text-center truncate ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
-                            {client.client_status}
+                            {estadoCliente(client.client_status)}
                           </span>
                         )}
                         {client.type && (

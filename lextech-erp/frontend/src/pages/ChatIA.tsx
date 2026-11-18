@@ -228,7 +228,7 @@ function groupByDate(convs: Conversation[]) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yest  = new Date(today.getTime()-86400000);
   const week  = new Date(today.getTime()-7*86400000);
-  const g = (label: string, items: Conversation[]) => items.length ? [{label,items}] : [];
+  const g = (label: string, items: Conversation[]) => items.length ? [{label: t(label),items}] : [];
   return [
     ...g('Hoy',            convs.filter(c=>new Date(c.updated_at)>=today)),
     ...g('Ayer',           convs.filter(c=>new Date(c.updated_at)>=yest  && new Date(c.updated_at)<today)),
@@ -927,7 +927,7 @@ export default function ChatIA() {
                         <button
                           onClick={e => handleDelete(conv, e)}
                           disabled={deletingId === conv.id}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 hover:text-red-500 text-slate-300 transition-all shrink-0"
+                          className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 hover:text-red-500 text-slate-300 transition-all shrink-0"
                         >
                           {deletingId === conv.id
                             ? <span className="block h-3.5 w-3.5 rounded-full border-2 border-slate-300 border-t-red-500 cia-spin" />
@@ -1050,7 +1050,7 @@ export default function ChatIA() {
                       <Download className="h-3.5 w-3.5" />{t("Exportar conversación (.txt)")}</button>
                     <button
                       onClick={deleteCurrentConversation}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      className="peligro w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />{t("Eliminar esta conversación")}</button>
                   </div>
@@ -1087,7 +1087,7 @@ export default function ChatIA() {
                       >
                         <span className="text-xl block mb-1.5">{icon}</span>
                         <span className="text-xs font-semibold text-slate-700 group-hover:text-red-700 transition-colors leading-tight block">
-                          {label}
+                          {t(label)}
                         </span>
                       </button>
                     ))}
@@ -1241,7 +1241,7 @@ export default function ChatIA() {
                     <span className="cia-fade-up inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 pl-2.5 pr-1.5 py-1 rounded-full max-w-xs">
                       <Link2 className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{linkedExpediente.ref}{linkedExpediente.descripcion ? ` · ${linkedExpediente.descripcion}` : ''}</span>
-                      <button onClick={() => setLinkedExpediente(null)} className="p-0.5 rounded-full hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors shrink-0">
+                      <button onClick={() => setLinkedExpediente(null)} className="peligro p-0.5 rounded-full hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors shrink-0">
                         <X className="h-3 w-3" />
                       </button>
                     </span>

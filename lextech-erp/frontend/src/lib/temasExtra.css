@@ -37,11 +37,11 @@
    (hover más oscuro, iconos activos del menú, bordes de color con opacidad,
    checkboxes, sombras…) sin regla de tema: con el tema azul, un botón azul
    se volvía rojo al pasar el ratón. Las reglas usan la rampa de cada tema. */
-[data-theme="azul"]    { --tema-500: #3b82f6; --tema-600: #2563eb; --tema-700: #1d4ed8; --tema-800: #1e40af; --tema-900: #1e3a8a; --tema-400-rgb: 96 165 250;  --tema-500-rgb: 59 130 246;  --tema-600-rgb: 37 99 235;  --tema-700-rgb: 29 78 216; }
-[data-theme="verde"]   { --tema-500: #10b981; --tema-600: #059669; --tema-700: #047857; --tema-800: #065f46; --tema-900: #064e3b; --tema-400-rgb: 52 211 153;  --tema-500-rgb: 16 185 129;  --tema-600-rgb: 5 150 105;  --tema-700-rgb: 4 120 87; }
-[data-theme="violeta"] { --tema-500: #8b5cf6; --tema-600: #7c3aed; --tema-700: #6d28d9; --tema-800: #5b21b6; --tema-900: #4c1d95; --tema-400-rgb: 167 139 250; --tema-500-rgb: 139 92 246;  --tema-600-rgb: 124 58 237; --tema-700-rgb: 109 40 217; }
-[data-theme="grafito"] { --tema-500: #14b8a6; --tema-600: #0d9488; --tema-700: #0f766e; --tema-800: #115e59; --tema-900: #134e4a; --tema-400-rgb: 45 212 191;  --tema-500-rgb: 20 184 166;  --tema-600-rgb: 13 148 136; --tema-700-rgb: 15 118 110; }
-[data-theme="indigo"]  { --tema-500: #6366f1; --tema-600: #4f46e5; --tema-700: #4338ca; --tema-800: #3730a3; --tema-900: #312e81; --tema-400-rgb: 129 140 248; --tema-500-rgb: 99 102 241;  --tema-600-rgb: 79 70 229;  --tema-700-rgb: 67 56 202; }
+[data-theme="azul"]    { --marca: #2563eb; --marca-oscuro: #1d4ed8; --tema-500: #3b82f6; --tema-600: #2563eb; --tema-700: #1d4ed8; --tema-800: #1e40af; --tema-900: #1e3a8a; --tema-400-rgb: 96 165 250;  --tema-500-rgb: 59 130 246;  --tema-600-rgb: 37 99 235;  --tema-700-rgb: 29 78 216; }
+[data-theme="verde"]   { --marca: #059669; --marca-oscuro: #047857; --tema-500: #10b981; --tema-600: #059669; --tema-700: #047857; --tema-800: #065f46; --tema-900: #064e3b; --tema-400-rgb: 52 211 153;  --tema-500-rgb: 16 185 129;  --tema-600-rgb: 5 150 105;  --tema-700-rgb: 4 120 87; }
+[data-theme="violeta"] { --marca: #7c3aed; --marca-oscuro: #6d28d9; --tema-500: #8b5cf6; --tema-600: #7c3aed; --tema-700: #6d28d9; --tema-800: #5b21b6; --tema-900: #4c1d95; --tema-400-rgb: 167 139 250; --tema-500-rgb: 139 92 246;  --tema-600-rgb: 124 58 237; --tema-700-rgb: 109 40 217; }
+[data-theme="grafito"] { --marca: #0d9488; --marca-oscuro: #0f766e; --tema-500: #14b8a6; --tema-600: #0d9488; --tema-700: #0f766e; --tema-800: #115e59; --tema-900: #134e4a; --tema-400-rgb: 45 212 191;  --tema-500-rgb: 20 184 166;  --tema-600-rgb: 13 148 136; --tema-700-rgb: 15 118 110; }
+[data-theme="indigo"]  { --marca: #4f46e5; --marca-oscuro: #4338ca; --tema-500: #6366f1; --tema-600: #4f46e5; --tema-700: #4338ca; --tema-800: #3730a3; --tema-900: #312e81; --tema-400-rgb: 129 140 248; --tema-500-rgb: 99 102 241;  --tema-600-rgb: 79 70 229;  --tema-700-rgb: 67 56 202; }
 
 /* Texto */
 :where([data-theme]:not([data-theme="rojo"])) .text-red-400:where(:not(.peligro):not(.peligro *)) { color: var(--tema-400) !important; }
@@ -109,6 +109,24 @@
 :where([data-theme]:not([data-theme="rojo"])) .group:hover .group-hover\:shadow-red-700\/50:where(:not(.peligro):not(.peligro *)) { --tw-shadow-color: rgb(var(--tema-700-rgb) / 0.5) !important; }
 :where([data-theme]:not([data-theme="rojo"])) .accent-red-600:where(:not(.peligro):not(.peligro *)),
 :where([data-theme]:not([data-theme="rojo"])) .accent-\[\#ab0433\]:where(:not(.peligro):not(.peligro *)) { accent-color: var(--tema-600) !important; }
+
+/* ── 1c. Tinte claro de acento (17/11/2026) ─────────────────────────────────
+   bg-red-50/100 se quedan rojos a propósito (avisos, vencidos…), pero en
+   botones/pestañas seleccionados y en recuadros que solo llevan un icono son
+   acento: con el tema azul se veía texto azul sobre fondo rosa, y en oscuro
+   un tinte rojo. Solo esos dos casos siguen el tema. */
+[data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]).bg-red-50:not(.peligro):not(.peligro *),
+[data-theme]:not([data-theme="rojo"]) .bg-red-50:has(> svg:only-child):not(.peligro):not(.peligro *) { background-color: var(--tema-50) !important; }
+[data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]).bg-red-100:not(.peligro):not(.peligro *),
+[data-theme]:not([data-theme="rojo"]) .bg-red-100:has(> svg:only-child):not(.peligro):not(.peligro *) { background-color: var(--tema-100) !important; }
+[data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]).bg-red-50.border-red-100:not(.peligro):not(.peligro *),
+[data-theme]:not([data-theme="rojo"]) .bg-red-50.border-red-100:has(> svg:only-child):not(.peligro):not(.peligro *) { border-color: var(--tema-100) !important; }
+[data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]).bg-red-50.border-red-200:not(.peligro):not(.peligro *),
+[data-theme]:not([data-theme="rojo"]) .bg-red-50.border-red-200:has(> svg:only-child):not(.peligro):not(.peligro *) { border-color: var(--tema-200) !important; }
+html[data-modo="oscuro"][data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]):is(.bg-red-50, .bg-red-100):not(.peligro):not(.peligro *),
+html[data-modo="oscuro"][data-theme]:not([data-theme="rojo"]) :is(.bg-red-50, .bg-red-100):has(> svg:only-child):not(.peligro):not(.peligro *) { background-color: rgb(var(--tema-500-rgb) / 0.14) !important; }
+html[data-modo="oscuro"][data-theme]:not([data-theme="rojo"]) :is(button, a, [role="tab"]).bg-red-50:is(.border-red-100, .border-red-200):not(.peligro):not(.peligro *),
+html[data-modo="oscuro"][data-theme]:not([data-theme="rojo"]) .bg-red-50:is(.border-red-100, .border-red-200):has(> svg:only-child):not(.peligro):not(.peligro *) { border-color: rgb(var(--tema-500-rgb) / 0.3) !important; }
 
 /* ── 2. Peligro: el rojo de siempre, con cualquier tema ── */
 [data-theme] .peligro.bg-red-500, [data-theme] .peligro .bg-red-500 { background-color: #ef4444 !important; }

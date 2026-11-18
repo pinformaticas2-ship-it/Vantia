@@ -1246,7 +1246,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                   onClick={() => {
                     setPreview(null);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                   title={t("Cerrar vista previa")}
                 >
                   <X size={14} />

@@ -88,8 +88,10 @@ for fam, (rgb, texto) in FAMILIAS.items():
         regla(s, f'background-color: rgb({rgb} / {alfa})')
         s = [sel('hover:', f'bg-{fam}-{tono}{o}') for o in OPACIDADES] + [sel(v, f'bg-{fam}-{tono}') for v in ('group-hover:', 'group-hover/file:')]
         regla(s, f'background-color: rgb({rgb} / {TINTE_HOVER[tono]})')
-    # Degradados claros de color: el mismo tinte liso
-    s = [f'{O} [class*="from-{fam}-{t}"]' for t in ('50', '100', '200') if f'from-{fam}-{t}' in usadas]
+    # Degradados claros de color: el mismo tinte liso. Clase exacta ([class~=]
+    # o con /opacidad): [class*="from-red-50"] también atrapaba from-red-500 y
+    # borraba los degradados intensos (avatares, logo de Chat IA) (17/11/2026).
+    s = [f'{O} [class~="from-{fam}-{t}"], {O} [class*="from-{fam}-{t}/"]' for t in ('50', '100', '200') if f'from-{fam}-{t}' in usadas]
     if s: reglas.append(',\n'.join(s) + f' {{ background-image: none !important; background-color: rgb({rgb} / 0.10) !important; }}')
     # Textos oscuros (pensados para fondo blanco): su versión clara
     s = [sel(v, f'text-{fam}-{t}{o}') for v in ('',) for t in ('700', '800', '900', '950') for o in ('', '/80', '/90')]

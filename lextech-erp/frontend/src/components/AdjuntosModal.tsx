@@ -794,7 +794,7 @@ export default function AdjuntosModal({
                 <Mail size={14} />{t("Enviar correo")}</button>
               <button
                 onClick={() => setConfirmDeleteFileId(selectedFile.id)}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors"
+                className="peligro inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors"
               >
                 <Trash2 size={14} />{t("Eliminar")}</button>
             </div>

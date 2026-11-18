@@ -397,7 +397,7 @@ function BandejaTikTok({
                   <button type="button" onClick={() => setConfirmDisconnect(false)} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-600">{t("Cancelar")}</button>
                 </span>
               ) : (
-                <button type="button" onClick={() => setConfirmDisconnect(true)} title={t("Desconectar la cuenta de TikTok")} className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-red-600">
+                <button type="button" onClick={() => setConfirmDisconnect(true)} title={t("Desconectar la cuenta de TikTok")} className="peligro inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-red-600">
                   <Unplug size={15} />
                 </button>
               )}

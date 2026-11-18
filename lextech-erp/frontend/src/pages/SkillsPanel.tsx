@@ -151,7 +151,7 @@ export default function SkillsPanel() {
                                   <button type="button" onClick={() => setBorrando(null)} className="rounded-lg px-2 py-1 font-semibold text-slate-500">{t("No")}</button>
                                 </>
                               ) : (
-                                <button type="button" onClick={() => setBorrando(s.id)} className="rounded-lg p-1 text-slate-400 hover:text-red-600" title={t("Borrar")}><Trash2 size={12} /></button>
+                                <button type="button" onClick={() => setBorrando(s.id)} className="peligro rounded-lg p-1 text-slate-400 hover:text-red-600" title={t("Borrar")}><Trash2 size={12} /></button>
                               )}
                             </span>
                           )}

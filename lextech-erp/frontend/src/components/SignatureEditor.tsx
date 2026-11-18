@@ -144,7 +144,7 @@ export function ImagenesNoAccesibles({ html, onChange }: { html: string; onChang
             <button type="button" disabled={!!subiendo} onClick={() => { objetivo.current = src; inputRef.current?.click(); }}
               className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 disabled:opacity-50">
               {subiendo === src ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}{" "}{t("Subir imagen")}</button>
-            <button type="button" onClick={() => quitar(src)} className="text-amber-700 hover:text-red-600">{t("Quitar")}</button>
+            <button type="button" onClick={() => quitar(src)} className="peligro text-amber-700 hover:text-red-600">{t("Quitar")}</button>
           </li>
         ))}
       </ul>
@@ -200,7 +200,7 @@ function ImagenInput({ label, value, onChange, ayuda }: { label: string; value: 
           className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
           {subiendo ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} {value ? t("Cambiar") : t("Subir imagen")}
         </button>
-        {value && <button type="button" onClick={() => onChange("")} className="text-xs text-gray-400 hover:text-red-600">{t("Quitar")}</button>}
+        {value && <button type="button" onClick={() => onChange("")} className="peligro text-xs text-gray-400 hover:text-red-600">{t("Quitar")}</button>}
         <input ref={ref} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { void elegir(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
       {ayuda && <p className="mt-1 text-[11px] text-gray-400">{ayuda}</p>}

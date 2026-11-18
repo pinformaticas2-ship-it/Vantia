@@ -317,7 +317,7 @@ export default function Documentos() {
                       <button type="button" onClick={() => setConfirmarBorrar(false)} className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">{t("No")}</button>
                     </span>
                   ) : (
-                    <button type="button" onClick={() => setConfirmarBorrar(true)} title={t("Borrar el documento")} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-red-600">
+                    <button type="button" onClick={() => setConfirmarBorrar(true)} title={t("Borrar el documento")} className="peligro inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:text-red-600">
                       <Trash2 size={14} />
                     </button>
                   )}
@@ -587,7 +587,7 @@ function SelectorExpediente({ titulo, getToken, onElegir, onQuitar, onCerrar }: 
             ))}
           </div>
           {onQuitar && (
-            <button type="button" onClick={onQuitar} className="text-xs font-semibold text-slate-500 hover:text-red-600">{t("Quitar el expediente vinculado")}</button>
+            <button type="button" onClick={onQuitar} className="peligro text-xs font-semibold text-slate-500 hover:text-red-600">{t("Quitar el expediente vinculado")}</button>
           )}
         </div>
       </div>

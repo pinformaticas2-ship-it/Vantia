@@ -3757,7 +3757,7 @@ function TabCorreoExpediente({
                     <div key={att.id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs text-slate-700">
                       {att.loading ? <Loader2 size={10} className="animate-spin text-slate-400" /> : <Paperclip size={10} className="text-slate-400" />}
                       <span className="max-w-[160px] truncate">{att.name}</span>
-                      <button type="button" onClick={() => setComposeAttachments(prev => prev.filter(a => a.id !== att.id))} className="ml-0.5 text-slate-400 hover:text-red-500"><X size={10} /></button>
+                      <button type="button" onClick={() => setComposeAttachments(prev => prev.filter(a => a.id !== att.id))} className="peligro ml-0.5 text-slate-400 hover:text-red-500"><X size={10} /></button>
                     </div>
                   ))}
                 </div>
@@ -3947,7 +3947,7 @@ function TabCorreoExpediente({
                           {email.cc_emails && <p><span className="font-semibold">{t("CC:")}</span> {email.cc_emails}</p>}
                         </div>
                         <button type="button" onClick={() => handleUnlink(email.id)} disabled={linking === email.id}
-                          className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          className="peligro text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 disabled:opacity-50">
                           {linking === email.id ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}{" "}{t("Desasociar")}</button>
                       </div>
                       {viewLoading && viewEmail === email.id ? (
@@ -5130,9 +5130,9 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{t("Actividad")}</p>
             <Indicador label={t("Actuaciones")}      value={fmt(ind.total_actuaciones)}
               color={ind.total_actuaciones > 0 ? 'text-blue-600' : 'text-slate-700'} />
-            <Indicador label={t("Días sin actuac.")} value={fmt(ind.dias_sin_actuacion, ' días')}
+            <Indicador label={t("Días sin actuac.")} value={fmt(ind.dias_sin_actuacion, ` ${t("días")}`)}
               color={ind.dias_sin_actuacion != null && ind.dias_sin_actuacion > 30 ? 'text-amber-600' : 'text-slate-700'} />
-            <Indicador label={t("Días abierto")}     value={fmt(ind.dias_desde_apertura, ' días')} />
+            <Indicador label={t("Días abierto")}     value={fmt(ind.dias_desde_apertura, ` ${t("días")}`)} />
 
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{t("Expediente")}</p>
             <Indicador label={t("Estado")}   value={ind.estado || '—'}
@@ -5831,7 +5831,7 @@ export default function ExpedienteDetail() {
               {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Reabrir expediente")}</button>
           ) : (
             <>
-              <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+              <button onClick={handleToggleEstado} disabled={saving} className="peligro flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="text-slate-400" />}{" "}{t("Cerrar exp.")}</button>
               <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
                 <Edit3 size={14} />{" "}{t("Editar")}</button>
@@ -5857,7 +5857,7 @@ export default function ExpedienteDetail() {
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(var(--accent-glow),0.7)]" />}
                   </button>
                 );
               })}
@@ -5872,7 +5872,7 @@ export default function ExpedienteDetail() {
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(var(--accent-glow),0.7)]" />}
                   </button>
                 );
               })}
@@ -6856,7 +6856,7 @@ export default function ExpedienteDetail() {
                   <button
                     onClick={disconnectPlaud}
                     disabled={plaudLoading}
-                    className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+                    className="peligro mt-4 flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
                   >
                     {plaudLoading ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}{" "}{t("Desconectar")}</button>
                 </>

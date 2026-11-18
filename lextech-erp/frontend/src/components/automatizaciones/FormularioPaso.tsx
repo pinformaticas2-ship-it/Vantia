@@ -90,7 +90,7 @@ export function FormularioPaso({ tipo, config, set, catalogo, variables, vincula
               <div key={i} className="space-y-2 rounded-xl border border-slate-200 p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase text-slate-400">{i === 0 ? t('Regla') : (c.modo === 'o' ? t('o') : t('y'))}</span>
-                  {reglas.length > 1 && <button type="button" onClick={() => set('reglas', reglas.filter((_, j) => j !== i))} className="rounded p-0.5 text-slate-400 hover:text-red-600"><X size={13} /></button>}
+                  {reglas.length > 1 && <button type="button" onClick={() => set('reglas', reglas.filter((_, j) => j !== i))} className="peligro rounded p-0.5 text-slate-400 hover:text-red-600"><X size={13} /></button>}
                 </div>
                 <select className={campoCls} value={x.campo || ''} onChange={(e) => setRegla(i, 'campo', e.target.value)}>
                   <option value="">{t('Elige un dato…')}</option>

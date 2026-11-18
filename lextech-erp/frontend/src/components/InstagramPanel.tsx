@@ -440,7 +440,7 @@ function Publicaciones({ api, onDesconectado }: { api: (p: string, i?: RequestIn
           {confirmarDesconectar ? (
             <button type="button" onClick={async () => { await api("/api/instagram", { method: "DELETE" }).catch(() => {}); onDesconectado(); }} className="rounded-xl bg-red-600 px-2.5 py-1.5 text-[11px] font-semibold text-white">{t("Sí, desconectar")}</button>
           ) : (
-            <button type="button" onClick={() => setConfirmarDesconectar(true)} title={t("Desconectar la cuenta de Instagram")} className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-600"><Unplug size={13} /></button>
+            <button type="button" onClick={() => setConfirmarDesconectar(true)} title={t("Desconectar la cuenta de Instagram")} className="peligro inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-600"><Unplug size={13} /></button>
           )}
         </div>
         {aviso && <div className="border-b border-slate-100 p-3"><Aviso aviso={{ tono: "ok", texto: aviso }} onCerrar={() => setAviso(null)} /></div>}
@@ -534,7 +534,7 @@ function DetalleMedio({ medio, api, onVolver, movil }: { medio: Medio; api: (p: 
                   <button type="button" disabled={ocupado} onClick={() => { setRespondiendo({ id: c.id, privado: false }); setTexto(""); }} className="font-semibold hover:text-slate-700">{t("Responder")}</button>
                   <button type="button" disabled={ocupado} onClick={() => { setRespondiendo({ id: c.id, privado: true }); setTexto(""); }} className="font-semibold hover:text-slate-700" title={t("Mensaje directo a quien comentó (una vez, en los 7 días siguientes)")}>{t("Responder por privado")}</button>
                   <button type="button" disabled={ocupado} onClick={() => accion(() => api(`/api/instagram/comentarios/${c.id}/ocultar`, { method: "POST", body: JSON.stringify({ ocultar: !c.hidden }) }))} className="inline-flex items-center gap-0.5 font-semibold hover:text-slate-700"><EyeOff size={11} /> {c.hidden ? t("Mostrar") : t("Ocultar")}</button>
-                  <button type="button" disabled={ocupado} onClick={() => accion(() => api(`/api/instagram/comentarios/${c.id}`, { method: "DELETE" }))} className="inline-flex items-center gap-0.5 font-semibold hover:text-red-600"><Trash2 size={11} />{" "}{t("Borrar")}</button>
+                  <button type="button" disabled={ocupado} onClick={() => accion(() => api(`/api/instagram/comentarios/${c.id}`, { method: "DELETE" }))} className="peligro inline-flex items-center gap-0.5 font-semibold hover:text-red-600"><Trash2 size={11} />{" "}{t("Borrar")}</button>
                 </div>
                 {c.replies?.data?.map((r) => (
                   <p key={r.id} className="ml-4 mt-2 border-l-2 border-slate-100 pl-3 text-sm text-slate-600"><span className="font-semibold">@{r.username || t("usuario")}</span> {r.text}</p>

@@ -429,7 +429,7 @@ function EditorEscala({ inicial, onClose, onGuardada }: { inicial: Escala; onClo
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">%</span>
                 </div>
                 <button type="button" title={t("Quitar tramo")} disabled={filas.length <= 1} onClick={() => setFilas((x) => x.filter((_, j) => j !== i))}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"><Trash2 size={14} /></button>
+                  className="peligro inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"><Trash2 size={14} /></button>
               </div>
             );
           })}

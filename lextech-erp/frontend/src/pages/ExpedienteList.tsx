@@ -2430,7 +2430,7 @@ function CsvImportErrorDetailView({
                       <div className="flex flex-wrap items-center gap-3">
                         <button
                           type="button"
-                          className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                          className="peligro rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
                         >{t("Descartar todos")}</button>
                         <button
                           type="button"
@@ -2595,7 +2595,7 @@ function ZipUploadIllustration({ hasFile, clicked }: { hasFile: boolean; clicked
         {/* Glow de fondo */}
         <div style={{
           position: 'absolute', inset: '-20%', borderRadius: '50%',
-          background: `radial-gradient(circle at ${glowX}% ${glowY}%, rgba(171,4,51,0.12) 0%, transparent 65%)`,
+          background: `radial-gradient(circle at ${glowX}% ${glowY}%, rgba(var(--accent-glow),0.12) 0%, transparent 65%)`,
           opacity: tilt.active ? 1 : 0.4,
           transition: ease,
           pointerEvents: 'none',
@@ -3265,7 +3265,7 @@ function PartyRow({ color, value, onChange, onRemove, list }: {
       </select>
       {onRemove && (
         <button type="button" onClick={onRemove}
-          className="shrink-0 p-1 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+          className="peligro shrink-0 p-1 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
           <X size={13} />
         </button>
       )}
@@ -4354,7 +4354,7 @@ function FilterRow({
           <button
             onClick={() => onRemove(filter.id)}
             title={t("Quitar filtro")}
-            className="flex h-full items-center px-2 text-slate-300 hover:text-red-500 transition-colors"
+            className="peligro flex h-full items-center px-2 text-slate-300 hover:text-red-500 transition-colors"
           >
             <X size={12} />
           </button>

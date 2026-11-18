@@ -1121,7 +1121,7 @@ function ComposeWindow({
                   <button
                     type="button"
                     onClick={() => setAttachments((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}
-                    className="text-gray-400 hover:text-red-500">
+                    className="peligro text-gray-400 hover:text-red-500">
                     <X size={12} />
                   </button>
                 </div>
@@ -1343,7 +1343,7 @@ function ConnectAccountModal({
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteImap(acc.id); }}
                         title={t("Eliminar")}
-                        className="p-1.5 rounded-xl text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
+                        className="peligro p-1.5 rounded-xl text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>

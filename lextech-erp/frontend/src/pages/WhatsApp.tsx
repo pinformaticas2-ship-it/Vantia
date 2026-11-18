@@ -515,7 +515,7 @@ export default function WhatsApp() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(171,4,51,0.06),transparent_26%),linear-gradient(180deg,#f8fafc_0%,#f3f6fb_100%)] px-6 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(var(--accent-glow),0.06),transparent_26%),linear-gradient(180deg,#f8fafc_0%,#f3f6fb_100%)] px-6 py-5">
             {!selectedClient ? (
               <EmptyConversation />
             ) : loadingConversation ? (

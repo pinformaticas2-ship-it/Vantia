@@ -1641,7 +1641,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
           <Plus size={14} className="om-t4" />{" "}{t("Crear organización")}</button>
         {organizaciones.length > 1 && (
           <p className="hidden [@media(hover:hover)]:block px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
-            <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd>{" "}{t("para moverte ·")}{" "}<kbd className="font-sans">Intro</kbd>{" "}{t("para entrar")}</p>
+            <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd>{" "}{t("para moverte ·")}{" "}<kbd className="font-sans">{t("Intro")}</kbd>{" "}{t("para entrar")}</p>
         )}
       </div>
     </div>,

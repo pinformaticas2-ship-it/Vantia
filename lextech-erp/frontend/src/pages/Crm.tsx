@@ -196,7 +196,7 @@ export default function Crm() {
               { label: "Abiertas", valor: resumen ? String(resumen.abiertas) : "—", Icon: HeartHandshake, pie: "", alerta: false },
               { label: "Valor en curso", valor: resumen ? euros(resumen.valorAbierto) : "—", Icon: Euro, pie: "", alerta: false },
               { label: "Conversión (90 días)", valor: resumen?.conversion90 != null ? `${resumen.conversion90} %` : "—", Icon: TrendingUp, alerta: false,
-                pie: resumen ? `${resumen.ganadas90} ganadas · ${resumen.perdidas90} perdidas o abandonadas` : "" },
+                pie: resumen ? t("{g} ganadas · {p} perdidas o abandonadas", { g: resumen.ganadas90, p: resumen.perdidas90 }) : "" },
               { label: "Seguimientos vencidos", valor: resumen ? String(resumen.seguimientosVencidos) : "—", Icon: CalendarClock, pie: "", alerta: !!resumen?.seguimientosVencidos },
             ].map((t) => (
               <div key={t.label} className={`rounded-2xl border bg-white p-3.5 ${t.alerta ? "border-rose-200" : "border-slate-200"}`}>
@@ -255,7 +255,7 @@ export default function Crm() {
                   const items = porEtapa.get(e.id) || [];
                   const total = items.reduce((s, o) => s + Number(o.valor_estimado || 0), 0);
                   const reglas = [e.aviso_responsable && t("aviso al propietario"), e.accion_texto && t("próxima acción: {accion}", { accion: e.accion_texto }),
-                    e.mover_horas && e.mover_a_etapa_id && `tras ${e.mover_horas} h → ${nombreEtapa(e.mover_a_etapa_id)}`].filter(Boolean);
+                    e.mover_horas && e.mover_a_etapa_id && t("tras {h} h → {etapa}", { h: e.mover_horas, etapa: nombreEtapa(e.mover_a_etapa_id) })].filter(Boolean);
                   return (
                     <div key={e.id}
                       onDragOver={(ev) => { if (arrastrando) { ev.preventDefault(); setSobre(e.id); } }}
