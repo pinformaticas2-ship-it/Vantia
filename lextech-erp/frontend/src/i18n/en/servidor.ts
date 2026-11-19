@@ -348,4 +348,5 @@ registrarEn({
   "target_user_id requerido": "target_user_id required",
   "tipo debe ser PROCURADOR, ABOGADO o CONTRARIO": "tipo must be PROCURADOR, ABOGADO or CONTRARIO",
   "titulo y fecha_recepcion son obligatorios": "titulo and fecha_recepcion are required",
+  "Este documento se ha cambiado en otra pestaña o por otra persona mientras lo tenías abierto. Vuelve a abrirlo para ver la versión actual.": "This document was changed in another tab or by someone else while you had it open. Reopen it to see the current version.",
 });

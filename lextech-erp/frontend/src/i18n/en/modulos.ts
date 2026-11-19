@@ -3746,4 +3746,5 @@ registrarEn({
   "cancelada": "cancelled",
   "Anteriores": "Older",
   "Jurisprudencia": "Case law",
+  "Este documento se ha cambiado en otra pestaña o por otra persona mientras lo tenías abierto, y no se ha guardado lo tuyo para no pisarlo. Sal y vuelve a abrirlo para ver la versión actual.": "This document was changed in another tab or by someone else while you had it open, and your changes were not saved so as not to overwrite theirs. Leave and reopen it to see the current version.",
 });

@@ -4602,7 +4602,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 
 // ── Componente principal ───────────────────────────────────────
 export default function ExpedienteList() {
-  const { getToken } = useAuth();
+  const { getToken, userId: authUserId } = useAuth();
   const { setProcessing: setDocumentProcessingIndicator } = useDocumentProcessing();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -5009,23 +5009,95 @@ export default function ExpedienteList() {
     itemId: documentImportVerifyItem?.id ?? null,
     batchId: documentImportActiveBatch?.id ?? null,
   };
+  // 19/11/2026: al cancelar y volver a abrir enseguida (con la latencia de
+  // producción) se abría la copia antigua del documento -- la recarga del lote
+  // aún no había llegado -- y esa copia se guardaba encima de lo rellenado.
+  // Ahora: (1) lo último guardado se apunta al instante en la lista local, para
+  // que al reabrir salga eso; (2) cada guardado dice sobre qué versión se hizo
+  // (base_edited_at) y el servidor rechaza uno basado en una versión vieja
+  // (otra pestaña u otra persona con el mismo documento); (3) los guardados van
+  // en fila, para que dos seguidos no se pisen entre sí.
+  const verifyBaseRef = useRef<Map<string, string | null>>(new Map());
+  const verifySaveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const verifySnapshotRef = useRef<Map<string, string>>(new Map());
+  // Huella para comparar borradores: vacío y nulo cuentan igual (algunos campos
+  // pasan de "" a null solos al abrir, sin que nadie cambie nada).
+  const huellaBorrador = (form: Record<string, unknown>, representaA: string) =>
+    JSON.stringify({ f: form, r: representaA }, (_k, v) => (v === null || v === undefined ? "" : v));
+  // Copia en este navegador de lo que aún no ha llegado al servidor: si la
+  // página se recarga o se cierra antes del guardado (que espera 0,8 s a que se
+  // deje de escribir), al reabrir el documento se recupera y se guarda.
+  const authUserIdRef = useRef(authUserId);
+  authUserIdRef.current = authUserId;
+  const clavePendiente = (itemId: string) => `vantia.revisionPendiente.${authUserIdRef.current || "anon"}.${itemId}`;
+  const quitarPendiente = (itemId: string) => { try { localStorage.removeItem(clavePendiente(itemId)); } catch { /* sin almacenamiento */ } };
+  useEffect(() => {
+    const itemId = documentImportVerifyItem?.id;
+    if (!itemId || !verifyDirtyRef.current) return;
+    try {
+      localStorage.setItem(clavePendiente(itemId), JSON.stringify({
+        form: documentImportVerifyForm, representaA: documentImportRepresentaA,
+        base: verifyBaseRef.current.get(itemId) ?? null, at: Date.now(),
+      }));
+    } catch { /* sin almacenamiento: queda el guardado normal */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentImportVerifyForm, documentImportRepresentaA]);
   const saveVerifyDraft = useCallback(async () => {
     if (verifyTimerRef.current) { window.clearTimeout(verifyTimerRef.current); verifyTimerRef.current = null; }
     const { form, representaA, itemId, batchId } = verifyLatestRef.current;
     if (!verifyDirtyRef.current || !itemId || !batchId) return;
     verifyDirtyRef.current = false;
-    try {
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/expedientes/documents/batch/${batchId}/items/${itemId}/draft`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ draft: form, representa_a: representaA }),
-      });
-      if (!res.ok) verifyDirtyRef.current = true;
-    } catch {
-      verifyDirtyRef.current = true;
-    }
+    // Solo si de verdad ha cambiado algo: al abrir, los campos se "tocan" solos
+    // con los mismos valores, y guardar eso subía la versión sin motivo (y la
+    // otra pestaña que tuviera el documento abierto ya no podía guardar).
+    const huella = huellaBorrador(form, representaA);
+    if (verifySnapshotRef.current.get(itemId) === huella) { quitarPendiente(itemId); return; }
+    verifySnapshotRef.current.set(itemId, huella);
+    // Al instante en la lista local: quien reabra este documento ve esto.
+    setDocumentImportItems((prev) => prev.map((it) => it.id !== itemId ? it : {
+      ...it,
+      payload: { ...(it.payload || {}), draft: { ...form, representa_a: representaA }, draftEditedAt: it.payload?.draftEditedAt || "local" },
+    }));
+    const guardar = async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/expedientes/documents/batch/${batchId}/items/${itemId}/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ draft: form, representa_a: representaA, base_edited_at: verifyBaseRef.current.get(itemId) ?? null }),
+        });
+        const data = await safeJson(res);
+        if (res.ok) {
+          const nueva = data.data?.draftEditedAt ?? null;
+          verifyBaseRef.current.set(itemId, nueva);
+          // Ya está en el servidor (salvo que se haya seguido escribiendo).
+          if (!(verifyDirtyRef.current && verifyLatestRef.current.itemId === itemId)) quitarPendiente(itemId);
+          setDocumentImportItems((prev) => prev.map((it) => it.id !== itemId ? it : { ...it, payload: { ...(it.payload || {}), draftEditedAt: nueva } }));
+        } else if (res.status === 409) {
+          // Alguien guardó una versión más nueva: no se pisa. Se recarga el lote
+          // (para que al reabrir salga la versión buena) y se avisa si la
+          // revisión de ese documento sigue abierta.
+          verifySnapshotRef.current.delete(itemId);
+          quitarPendiente(itemId);
+          try { await fetchDocumentImportBatch(batchId); } catch { /* se queda lo que hubiera */ }
+          if (verifyLatestRef.current.itemId === itemId) {
+            setDocumentImportVerifyError(t("Este documento se ha cambiado en otra pestaña o por otra persona mientras lo tenías abierto, y no se ha guardado lo tuyo para no pisarlo. Sal y vuelve a abrirlo para ver la versión actual."));
+          }
+        } else {
+          verifyDirtyRef.current = true;
+          verifySnapshotRef.current.delete(itemId);
+        }
+      } catch {
+        verifyDirtyRef.current = true;
+        verifySnapshotRef.current.delete(itemId);
+      }
+    };
+    const turno = verifySaveChainRef.current.then(guardar);
+    verifySaveChainRef.current = turno.catch(() => {});
+    await turno;
   }, [getToken]);
+  const saveVerifyDraftRef = useRef(saveVerifyDraft);
+  saveVerifyDraftRef.current = saveVerifyDraft;
   const markVerifyDirty = useCallback(() => {
     verifyDirtyRef.current = true;
     if (verifyTimerRef.current) window.clearTimeout(verifyTimerRef.current);
@@ -5237,7 +5309,11 @@ export default function ExpedienteList() {
     // derivar procuradores/contrarios de lo que extrajo la IA.
     const savedByUser = !!item.payload?.draftEditedAt;
     verifyDirtyRef.current = false;
-    setDocumentImportVerifyForm({
+    // Versión del borrador sobre la que se va a trabajar ("local" = guardado
+    // nuestro aún en camino: la versión la apunta ese guardado al terminar).
+    const editadoEn = (item.payload?.draftEditedAt as string | undefined) ?? null;
+    if (editadoEn !== "local") verifyBaseRef.current.set(item.id, editadoEn);
+    const formInicial = {
       ...EXP_EMPTY,
       ...draft,
       cliente_nombre: normalizeImportedName(draft.cliente_nombre),
@@ -5247,7 +5323,32 @@ export default function ExpedienteList() {
         procurador_contrario: procuradorContrario,
       }),
       cuantia_principal: draft.cuantia_principal != null ? String(draft.cuantia_principal) : "",
-    } as typeof EXP_EMPTY);
+    } as typeof EXP_EMPTY;
+    // ¿Quedó algo sin llegar al servidor (página recargada o cerrada justo
+    // después de escribir)? Se recupera, sobre la versión en la que se escribió:
+    // si mientras tanto otra persona guardó otra, el servidor no lo pisa y avisa.
+    let pendiente: { form: typeof EXP_EMPTY; representaA: "demandantes" | "demandados"; base: string | null } | null = null;
+    try {
+      const raw = localStorage.getItem(clavePendiente(item.id));
+      const p = raw ? JSON.parse(raw) : null;
+      if (p && p.form && typeof p.form === "object") pendiente = p;
+    } catch { /* sin almacenamiento o dato roto */ }
+    if (pendiente) {
+      setDocumentImportVerifyForm({ ...EXP_EMPTY, ...pendiente.form });
+      setDocumentImportRepresentaA(pendiente.representaA === "demandados" ? "demandados" : "demandantes");
+      verifyBaseRef.current.set(item.id, pendiente.base ?? null);
+      verifySnapshotRef.current.delete(item.id);
+      verifyDirtyRef.current = true;
+      if (verifyTimerRef.current) window.clearTimeout(verifyTimerRef.current);
+      verifyTimerRef.current = window.setTimeout(() => { void saveVerifyDraftRef.current(); }, 800);
+    } else {
+      setDocumentImportVerifyForm(formInicial);
+      // Lo que ya está guardado: si al abrir solo se "tocan" campos con los
+      // mismos valores, no hace falta guardar. En un documento sin borrador del
+      // usuario lo abierto aún no está guardado como tal, así que sí se guardará.
+      if (savedByUser) verifySnapshotRef.current.set(item.id, huellaBorrador(formInicial, inferredRepresentaA));
+      else verifySnapshotRef.current.delete(item.id);
+    }
     setViewMode("documentImportVerify");
   }, []);
 
@@ -5266,6 +5367,7 @@ export default function ExpedienteList() {
     setDocumentImportVerifyError(null);
     // Al aceptar ya no hay borrador que guardar (el item pasa a expediente).
     verifyDirtyRef.current = false;
+    quitarPendiente(documentImportVerifyItem.id);
     if (verifyTimerRef.current) { window.clearTimeout(verifyTimerRef.current); verifyTimerRef.current = null; }
     try {
       const token = await getToken({ skipCache: true });
@@ -5309,6 +5411,9 @@ export default function ExpedienteList() {
       }
     } catch (e: any) {
       setDocumentImportVerifyError(e.message || t("No se pudo aceptar el documento"));
+      // No se aceptó: lo rellenado sigue siendo un borrador por guardar.
+      verifySnapshotRef.current.delete(documentImportVerifyItem.id);
+      markVerifyDirty();
     } finally {
       setDocumentImportVerifySaving(false);
     }

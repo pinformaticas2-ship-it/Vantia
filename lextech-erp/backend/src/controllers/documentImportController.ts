@@ -1802,14 +1802,25 @@ export async function saveDocumentImportDraft(req: Request, res: Response) {
     if (itemRows[0].created_expediente_id) return err(res, 'Este documento ya fue aceptado', 409);
 
     const representaA = req.body?.representa_a === 'demandados' ? 'demandados' : 'demandantes';
-    const payload = itemRows[0].payload || {};
-    const newPayload = {
-      ...payload,
-      draft: { ...draft, representa_a: representaA },
-      draftEditedAt: new Date().toISOString(),
-    };
-    await pool.query(`UPDATE expediente_import_items SET payload=$1 WHERE id=$2`, [JSON.stringify(newPayload), itemId]);
-    return ok(res, { saved: true });
+    const draftEditedAt = new Date().toISOString();
+    // Si el cliente dice sobre qué versión trabajó (base_edited_at), solo se
+    // guarda si sigue siendo la actual: así una copia vieja (otra pestaña, otra
+    // persona, o reabrir antes de que llegue la recarga) no pisa lo más nuevo
+    // (19/11/2026). La comprobación va en el propio UPDATE, sin carreras.
+    // Clientes antiguos que no la mandan guardan como antes.
+    const comprobar = Object.prototype.hasOwnProperty.call(req.body || {}, 'base_edited_at');
+    const base = typeof req.body?.base_edited_at === 'string' ? req.body.base_edited_at : null;
+    const { rowCount } = await pool.query(
+      `UPDATE expediente_import_items
+          SET payload = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('draft', $1::jsonb, 'draftEditedAt', $2::text)
+        WHERE id = $3 AND created_expediente_id IS NULL
+          AND (NOT $4::boolean OR (payload->>'draftEditedAt') IS NOT DISTINCT FROM $5::text)`,
+      [JSON.stringify({ ...draft, representa_a: representaA }), draftEditedAt, itemId, comprobar, base],
+    );
+    if (!rowCount) {
+      return err(res, 'Este documento se ha cambiado en otra pestaña o por otra persona mientras lo tenías abierto. Vuelve a abrirlo para ver la versión actual.', 409);
+    }
+    return ok(res, { saved: true, draftEditedAt });
   } catch (error: any) {
     return err(res, error.message || 'No se pudo guardar el borrador');
   }
