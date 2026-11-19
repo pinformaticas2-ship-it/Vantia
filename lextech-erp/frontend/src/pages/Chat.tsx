@@ -23,7 +23,7 @@ import { createPortal } from "react-dom";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
-import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
+import { LinkPreviewCard, firstUrlIn, textoSinEnlace } from "../components/LinkPreviewCard";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { TarjetaPersonaChat, abrirPerfilChat } from "../components/TarjetaPersonaChat";
 import { aviso, confirmar } from "../lib/avisos";
@@ -2864,6 +2864,10 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   const previewUrl = !msg.gif_url && !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT
     ? firstUrlIn(msg.contenido || '')
     : null;
+  // El enlace al principio o al final del mensaje lo representa la tarjeta
+  // (URL y copiar al pasar el ratón); mientras se envía se ve el texto tal cual.
+  const textoVisible = previewUrl && !msg._envio ? textoSinEnlace(msg.contenido || '', previewUrl) : (msg.contenido || '');
+  const enlaceEnTarjeta = textoVisible !== (msg.contenido || '');
   // ?download=1 hace que el backend anada Content-Disposition: attachment
   // (server.ts) — se usa como fallback si el fetch de abajo falla.
   const fileDownloadHref = fileSrc
@@ -3098,11 +3102,11 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                   )}
                 </>
               )
-              : !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
-                <div className="text-slate-700 text-[15px] leading-relaxed break-words"><TextoMensaje texto={msg.contenido}/></div>
+              : !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT && textoVisible.trim() !== "" && (
+                <div className="text-slate-700 text-[15px] leading-relaxed break-words"><TextoMensaje texto={textoVisible}/></div>
               )
             }
-            {previewUrl && !msg._envio && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
+            {previewUrl && !msg._envio && <LinkPreviewCard url={previewUrl} getToken={getToken} reemplazaEnlace={enlaceEnTarjeta} />}
           </div>
           {msg._envio === "enviando" && envioLento && (
             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Clock3 size={11}/>{" "}{t("Enviando…")}</p>
