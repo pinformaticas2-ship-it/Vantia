@@ -3,7 +3,8 @@ import React, {
   useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo,
 } from "react";
 import { Spinner } from "../components/Spinner";
-import { FilePreviewModal, getFileTypeIcon, isPdfFile, isImageFile } from "../components/FilePreviewModal";
+import { FilePreviewModal, getFileTypeIcon, isImageFile } from "../components/FilePreviewModal";
+import { MiniaturaArchivo, admiteMiniatura } from "../components/MiniaturaArchivo";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   Hash, Lock, Plus, X, Search, Pin, PinOff, Smile, Send,
@@ -3044,31 +3045,14 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
               </>
             )}
             {fileSrc && fileTypeIcon && (() => {
-              const fIsImg = isImageFile(msg.file_name, msg.file_mime);
-              const fIsPdf = isPdfFile(msg.file_name, msg.file_mime);
+              const conVista = isImageFile(msg.file_name, msg.file_mime) || admiteMiniatura(msg.file_name, msg.file_mime);
               return (
               <div role="button" tabIndex={0}
+                title={msg.file_name || undefined}
                 onClick={() => setShowFilePreview(true)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowFilePreview(true); } }}
-                className="mt-1 w-[190px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md group/file text-left cursor-pointer">
-                {(fIsImg || fIsPdf) ? (
-                  <div className="h-[150px] w-full overflow-hidden bg-slate-50">
-                    {fIsImg ? (
-                      <img src={fileSrc} alt={msg.file_name || t("Archivo")} className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
-                        <iframe src={`${fileSrc}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} title={msg.file_name || t("PDF")} tabIndex={-1}
-                          className="h-[460px] w-[190px] origin-top-left border-0" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex h-[110px] w-full items-center justify-center bg-slate-50">
-                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
-                      <fileTypeIcon.Icon size={22}/>
-                    </div>
-                  </div>
-                )}
+                className="mt-1 w-[210px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-px hover:shadow-md group/file text-left cursor-pointer">
+                <MiniaturaArchivo src={fileSrc} fileName={msg.file_name} mime={msg.file_mime} alto={conVista ? 150 : 96} />
                 <div className="flex items-center gap-1.5 px-2.5 py-2 border-t border-slate-100">
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-xs font-semibold text-slate-700">{msg.file_name || t("Archivo")}</p>
