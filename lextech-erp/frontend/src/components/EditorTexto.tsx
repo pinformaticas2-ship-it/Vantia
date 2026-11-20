@@ -12,14 +12,17 @@ import Superscript from "@tiptap/extension-superscript";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight, Baseline, Bold, CaseSensitive, ChevronDown, ChevronUp,
-  Highlighter, ImagePlus, Indent as IndentIncrease, Outdent as IndentDecrease, Italic, Link2, List, ListOrdered, Minus, Sigma as Omega, Paintbrush, Pilcrow,
+  Highlighter, ImagePlus, Indent as IndentIncrease, Outdent as IndentDecrease, Italic, Link2, List, ListTree, ListOrdered, Minus, Sigma as Omega, Paintbrush, Pilcrow,
   Quote, Redo2, RemoveFormatting, Replace, Search, SeparatorHorizontal, Strikethrough, Subscript as SubIcon,
   Superscript as SupIcon, Table as TableIcon, Underline as UnderlineIcon, Undo2, WrapText, X, ZoomIn,
 } from "lucide-react";
 import "./editorTexto.css";
 import { t, idioma } from "../lib/i18n";
 import { aviso } from "../lib/avisos";
-import { Buscar, FormatoParrafo, SaltoPagina, type BuscarStorage } from "./editor/extensiones";
+import { Buscar, FormatoParrafo, Indice, SaltoPagina, type BuscarStorage } from "./editor/extensiones";
+import { SelectorFuente } from "./editor/SelectorFuente";
+import { useAuth } from "@clerk/clerk-react";
+import { asegurarFuentes, cargarCatalogo } from "../lib/fuentesWeb";
 
 // Editor de texto de Vantia (Documentos). TipTap guarda y devuelve HTML con
 // estilos en línea (fuente, tamaño, color, interlineado, sangrías…), que es
@@ -42,6 +45,10 @@ export function useEditorTexto(opts: { contenido: string; onChange: (html: strin
       TableKit.configure({ table: { resizable: false } }),
       FormatoParrafo,
       SaltoPagina,
+      Indice.configure({
+        textoVacio: t("Añade títulos (Título, Subtítulo o Apartado) y aparecerán aquí."),
+        aviso: t("Se actualiza solo. Los números de página se ponen al descargarlo en Word."),
+      }),
       Buscar,
       CharacterCount,
       Placeholder.configure({ placeholder: opts.placeholder || t("Empieza a escribir, o pide a la IA que lo redacte…") }),
@@ -58,10 +65,6 @@ export function useEditorTexto(opts: { contenido: string; onChange: (html: strin
 
 // ── Listas de opciones (como en Word) ──────────────────────────────────────
 
-const FUENTES = [
-  "Times New Roman", "Arial", "Calibri", "Cambria", "Garamond", "Georgia",
-  "Book Antiqua", "Helvetica", "Verdana", "Tahoma", "Courier New",
-];
 const TAMANOS = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 28, 36, 48, 72];
 const INTERLINEADOS = ["1", "1.15", "1.5", "2", "2.5", "3"];
 const COLORES_TEXTO = [
@@ -301,12 +304,7 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
           <option value="h2">{t("Subtítulo")}</option>
           <option value="h3">{t("Apartado")}</option>
         </select>
-        <select value={FUENTES.includes(fuente) ? fuente : ""} aria-label={t("Fuente")} title={t("Fuente")} className={`${selectCls} w-[150px]`}
-          style={fuente ? { fontFamily: fuente } : undefined}
-          onChange={(e) => (e.target.value ? c().setFontFamily(e.target.value).run() : c().unsetFontFamily().run())}>
-          <option value="">{fuente && !FUENTES.includes(fuente) ? fuente : t("Times New Roman (predeterminada)")}</option>
-          {FUENTES.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
-        </select>
+        <SelectorFuente editor={editor} actual={fuente} />
         <select value={TAMANOS.includes(tamano) ? String(tamano) : ""} aria-label={t("Tamaño de fuente")} title={t("Tamaño de fuente")} className={`${selectCls} w-[62px]`}
           onChange={(e) => (e.target.value ? c().setFontSize(`${e.target.value}pt`).run() : c().unsetFontSize().run())}>
           {!TAMANOS.includes(tamano) && <option value="">{Number.isFinite(tamano) ? tamano : ""}</option>}
@@ -398,6 +396,8 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
             {(cerrar) => <SelectorTabla onElegir={(filas, cols) => { c().insertTable({ rows: filas, cols, withHeaderRow: true }).run(); cerrar(); }} />}
           </Desplegable>
         )}
+        <button type="button" title={t("Insertar índice")} className={btn(false)}
+          onClick={() => { if (!c().insertarIndice(t("Índice")).run()) aviso.info(t("El documento ya tiene un índice.")); }}><ListTree size={15} /></button>
         <button type="button" title={t("Salto de página (Ctrl+Intro)")} className={btn(false)} onClick={() => c().insertarSaltoPagina().run()}><SeparatorHorizontal size={15} /></button>
         <button type="button" title={t("Línea separadora")} className={btn(false)} onClick={() => c().setHorizontalRule().run()}><Minus size={15} /></button>
         <Desplegable titulo={t("Símbolo")} ancho={244} boton={<Omega size={15} />}>
@@ -537,6 +537,26 @@ function PanelBuscar({ editor, reemplazarInicial, ancla, onCerrar }: {
 /** La hoja: tamaño A4 con márgenes, como en Word. */
 export function HojaEditor({ editor }: { editor: Editor | null }) {
   const zoom = useZoom();
+  const { getToken } = useAuth();
+  // Las fuentes de Google que use el documento se cargan para verlas igual.
+  useEffect(() => {
+    if (!editor) return;
+    let vivo = true;
+    const vistas = new Set<string>();
+    const revisar = () => {
+      const nuevas: string[] = [];
+      editor.state.doc.descendants((n) => {
+        for (const m of n.marks) {
+          const f = String(m.attrs.fontFamily || "").split(",")[0].replace(/["']/g, "").trim();
+          if (f && !vistas.has(f)) { vistas.add(f); nuevas.push(f); }
+        }
+      });
+      if (nuevas.length) void cargarCatalogo(getToken).then(() => { if (vivo) asegurarFuentes(nuevas); });
+    };
+    revisar();
+    editor.on("update", revisar);
+    return () => { vivo = false; editor.off("update", revisar); };
+  }, [editor, getToken]);
   return (
     <div style={{ zoom: zoom / 100, ["--vt-salto" as string]: JSON.stringify(t("Salto de página")) }}
       className="vt-hoja mx-auto w-full max-w-[816px] rounded-sm bg-white px-6 py-8 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_8px_24px_rgba(15,23,42,0.06)] sm:min-h-[1056px] sm:px-[72px] sm:py-[64px]">

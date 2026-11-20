@@ -255,3 +255,32 @@ test('Word: conserva los formatos del editor (fuente, color, resaltado, interlin
   assert.match(xml, /<w:drawing>/);
   assert.match(xml, /w:type="page"|pageBreakBefore/);
 });
+
+test('Word: el índice del editor pasa a ser un índice de Word (campo TOC) con los títulos', async () => {
+  const { htmlADocx, extraerIndice } = await import('../src/controllers/documentosController');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const JSZip = require('jszip');
+  const html = '<nav class="vt-indice" data-indice="" data-titulo="Índice"><p class="vt-indice-titulo">Índice</p></nav>'
+    + '<h1>Hechos</h1><p>a</p><h2>Primero &amp; único</h2><p>b</p><h3>Detalle</h3><h4>No entra</h4>';
+  const ind = extraerIndice(html);
+  assert.deepEqual(ind.entradas, [{ nivel: 1, texto: 'Hechos' }, { nivel: 2, texto: 'Primero & único' }, { nivel: 3, texto: 'Detalle' }]);
+  const zip = await JSZip.loadAsync(await htmlADocx('Índice', html));
+  const xml: string = (await zip.file('word/document.xml').async('string')).replace(/>\s+</g, '><');
+  assert.ok(xml.includes(String.raw`<w:instrText xml:space="preserve"> TOC \o "1-3" \h \z \u </w:instrText>`), 'campo TOC de títulos 1 a 3');
+  assert.equal((xml.match(/w:fldCharType="begin"/g) || []).length, 1);
+  assert.equal((xml.match(/w:fldCharType="end"/g) || []).length, 1);
+  assert.match(xml, /Primero &amp; único/);
+  assert.ok(!xml.includes('VTTOC'), 'no queda la marca');
+  assert.match(await zip.file('word/settings.xml').async('string'), /<w:updateFields w:val="true"\/>/);
+  // Sin índice no se toca settings (Word no pregunta por actualizar campos).
+  const sin = await JSZip.loadAsync(await htmlADocx('x', '<p>hola</p>'));
+  assert.doesNotMatch(await sin.file('word/settings.xml').async('string'), /updateFields/);
+});
+
+test('fuentes: nombres entre comillas y las de Office no se incrustan', async () => {
+  const { prepararHtmlParaDocx } = await import('../src/controllers/documentosController');
+  assert.match(prepararHtmlParaDocx('<p><span style="font-family: &quot;M PLUS 1p&quot;, serif">x</span></p>'), /font-family: M PLUS 1p"/);
+  const { fuentesGoogleDelHtml } = await import('../src/utils/fuentes');
+  const usadas = await fuentesGoogleDelHtml('<span style="font-family: Arial">a</span><span style="font-family: Lobster">b</span><span style="font-family: &quot;Playfair Display&quot;">c</span>');
+  assert.deepEqual(usadas.map((f) => f.n).sort(), ['Lobster', 'Playfair Display']);
+});

@@ -85,3 +85,19 @@ html[data-modo="oscuro"] .vt-editor .tiptap mark[style] { color: #0f172a !import
 html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: #000000"],
 html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: rgb(0, 0, 0)"],
 html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: #404040"] { color: var(--o-texto) !important; }
+
+/* ── Índice (20/11/2026) ─────────────────────────────────────────────── */
+.vt-editor .tiptap .vt-indice {
+  margin: 1.2em 0; padding: 14px 18px 10px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc;
+  font-family: inherit; user-select: none;
+}
+.vt-editor .tiptap .vt-indice.ProseMirror-selectednode { border-color: var(--tema-500, #ab0433); border-style: solid; }
+.vt-editor .tiptap .vt-indice-titulo { margin: 0 0 0.5em; font-size: 1.25em; font-weight: 700; }
+.vt-editor .tiptap .vt-indice button { display: block; width: 100%; text-align: left; padding: 2px 6px; margin: 0 -6px; border-radius: 4px; color: inherit; font: inherit; line-height: 1.5; cursor: pointer; }
+.vt-editor .tiptap .vt-indice button:hover { background: rgba(var(--accent-glow), 0.08); text-decoration: underline; }
+.vt-editor .tiptap .vt-indice .vt-indice-n1 { font-weight: 600; }
+.vt-editor .tiptap .vt-indice .vt-indice-n2 { padding-left: calc(1.4em + 6px); }
+.vt-editor .tiptap .vt-indice .vt-indice-n3 { padding-left: calc(2.8em + 6px); font-size: 0.95em; }
+.vt-editor .tiptap .vt-indice-vacio { margin: 0; color: #94a3b8; font-style: italic; font-size: 0.95em; }
+.vt-editor .tiptap .vt-indice-aviso { margin: 0.6em 0 0; color: #94a3b8; font: 500 11px/1.4 system-ui, sans-serif; }
+html[data-modo="oscuro"] .vt-editor .tiptap .vt-indice { background: var(--o-elevado); border-color: var(--o-borde-fuerte); }

@@ -158,6 +158,9 @@ export default function Documentos() {
     if (!w) { setAviso({ tono: "error", texto: "El navegador ha bloqueado la ventana de impresión." }); return; }
     w.opener = null;
     const t = (titulo || SIN_TITULO).replace(/</g, "&lt;");
+    // Las fuentes de Google que usa el documento, para que se impriman con su letra.
+    const fuentesWeb = [...document.querySelectorAll<HTMLLinkElement>('link[href^="https://fonts.googleapis.com/css2"]')]
+      .filter((l) => !l.href.includes("&text=")).map((l) => `<link rel="stylesheet" href="${l.href}">`).join("");
     w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${t}</title><style>
       @page { size: A4; margin: 2.5cm; }
       body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.5; color: #000; }
@@ -167,10 +170,14 @@ export default function Documentos() {
       mark { background: #ff0; } p { margin: 0 0 8pt; }
       img { max-width: 100%; height: auto; } .page-break { page-break-after: always; break-after: page; height: 0; }
       [data-resize-handle] { display: none; }
-    </style></head><body>${editor.getHTML()}</body></html>`);
+      nav.vt-indice { margin: 0 0 18pt; } .vt-indice-titulo { font-size: 14pt; font-weight: bold; margin-bottom: 6pt; }
+      .vt-indice p { margin: 0 0 3pt; } .vt-indice-n1 { font-weight: bold; } .vt-indice-n2 { padding-left: 1.4em; } .vt-indice-n3 { padding-left: 2.8em; }
+    </style>${fuentesWeb}</head><body>${editor.getHTML()}</body></html>`);
     w.document.close();
     w.focus();
-    setTimeout(() => w.print(), 300);
+    // Espera a que carguen las fuentes (como mucho 3 s) antes de imprimir.
+    const listas = (w.document as any).fonts?.ready ?? Promise.resolve();
+    void Promise.race([listas, new Promise((r) => setTimeout(r, 3000))]).then(() => setTimeout(() => w.print(), 150));
   };
 
   const guardarEnExpediente = async (exp?: ExpedienteOption) => {

@@ -5,7 +5,7 @@ import { costlyActionLimiter } from '../middleware/rateLimits';
 import { traducirDocumentoEditor } from '../controllers/traduccionesController';
 import {
   listarDocumentos, verDocumento, crearDocumento, actualizarDocumento, borrarDocumento,
-  exportarDocx, guardarEnExpediente, generarConIa,
+  exportarDocx, guardarEnExpediente, generarConIa, listarFuentes,
 } from '../controllers/documentosController';
 
 // Documentos (editor de texto de Vantia). Mismo permiso que el módulo
@@ -14,6 +14,8 @@ const router = Router();
 router.use(requireAuth, requireModulePermission('documental'));
 
 router.get('/', listarDocumentos);
+// Catálogo de fuentes del editor (antes de /:id, que lo tomaría por un id).
+router.get('/fuentes', listarFuentes);
 router.post('/', crearDocumento);
 router.post('/generar', costlyActionLimiter, generarConIa);
 router.get('/:id', verDocumento);

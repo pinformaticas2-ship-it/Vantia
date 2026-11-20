@@ -25,6 +25,7 @@ declare module "@tiptap/core" {
       quitarFormatoParrafo: () => ReturnType;
     };
     saltoPagina: { insertarSaltoPagina: () => ReturnType };
+    indice: { insertarIndice: (titulo: string) => ReturnType };
     buscar: {
       setBusqueda: (termino: string, mayusculas?: boolean) => ReturnType;
       irAResultado: (indice: number) => ReturnType;
@@ -290,6 +291,145 @@ export const Buscar = Extension.create<Record<string, never>, BuscarStorage>({
         },
       },
       props: { decorations(state) { return claveBuscar.getState(state); } },
+    })];
+  },
+});
+
+// ── Índice ──────────────────────────────────────────────────────────────────
+// Un bloque que lista los títulos del documento (Título, Subtítulo, Apartado)
+// y se actualiza solo. Se guarda como <nav data-indice> con las entradas (así
+// se imprime y la IA lo entiende); al exportar a Word se convierte en un campo
+// TOC de Word con números de página (documentosController.extraerIndice).
+
+export type EntradaIndice = { nivel: number; texto: string };
+
+function titulosDe(doc: PMNode): { entrada: EntradaIndice; pos: number }[] {
+  const out: { entrada: EntradaIndice; pos: number }[] = [];
+  doc.descendants((n, pos) => {
+    if (n.type.name === "heading" && n.attrs.level <= 3 && n.textContent.trim()) {
+      out.push({ entrada: { nivel: n.attrs.level, texto: n.textContent.trim() }, pos });
+    }
+    return n.type.name !== "indice";
+  });
+  return out;
+}
+
+export const Indice = Node.create<{ textoVacio: string; aviso: string }>({
+  name: "indice",
+  group: "block",
+  atom: true,
+  selectable: true,
+
+  addOptions() {
+    return { textoVacio: "", aviso: "" };
+  },
+
+  addAttributes() {
+    return {
+      titulo: { default: "Índice", parseHTML: (el) => el.getAttribute("data-titulo") || "Índice", renderHTML: () => ({}) },
+      entradas: {
+        default: [] as EntradaIndice[],
+        parseHTML: (el) => [...el.querySelectorAll("[data-nivel]")].map((e) => ({ nivel: Number(e.getAttribute("data-nivel")) || 1, texto: e.textContent || "" })),
+        renderHTML: () => ({}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "nav[data-indice]" }];
+  },
+
+  renderHTML({ node }) {
+    const entradas = (node.attrs.entradas || []) as EntradaIndice[];
+    return ["nav", { class: "vt-indice", "data-indice": "", "data-titulo": node.attrs.titulo },
+      ["p", { class: "vt-indice-titulo" }, node.attrs.titulo],
+      ...entradas.map((e) => ["p", { class: `vt-indice-n${e.nivel}`, "data-nivel": String(e.nivel) }, e.texto])];
+  },
+
+  addNodeView() {
+    const opciones = this.options;
+    return ({ node, editor }) => {
+      const dom = document.createElement("nav");
+      dom.className = "vt-indice";
+      dom.contentEditable = "false";
+      const pintar = (n: PMNode) => {
+        dom.replaceChildren();
+        const cab = document.createElement("p");
+        cab.className = "vt-indice-titulo";
+        cab.textContent = n.attrs.titulo;
+        dom.appendChild(cab);
+        const entradas = (n.attrs.entradas || []) as EntradaIndice[];
+        if (!entradas.length) {
+          const vacio = document.createElement("p");
+          vacio.className = "vt-indice-vacio";
+          vacio.textContent = opciones.textoVacio;
+          dom.appendChild(vacio);
+        }
+        entradas.forEach((e, i) => {
+          const fila = document.createElement("button");
+          fila.type = "button";
+          fila.className = `vt-indice-n${e.nivel}`;
+          fila.textContent = e.texto;
+          // Ir al título (el i-ésimo título del documento).
+          fila.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            const t = titulosDe(editor.state.doc)[i];
+            if (!t) return;
+            editor.chain().focus().setTextSelection(t.pos + 1).scrollIntoView().run();
+            (editor.view.domAtPos(t.pos + 1).node as HTMLElement)?.parentElement?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+          });
+          dom.appendChild(fila);
+        });
+        if (opciones.aviso) {
+          const pie = document.createElement("p");
+          pie.className = "vt-indice-aviso";
+          pie.textContent = opciones.aviso;
+          dom.appendChild(pie);
+        }
+      };
+      pintar(node);
+      return {
+        dom,
+        update: (n) => { if (n.type.name !== "indice") return false; pintar(n); return true; },
+        ignoreMutation: () => true,
+        stopEvent: (e) => e.type === "click" && (e.target as HTMLElement).tagName === "BUTTON",
+      };
+    };
+  },
+
+  addCommands() {
+    return {
+      insertarIndice: (titulo) => ({ state, chain }) => {
+        let hay = false;
+        state.doc.descendants((n) => { if (n.type.name === "indice") hay = true; return !hay; });
+        if (hay) return false; // uno por documento, como en Word
+        return chain().insertContent([
+          { type: this.name, attrs: { titulo, entradas: titulosDe(state.doc).map((t) => t.entrada) } },
+          { type: "paragraph" },
+        ]).run();
+      },
+    };
+  },
+
+  // Mantiene las entradas al día cada vez que cambian los títulos.
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: new PluginKey("vtIndice"),
+      appendTransaction: (trs, _viejo, state) => {
+        if (!trs.some((t) => t.docChanged)) return null;
+        const entradas = titulosDe(state.doc).map((t) => t.entrada);
+        const json = JSON.stringify(entradas);
+        let tr: ReturnType<typeof state.tr.setNodeMarkup> | null = null;
+        state.doc.descendants((n, pos) => {
+          if (n.type.name === "indice" && JSON.stringify(n.attrs.entradas) !== json) {
+            tr = (tr || state.tr).setNodeMarkup(pos, undefined, { ...n.attrs, entradas });
+          }
+          return n.type.name !== "indice";
+        });
+        // Sin entrada propia en el historial: deshacer deshace el título, no esto.
+        if (tr) (tr as any).setMeta("addToHistory", false);
+        return tr;
+      },
     })];
   },
 });

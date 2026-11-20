@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { resolveUserName, logActivityForReq } from './activityController';
 import { saveExpedienteAttachmentFromBuffer } from './filesController';
 import { skillsActivas } from './skillsController';
+import { catalogoFuentes, fuentesGoogleDelHtml, incrustarFuentes, type Fuente } from '../utils/fuentes';
 
 // Documentos (30/10/2026): editor de texto de Vantia. El contenido es el HTML
 // que produce TipTap en el navegador; aquí se guarda, se exporta a Word, se
@@ -169,30 +170,57 @@ export async function htmlADocx(titulo: string, html: string): Promise<Buffer> {
   // html-to-docx no trae tipos.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const HTMLtoDOCX = require('html-to-docx');
-  const cuerpo = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo.replace(/</g, '&lt;')}</title></head><body>${prepararHtmlParaDocx(html)}</body></html>`;
-  const out = await HTMLtoDOCX(cuerpo, null, {
-    title: titulo,
-    font: 'Times New Roman',
-    fontSize: 24, // medios puntos
-    // Márgenes COMPLETOS: si falta header/footer/gutter, html-to-docx escribe
-    // w:header="undefined" y Word se niega a abrir el archivo («Word detectó un
-    // error…»). Comprobado abriendo la exportación con Word (20/11/2026).
-    margins: { top: 1417, right: 1417, bottom: 1417, left: 1417, header: 709, footer: 709, gutter: 0 },
-    // A4 (por defecto la librería usa carta americana).
-    orientation: 'portrait',
-    pageSize: { width: 11906, height: 16838 },
-    table: { row: { cantSplit: true } },
-    footer: false,
-    pageNumber: false,
-  });
+  const indice = extraerIndice(html);
+  const cuerpo = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo.replace(/</g, '&lt;')}</title></head><body>${prepararHtmlParaDocx(indice.html)}</body></html>`;
+  const [out, fuentes] = await Promise.all([
+    HTMLtoDOCX(cuerpo, null, {
+      title: titulo,
+      font: 'Times New Roman',
+      fontSize: 24, // medios puntos
+      // Márgenes COMPLETOS: si falta header/footer/gutter, html-to-docx escribe
+      // w:header="undefined" y Word se niega a abrir el archivo («Word detectó un
+      // error…»). Comprobado abriendo la exportación con Word (20/11/2026).
+      margins: { top: 1417, right: 1417, bottom: 1417, left: 1417, header: 709, footer: 709, gutter: 0 },
+      // A4 (por defecto la librería usa carta americana).
+      orientation: 'portrait',
+      pageSize: { width: 11906, height: 16838 },
+      table: { row: { cantSplit: true } },
+      footer: false,
+      pageNumber: false,
+    }),
+    // Si Google no responde, el documento sale igual (sin incrustarlas).
+    fuentesGoogleDelHtml(html).catch(() => [] as Fuente[]),
+  ]);
   const buf = Buffer.isBuffer(out) ? out : Buffer.from(await (out as Blob).arrayBuffer());
-  return aplicarPrimeraLinea(buf);
+  return retocarDocx(buf, { indice, fuentes });
 }
 
 // ── Ajustes del HTML del editor para html-to-docx ─────────────────────────
 // Lo que html-to-docx no entiende por sí solo (comprobado con su salida XML,
-// 20/11/2026): <em>, <mark> y la sangría de primera línea (text-indent).
-const MARCA_SANGRIA = '⁣VTFI'; // separador invisible + clave; se quita al final
+// 20/11/2026): <em>, <mark>, la sangría de primera línea (text-indent) y el
+// índice. Se dejan marcas invisibles que retocarDocx convierte en XML de Word.
+const SEP = '⁣';
+const MARCA_SANGRIA = `${SEP}VTFI`;
+const MARCA_INDICE = `${SEP}VTTOC${SEP}`;
+
+const sinEtiquetas = (s: string) => s.replace(/<[^>]+>/g, '')
+  .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
+  .replace(/\s+/g, ' ').trim();
+
+type Indice = { html: string; hay: boolean; titulo: string; entradas: { nivel: number; texto: string }[] };
+
+/** El bloque de índice del editor (<nav data-indice>) y los títulos que debe listar. */
+export function extraerIndice(html: string): Indice {
+  const src = String(html || '');
+  const nav = /<nav\b[^>]*data-indice[^>]*>[\s\S]*?<\/nav>/i.exec(src);
+  if (!nav) return { html: src, hay: false, titulo: '', entradas: [] };
+  const titulo = sinEtiquetas(/data-titulo="([^"]*)"/i.exec(nav[0])?.[1] || '') || 'Índice';
+  const resto = src.replace(nav[0], `<p>${MARCA_INDICE}</p>`);
+  const entradas = [...resto.matchAll(/<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi)]
+    .map((m) => ({ nivel: Number(m[1]), texto: sinEtiquetas(m[2]) }))
+    .filter((e) => e.texto);
+  return { html: resto, hay: true, titulo, entradas };
+}
 
 export function prepararHtmlParaDocx(html: string): string {
   return String(html || '<p></p>')
@@ -205,6 +233,10 @@ export function prepararHtmlParaDocx(html: string): string {
       return `<span style="background-color: ${color}">`;
     })
     .replace(/<\/mark>/gi, '</span>')
+    // font-family: solo la primera familia y sin comillas (&quot;M PLUS 1p&quot;):
+    // html-to-docx copia el valor tal cual como nombre de la fuente en Word.
+    .replace(/font-family:\s*((?:&quot;[^&]*&quot;|'[^']*'|[^;"])+)/gi, (_m, v: string) =>
+      `font-family: ${v.split(',')[0].replace(/&quot;|['"]/g, '').trim()}`)
     // Tablas a todo el ancho, como en el editor (si no, en Word una tabla
     // vacía se encoge al mínimo). html-to-docx admite el % en <table>.
     .replace(/<table\b([^>]*)>/gi, (m, attrs: string) => {
@@ -214,32 +246,28 @@ export function prepararHtmlParaDocx(html: string): string {
         ? `<table${attrs.replace(estilo[0], ` style="width: 100%; ${estilo[1]}"`)}>`
         : `<table${attrs} style="width: 100%">`;
     })
-    // text-indent → marca invisible al principio del párrafo; aplicarPrimeraLinea
-    // la convierte en <w:ind w:firstLine> en el XML de Word.
+    // text-indent → marca invisible al principio del párrafo; retocarDocx la
+    // convierte en <w:ind w:firstLine> en el XML de Word.
     .replace(/<(p|h[1-6])\b([^>]*?)\sstyle="([^"]*)"([^>]*)>/gi, (m, tag: string, antes: string, estilo: string, despues: string) => {
       const ti = /(?:^|;)\s*text-indent:\s*([\d.]+)px\s*;?/i.exec(estilo);
       if (!ti) return m;
       const twips = Math.round(Number(ti[1]) * 15);
       const resto = estilo.replace(ti[0], ti[0].startsWith(';') ? ';' : '').trim();
-      return `<${tag}${antes}${resto ? ` style="${resto}"` : ''}${despues}>${MARCA_SANGRIA}${twips}⁣`;
+      return `<${tag}${antes}${resto ? ` style="${resto}"` : ''}${despues}>${MARCA_SANGRIA}${twips}${SEP}`;
     });
 }
 
-async function aplicarPrimeraLinea(docx: Buffer): Promise<Buffer> {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const JSZip = require('jszip');
-  const zip = await JSZip.loadAsync(docx);
-  const f = zip.file('word/document.xml');
-  if (!f) return docx;
-  const xml: string = await f.async('string');
-  if (!xml.includes(MARCA_SANGRIA)) return docx;
-  const marca = new RegExp(`${MARCA_SANGRIA}(\\d+)⁣`);
-  // Cada párrafo por separado: busca su marca, la quita y añade la sangría.
-  const nuevo = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (p) => {
+const escXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Sangría de primera línea: la marca del párrafo pasa a <w:ind w:firstLine>. */
+function xmlPrimeraLinea(xml: string): string {
+  if (!xml.includes(MARCA_SANGRIA)) return xml;
+  const marca = new RegExp(`${MARCA_SANGRIA}(\\d+)${SEP}`);
+  return xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (p) => {
     const m = marca.exec(p);
     if (!m) return p;
     const twips = m[1];
-    let s = p.replace(marca, '');
+    const s = p.replace(marca, '');
     if (/<w:ind\b/.test(s)) return s.replace(/<w:ind\b/, `<w:ind w:firstLine="${twips}"`);
     const ind = `<w:ind w:firstLine="${twips}"/>`;
     if (!/<w:pPr>/.test(s)) return s.replace(/^(<w:p(?:\s[^>]*)?>)/, `$1<w:pPr>${ind}</w:pPr>`);
@@ -249,8 +277,65 @@ async function aplicarPrimeraLinea(docx: Buffer): Promise<Buffer> {
     const pos = s.indexOf('<w:pPr>') + (antesDe ? antesDe.index : 7);
     return s.slice(0, pos) + ind + s.slice(pos);
   });
-  zip.file('word/document.xml', nuevo);
-  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
+/**
+ * Índice: un campo TOC de Word de verdad (títulos 1 a 3, con enlaces). Va
+ * relleno con los títulos para que se vea aunque no se actualice, y Word lo
+ * recalcula con los números de página al abrirlo (updateFields).
+ */
+function xmlIndice(xml: string, indice: Indice): string {
+  if (!indice.hay || !xml.includes(MARCA_INDICE)) return xml;
+  const inicio = '<w:r><w:fldChar w:fldCharType="begin" w:dirty="true"/></w:r>'
+    + '<w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r>'
+    + '<w:r><w:fldChar w:fldCharType="separate"/></w:r>';
+  const fin = '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+  const tab = '<w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9062"/></w:tabs>';
+  const cab = `<w:p><w:pPr><w:keepNext/><w:spacing w:after="240"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:t xml:space="preserve">${escXml(indice.titulo)}</w:t></w:r></w:p>`;
+  const lista = indice.entradas.length ? indice.entradas : [{ nivel: 1, texto: '' }];
+  const parrafos = lista.map((e, i) =>
+    `<w:p><w:pPr><w:pStyle w:val="TOC${e.nivel}"/>${tab}<w:spacing w:after="80"/><w:ind w:left="${(e.nivel - 1) * 440}"/></w:pPr>`
+    + `${i === 0 ? inicio : ''}<w:r><w:t xml:space="preserve">${escXml(e.texto)}</w:t></w:r></w:p>`).join('');
+  const bloque = `${cab}${parrafos}<w:p>${fin}</w:p>`;
+  // El párrafo que contiene la marca (sin cruzar el final de otro párrafo).
+  const parrafoMarca = new RegExp(`<w:p(?:\\s[^>]*)?>(?:(?!</w:p>)[\\s\\S])*?${MARCA_INDICE}[\\s\\S]*?</w:p>`);
+  return xml.replace(parrafoMarca, () => bloque);
+}
+
+/** Retoques sobre el .docx de html-to-docx: sangrías, índice y fuentes incrustadas. */
+async function retocarDocx(docx: Buffer, extra: { indice: Indice; fuentes: Fuente[] }): Promise<Buffer> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(docx);
+  const f = zip.file('word/document.xml');
+  if (!f) return docx;
+  const xml: string = await f.async('string');
+  if (!xml.includes(MARCA_SANGRIA) && !xml.includes(MARCA_INDICE) && !extra.fuentes.length) return docx;
+  zip.file('word/document.xml', xmlIndice(xmlPrimeraLinea(xml), extra.indice));
+  if (extra.indice.hay) {
+    // Que Word actualice el índice (números de página) al abrir el documento.
+    const ajustes = zip.file('word/settings.xml');
+    if (ajustes) {
+      let s: string = await ajustes.async('string');
+      if (!/<w:updateFields\b/.test(s)) {
+        s = /<w:decimalSymbol\b/.test(s)
+          ? s.replace(/<w:decimalSymbol\b/, '<w:updateFields w:val="true"/><w:decimalSymbol')
+          : s.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>');
+        zip.file('word/settings.xml', s);
+      }
+    }
+  }
+  await incrustarFuentes(zip, extra.fuentes);
+  return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+}
+
+// GET /api/documentos/fuentes → catálogo de fuentes para el editor.
+export async function listarFuentes(_req: Request, res: Response) {
+  try {
+    const { fuentes, origen } = await catalogoFuentes();
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    return ok(res, { origen, fuentes: fuentes.map((f) => `${f.n}|${f.c}|${f.v}`).join('\n') });
+  } catch (e: any) { return fallo(res, e?.message || 'No se pudo cargar el catálogo de fuentes'); }
 }
 
 // GET /api/documentos/:id/docx
