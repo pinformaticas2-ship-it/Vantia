@@ -284,3 +284,15 @@ test('fuentes: nombres entre comillas y las de Office no se incrustan', async ()
   const usadas = await fuentesGoogleDelHtml('<span style="font-family: Arial">a</span><span style="font-family: Lobster">b</span><span style="font-family: &quot;Playfair Display&quot;">c</span>');
   assert.deepEqual(usadas.map((f) => f.n).sort(), ['Lobster', 'Playfair Display']);
 });
+
+test('IA: el documento va sin las imágenes pesadas, que vuelven en la respuesta; y lee si sustituye o añade', async () => {
+  const { htmlParaIa, leerAccion } = await import('../src/controllers/documentosController');
+  const img = '<img src="data:image/png;base64,AAAABBBB" width="120" height="60">';
+  const a = htmlParaIa(`<p>Hola</p><p>${img}</p>`);
+  assert.equal(a.html, '<p>Hola</p><p><img data-vt-img="1"></p>');
+  assert.equal(a.recortado, false);
+  assert.equal(a.restaurar('<p>Hello</p><p><img data-vt-img="1" alt=""></p>'), `<p>Hello</p><p>${img}</p>`);
+  assert.equal(htmlParaIa('<p>' + 'x'.repeat(100) + '</p>', 50).recortado, true);
+  assert.equal(leerAccion('{"accion":"sustituir","documento":"<p>x</p>"}'), 'sustituir');
+  assert.equal(leerAccion('<p>no es JSON</p>'), null);
+});

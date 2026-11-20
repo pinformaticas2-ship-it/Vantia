@@ -3835,4 +3835,8 @@ registrarEn({
   "Superíndice": "Superscript",
   "Reducir sangría": "Decrease indent",
   "Aumentar sangría": "Increase indent",
+  // IA de Documentos: cambiar el documento entero (20/11/2026)
+  "Selecciona el texto que quieres cambiar, o di qué hago con el documento entero.": "Select the text you want to change, or tell me what to do with the whole document.",
+  "He cambiado el documento entero. Si no te convence, deshazlo con Ctrl+Z.": "I changed the whole document. If you don't like it, undo it with Ctrl+Z.",
+  "Sin selección: se cambia el documento entero. Para cambiar solo una parte, selecciónala.": "Nothing selected: the whole document will be changed. To change only part of it, select it.",
 });

@@ -460,16 +460,23 @@ function PanelIa({ skills, skillInicial, expediente, expedienteId, onVincular, o
   const generar = async () => {
     setError(null); setHecho(null);
     const seleccion = haySeleccion ? editor.state.doc.textBetween(from, to, "\n") : "";
-    if (modo === "reescribir" && !seleccion.trim()) { setError(t("Selecciona en el documento el texto que quieres cambiar.")); return; }
+    // «Cambiar» sin nada seleccionado: se cambia el documento entero (p. ej. «Tradúcelo al inglés»).
+    const todoElDocumento = modo === "reescribir" && !seleccion.trim();
+    if (todoElDocumento && (editor.isEmpty || !instrucciones.trim())) { setError(t("Selecciona el texto que quieres cambiar, o di qué hago con el documento entero.")); return; }
+    const modoEnvio: Modo = todoElDocumento ? "nuevo" : modo;
     setGenerando(true);
     try {
       const r = await apiFetch("/api/documentos/generar", {
         getToken, method: "POST",
-        body: JSON.stringify({ modo, instrucciones, skillId: skillId || undefined, expedienteId: expedienteId || undefined, documentoHtml: editor.getHTML(), seleccion }),
+        body: JSON.stringify({ modo: modoEnvio, instrucciones, skillId: skillId || undefined, expedienteId: expedienteId || undefined, documentoHtml: editor.getHTML(), seleccion }),
       });
       if (r?.success === false) throw new Error(r.error);
       const html: string = r.data.html;
-      if (modo === "reescribir") {
+      if (modoEnvio === "nuevo" && r.data.accion === "sustituir" && !editor.isEmpty) {
+        // Versión nueva del documento entero (traducción, corrección…): se deshace con Ctrl+Z.
+        editor.chain().focus().selectAll().insertContent(html).run();
+        setHecho(t("He cambiado el documento entero. Si no te convence, deshazlo con Ctrl+Z."));
+      } else if (modo === "reescribir" && !todoElDocumento) {
         editor.chain().focus().insertContentAt({ from, to }, html).run();
         setHecho("Texto sustituido. Si no te convence, deshazlo con Ctrl+Z.");
       } else if (modo === "nuevo" && editor.isEmpty) {
@@ -509,8 +516,8 @@ function PanelIa({ skills, skillInicial, expediente, expedienteId, onVincular, o
         </div>
 
         {modo === "reescribir" && (
-          <p className={`rounded-xl px-3 py-2 text-xs ${haySeleccion ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-            {haySeleccion ? t("Texto seleccionado: {slice}{v}", { slice: editor.state.doc.textBetween(from, to, " ").slice(0, 90), v: to - from > 90 ? "…" : "" }) : t("Selecciona en el documento el texto que quieres cambiar.")}
+          <p className={`rounded-xl px-3 py-2 text-xs ${haySeleccion ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-sky-700"}`}>
+            {haySeleccion ? t("Texto seleccionado: {slice}{v}", { slice: editor.state.doc.textBetween(from, to, " ").slice(0, 90), v: to - from > 90 ? "…" : "" }) : t("Sin selección: se cambia el documento entero. Para cambiar solo una parte, selecciónala.")}
           </p>
         )}
 
@@ -561,7 +568,7 @@ function PanelIa({ skills, skillInicial, expediente, expedienteId, onVincular, o
         <button
           type="button"
           onClick={generar}
-          disabled={generando || (modo === "nuevo" && !instrucciones.trim() && !skillId) || (modo === "reescribir" && !haySeleccion)}
+          disabled={generando || (modo === "nuevo" && !instrucciones.trim() && !skillId) || (modo === "reescribir" && !haySeleccion && (!instrucciones.trim() || editor.isEmpty))}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#92042c] disabled:opacity-40"
         >
           {generando ? <><Loader2 size={15} className="animate-spin" />{" "}{t("Redactando… (puede tardar un poco)")}</> : <><Wand2 size={15} /> {modo === "nuevo" ? t("Redactar") : modo === "reescribir" ? t("Cambiar el texto") : t("Continuar")}</>}

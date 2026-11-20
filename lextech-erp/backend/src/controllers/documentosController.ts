@@ -524,6 +524,27 @@ export function leerRespuestaConSkill<T extends { nombre: string }>(texto: strin
   return { texto, skill: null };
 }
 
+/** «accion» de la respuesta en JSON (sustituir / anadir), si viene. */
+export function leerAccion(texto: string): string | null {
+  try {
+    const j = JSON.parse(String(texto || '').trim().replace(/^```(json)?/i, '').replace(/```$/, ''));
+    return typeof j?.accion === 'string' ? j.accion : null;
+  } catch { return null; }
+}
+
+/**
+ * El documento actual para mandarlo a la IA: las imágenes (data: de varios MB)
+ * se cambian por <img data-vt-img="n"> y se vuelven a poner en la respuesta.
+ */
+export function htmlParaIa(html: string, max = 60_000): { html: string; recortado: boolean; restaurar: (respuesta: string) => string } {
+  const imagenes: string[] = [];
+  let ligero = String(html || '').replace(/<img\b[^>]*>/gi, (tag) => { imagenes.push(tag); return `<img data-vt-img="${imagenes.length}">`; });
+  const recortado = ligero.length > max;
+  if (recortado) ligero = ligero.slice(0, max);
+  const restaurar = (respuesta: string) => String(respuesta || '').replace(/<img\b[^>]*data-vt-img="(\d+)"[^>]*>/gi, (_m, n) => imagenes[Number(n) - 1] || '');
+  return { html: ligero, recortado, restaurar };
+}
+
 /** Quita los ``` y lo que no sea el cuerpo, por si la IA no obedece del todo. */
 export function htmlDeRespuesta(t: string): string {
   let s = String(t || '').trim();
@@ -563,9 +584,10 @@ export async function generarConIa(req: Request, res: Response) {
 - Si es otra cosa (un resumen, una explicación, un correo, unas notas, un acta…), hazlo igualmente, bien y con el formato que le corresponde: sin convertirlo en un escrito jurídico, sin encabezados de carta ni firma si no los pide.
 - Nunca escribas sobre la propia petición (cartas, notas o memorandos diciendo qué te han pedido o si te corresponde). El documento es el resultado, no una conversación.
 - Si de verdad no puedes hacerlo (algo ilegal o dañino), responde solo con una línea: «NO_PUEDO: » y el motivo en una frase para el usuario.
-- Fechas: usa la FECHA DE HOY cuando el documento lleve fecha. No inventes nunca otra fecha.`,
+- Fechas: usa la FECHA DE HOY cuando el documento lleve fecha. No inventes nunca otra fecha.
+- IDIOMA: por defecto, en español. Si el usuario pide otro idioma o una traducción (de todo el documento o de una parte), escribe en ese idioma: lo que pide el usuario manda sobre el estilo del despacho. Traducir es una tarea normal: hazla siempre, fiel al original, sin resumir ni omitir nada y conservando la estructura.`,
     ];
-    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo siempre que redactes; en textos informales, solo lo que encaje: tono, fechas, ortografía…):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
+    if (estilo.length) partes.push(`ESTILO DEL DESPACHO (aplícalo siempre que redactes; en textos informales, solo lo que encaje: tono, fechas, ortografía…; el idioma lo decide la petición: si piden otro idioma o traducir, se hace en ese idioma):\n${estilo.map((s) => s.instrucciones).join('\n\n')}`);
     if (elegida) partes.push(`SKILL ELEGIDA — «${elegida.nombre}». Síguela al pie de la letra:\n${elegida.instrucciones}`);
     if (candidatas.length) {
       const bloques: string[] = [];
@@ -581,8 +603,16 @@ export async function generarConIa(req: Request, res: Response) {
     if (contexto) partes.push(`DATOS REALES (úsalos; en un escrito, los datos del despacho, cliente o asunto que no estén aquí déjalos como [●]):\n${contexto}`);
 
     const documentoTexto = textoPlano(b.documentoHtml || '').slice(0, 60_000);
+    // «Nuevo» con el documento ya escrito: la IA lo ve (con su formato) por si
+    // la petición es sobre él —traducirlo, corregirlo entero…— y dice si su
+    // resultado lo SUSTITUYE o se AÑADE al final (20/11/2026).
+    const actual = modo === 'nuevo' && documentoTexto ? htmlParaIa(String(b.documentoHtml || '')) : null;
+    const conJson = candidatas.length > 0 || !!actual;
     if (modo === 'nuevo') {
-      partes.push(`TAREA: redacta el documento completo.${instrucciones ? `\nIndicaciones del usuario: ${instrucciones}` : ''}`);
+      if (actual) {
+        partes.push(`DOCUMENTO ACTUAL (en HTML${actual.recortado ? '; es largo y aquí solo va el principio' : ''}). Úsalo si la petición se refiere a él (traducirlo, corregirlo, cambiarle el tono, resumirlo…):\n${actual.html}`);
+      }
+      partes.push(`TAREA: ${actual ? 'haz lo que se pide. Si es sobre el documento actual entero (traducirlo, corregirlo…), devuelve la versión nueva COMPLETA; si es contenido nuevo, redáctalo completo.' : 'redacta el documento completo.'}${instrucciones ? `\nIndicaciones del usuario: ${instrucciones}` : ''}`);
     } else if (modo === 'reescribir') {
       const sel = String(b.seleccion || '').trim().slice(0, 30_000);
       if (!sel) return fallo(res, 'Selecciona el texto que quieres que cambie la IA.', 400);
@@ -593,12 +623,17 @@ export async function generarConIa(req: Request, res: Response) {
       partes.push(`TAREA: continúa el documento desde donde termina, sin repetir lo que ya está. Devuelve solo lo nuevo.${instrucciones ? `\nIndicaciones: ${instrucciones}` : ''}`);
     }
     partes.push(INSTRUCCIONES_FORMATO);
-    if (candidatas.length) partes.push('ENTREGA: responde SOLO con JSON {"skill": número de la skill que has seguido o null, "documento": "el HTML del documento (o la línea NO_PUEDO)"}.');
+    if (actual) partes.push('Si trabajas sobre el DOCUMENTO ACTUAL, conserva sus etiquetas y atributos (style, span, mark, sub, sup, img data-vt-img, nav data-indice…) en su sitio y cambia solo el texto; en <nav data-indice> traduce o adapta también el valor de data-titulo.');
+    if (conJson) {
+      partes.push(`ENTREGA: responde SOLO con JSON {${candidatas.length ? '"skill": número de la skill que has seguido o null, ' : ''}${actual ? '"accion": "sustituir" si es una versión nueva del documento actual entero (traducción, corrección…) o "anadir" si es contenido nuevo para añadir al final, ' : ''}"documento": "el HTML (o la línea NO_PUEDO)"}.`);
+    }
 
-    const bruto = await llamarGemini(partes.join('\n\n'), candidatas.length ? { json: true } : {});
+    const bruto = await llamarGemini(partes.join('\n\n'), conJson ? { json: true } : {});
     const uso = bruto.uso;
-    const leido = candidatas.length ? leerRespuestaConSkill(bruto.texto, candidatas) : { texto: bruto.texto, skill: null };
-    const texto = leido.texto;
+    const leido = conJson ? leerRespuestaConSkill(bruto.texto, candidatas) : { texto: bruto.texto, skill: null };
+    // Solo se sustituye si la IA ha visto el documento entero (si iba recortado, se añade).
+    const accion: 'sustituir' | 'anadir' = actual && !actual.recortado && leerAccion(bruto.texto) === 'sustituir' ? 'sustituir' : 'anadir';
+    const texto = actual ? actual.restaurar(leido.texto) : leido.texto;
     const automatica = leido.skill;
     const negativa = motivoNegativa(texto);
     if (negativa) return fallo(res, negativa, 422);
@@ -619,7 +654,7 @@ export async function generarConIa(req: Request, res: Response) {
     // Título sugerido para documentos nuevos: el primer encabezado.
     const h = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/i.exec(html);
     const tituloSugerido = modo === 'nuevo' ? (textoPlano(h?.[1] || '') || elegida?.nombre || '').slice(0, 300) : null;
-    return ok(res, { html, tituloSugerido, skill: elegida?.nombre || automatica?.nombre || null, skillAutomatica: Boolean(automatica) });
+    return ok(res, { html, tituloSugerido, accion, skill: elegida?.nombre || automatica?.nombre || null, skillAutomatica: Boolean(automatica) });
   } catch (e: any) {
     return fallo(res, e?.message || 'No se pudo generar con la IA', e?.status || 500);
   }
