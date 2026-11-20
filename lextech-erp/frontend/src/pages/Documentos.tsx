@@ -165,6 +165,8 @@ export default function Documentos() {
       table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #555; padding: 4px 6px; vertical-align: top; }
       th { background: #eee; } blockquote { border-left: 3px solid #999; padding-left: 10px; font-style: italic; }
       mark { background: #ff0; } p { margin: 0 0 8pt; }
+      img { max-width: 100%; height: auto; } .page-break { page-break-after: always; break-after: page; height: 0; }
+      [data-resize-handle] { display: none; }
     </style></head><body>${editor.getHTML()}</body></html>`);
     w.document.close();
     w.focus();

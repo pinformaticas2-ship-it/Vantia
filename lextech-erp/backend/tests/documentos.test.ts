@@ -220,3 +220,38 @@ test('IA: dice qué skill ha seguido (solo si existe) y, sin cupo o saturada, us
     assert.deepEqual(modelos, ['gemini-2.5-flash', MODELO_RESERVA]);
   } finally { globalThis.fetch = original; }
 });
+
+test('Word: conserva los formatos del editor (fuente, color, resaltado, interlineado, sangrías, imagen, salto de página)', async () => {
+  const { htmlADocx } = await import('../src/controllers/documentosController');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const JSZip = require('jszip');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const html = '<p style="text-indent: 48px">PRIMERA</p>'
+    + '<p style="line-height: 1.5; margin-left: 48px; text-indent: 32px">AMBAS</p>'
+    + '<p><span style="font-family: Arial; font-size: 14pt; color: #c00000">FUENTE</span> '
+    + '<mark data-color="#a5f3fc" style="background-color: #a5f3fc; color: inherit">MARCA</mark> <mark>AMARILLO</mark> <sub>SUB</sub><sup>SUP</sup></p>'
+    + '<div class="page-break" style="page-break-after: always"></div>'
+    + `<p><img src="data:image/png;base64,${png}" width="120" height="60"></p>`
+    + '<table style="min-width: 75px"><tbody><tr><td><p></p></td><td><p></p></td></tr></tbody></table>';
+  const zip = await JSZip.loadAsync(await htmlADocx('Prueba', html));
+  const xml: string = (await zip.file('word/document.xml').async('string')).replace(/>\s+</g, '><');
+  const parrafo = (txt: string) => { const i = xml.indexOf(`>${txt}<`); return xml.slice(xml.lastIndexOf('<w:p>', i), i); };
+  assert.ok(!xml.includes('\u2063') && !xml.includes('VTFI'), 'no queda la marca interna');
+  // Word no abre el archivo si alg\u00fan atributo vale "undefined" (pasaba con los
+  // m\u00e1rgenes de p\u00e1gina incompletos: \u00abWord detect\u00f3 un error al abrir el archivo\u00bb).
+  assert.ok(!/="undefined"/.test(xml), 'ning\u00fan atributo "undefined"');
+  assert.match(xml, /<w:pgSz w:w="11906" w:h="16838"/, 'hoja A4');
+  assert.match(xml, /<w:tblW w:type="dxa" w:w="9\d{3}"\/>/, 'tabla a todo el ancho \u00fatil');
+  assert.match(parrafo('PRIMERA'), /<w:ind w:firstLine="720"\/>/);
+  assert.match(parrafo('AMBAS'), /<w:ind w:firstLine="480" w:left="720"\/>/);
+  assert.match(parrafo('AMBAS'), /<w:spacing w:line="360"/);
+  assert.match(parrafo('FUENTE'), /w:ascii="Arial"/);
+  assert.match(parrafo('FUENTE'), /<w:sz w:val="28"\/>/);
+  assert.match(parrafo('FUENTE'), /<w:color w:val="c00000"\/>/);
+  assert.match(parrafo('MARCA'), /w:fill="a5f3fc"/);
+  assert.match(parrafo('AMARILLO'), /w:fill="ffff00"/);
+  assert.match(parrafo('SUB'), /subscript/);
+  assert.match(parrafo('SUP'), /superscript/);
+  assert.match(xml, /<w:drawing>/);
+  assert.match(xml, /w:type="page"|pageBreakBefore/);
+});

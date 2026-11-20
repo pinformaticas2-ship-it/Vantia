@@ -45,3 +45,43 @@ html[data-modo="oscuro"] .vt-editor .tiptap th, html[data-modo="oscuro"] .vt-edi
 html[data-modo="oscuro"] .vt-editor .tiptap th { background: var(--o-elevado); }
 html[data-modo="oscuro"] .vt-editor .tiptap hr { border-top-color: var(--o-borde-fuerte); }
 html[data-modo="oscuro"] .vt-editor .tiptap mark { background: rgba(250, 204, 21, 0.35); }
+
+/* ── Opciones tipo Word (20/11/2026) ───────────────────────────────────── */
+.vt-editor .tiptap sub, .vt-editor .tiptap sup { font-size: 0.75em; line-height: 0; }
+/* Salto de página: línea discontinua con rótulo (el rótulo viene de --vt-salto, traducido). */
+.vt-editor .tiptap .page-break {
+  position: relative; height: 0; margin: 2.2em -72px; border-top: 1px dashed #94a3b8; cursor: default;
+}
+.vt-editor .tiptap .page-break::after {
+  content: var(--vt-salto, "Salto de página"); position: absolute; left: 50%; top: -0.75em; transform: translateX(-50%);
+  padding: 0 0.6em; background: #fff; color: #64748b; font: 600 11px/1.5 system-ui, sans-serif; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.vt-editor .tiptap .page-break.ProseMirror-selectednode { border-top-color: var(--tema-500, #ab0433); }
+@media (max-width: 639px) { .vt-editor .tiptap .page-break { margin-left: -24px; margin-right: -24px; } }
+/* Imágenes: nunca más anchas que la hoja; asas en las esquinas para cambiar el tamaño. */
+.vt-editor .tiptap img { max-width: 100%; height: auto; display: block; }
+.vt-editor .tiptap [data-resize-container] { max-width: 100%; margin: 0.5em 0; }
+.vt-editor .tiptap [data-resize-wrapper] { display: inline-block; max-width: 100%; }
+.vt-editor .tiptap [data-resize-container].ProseMirror-selectednode [data-resize-wrapper] { outline: 2px solid var(--tema-500, #ab0433); outline-offset: 1px; }
+.vt-editor .tiptap [data-resize-handle] {
+  width: 11px; height: 11px; margin: -5px; background: #fff; border: 1.5px solid var(--tema-500, #ab0433); border-radius: 2px; opacity: 0; z-index: 2; transition: opacity 0.12s;
+}
+.vt-editor .tiptap [data-resize-container]:hover [data-resize-handle],
+.vt-editor .tiptap [data-resize-container].ProseMirror-selectednode [data-resize-handle] { opacity: 1; }
+.vt-editor .tiptap [data-resize-handle="top-left"], .vt-editor .tiptap [data-resize-handle="bottom-right"] { cursor: nwse-resize; }
+.vt-editor .tiptap [data-resize-handle="top-right"], .vt-editor .tiptap [data-resize-handle="bottom-left"] { cursor: nesw-resize; }
+/* Buscar y reemplazar. */
+.vt-editor .tiptap .vt-busca { background: rgba(250, 204, 21, 0.45); border-radius: 2px; }
+.vt-editor .tiptap .vt-busca-actual { background: #fb923c; color: #0f172a; box-shadow: 0 0 0 1px #ea580c; }
+/* Copiar formato: cursor de brocha mientras está activo. */
+.vt-editor .tiptap.vt-pincel { cursor: copy; }
+
+html[data-modo="oscuro"] .vt-editor .tiptap .page-break::after { background: var(--o-superficie); color: var(--o-texto-3); }
+html[data-modo="oscuro"] .vt-editor .tiptap .page-break { border-top-color: var(--o-borde-fuerte); }
+/* Resaltados de color con el texto claro del modo oscuro: el texto resaltado
+   pasa a oscuro para que se lea sobre el color (el color se mantiene). */
+html[data-modo="oscuro"] .vt-editor .tiptap mark[style] { color: #0f172a !important; }
+/* Negro o gris muy oscuro elegido a mano no se vería sobre la hoja oscura. */
+html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: #000000"],
+html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: rgb(0, 0, 0)"],
+html[data-modo="oscuro"] .vt-editor .tiptap span[style*="color: #404040"] { color: var(--o-texto) !important; }

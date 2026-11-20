@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { apiFetch, safeJson } from "./api";
 import { useEditorTexto } from "../components/EditorTexto";
 import { t } from './i18n';
+import { aviso } from './avisos';
 
 // Un documento de Vantia abierto en el editor: carga, guardado automático y
 // descarga en Word. Lo usan la página Documentos y el panel lateral de Chat IA.
@@ -38,6 +39,7 @@ export function useDocumento(id: string | null | undefined, opts: { onGuardado?:
   // ignoran los cambios: al abrir, el editor emite un cambio "vacío" propio
   // que, si se guardaba, machacaba el documento con <p></p>.
   const cargadoPara = useRef<string | null>(null);
+  const ultimoFallo = useRef<string | null>(null);
   const onGuardado = useRef(opts.onGuardado);
   onGuardado.current = opts.onGuardado;
 
@@ -52,10 +54,15 @@ export function useDocumento(id: string | null | undefined, opts: { onGuardado?:
       const r = await apiFetch(`/api/documentos/${docId}`, { getToken, method: "PUT", body: JSON.stringify(cambios) });
       if (r?.success === false) throw new Error(r.error);
       setEstadoGuardado(Object.keys(pendiente.current).length ? "pendiente" : "guardado");
+      ultimoFallo.current = null;
       onGuardado.current?.(r.data, cambios);
-    } catch {
+    } catch (e: any) {
       pendiente.current = { ...cambios, ...pendiente.current };
       setEstadoGuardado("error");
+      // El motivo (p. ej. «demasiado grande por las imágenes») una sola vez,
+      // no en cada reintento del guardado automático.
+      const motivo = String(e?.message || "");
+      if (motivo && motivo !== ultimoFallo.current) { ultimoFallo.current = motivo; aviso.error(t(motivo)); }
     }
   }, [getToken]);
 

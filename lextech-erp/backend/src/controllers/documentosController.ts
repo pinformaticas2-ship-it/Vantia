@@ -11,7 +11,11 @@ import { skillsActivas } from './skillsController';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GEMINI_MODEL = 'gemini-2.5-flash';
-const MAX_CONTENIDO = 2_000_000;
+// Las imágenes van dentro del HTML (data URL, ya comprimidas en el navegador):
+// el límite deja sitio a varias, por debajo del límite de 10 MB del JSON.
+const MAX_CONTENIDO = 8_000_000;
+const DEMASIADO_GRANDE = 'El documento es demasiado grande para guardarlo (sobre todo por las imágenes). Quita alguna imagen o usa imágenes más pequeñas.';
+const excedeTamano = (html: unknown) => String(html || '').length > MAX_CONTENIDO;
 
 const ok = (res: Response, data: any, status = 200) => res.status(status).json({ success: true, data });
 const fallo = (res: Response, error: string, status = 500) => res.status(status).json({ success: false, error });
@@ -101,6 +105,8 @@ export async function crearDocumento(req: Request, res: Response) {
   try {
     const { org, userId } = ctx(req);
     const b = req.body || {};
+    // Nunca recortar en silencio: un HTML cortado a medias rompe el documento.
+    if (excedeTamano(b.contenido)) return fallo(res, DEMASIADO_GRANDE, 413);
     const expedienteId = b.expedienteId ? await expedienteDeLaOrg(org, b.expedienteId) : null;
     if (b.expedienteId && !expedienteId) return fallo(res, 'Expediente no encontrado.', 404);
     const autor = await resolveUserName(userId).catch(() => null);
@@ -121,6 +127,7 @@ export async function actualizarDocumento(req: Request, res: Response) {
     const { org, userId } = ctx(req);
     if (!UUID_RE.test(req.params.id)) return fallo(res, 'Documento no encontrado.', 404);
     const b = req.body || {};
+    if ('contenido' in b && excedeTamano(b.contenido)) return fallo(res, DEMASIADO_GRANDE, 413);
     const sets: string[] = [];
     const vals: any[] = [req.params.id, org];
     if ('titulo' in b) { vals.push(String(b.titulo || '').trim().slice(0, 300) || 'Documento sin título'); sets.push(`titulo=$${vals.length}`); }
@@ -162,19 +169,88 @@ export async function htmlADocx(titulo: string, html: string): Promise<Buffer> {
   // html-to-docx no trae tipos.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const HTMLtoDOCX = require('html-to-docx');
-  // html-to-docx solo reconoce la cursiva como <i> (con <em> la pierde).
-  const compatible = String(html || '<p></p>').replace(/<(\/?)em(\s[^>]*)?>/gi, '<$1i>');
-  const cuerpo = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo.replace(/</g, '&lt;')}</title></head><body>${compatible}</body></html>`;
+  const cuerpo = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo.replace(/</g, '&lt;')}</title></head><body>${prepararHtmlParaDocx(html)}</body></html>`;
   const out = await HTMLtoDOCX(cuerpo, null, {
     title: titulo,
     font: 'Times New Roman',
     fontSize: 24, // medios puntos
-    margins: { top: 1417, right: 1417, bottom: 1417, left: 1417 },
+    // Márgenes COMPLETOS: si falta header/footer/gutter, html-to-docx escribe
+    // w:header="undefined" y Word se niega a abrir el archivo («Word detectó un
+    // error…»). Comprobado abriendo la exportación con Word (20/11/2026).
+    margins: { top: 1417, right: 1417, bottom: 1417, left: 1417, header: 709, footer: 709, gutter: 0 },
+    // A4 (por defecto la librería usa carta americana).
+    orientation: 'portrait',
+    pageSize: { width: 11906, height: 16838 },
     table: { row: { cantSplit: true } },
     footer: false,
     pageNumber: false,
   });
-  return Buffer.isBuffer(out) ? out : Buffer.from(await (out as Blob).arrayBuffer());
+  const buf = Buffer.isBuffer(out) ? out : Buffer.from(await (out as Blob).arrayBuffer());
+  return aplicarPrimeraLinea(buf);
+}
+
+// ── Ajustes del HTML del editor para html-to-docx ─────────────────────────
+// Lo que html-to-docx no entiende por sí solo (comprobado con su salida XML,
+// 20/11/2026): <em>, <mark> y la sangría de primera línea (text-indent).
+const MARCA_SANGRIA = '⁣VTFI'; // separador invisible + clave; se quita al final
+
+export function prepararHtmlParaDocx(html: string): string {
+  return String(html || '<p></p>')
+    // Solo reconoce la cursiva como <i>.
+    .replace(/<(\/?)em(\s[^>]*)?>/gi, '<$1i>')
+    // <mark> (resaltado) se perdía entero: pasa a un span con color de fondo.
+    .replace(/<mark\b([^>]*)>/gi, (_m, attrs: string) => {
+      const color = /background-color:\s*([^;"']+)/i.exec(attrs)?.[1]?.trim()
+        || /data-color="([^"]+)"/i.exec(attrs)?.[1] || '#ffff00';
+      return `<span style="background-color: ${color}">`;
+    })
+    .replace(/<\/mark>/gi, '</span>')
+    // Tablas a todo el ancho, como en el editor (si no, en Word una tabla
+    // vacía se encoge al mínimo). html-to-docx admite el % en <table>.
+    .replace(/<table\b([^>]*)>/gi, (m, attrs: string) => {
+      const estilo = /\sstyle="([^"]*)"/i.exec(attrs);
+      if (estilo && /(?:^|;)\s*width\s*:/i.test(estilo[1])) return m;
+      return estilo
+        ? `<table${attrs.replace(estilo[0], ` style="width: 100%; ${estilo[1]}"`)}>`
+        : `<table${attrs} style="width: 100%">`;
+    })
+    // text-indent → marca invisible al principio del párrafo; aplicarPrimeraLinea
+    // la convierte en <w:ind w:firstLine> en el XML de Word.
+    .replace(/<(p|h[1-6])\b([^>]*?)\sstyle="([^"]*)"([^>]*)>/gi, (m, tag: string, antes: string, estilo: string, despues: string) => {
+      const ti = /(?:^|;)\s*text-indent:\s*([\d.]+)px\s*;?/i.exec(estilo);
+      if (!ti) return m;
+      const twips = Math.round(Number(ti[1]) * 15);
+      const resto = estilo.replace(ti[0], ti[0].startsWith(';') ? ';' : '').trim();
+      return `<${tag}${antes}${resto ? ` style="${resto}"` : ''}${despues}>${MARCA_SANGRIA}${twips}⁣`;
+    });
+}
+
+async function aplicarPrimeraLinea(docx: Buffer): Promise<Buffer> {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(docx);
+  const f = zip.file('word/document.xml');
+  if (!f) return docx;
+  const xml: string = await f.async('string');
+  if (!xml.includes(MARCA_SANGRIA)) return docx;
+  const marca = new RegExp(`${MARCA_SANGRIA}(\\d+)⁣`);
+  // Cada párrafo por separado: busca su marca, la quita y añade la sangría.
+  const nuevo = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (p) => {
+    const m = marca.exec(p);
+    if (!m) return p;
+    const twips = m[1];
+    let s = p.replace(marca, '');
+    if (/<w:ind\b/.test(s)) return s.replace(/<w:ind\b/, `<w:ind w:firstLine="${twips}"`);
+    const ind = `<w:ind w:firstLine="${twips}"/>`;
+    if (!/<w:pPr>/.test(s)) return s.replace(/^(<w:p(?:\s[^>]*)?>)/, `$1<w:pPr>${ind}</w:pPr>`);
+    // Orden del esquema de Word: …spacing, ind, …jc, …rPr.
+    if (/<w:spacing\b[^>]*\/>/.test(s)) return s.replace(/(<w:spacing\b[^>]*\/>)/, `$1${ind}`);
+    const antesDe = /<w:(contextualSpacing|jc|textDirection|textAlignment|outlineLvl|rPr)\b|<\/w:pPr>/.exec(s.slice(s.indexOf('<w:pPr>')));
+    const pos = s.indexOf('<w:pPr>') + (antesDe ? antesDe.index : 7);
+    return s.slice(0, pos) + ind + s.slice(pos);
+  });
+  zip.file('word/document.xml', nuevo);
+  return zip.generateAsync({ type: 'nodebuffer' });
 }
 
 // GET /api/documentos/:id/docx
