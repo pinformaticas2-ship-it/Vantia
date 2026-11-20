@@ -15,6 +15,7 @@ import { useOrganizacion } from "../lib/useOrganizacion";
 import ComoFunciona from "../components/ComoFunciona";
 import { t, tn } from '../lib/i18n';
 import { haceTiempo } from "../lib/haceTiempo";
+import { traducirActividad } from "../lib/actividad";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -130,13 +131,13 @@ function getEventConfig(item: ActivityItem): EventConfig {
     case "CREATE":
       if (etype === "CLIENT")     return { nodeBg: "bg-purple-100", nodeText: "text-purple-600", Icon: UserPlus,    title: t("Nuevo cliente creado") };
       if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen,  title: t("Nuevo expediente creado") };
-      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: Plus, title: item.action_type || t("Creación") };
+      return { nodeBg: "bg-emerald-100", nodeText: "text-emerald-600", Icon: Plus, title: traducirActividad(item.action_type) || t("Creación") };
     case "UPDATE":
       if (etype === "EXPEDIENTE") return { nodeBg: "bg-blue-100",   nodeText: "text-blue-600",   Icon: FolderOpen, title: t("Expediente modificado") };
       if (etype === "CLIENT")     return { nodeBg: "bg-indigo-100", nodeText: "text-indigo-600", Icon: Edit2,      title: t("Cliente modificado") };
-      return { nodeBg: "bg-yellow-100", nodeText: "text-yellow-600", Icon: Edit2, title: item.action_type || t("Modificación") };
+      return { nodeBg: "bg-yellow-100", nodeText: "text-yellow-600", Icon: Edit2, title: traducirActividad(item.action_type) || t("Modificación") };
     case "DELETE":
-      return { nodeBg: "bg-red-100",    nodeText: "text-red-600",    Icon: Trash2,   title: item.action_type || t("Eliminación"), isError: true };
+      return { nodeBg: "bg-red-100",    nodeText: "text-red-600",    Icon: Trash2,   title: traducirActividad(item.action_type) || t("Eliminación"), isError: true };
     case "EXPORT":
       return { nodeBg: "bg-violet-100", nodeText: "text-violet-600", Icon: Download, title: t("Exportación de datos") };
     case "DOWNLOAD":
@@ -146,7 +147,7 @@ function getEventConfig(item: ActivityItem): EventConfig {
     case "VIEW":
       return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Eye,      title: t("Consulta") };
     default:
-      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Activity, title: item.action_type || t("Acción") };
+      return { nodeBg: "bg-slate-100",  nodeText: "text-slate-500",  Icon: Activity, title: traducirActividad(item.action_type) || t("Acción") };
   }
 }
 
@@ -665,7 +666,7 @@ export default function Trazabilidad() {
 
                               {showDescription && (
                                 <p className={`text-xs mt-1 ${cfg.isError ? "text-rose-500/80" : "text-slate-500"}`}>
-                                  {item.action_type}
+                                  {traducirActividad(item.action_type)}
                                 </p>
                               )}
 

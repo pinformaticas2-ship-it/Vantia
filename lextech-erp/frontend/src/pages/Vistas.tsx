@@ -128,8 +128,8 @@ function fmtCorto(iso: string | null) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const dia = new Date(d); dia.setHours(0, 0, 0, 0);
   const dias = Math.round((hoy.getTime() - dia.getTime()) / 86400000);
-  if (dias === 0) return `hoy ${hora}`;
-  if (dias === 1) return `ayer ${hora}`;
+  if (dias === 0) return t("hoy {hora}", { hora });
+  if (dias === 1) return t("ayer {hora}", { hora });
   const fecha = d.toLocaleDateString("es-ES", { day: "numeric", month: "short", ...(d.getFullYear() !== hoy.getFullYear() ? { year: "numeric" } : {}) });
   return `${fecha}, ${hora}`;
 }
@@ -674,8 +674,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const recordatorioTexto = useMemo(() => {
     if (!d) return "";
     const dias = d.defaults.recordatorioDias;
-    const base = d.datos?.fecha_preparacion ? "la fecha de preparación indicada en el correo" : "la vista";
-    return `${dias === 0 ? "El mismo día de" : tn(dias, "{n} día antes de", "{n} días antes de")} ${base}, a las ${d.defaults.recordatorioHora}`;
+    const hora = d.defaults.recordatorioHora;
+    const prep = !!d.datos?.fecha_preparacion;
+    if (dias === 0) return prep ? t("El mismo día de la fecha de preparación indicada en el correo, a las {hora}", { hora }) : t("El mismo día de la vista, a las {hora}", { hora });
+    return prep
+      ? tn(dias, "{n} día antes de la fecha de preparación indicada en el correo, a las {hora}", "{n} días antes de la fecha de preparación indicada en el correo, a las {hora}", { hora })
+      : tn(dias, "{n} día antes de la vista, a las {hora}", "{n} días antes de la vista, a las {hora}", { hora });
   }, [d]);
 
   if (loadError) return <div className="p-8 text-sm text-red-600">{loadError}</div>;

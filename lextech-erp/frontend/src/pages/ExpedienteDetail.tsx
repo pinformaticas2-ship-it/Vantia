@@ -83,7 +83,7 @@ import RellenarPlantilla from "../components/RellenarPlantilla";
 import VistaPreviaPlantilla from "../components/VistaPreviaPlantilla";
 import DocumentosBaseExpediente from "../components/DocumentosBaseExpediente";
 import DatosDocumentosExpediente from "../components/DatosDocumentosExpediente";
-import { t, t as tr } from '../lib/i18n';
+import { t, t as tr, tn } from '../lib/i18n';
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -2236,7 +2236,7 @@ function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { task
   // Actualizar el ref en cada render con las funciones correctas
   pasteActHandlerRef.current = (pasted: File[]) => {
     if (locked) return;
-    showPasteToastAct(`Pegando ${pasted.length} archivo${pasted.length > 1 ? "s" : ""}…`);
+    showPasteToastAct(tn(pasted.length, "Pegando {n} archivo…", "Pegando {n} archivos…"));
     if (pasted.length === 1) openMetadataForUpload(pasted[0]);
     else handleFolderImport(pasted as unknown as FileList);
   };

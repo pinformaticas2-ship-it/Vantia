@@ -702,7 +702,7 @@ export function MisDatosPanel() {
           <input value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)} placeholder={t("Escribe ELIMINAR")}
             aria-label={t("Escribe ELIMINAR para confirmar")}
             className="w-48 rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-300" />
-          <button type="button" onClick={() => void eliminarCuenta()} disabled={confirmacion.trim().toUpperCase() !== 'ELIMINAR' || eliminando}
+          <button type="button" onClick={() => void eliminarCuenta()} disabled={!['ELIMINAR', 'DELETE'].includes(confirmacion.trim().toUpperCase()) || eliminando}
             className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
             {eliminando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}{" "}{t("Eliminar mi cuenta")}</button>
         </div>

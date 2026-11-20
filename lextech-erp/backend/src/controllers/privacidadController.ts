@@ -182,7 +182,8 @@ export const exportarMisDatos = async (req: Request, res: Response) => {
 export const eliminarMiCuenta = async (req: Request, res: Response) => {
   const userId = (req as any).auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
-  if (String(req.body?.confirmacion || '').trim().toUpperCase() !== 'ELIMINAR') {
+  // «ELIMINAR» (o «DELETE», con la app en inglés).
+  if (!['ELIMINAR', 'DELETE'].includes(String(req.body?.confirmacion || '').trim().toUpperCase())) {
     return res.status(400).json({ success: false, error: 'Escribe ELIMINAR para confirmar.' });
   }
   try {

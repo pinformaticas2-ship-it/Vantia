@@ -19,7 +19,7 @@ import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 import { aviso } from "../lib/avisos";
 import RellenarPlantilla from './RellenarPlantilla';
 import OnlyOfficeEditor, { isOnlyOfficeCompatible, useOnlyOfficeEnabled } from './OnlyOfficeEditor';
-import { t } from '../lib/i18n';
+import { t, tn } from '../lib/i18n';
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -185,7 +185,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   usePasteFiles(
     (pasted: File[]) => {
       if (locked) return;
-      showPasteToast(`Pegando ${pasted.length} archivo${pasted.length > 1 ? "s" : ""}…`);
+      showPasteToast(tn(pasted.length, "Pegando {n} archivo…", "Pegando {n} archivos…"));
       enqueueFiles(pasted);
     },
     !locked,
@@ -912,7 +912,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <div className="flex items-center gap-3">
           <p className="text-sm text-slate-500">
-            {loadingFiles ? t("Cargando…") : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+            {loadingFiles ? t("Cargando…") : tn(files.length, "{n} archivo", "{n} archivos")}
           </p>
           {/* Indicador de portapapeles ERP — visible mientras haya algo copiado */}
           {erpClip && !locked && (

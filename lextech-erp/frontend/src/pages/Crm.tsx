@@ -254,8 +254,8 @@ export default function Crm() {
                 {etapas.map((e) => {
                   const items = porEtapa.get(e.id) || [];
                   const total = items.reduce((s, o) => s + Number(o.valor_estimado || 0), 0);
-                  const reglas = [e.aviso_responsable && t("aviso al propietario"), e.accion_texto && t("próxima acción: {accion}", { accion: e.accion_texto }),
-                    e.mover_horas && e.mover_a_etapa_id && t("tras {h} h → {etapa}", { h: e.mover_horas, etapa: nombreEtapa(e.mover_a_etapa_id) })].filter(Boolean);
+                  const reglas = [e.aviso_responsable && t("aviso al propietario"), e.accion_texto && t("próxima acción: {accion}", { accion: t(e.accion_texto) }),
+                    e.mover_horas && e.mover_a_etapa_id && t("tras {h} h → {etapa}", { h: e.mover_horas, etapa: t(nombreEtapa(e.mover_a_etapa_id)) })].filter(Boolean);
                   return (
                     <div key={e.id}
                       onDragOver={(ev) => { if (arrastrando) { ev.preventDefault(); setSobre(e.id); } }}

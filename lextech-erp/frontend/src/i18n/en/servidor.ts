@@ -86,7 +86,7 @@ registrarEn({
   "Error interno del servidor.": "Internal server error.",
   "Esa cuenta de Instagram ya está conectada en otro despacho de Vantia.": "That Instagram account is already connected in another Vantia firm.",
   "Esa cuenta ya existe en el módulo de correo. Usa la cuenta ya creada o bórrala antes de crear otra igual.": "That account already exists in the email module. Use the existing account or delete it before creating an identical one.",
-  "Escribe ELIMINAR para confirmar.": "Type ELIMINAR to confirm.",
+  "Escribe ELIMINAR para confirmar.": "Type DELETE to confirm.",
   "Escribe el mensaje.": "Write the message.",
   "Escribe la respuesta.": "Write the reply.",
   "Ese dominio no está permitido.": "That domain isn't allowed.",

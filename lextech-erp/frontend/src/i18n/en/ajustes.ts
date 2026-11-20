@@ -233,8 +233,8 @@ registrarEn({
   "Cierra la sesión en este dispositivo. Las demás sesiones abiertas se ven y se cierran en Seguridad.": "Signs you out on this device. Other open sessions can be seen and closed in Security.",
   "Eliminar mi cuenta": "Delete my account",
   "Tu usuario se borra y ya no podrás entrar. Sales de todos tus despachos; lo que hiciste en ellos se queda, porque es del despacho. Si eres propietario de un despacho, antes tienes que transferirlo a otra persona o eliminarlo. No se puede deshacer.": "Your user is deleted and you won't be able to sign in again. You leave all your firms; what you did in them stays, because it belongs to the firm. If you own a firm, you first have to transfer it to someone else or delete it. This can't be undone.",
-  "Escribe ELIMINAR": "Type ELIMINAR",
-  "Escribe ELIMINAR para confirmar": "Type ELIMINAR to confirm",
+  "Escribe ELIMINAR": "Type DELETE",
+  "Escribe ELIMINAR para confirmar": "Type DELETE to confirm",
 
   // ── Ayuda e información ──
   "Pendiente de publicar": "Not published yet",

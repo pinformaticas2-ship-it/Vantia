@@ -15,3 +15,5 @@ import './motor';
 import './automatizacionesIA';
 import './pendientes3';
 import './contextos';
+import './actividad';
+import './datosIniciales';

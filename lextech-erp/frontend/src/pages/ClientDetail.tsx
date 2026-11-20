@@ -24,8 +24,9 @@ import BackButton from "../components/BackButton";
 import { Spinner } from "../components/Spinner";
 import { aviso, confirmar } from "../lib/avisos";
 import { useAvisoSalida } from "../lib/borradores";
-import { t, t as tr } from '../lib/i18n';
+import { t, t as tr, tn } from '../lib/i18n';
 import { estadoCliente } from '../lib/estadoCliente';
+import { traducirActividad } from "../lib/actividad";
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -681,7 +682,7 @@ function TabHistorial({ clientId }: { clientId: string }) {
                   {/* Contenido */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge}`}>{label}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge}`}>{traducirActividad(label)}</span>
                       {detail && <span className="text-sm text-slate-700 truncate">{detail}</span>}
                     </div>
                     <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(a.created_at)}</p>
@@ -2746,7 +2747,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       {/* Barra de acciones */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <p className="text-sm text-slate-500">
-          {loadingFiles ? t("Cargando…") : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+          {loadingFiles ? t("Cargando…") : tn(files.length, "{n} archivo", "{n} archivos")}
         </p>
         <div className="flex flex-wrap gap-2">
           {/* Importar carpeta */}

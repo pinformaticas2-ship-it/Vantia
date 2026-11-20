@@ -125,10 +125,10 @@ export function datosCalculadora(opts: {
     if (!f.cuant && !f.indet) falta.push("cuantía");
     if (!f.proc) falta.push("tipo de procedimiento");
   }
-  const origen = e ? t("del expediente {ref}", { ref: refExpediente(e) }) : c ? "del cliente" : "";
+  const origen = e ? t("del expediente {ref}", { ref: refExpediente(e) }) : c ? t("del cliente") : "";
   const aviso = origen
-    ? t("Datos cargados {origen}.", { origen }) + (falta.length ? ` Faltan: ${falta.join(", ")}.` : "") +
-      " Sube la sentencia o el decreto para completar fechas, condena y posición del cliente."
+    ? t("Datos cargados {origen}.", { origen }) + (falta.length ? ` ${t("Faltan: {lista}.", { lista: falta.map((x) => t(x)).join(", ") })}` : "") +
+      ` ${t("Sube la sentencia o el decreto para completar fechas, condena y posición del cliente.")}`
     : undefined;
   return { campos: f, localidad: e?.centro || undefined, aviso };
 }

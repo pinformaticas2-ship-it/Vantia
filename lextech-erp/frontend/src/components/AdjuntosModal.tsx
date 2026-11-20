@@ -15,7 +15,7 @@ import { useUndoDelete } from "../lib/useUndoDelete";
 import { Modal } from "./Modal";
 import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 import { aviso } from "../lib/avisos";
-import { t } from '../lib/i18n';
+import { t, tn } from '../lib/i18n';
 
 // ── helpers ───────────────────────────────────────────────────
 function fileIcon(mime: string, name: string) {
@@ -653,7 +653,7 @@ export default function AdjuntosModal({
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-slate-900">Adjuntos</h2>
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+                  {loadingFiles ? t("Cargando…") : tn(files.length, "{n} archivo", "{n} archivos")}
                 </span>
                 <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">
                   {sidebarSection}
@@ -664,7 +664,7 @@ export default function AdjuntosModal({
               </p>
             </div>
             {/*
-              {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+              {loadingFiles ? t("Cargando…") : tn(files.length, "{n} archivo", "{n} archivos")}
             
             */}
           </div>

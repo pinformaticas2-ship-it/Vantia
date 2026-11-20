@@ -25,18 +25,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { t } from '../lib/i18n';
 import { haceTiempo } from "../lib/haceTiempo";
+import { traducirActividad } from "../lib/actividad";
 
 // ── Saludo por hora ───────────────────────────────────────────────────────────
 /** El registro de actividad llega del servidor en español: se traducen las
  *  frases conocidas (con su dato variable) y el resto sale tal cual. */
-function textoActividad(s?: string | null): string {
-  if (!s) return "";
-  const m = s.match(/^Inicio de sesión desde (.+)$/);
-  if (m) return t("Inicio de sesión desde {ip}", { ip: m[1] });
-  const c = s.match(/^Cierre de sesión desde (.+)$/);
-  if (c) return t("Cierre de sesión desde {ip}", { ip: c[1] });
-  return t(s);
-}
+const textoActividad = (s?: string | null) => traducirActividad(s);
 
 function getGreeting(): string {
   const h = new Date().getHours();
