@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, Loader2, Search, PencilLine, RefreshCw } from 'lucide-react';
 import { safeJson } from '../lib/api';
 import { t } from '../lib/i18n';
+import { haceTiempo } from '../lib/haceTiempo';
 
 interface VantiaHistoryEntry {
   id: string;
@@ -15,16 +16,7 @@ interface VantiaHistoryEntry {
   createdAt: string;
 }
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'ahora mismo';
-  if (mins < 60) return `hace ${mins} min`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `hace ${hours} h`;
-  const days = Math.floor(hours / 24);
-  return `hace ${days} d`;
-}
+const timeAgo = (iso: string) => haceTiempo(iso, { espacio: true });
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   pending:   { label: 'pendiente de confirmar', cls: 'bg-amber-50 text-amber-600' },

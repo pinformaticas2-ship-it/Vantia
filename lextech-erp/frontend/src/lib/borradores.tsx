@@ -3,6 +3,7 @@ import { useUser } from '@clerk/clerk-react';
 import { History, X } from 'lucide-react';
 import { getOrganizacionResuelta } from './useOrganizacion';
 import { t } from './i18n';
+import { haceTiempo, localeApp } from './haceTiempo';
 
 // ── No perder lo que se está escribiendo (16/10/2026) ───────────────────────
 //  - useAvisoSalida(sucio): si hay cambios sin guardar y se cierra o recarga
@@ -81,12 +82,8 @@ export function useBorrador<T>(clave: string | null, valor: T, sucio: boolean) {
 }
 
 function haceCuanto(fecha: number) {
-  const min = Math.round((Date.now() - fecha) / 60000);
-  if (min < 1) return 'hace un momento';
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `hace ${h} h`;
-  return new Date(fecha).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  if (Date.now() - fecha < 24 * 3600 * 1000) return haceTiempo(fecha, { reciente: 'hace un momento', espacio: true });
+  return new Date(fecha).toLocaleString(localeApp(), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Franja "Tienes un borrador sin guardar · Recuperar / Descartar". */

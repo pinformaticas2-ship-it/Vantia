@@ -50,6 +50,7 @@ const fuenteDeAviso = (id: string) =>
   : id.startsWith("vista-") ? "vistas" : id.startsWith("auto-") ? "auto" : "otro";
 import type { Modulo } from "../lib/useOrganizacion";
 import { t, t as tr, tn, idioma } from '../lib/i18n';
+import { haceTiempo } from "../lib/haceTiempo";
 
 // Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
 // Roles y permisos) gobierna cada entrada de navegación/búsqueda. Las que no
@@ -237,15 +238,7 @@ function getVantiaLabelEs(pathname: string): string {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "ahora mismo";
-  if (m < 60) return `hace ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-}
+const timeAgo = (dateStr: string) => haceTiempo(dateStr);
 function actionIcon(t: string) {
   const value = String(t || "").toLowerCase();
   if (value.includes("correo") || value.includes("email")) return "??";

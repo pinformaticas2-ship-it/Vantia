@@ -14,6 +14,7 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import ComoFunciona from "../components/ComoFunciona";
 import { t, tn } from '../lib/i18n';
+import { haceTiempo } from "../lib/haceTiempo";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -52,16 +53,7 @@ type TimelineEntry =
   | { type: "item"; data: ActivityItem };
 
 // ── Helpers de tiempo ─────────────────────────────────────────────────────────
-function timeAgo(d: string) {
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "ahora";
-  if (m < 60) return `Hace ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `Hace ${h}h`;
-  const days = Math.floor(h / 24);
-  return `Hace ${days}d`;
-}
+const timeAgo = (d: string) => haceTiempo(d, { reciente: "ahora", mayuscula: true });
 function fmtFull(d: string) {
   return new Date(d).toLocaleString("es-ES", {
     day: "2-digit", month: "2-digit", year: "numeric",

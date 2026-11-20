@@ -24,6 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { t } from '../lib/i18n';
+import { haceTiempo } from "../lib/haceTiempo";
 
 // ── Saludo por hora ───────────────────────────────────────────────────────────
 /** El registro de actividad llega del servidor en español: se traducen las
@@ -71,14 +72,7 @@ function useWeather(): WeatherState {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function timeAgo(dateStr: string): string {
-  const m = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-  if (m < 1) return "ahora mismo";
-  if (m < 60) return `hace ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h}h`;
-  return `hace ${Math.floor(h / 24)}d`;
-}
+const timeAgo = (dateStr: string) => haceTiempo(dateStr);
 function actionIcon(type: string) {
   if (type.toLowerCase().includes("cliente"))    return "👤";
   if (type.toLowerCase().includes("expediente")) return "📁";

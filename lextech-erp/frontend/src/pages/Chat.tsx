@@ -29,6 +29,7 @@ import { TarjetaPersonaChat, abrirPerfilChat } from "../components/TarjetaPerson
 import { aviso, confirmar } from "../lib/avisos";
 import { abrirPaleta } from "../components/PaletaComandos";
 import { t, t as tr } from '../lib/i18n';
+import { haceTiempo, localeApp } from "../lib/haceTiempo";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -452,14 +453,13 @@ const fmtTime = (iso: string) =>
 function haceRato(iso: string): string {
   const t = new Date(iso).getTime();
   const min = Math.round((Date.now() - t) / 60_000);
-  if (min < 1) return "ahora mismo";
-  if (min < 60) return `hace ${min} min`;
+  if (min < 60) return haceTiempo(t);
   const d = new Date(t);
   const hoy = new Date();
   if (d.toDateString() === hoy.toDateString()) return tr("hoy a las {hora}", { hora: fmtTime(iso) });
   const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
   if (d.toDateString() === ayer.toDateString()) return tr("ayer a las {hora}", { hora: fmtTime(iso) });
-  return tr("el {fecha}", { fecha: d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }) });
+  return tr("el {fecha}", { fecha: d.toLocaleDateString(localeApp(), { day: "numeric", month: "short" }) });
 }
 
 /** Reacciones de un clic en la barra de cada mensaje. */
@@ -470,10 +470,10 @@ const mediaUrl = (url?: string | null) => resolveUploadUrl(url);
 function fmtDateLabel(iso: string) {
   const d = new Date(iso);
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) return "Hoy";
+  if (d.toDateString() === now.toDateString()) return tr("Hoy");
   const y = new Date(); y.setDate(now.getDate() - 1);
-  if (d.toDateString() === y.toDateString()) return "Ayer";
-  return d.toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long" });
+  if (d.toDateString() === y.toDateString()) return tr("Ayer");
+  return d.toLocaleDateString(localeApp(), { weekday:"long", day:"numeric", month:"long" });
 }
 
 const initials = (s: string) =>
