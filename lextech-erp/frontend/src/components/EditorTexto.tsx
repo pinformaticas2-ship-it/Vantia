@@ -14,13 +14,14 @@ import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight, Baseline, Bold, CaseSensitive, ChevronDown, ChevronUp,
   Highlighter, ImagePlus, Indent as IndentIncrease, Outdent as IndentDecrease, Italic, Link2, List, ListTree, ListOrdered, Minus, Sigma as Omega, Paintbrush, Pilcrow,
   Quote, Redo2, RemoveFormatting, Replace, Search, SeparatorHorizontal, Strikethrough, Subscript as SubIcon,
-  Superscript as SupIcon, Table as TableIcon, Underline as UnderlineIcon, Undo2, WrapText, X, ZoomIn,
+  Superscript as SupIcon, Table as TableIcon, Underline as UnderlineIcon, Undo2, WrapText, X, ZoomIn, Maximize2, Minimize2,
 } from "lucide-react";
 import "./editorTexto.css";
 import { t, idioma } from "../lib/i18n";
 import { aviso } from "../lib/avisos";
 import { Buscar, FormatoParrafo, Indice, SaltoPagina, type BuscarStorage } from "./editor/extensiones";
 import { SelectorFuente } from "./editor/SelectorFuente";
+import { AtajosWord, atajoGlobal, teclaDe, RESERVADAS_NAVEGADOR, type Accion, type AtajosStorage } from "./editor/atajosWord";
 import { useAuth } from "@clerk/clerk-react";
 import { asegurarFuentes, cargarCatalogo } from "../lib/fuentesWeb";
 
@@ -50,6 +51,7 @@ export function useEditorTexto(opts: { contenido: string; onChange: (html: strin
         aviso: t("Se actualiza solo. Los números de página se ponen al descargarlo en Word."),
       }),
       Buscar,
+      AtajosWord,
       CharacterCount,
       Placeholder.configure({ placeholder: opts.placeholder || t("Empieza a escribir, o pide a la IA que lo redacte…") }),
     ],
@@ -91,6 +93,12 @@ function useZoom() {
 
 // ── Piezas de la barra ──────────────────────────────────────────────────────
 
+/** «Negrita (Ctrl+N)»: el nombre y el atajo del Word que corresponde (español, inglés o Mac). */
+const tt = (texto: string, accion?: Accion) => {
+  const k = accion ? teclaDe(accion) : null;
+  return k ? `${t(texto)} (${k})` : t(texto);
+};
+
 const btn = (activo: boolean) =>
   `inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-0.5 rounded-lg px-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-transparent ${activo ? "bg-slate-200/80 text-slate-900" : ""}`;
 const selectCls = "h-8 shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none hover:border-slate-300 focus:border-slate-400";
@@ -100,8 +108,9 @@ function Separador() {
 }
 
 /** Botón que abre un panel flotante (en un portal: la barra tiene scroll horizontal en el móvil y lo cortaría). */
-function Desplegable({ titulo, boton, activo = false, ancho = 220, children }: {
+function Desplegable({ titulo, boton, activo = false, ancho = 220, atajo, children }: {
   titulo: string;
+  atajo?: string;
   boton: ReactNode;
   activo?: boolean;
   ancho?: number;
@@ -134,7 +143,7 @@ function Desplegable({ titulo, boton, activo = false, ancho = 220, children }: {
 
   return (
     <>
-      <button ref={refBoton} type="button" title={titulo} aria-label={titulo} aria-expanded={abierto}
+      <button ref={refBoton} type="button" title={titulo} aria-label={titulo} aria-expanded={abierto} data-atajo={atajo}
         className={btn(activo || abierto)} onMouseDown={(e) => e.preventDefault()} onClick={() => setAbierto((v) => !v)}>
         {boton}<ChevronDown size={11} className="opacity-50" />
       </button>
@@ -223,12 +232,42 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
   const refImagen = useRef<HTMLInputElement>(null);
   const zoom = useZoom();
 
-  // Ctrl+F / Ctrl+H dentro del editor abren el panel de búsqueda.
+  // Atajos de Word que dependen de la barra (buscar, fuente, enlace, zoom…).
   useEffect(() => {
     if (!editor) return;
-    const st = (editor.storage as any).buscar as BuscarStorage;
-    st.onAbrir = (reemplazar) => setBuscador({ reemplazar });
-    return () => { st.onAbrir = null; };
+    const st = (editor.storage as any).atajosWord as AtajosStorage;
+    const abrirBuscador = (reemplazar: boolean) => {
+      setBuscador((b) => ({ reemplazar: reemplazar || !!b?.reemplazar }));
+      window.setTimeout(() => {
+        const campos = document.querySelectorAll<HTMLInputElement>("[role=search] input");
+        const campo = reemplazar && campos[1] ? campos[1] : campos[0];
+        campo?.focus(); campo?.select();
+      }, 50);
+    };
+    const pulsar = (atajo: string) => () => refBarra.current?.querySelector<HTMLElement>(`[data-atajo="${atajo}"]`)?.click();
+    const propias: Partial<Record<Accion, () => void>> = {
+      buscar: () => abrirBuscador(false),
+      reemplazar: () => abrirBuscador(true),
+      fuente: pulsar("fuente"),
+      enlace: pulsar("enlace"),
+      tamano: () => refBarra.current?.querySelector<HTMLElement>('[data-atajo="tamano"]')?.focus(),
+      zoomMas: () => { const sig = ZOOMS.find((z) => z > zoomActual); if (sig) setZoom(sig); },
+      zoomMenos: () => { const ant = [...ZOOMS].reverse().find((z) => z < zoomActual); if (ant) setZoom(ant); },
+      zoom100: () => setZoom(100),
+      contarPalabras: () => {
+        const cc = (editor.storage as any).characterCount;
+        aviso.info(t("{p} palabras · {c} caracteres", { p: (cc?.words?.() ?? 0).toLocaleString(), c: (cc?.characters?.() ?? 0).toLocaleString() }));
+      },
+    };
+    // Guardar sin página que lo gestione: el documento ya se guarda solo.
+    st.acciones = { guardar: () => aviso.ok(t("Guardado: los documentos se guardan solos mientras escribes.")), ...st.acciones, ...propias };
+    // Fuera del documento (barra, título…): guardar, imprimir, buscar, zoom…
+    const tecla = (e: KeyboardEvent) => { if (atajoGlobal(editor, e)) e.preventDefault(); };
+    window.addEventListener("keydown", tecla, true);
+    return () => {
+      window.removeEventListener("keydown", tecla, true);
+      for (const k of Object.keys(propias) as Accion[]) delete st.acciones[k];
+    };
   }, [editor]);
 
   // Copiar formato: el siguiente texto que se seleccione con el ratón recibe
@@ -286,9 +325,9 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
     <>
       <div ref={refBarra} className="flex items-center gap-0.5 overflow-x-auto px-3 py-1.5 sm:flex-wrap sm:gap-y-1" role="toolbar" aria-label={t("Formato del texto")}>
         {/* Deshacer / estilos */}
-        <button type="button" title={t("Deshacer (Ctrl+Z)")} className={btn(false)} onClick={() => c().undo().run()} disabled={!editor.can().undo()}><Undo2 size={15} /></button>
-        <button type="button" title={t("Rehacer (Ctrl+Y)")} className={btn(false)} onClick={() => c().redo().run()} disabled={!editor.can().redo()}><Redo2 size={15} /></button>
-        <button type="button" title={t("Copiar formato (brocha). Selecciona después el texto al que aplicarlo.")} className={btn(!!pincel)}
+        <button type="button" title={tt("Deshacer", "deshacer")} className={btn(false)} onClick={() => c().undo().run()} disabled={!editor.can().undo()}><Undo2 size={15} /></button>
+        <button type="button" title={tt("Rehacer", "rehacer")} className={btn(false)} onClick={() => c().redo().run()} disabled={!editor.can().redo()}><Redo2 size={15} /></button>
+        <button type="button" title={`${t("Copiar formato (brocha). Selecciona después el texto al que aplicarlo.")}${teclaDe("copiarFormato") ? ` ${teclaDe("copiarFormato")} / ${teclaDe("pegarFormato")}` : ""}`} className={btn(!!pincel)}
           onClick={() => setPincel(pincel ? null : editor.state.selection.$from.marks().map((m) => ({ type: m.type.name, attrs: m.attrs })))}>
           <Paintbrush size={15} />
         </button>
@@ -305,41 +344,41 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
           <option value="h3">{t("Apartado")}</option>
         </select>
         <SelectorFuente editor={editor} actual={fuente} />
-        <select value={TAMANOS.includes(tamano) ? String(tamano) : ""} aria-label={t("Tamaño de fuente")} title={t("Tamaño de fuente")} className={`${selectCls} w-[62px]`}
+        <select value={TAMANOS.includes(tamano) ? String(tamano) : ""} aria-label={t("Tamaño de fuente")} title={tt("Tamaño de fuente", "tamano")} data-atajo="tamano" className={`${selectCls} w-[62px]`}
           onChange={(e) => (e.target.value ? c().setFontSize(`${e.target.value}pt`).run() : c().unsetFontSize().run())}>
           {!TAMANOS.includes(tamano) && <option value="">{Number.isFinite(tamano) ? tamano : ""}</option>}
           {TAMANOS.map((s) => <option key={s} value={String(s)}>{s}</option>)}
         </select>
-        <button type="button" title={t("Aumentar tamaño")} className={btn(false)} onClick={() => cambiarTamano(1)}>
+        <button type="button" title={tt("Aumentar tamaño", "agrandar")} className={btn(false)} onClick={() => cambiarTamano(1)}>
           <span className="font-serif text-[15px] font-bold leading-none">A<sup className="text-[9px]">+</sup></span></button>
-        <button type="button" title={t("Reducir tamaño")} className={btn(false)} onClick={() => cambiarTamano(-1)}>
+        <button type="button" title={tt("Reducir tamaño", "achicar")} className={btn(false)} onClick={() => cambiarTamano(-1)}>
           <span className="font-serif text-[12px] font-bold leading-none">A<sup className="text-[9px]">−</sup></span></button>
         <Separador />
         {/* Fuente */}
-        <button type="button" title={t("Negrita (Ctrl+B)")} className={btn(editor.isActive("bold"))} onClick={() => c().toggleBold().run()}><Bold size={15} /></button>
-        <button type="button" title={t("Cursiva (Ctrl+I)")} className={btn(editor.isActive("italic"))} onClick={() => c().toggleItalic().run()}><Italic size={15} /></button>
-        <button type="button" title={t("Subrayado (Ctrl+U)")} className={btn(editor.isActive("underline"))} onClick={() => c().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
+        <button type="button" title={tt("Negrita", "negrita")} className={btn(editor.isActive("bold"))} onClick={() => c().toggleBold().run()}><Bold size={15} /></button>
+        <button type="button" title={tt("Cursiva", "cursiva")} className={btn(editor.isActive("italic"))} onClick={() => c().toggleItalic().run()}><Italic size={15} /></button>
+        <button type="button" title={tt("Subrayado", "subrayado")} className={btn(editor.isActive("underline"))} onClick={() => c().toggleUnderline().run()}><UnderlineIcon size={15} /></button>
         <button type="button" title={t("Tachado")} className={btn(editor.isActive("strike"))} onClick={() => c().toggleStrike().run()}><Strikethrough size={15} /></button>
-        <button type="button" title={t("Subíndice (Ctrl+,)")} className={btn(editor.isActive("subscript"))} onClick={() => c().unsetSuperscript().toggleSubscript().run()}><SubIcon size={15} /></button>
-        <button type="button" title={t("Superíndice (Ctrl+.)")} className={btn(editor.isActive("superscript"))} onClick={() => c().unsetSubscript().toggleSuperscript().run()}><SupIcon size={15} /></button>
+        <button type="button" title={tt("Subíndice", "subindice")} className={btn(editor.isActive("subscript"))} onClick={() => c().unsetSuperscript().toggleSubscript().run()}><SubIcon size={15} /></button>
+        <button type="button" title={tt("Superíndice", "superindice")} className={btn(editor.isActive("superscript"))} onClick={() => c().unsetSubscript().toggleSuperscript().run()}><SupIcon size={15} /></button>
         <Desplegable titulo={t("Color del texto")} ancho={236}
           boton={<span className="flex flex-col items-center leading-none"><Baseline size={15} /><span className="mt-px h-[3px] w-4 rounded-full" style={{ background: ts.color || "#0f172a" }} /></span>}>
           {(cerrar) => <Paleta colores={COLORES_TEXTO} personalizado textoQuitar={t("Automático")}
             onElegir={(col) => { c().setColor(col).run(); cerrar(); }} onQuitar={() => { c().unsetColor().run(); cerrar(); }} />}
         </Desplegable>
-        <Desplegable titulo={t("Color de resaltado")} activo={editor.isActive("highlight")} ancho={236}
+        <Desplegable titulo={tt("Color de resaltado", "resaltar")} activo={editor.isActive("highlight")} ancho={236}
           boton={<span className="flex flex-col items-center leading-none"><Highlighter size={15} /><span className="mt-px h-[3px] w-4 rounded-full" style={{ background: colorResaltado || "#fef08a" }} /></span>}>
           {(cerrar) => <Paleta colores={COLORES_RESALTADO} textoQuitar={t("Sin resaltado")}
             onElegir={(col) => { c().setHighlight({ color: col }).run(); cerrar(); }} onQuitar={() => { c().unsetHighlight().run(); cerrar(); }} />}
         </Desplegable>
-        <button type="button" title={t("Borrar formato")} className={btn(false)}
+        <button type="button" title={tt("Borrar formato", "borrarFormatoCaracter")} className={btn(false)}
           onClick={() => c().unsetAllMarks().quitarFormatoParrafo().unsetTextAlign().run()}><RemoveFormatting size={15} /></button>
         <Separador />
         {/* Párrafo */}
-        <button type="button" title={t("Alinear a la izquierda (Ctrl+Mayús+L)")} className={btn(editor.isActive({ textAlign: "left" }))} onClick={() => c().setTextAlign("left").run()}><AlignLeft size={15} /></button>
-        <button type="button" title={t("Centrar (Ctrl+Mayús+E)")} className={btn(editor.isActive({ textAlign: "center" }))} onClick={() => c().setTextAlign("center").run()}><AlignCenter size={15} /></button>
-        <button type="button" title={t("Alinear a la derecha (Ctrl+Mayús+R)")} className={btn(editor.isActive({ textAlign: "right" }))} onClick={() => c().setTextAlign("right").run()}><AlignRight size={15} /></button>
-        <button type="button" title={t("Justificar (Ctrl+Mayús+J)")} className={btn(editor.isActive({ textAlign: "justify" }))} onClick={() => c().setTextAlign("justify").run()}><AlignJustify size={15} /></button>
+        <button type="button" title={tt("Alinear a la izquierda", "izquierda")} className={btn(editor.isActive({ textAlign: "left" }))} onClick={() => c().setTextAlign("left").run()}><AlignLeft size={15} /></button>
+        <button type="button" title={tt("Centrar", "centrar")} className={btn(editor.isActive({ textAlign: "center" }))} onClick={() => c().setTextAlign("center").run()}><AlignCenter size={15} /></button>
+        <button type="button" title={tt("Alinear a la derecha", "derecha")} className={btn(editor.isActive({ textAlign: "right" }))} onClick={() => c().setTextAlign("right").run()}><AlignRight size={15} /></button>
+        <button type="button" title={tt("Justificar", "justificar")} className={btn(editor.isActive({ textAlign: "justify" }))} onClick={() => c().setTextAlign("justify").run()}><AlignJustify size={15} /></button>
         <Desplegable titulo={t("Interlineado")} activo={!!parrafo.lineHeight} ancho={170} boton={<WrapText size={15} />}>
           {(cerrar) => (
             <div>
@@ -355,16 +394,16 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
             </div>
           )}
         </Desplegable>
-        <button type="button" title={t("Reducir sangría (Ctrl+Mayús+M)")} className={btn(false)} onClick={() => c().cambiarSangria(-1).run()}><IndentDecrease size={15} /></button>
-        <button type="button" title={t("Aumentar sangría (Ctrl+M)")} className={btn(false)} onClick={() => c().cambiarSangria(1).run()}><IndentIncrease size={15} /></button>
+        <button type="button" title={tt("Reducir sangría", "quitarSangria")} className={btn(false)} onClick={() => c().cambiarSangria(-1).run()}><IndentDecrease size={15} /></button>
+        <button type="button" title={tt("Aumentar sangría", "sangria")} className={btn(false)} onClick={() => c().cambiarSangria(1).run()}><IndentIncrease size={15} /></button>
         <button type="button" title={t("Sangría de primera línea (Tab al principio del párrafo)")} className={btn(!!parrafo.primeraLinea)}
           onClick={() => c().setPrimeraLinea(parrafo.primeraLinea ? null : 48).run()}><Pilcrow size={15} /></button>
-        <button type="button" title={t("Lista con viñetas")} className={btn(editor.isActive("bulletList"))} onClick={() => c().toggleBulletList().run()}><List size={15} /></button>
+        <button type="button" title={tt("Lista con viñetas", "vinetas")} className={btn(editor.isActive("bulletList"))} onClick={() => c().toggleBulletList().run()}><List size={15} /></button>
         <button type="button" title={t("Lista numerada")} className={btn(editor.isActive("orderedList"))} onClick={() => c().toggleOrderedList().run()}><ListOrdered size={15} /></button>
         <button type="button" title={t("Cita")} className={btn(editor.isActive("blockquote"))} onClick={() => c().toggleBlockquote().run()}><Quote size={15} /></button>
         <Separador />
         {/* Insertar */}
-        <Desplegable titulo={t("Enlace")} activo={editor.isActive("link")} ancho={300} boton={<Link2 size={15} />}>
+        <Desplegable titulo={tt("Enlace", "enlace")} atajo="enlace" activo={editor.isActive("link")} ancho={300} boton={<Link2 size={15} />}>
           {(cerrar) => <PanelEnlace editor={editor} cerrar={cerrar} />}
         </Desplegable>
         <button type="button" title={t("Insertar imagen")} className={btn(false)} onClick={() => refImagen.current?.click()}><ImagePlus size={15} /></button>
@@ -398,7 +437,7 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
         )}
         <button type="button" title={t("Insertar índice")} className={btn(false)}
           onClick={() => { if (!c().insertarIndice(t("Índice")).run()) aviso.info(t("El documento ya tiene un índice.")); }}><ListTree size={15} /></button>
-        <button type="button" title={t("Salto de página (Ctrl+Intro)")} className={btn(false)} onClick={() => c().insertarSaltoPagina().run()}><SeparatorHorizontal size={15} /></button>
+        <button type="button" title={tt("Salto de página", "saltoPagina")} className={btn(false)} onClick={() => c().insertarSaltoPagina().run()}><SeparatorHorizontal size={15} /></button>
         <button type="button" title={t("Línea separadora")} className={btn(false)} onClick={() => c().setHorizontalRule().run()}><Minus size={15} /></button>
         <Desplegable titulo={t("Símbolo")} ancho={244} boton={<Omega size={15} />}>
           {(cerrar) => (
@@ -412,8 +451,9 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
         </Desplegable>
         <Separador />
         {/* Herramientas */}
-        <button type="button" title={t("Buscar (Ctrl+F)")} className={btn(!!buscador && !buscador.reemplazar)} onClick={() => setBuscador(buscador ? null : { reemplazar: false })}><Search size={15} /></button>
-        <button type="button" title={t("Reemplazar (Ctrl+H)")} className={btn(!!buscador?.reemplazar)} onClick={() => setBuscador({ reemplazar: true })}><Replace size={15} /></button>
+        <button type="button" title={tt("Buscar", "buscar")} className={btn(!!buscador && !buscador.reemplazar)} onClick={() => setBuscador(buscador ? null : { reemplazar: false })}><Search size={15} /></button>
+        <button type="button" title={tt("Reemplazar", "reemplazar")} className={btn(!!buscador?.reemplazar)} onClick={() => setBuscador({ reemplazar: true })}><Replace size={15} /></button>
+        <ModoWord editor={editor} />
         <label className="ml-1 flex shrink-0 items-center gap-1 text-slate-500" title={t("Zoom")}>
           <ZoomIn size={14} />
           <select value={String(zoom)} onChange={(e) => setZoom(Number(e.target.value))} aria-label={t("Zoom")} className={`${selectCls} w-[70px]`}>
@@ -423,6 +463,43 @@ export function BarraEditor({ editor }: { editor: Editor | null }) {
       </div>
       {buscador && <PanelBuscar editor={editor} reemplazarInicial={buscador.reemplazar} ancla={refBarra} onCerrar={() => { editor.commands.setBusqueda(""); setBuscador(null); editor.commands.focus(); }} />}
     </>
+  );
+}
+
+/**
+ * Pantalla completa con el teclado bloqueado (Keyboard Lock API, Chrome/Edge):
+ * es la única forma de que una web reciba Ctrl+N, Ctrl+T y Ctrl+W, que Word en
+ * español usa para negrita, centrar y quitar formato de párrafo y que el
+ * navegador se reserva (ventana, pestaña, cerrar). Esc sale.
+ */
+function ModoWord({ editor }: { editor: Editor }) {
+  const [activo, setActivo] = useState(false);
+  const teclado = (navigator as any).keyboard;
+  const usaReservadas = ["negrita", "centrar", "borrarFormatoParrafo", "nuevo"].some((a) => {
+    const k = teclaDe(a as Accion);
+    return !!k && RESERVADAS_NAVEGADOR.has(k);
+  });
+  useEffect(() => {
+    const cambio = () => setActivo(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", cambio);
+    return () => document.removeEventListener("fullscreenchange", cambio);
+  }, []);
+  if (!usaReservadas || !teclado?.lock || !document.documentElement.requestFullscreen) return null;
+  const alternar = async () => {
+    try {
+      if (document.fullscreenElement) { teclado.unlock?.(); await document.exitFullscreen(); return; }
+      await document.documentElement.requestFullscreen();
+      await teclado.lock(["KeyN", "KeyT", "KeyW"]);
+      editor.commands.focus();
+    } catch {
+      aviso.error(t("El navegador no ha permitido la pantalla completa."));
+    }
+  };
+  return (
+    <button type="button" onClick={() => void alternar()} className={btn(activo)}
+      title={activo ? t("Salir de pantalla completa (Esc)") : t("Pantalla completa: así funcionan también Ctrl+N, Ctrl+T y Ctrl+W, que el navegador se reserva")}>
+      {activo ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+    </button>
   );
 }
 

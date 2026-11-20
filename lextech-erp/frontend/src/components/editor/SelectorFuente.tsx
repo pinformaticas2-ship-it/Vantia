@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import type { Editor } from "@tiptap/react";
 import { Check, ChevronDown, Laptop, Loader2, Search } from "lucide-react";
 import { t } from "../../lib/i18n";
+import { teclaDe } from "./atajosWord";
 import {
   FUENTES_OFFICE, anotarReciente, cargarCatalogo, cargarFuenteGoogle, cargarMuestraGoogle, fuentesLocales,
   fuentesRecientes, puedeLeerFuentesLocales, valorCss, type Categoria, type Fuente,
@@ -98,7 +99,7 @@ export function SelectorFuente({ editor, actual }: { editor: Editor; actual: str
 
   return (
     <>
-      <button ref={refBoton} type="button" title={t("Fuente")} aria-label={t("Fuente")} aria-expanded={abierto}
+      <button ref={refBoton} type="button" title={teclaDe("fuente") ? `${t("Fuente")} (${teclaDe("fuente")})` : t("Fuente")} aria-label={t("Fuente")} aria-expanded={abierto} data-atajo="fuente"
         onMouseDown={(e) => e.preventDefault()} onClick={() => setAbierto((v) => !v)}
         className="flex h-8 w-[160px] shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-left text-xs font-semibold text-slate-700 outline-none hover:border-slate-300">
         <span className="min-w-0 flex-1 truncate text-[13px]" style={{ fontFamily: actual ? valorCss(actual) : "Times New Roman" }}>{actual || "Times New Roman"}</span>

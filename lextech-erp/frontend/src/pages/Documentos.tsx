@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -13,6 +13,7 @@ import { SIN_TITULO, useDocumento } from "../lib/useDocumento";
 import { useIsMobile } from "../lib/useIsMobile";
 import { Spinner } from "../components/Spinner";
 import { BarraEditor, HojaEditor, contarPalabras, useEditorTexto } from "../components/EditorTexto";
+import type { Accion, AtajosStorage } from "../components/editor/atajosWord";
 import { t } from '../lib/i18n';
 
 // Documentos (30/10/2026): editor de texto del despacho con IA. A la
@@ -196,6 +197,25 @@ export default function Documentos() {
     }
   };
 
+  // Atajos de Word de documento entero: guardar (Ctrl+G), imprimir (Ctrl+P),
+  // nuevo (Ctrl+U) y abrir (Ctrl+A → buscar en la lista), según atajosWord.ts.
+  const accionesPagina = useRef({ guardarYa, imprimir, crear });
+  accionesPagina.current = { guardarYa, imprimir, crear };
+  const refBuscarDocs = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!editor) return;
+    const st = (editor.storage as any).atajosWord as AtajosStorage | undefined;
+    if (!st) return;
+    const propias: Partial<Record<Accion, () => void>> = {
+      guardar: () => { void accionesPagina.current.guardarYa().then(() => avisoGlobal.ok(t("Guardado"))); },
+      imprimir: () => accionesPagina.current.imprimir(),
+      nuevo: () => { void accionesPagina.current.crear(); },
+      abrir: () => { refBuscarDocs.current?.focus(); refBuscarDocs.current?.select(); },
+    };
+    Object.assign(st.acciones, propias);
+    return () => { for (const k of Object.keys(propias) as Accion[]) delete st.acciones[k]; };
+  }, [editor]);
+
   const borrar = async () => {
     if (!doc) return;
     descartarCambios();
@@ -225,7 +245,7 @@ export default function Documentos() {
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <Search size={15} className="text-slate-400" />
-            <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("Buscar en los documentos...")} className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
+            <input ref={refBuscarDocs} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder={t("Buscar en los documentos...")} className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400" />
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">

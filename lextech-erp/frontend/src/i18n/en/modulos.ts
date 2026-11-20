@@ -3821,4 +3821,18 @@ registrarEn({
   "Manuscrita": "Handwriting",
   "Decorativa": "Display",
   "Monoespaciada": "Monospace",
+  // Atajos de Word en el editor (20/11/2026)
+  "{p} palabras · {c} caracteres": "{p} words · {c} characters",
+  "Guardado: los documentos se guardan solos mientras escribes.": "Saved: documents save automatically as you type.",
+  "El navegador no ha permitido la pantalla completa.": "The browser did not allow full screen.",
+  "Salir de pantalla completa (Esc)": "Exit full screen (Esc)",
+  "Pantalla completa: así funcionan también Ctrl+N, Ctrl+T y Ctrl+W, que el navegador se reserva": "Full screen: lets the Word shortcuts the browser keeps for itself (such as Ctrl+N) work too",
+  "Rehacer": "Redo",
+  "Negrita": "Bold",
+  "Cursiva": "Italic",
+  "Subrayado": "Underline",
+  "Subíndice": "Subscript",
+  "Superíndice": "Superscript",
+  "Reducir sangría": "Decrease indent",
+  "Aumentar sangría": "Increase indent",
 });

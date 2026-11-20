@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Briefcase, Check, Download, ExternalLink, FileText, Loader2, X } from "lucide-react";
@@ -6,6 +6,8 @@ import { BarraEditor, HojaEditor, contarPalabras } from "./EditorTexto";
 import { SIN_TITULO, useDocumento } from "../lib/useDocumento";
 import { Spinner } from "./Spinner";
 import { t } from '../lib/i18n';
+import { aviso } from "../lib/avisos";
+import type { AtajosStorage } from "./editor/atajosWord";
 
 // Editor de Documentos en un panel lateral (Chat IA): el documento que acaba
 // de crear la IA se revisa y retoca sin salir de la conversación. Se guarda
@@ -15,6 +17,14 @@ export default function PanelDocumento({ id, onCerrar, movil }: { id: string; on
   const navigate = useNavigate();
   const { doc, cargando, error, titulo, cambiarTitulo, estadoGuardado, editor, guardarYa, descargarWord, exportando } = useDocumento(id);
   const [fallo, setFallo] = useState<string | null>(null);
+  // Ctrl+G (o Ctrl+S en Word en inglés) guarda ya, como en Word.
+  useEffect(() => {
+    if (!editor) return;
+    const st = (editor.storage as any).atajosWord as AtajosStorage | undefined;
+    if (!st) return;
+    st.acciones.guardar = () => { void guardarYa().then(() => aviso.ok(t("Guardado"))); };
+    return () => { delete st.acciones.guardar; };
+  }, [editor, guardarYa]);
 
   const panel = (
     <aside className={`${movil ? "fixed inset-0 z-[120]" : "relative h-full w-1/2 min-w-[420px] max-w-[760px] shrink-0 border-l border-slate-200 shadow-[-8px_0_24px_-12px_rgba(15,23,42,0.15)]"} flex min-h-0 flex-col bg-[#f6f8fc]`}>

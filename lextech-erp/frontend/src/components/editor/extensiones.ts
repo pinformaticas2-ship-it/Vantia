@@ -130,8 +130,6 @@ export const FormatoParrafo = Extension.create({
         if ($from.parent.attrs.primeraLinea) return this.editor.commands.setPrimeraLinea(null);
         return false;
       },
-      "Mod-Shift-m": () => this.editor.commands.cambiarSangria(-1),
-      "Mod-m": () => this.editor.commands.cambiarSangria(1),
     };
   },
 });
@@ -166,7 +164,7 @@ export interface BuscarStorage {
   mayusculas: boolean;
   resultados: ResultadoBusqueda[];
   actual: number;
-  /** Lo pone la barra de herramientas para abrir el panel con Ctrl+F / Ctrl+H. */
+  /** Lo pone la barra de herramientas para abrir el panel (atajos de Word: ver atajosWord.ts). */
   onAbrir: ((reemplazar: boolean) => void) | null;
 }
 
@@ -261,13 +259,6 @@ export const Buscar = Extension.create<Record<string, never>, BuscarStorage>({
         }
         return true;
       },
-    };
-  },
-
-  addKeyboardShortcuts() {
-    return {
-      "Mod-f": () => { this.storage.onAbrir?.(false); return !!this.storage.onAbrir; },
-      "Mod-h": () => { this.storage.onAbrir?.(true); return !!this.storage.onAbrir; },
     };
   },
 
