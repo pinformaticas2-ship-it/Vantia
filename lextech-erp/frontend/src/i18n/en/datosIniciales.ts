@@ -105,4 +105,17 @@ registrarEn({
   "{n} días antes de la fecha de preparación indicada en el correo, a las {hora}": "{n} days before the preparation date given in the email, at {hora}",
   "{n} día antes de la vista, a las {hora}": "{n} day before the hearing, at {hora}",
   "{n} días antes de la vista, a las {hora}": "{n} days before the hearing, at {hora}",
+
+  // Instagram → Página de Facebook vinculada (23/11/2026)
+  "Mensajes": "Messages",
+  "Publicaciones": "Posts",
+  "Página de Facebook": "Facebook Page",
+  "No se pudo cargar la Página de Facebook.": "The Facebook Page could not be loaded.",
+  "Esta cuenta de Instagram no tiene una Página de Facebook vinculada.": "This Instagram account has no linked Facebook Page.",
+  "Página de Facebook vinculada": "Linked Facebook Page",
+  "seguidores": "followers",
+  "Abrir en Facebook": "Open on Facebook",
+  "Últimas publicaciones de la Página": "Latest posts from the Page",
+  "La Página todavía no tiene publicaciones.": "The Page has no posts yet.",
+  "Ver en Facebook": "View on Facebook",
 });

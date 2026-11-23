@@ -8,7 +8,7 @@ import { TEMP_ROOT } from '../config/paths';
 import {
   getInstagramStatus, startInstagramConnect, conectarConToken, instagramCallback, disconnectInstagram, reintentarWebhook,
   listarConversaciones, verConversacion, enviarMensaje, listarMedios, publicar, estadoPublicacion,
-  listarComentarios, responderComentario, ocultarComentario, borrarComentario, servirArchivo,
+  listarComentarios, responderComentario, ocultarComentario, borrarComentario, servirArchivo, verPaginaFacebook,
 } from '../controllers/instagramController';
 
 // Comunicación Externa → Instagram. El webhook va aparte (routes/instagramWebhook.ts)
@@ -48,6 +48,7 @@ router.get('/conversaciones/:igsid', verConversacion);
 router.post('/conversaciones/:igsid/mensajes', enviarMensaje);
 
 router.get('/medios', listarMedios);
+router.get('/pagina', verPaginaFacebook);
 router.get('/medios/:mediaId/comentarios', listarComentarios);
 router.post('/publicar', subida.single('archivo'), publicar);
 router.get('/publicar/:token', estadoPublicacion);

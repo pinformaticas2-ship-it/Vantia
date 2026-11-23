@@ -286,6 +286,30 @@ export async function listarMediosInstagram(c: CuentaInstagram, after?: string) 
   return { medios: d?.data || [], siguiente: d?.paging?.next ? d?.paging?.cursors?.after || null : null };
 }
 
+/**
+ * La Página de Facebook vinculada a la cuenta de Instagram y sus últimas
+ * publicaciones (23/11/2026). Usa pages_read_engagement con el token de la
+ * Página (el que se guarda al conectar): es lo que pide ver Meta en la
+ * revisión de la app («Page identity» + contenido de la Página en la UI).
+ */
+export async function paginaFacebookInstagram(c: CuentaInstagram) {
+  if (!c.pageId) return null;
+  const id = encodeURIComponent(c.pageId);
+  const [pagina, posts] = await Promise.all([
+    igFetch(g(`${id}?fields=id,name,category,link,fan_count,followers_count,picture.type(large){url}`), { token: c.token }),
+    igFetch(g(`${id}/posts?fields=id,message,created_time,full_picture,permalink_url&limit=12`), { token: c.token }),
+  ]);
+  return {
+    pagina: {
+      id: String(pagina?.id || c.pageId), nombre: pagina?.name || '', categoria: pagina?.category || null, enlace: pagina?.link || null,
+      seguidores: pagina?.followers_count ?? pagina?.fan_count ?? null, foto: pagina?.picture?.data?.url || null,
+    },
+    publicaciones: (posts?.data || []).map((p: any) => ({
+      id: String(p.id), texto: p.message || '', fecha: p.created_time || null, imagen: p.full_picture || null, enlace: p.permalink_url || null,
+    })),
+  };
+}
+
 export type FormatoInstagram = 'REELS' | 'IMAGE' | 'STORIES';
 
 export async function crearContenedorInstagram(c: CuentaInstagram, o: {

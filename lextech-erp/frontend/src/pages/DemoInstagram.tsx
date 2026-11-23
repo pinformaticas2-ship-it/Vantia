@@ -108,6 +108,14 @@ async function responder(e: Estado, metodo: string, ruta: string, body: any): Pr
     return respuesta(e.comentarios[seg[1]] || []);
   }
   if (seg[0] === "medios") return respuesta({ medios: e.medios, siguiente: null });
+  if (seg[0] === "pagina") {
+    return respuesta({
+      pagina: { id: "demo", nombre: "Despacho Demo Abogados", categoria: "Bufete de abogados", enlace: null, seguidores: 920, foto: null },
+      publicaciones: e.medios.slice(0, 4).map((m: any, i: number) => ({
+        id: `p${i}`, texto: m.caption || "", fecha: m.timestamp || null, imagen: m.thumbnail_url || m.media_url || null, enlace: null,
+      })),
+    });
+  }
   if (seg[0] === "comentarios" && seg[1]) {
     const todos = Object.values(e.comentarios).flat();
     const c = todos.find((x) => x.id === seg[1]);

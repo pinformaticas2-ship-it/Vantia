@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowLeft, CheckCircle2, Clock, Copy, EyeOff, Heart, Image as ImageIcon, Instagram, Loader2,
+  AlertTriangle, ArrowLeft, CheckCircle2, Clock, Copy, ExternalLink, EyeOff, Flag, Heart, Image as ImageIcon, Instagram, Loader2,
   Lock, MessageCircle, MessageSquare, Plus, RefreshCw, Search, Send, Trash2, Unplug, Upload, UserRound,
 } from "lucide-react";
 import { Spinner } from "./Spinner";
@@ -83,7 +83,7 @@ export default function InstagramPanel() {
   const [status, setStatus] = useState<Status | null>(null);
   const [cargando, setCargando] = useState(true);
   const [aviso, setAviso] = useState<{ tono: "ok" | "error"; texto: string } | null>(null);
-  const [vista, setVista] = useState<"mensajes" | "publicaciones">("mensajes");
+  const [vista, setVista] = useState<"mensajes" | "publicaciones" | "pagina">("mensajes");
   const [conectando, setConectando] = useState(false);
 
   const api = useCallback(async (path: string, init: RequestInit = {}) => {
@@ -161,9 +161,9 @@ export default function InstagramPanel() {
           <span className="hidden text-[11px] text-slate-400 sm:inline">{fmt(acc.followers)}{" "}{t("seguidores ·")}{" "}{fmt(acc.media)}{" "}{t("publicaciones")}</span>
         </div>
         <div className="ml-auto flex items-center gap-1 rounded-xl bg-slate-100 p-1">
-          {([["mensajes", "Mensajes", MessageCircle], ["publicaciones", "Publicaciones", ImageIcon]] as const).map(([k, label, Icon]) => (
+          {([["mensajes", "Mensajes", MessageCircle], ["publicaciones", "Publicaciones", ImageIcon], ["pagina", "Página de Facebook", Flag]] as const).map(([k, label, Icon]) => (
             <button key={k} type="button" onClick={() => setVista(k)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${vista === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-              <Icon size={13} /> {label}
+              <Icon size={13} /> {t(label)}
             </button>
           ))}
         </div>
@@ -175,7 +175,7 @@ export default function InstagramPanel() {
           {status.webhookOk === false && <AvisoWebhook status={status} api={api} onListo={cargarStatus} />}
         </div>
       )}
-      {vista === "mensajes" ? <Mensajes api={api} /> : <Publicaciones api={api} onDesconectado={cargarStatus} />}
+      {vista === "mensajes" ? <Mensajes api={api} /> : vista === "pagina" ? <PaginaFacebook api={api} /> : <Publicaciones api={api} onDesconectado={cargarStatus} />}
     </div>
   );
 }
@@ -407,6 +407,78 @@ function Mensajes({ api }: { api: (p: string, i?: RequestInit) => Promise<any> }
 }
 
 // ── Publicaciones y comentarios ─────────────────────────────────────────
+
+/**
+ * Página de Facebook vinculada a la cuenta de Instagram: su identidad y sus
+ * últimas publicaciones (pages_read_engagement). Así el equipo ve de un vistazo
+ * qué está publicando el despacho también en Facebook.
+ */
+function PaginaFacebook({ api }: { api: (p: string, i?: RequestInit) => Promise<any> }) {
+  const [datos, setDatos] = useState<{ pagina: { id: string; nombre: string; categoria: string | null; enlace: string | null; seguidores: number | null; foto: string | null };
+    publicaciones: { id: string; texto: string; fecha: string | null; imagen: string | null; enlace: string | null }[] } | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const cargar = useCallback(async () => {
+    setError(null);
+    try { setDatos((await api("/api/instagram/pagina")) ?? null); }
+    catch (e: any) { setError(e?.message || t("No se pudo cargar la Página de Facebook.")); setDatos(null); }
+  }, [api]);
+  useEffect(() => { void cargar(); }, [cargar]);
+
+  if (datos === undefined) return <div className="flex flex-1 items-center justify-center"><Spinner size="sm" muted /></div>;
+  if (error || !datos) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-slate-500">
+        {error || t("Esta cuenta de Instagram no tiene una Página de Facebook vinculada.")}
+      </div>
+    );
+  }
+  const { pagina, publicaciones } = datos;
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto bg-[#f6f8fc] p-4">
+      <div className="mx-auto max-w-4xl space-y-4">
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+          {pagina.foto
+            ? <img src={pagina.foto} alt="" className="h-14 w-14 rounded-full object-cover" />
+            : <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1877f2] text-white"><Flag size={22} /></span>}
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("Página de Facebook vinculada")}</p>
+            <p className="truncate text-base font-bold text-slate-800">{pagina.nombre}</p>
+            <p className="text-xs text-slate-500">{[pagina.categoria, pagina.seguidores != null ? `${fmt(pagina.seguidores)} ${t("seguidores")}` : null].filter(Boolean).join(" · ")}</p>
+          </div>
+          <button type="button" onClick={() => void cargar()} title={t("Actualizar")} className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><RefreshCw size={13} /></button>
+          {pagina.enlace && (
+            <a href={pagina.enlace} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+              <ExternalLink size={12} />{t("Abrir en Facebook")}
+            </a>
+          )}
+        </div>
+        <h3 className="px-1 text-sm font-bold text-slate-700">{t("Últimas publicaciones de la Página")}</h3>
+        {!publicaciones.length ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-xs text-slate-400">{t("La Página todavía no tiene publicaciones.")}</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {publicaciones.map((p) => (
+              <article key={p.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="flex items-center gap-2 px-3 pt-3">
+                  {pagina.foto ? <img src={pagina.foto} alt="" className="h-6 w-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#1877f2] text-white"><Flag size={11} /></span>}
+                  <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{pagina.nombre}</span>
+                  <span className="shrink-0 text-[10px] text-slate-400">{hora(p.fecha)}</span>
+                </div>
+                {p.imagen && <img src={p.imagen} alt="" className="mt-2 aspect-video w-full object-cover" loading="lazy" />}
+                <p className="line-clamp-4 px-3 py-2.5 text-xs leading-5 text-slate-700">{p.texto || t("Sin texto")}</p>
+                {p.enlace && (
+                  <a href={p.enlace} target="_blank" rel="noreferrer" className="flex items-center gap-1 border-t border-slate-100 px-3 py-2 text-[11px] font-semibold text-[#1877f2] hover:bg-slate-50">
+                    <ExternalLink size={11} />{t("Ver en Facebook")}
+                  </a>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Publicaciones({ api, onDesconectado }: { api: (p: string, i?: RequestInit) => Promise<any>; onDesconectado: () => void }) {
   const isMobile = useIsMobile();

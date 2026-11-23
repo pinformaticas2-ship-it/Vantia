@@ -8,7 +8,7 @@ import {
   instagramPublicBase, instagramVerifyToken, canjearCodigoInstagram, perfilInstagram, suscribirWebhooksInstagram,
   guardarCuentaInstagram, cuentaInstagram, paginaDeInstagram, tokenLargaDuracion, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
   crearContenedorInstagram, estadoContenedorInstagram, publicarContenedorInstagram, comentariosInstagram,
-  responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, type FormatoInstagram,
+  responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, paginaFacebookInstagram, type FormatoInstagram,
 } from '../utils/instagram';
 
 // Comunicación Externa → Instagram. Conectar va por redirección completa
@@ -383,6 +383,14 @@ export async function listarMedios(req: Request, res: Response) {
   try {
     const c = await cuentaInstagram(ctx(req).org);
     return ok(res, await listarMediosInstagram(c, req.query.after ? String(req.query.after) : undefined));
+  } catch (e) { return err(res, e); }
+}
+
+// GET /api/instagram/pagina → Página de Facebook vinculada y sus últimas publicaciones.
+export async function verPaginaFacebook(req: Request, res: Response) {
+  try {
+    const c = await cuentaInstagram(ctx(req).org);
+    return ok(res, await paginaFacebookInstagram(c));
   } catch (e) { return err(res, e); }
 }
 
