@@ -3,7 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, Clock, Copy, ExternalLink, EyeOff, Flag, Heart, Image as ImageIcon, Instagram, Loader2,
-  Lock, MessageCircle, MessageSquare, Plus, RefreshCw, Search, Send, Trash2, Unplug, Upload, UserRound,
+  Lock, MessageCircle, MessageSquare, Plus, RefreshCw, Search, Send, ShieldCheck, Trash2, Unplug, Upload, UserRound, XCircle,
 } from "lucide-react";
 import { Spinner } from "./Spinner";
 import { Modal } from "./Modal";
@@ -25,6 +25,8 @@ interface Status {
   webhookError?: string | null;
   account?: { username?: string; name?: string; picture?: string; followers?: number; media?: number };
   accountError?: string | null;
+  pagina?: { id: string; nombre: string; enlace: string | null } | null;
+  scopes?: string[];
 }
 interface Conversacion {
   igsid: string;
@@ -75,6 +77,17 @@ const hora = (iso?: string | null) => {
     : d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 };
 const nombreDe = (c: Conversacion) => c.nombre || (c.username ? `@${c.username}` : "Usuario de Instagram");
+// Permisos de Meta que usa Vantia y para qué (se enseñan en «Permisos»).
+const PERMISOS: [string, string][] = [
+  ["instagram_basic", "Ver el perfil de la cuenta y sus publicaciones"],
+  ["instagram_manage_messages", "Recibir y contestar mensajes directos"],
+  ["instagram_manage_comments", "Leer, contestar, ocultar y borrar comentarios"],
+  ["instagram_content_publish", "Publicar fotos, reels e historias"],
+  ["pages_show_list", "Encontrar la Página de Facebook vinculada a la cuenta"],
+  ["pages_read_engagement", "Ver la Página de Facebook y sus publicaciones"],
+  ["business_management", "Acceder a la cuenta dentro del portfolio empresarial de Meta"],
+  ["public_profile", "Saber quién ha iniciado sesión con Facebook"],
+];
 const GRADIENTE = "bg-gradient-to-br from-fuchsia-500 via-pink-500 to-amber-400";
 
 export default function InstagramPanel() {
@@ -159,6 +172,12 @@ export default function InstagramPanel() {
           {acc.picture ? <img src={acc.picture} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className={`flex h-7 w-7 items-center justify-center rounded-full ${GRADIENTE}`}><Instagram size={14} className="text-white" /></span>}
           <span className="truncate text-sm font-bold text-slate-800">@{acc.username || t("instagram")}</span>
           <span className="hidden text-[11px] text-slate-400 sm:inline">{fmt(acc.followers)}{" "}{t("seguidores ·")}{" "}{fmt(acc.media)}{" "}{t("publicaciones")}</span>
+          {status.pagina?.nombre && (
+            <span className="hidden items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 md:inline-flex" title={t("Página de Facebook vinculada a esta cuenta de Instagram")}>
+              <Flag size={11} />{" "}{t("Página de Facebook:")}{" "}{status.pagina.nombre}
+            </span>
+          )}
+          <PermisosMeta scopes={status.scopes || []} />
         </div>
         <div className="ml-auto flex items-center gap-1 rounded-xl bg-slate-100 p-1">
           {([["mensajes", "Mensajes", MessageCircle], ["publicaciones", "Publicaciones", ImageIcon], ["pagina", "Página de Facebook", Flag]] as const).map(([k, label, Icon]) => (
@@ -176,6 +195,49 @@ export default function InstagramPanel() {
         </div>
       )}
       {vista === "mensajes" ? <Mensajes api={api} /> : vista === "pagina" ? <PaginaFacebook api={api} /> : <Publicaciones api={api} onDesconectado={cargarStatus} />}
+    </div>
+  );
+}
+
+/** Qué permisos concedió la cuenta al conectar y para qué los usa Vantia. */
+function PermisosMeta({ scopes }: { scopes: string[] }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [abierto]);
+  return (
+    <div ref={caja} className="relative">
+      <button type="button" onClick={() => setAbierto((v) => !v)} title={t("Permisos que la cuenta ha concedido a Vantia en Meta")}
+        className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50">
+        <ShieldCheck size={11} />{" "}{t("Permisos")}
+      </button>
+      {abierto && (
+        <div className="absolute left-0 top-full z-30 mt-2 w-[340px] max-w-[85vw] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+          <p className="text-xs font-bold text-slate-800">{t("Permisos concedidos a Vantia")}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{t("Se eligieron al conectar la cuenta con Facebook. Para cambiarlos, vuelve a conectarla.")}</p>
+          <ul className="mt-2 space-y-1.5">
+            {PERMISOS.map(([p, uso]) => {
+              const concedido = scopes.includes(p);
+              return (
+                <li key={p} className="flex items-start gap-2">
+                  {!scopes.length ? <ShieldCheck size={14} className="mt-0.5 shrink-0 text-slate-300" />
+                    : concedido ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-500" />
+                    : <XCircle size={14} className="mt-0.5 shrink-0 text-slate-300" />}
+                  <span className="min-w-0">
+                    <code className="text-[11px] font-semibold text-slate-700">{p}</code>
+                    <span className="block text-[11px] text-slate-500">{t(uso)}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+          {!scopes.length && <p className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-[11px] text-slate-500">{t("Vuelve a conectar la cuenta para ver cuáles se concedieron.")}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -221,11 +283,11 @@ function ConectarConToken({ api, onConectado }: { api: (path: string, init?: Req
   );
 }
 
-function Aviso({ aviso, onCerrar }: { aviso: { tono: "ok" | "error"; texto: string }; onCerrar?: () => void }) {
+function Aviso({ aviso, onCerrar }: { aviso: { tono: "ok" | "error"; texto: string; enlace?: string | null }; onCerrar?: () => void }) {
   return (
     <div className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-sm ${aviso.tono === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
       {aviso.tono === "ok" ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <AlertTriangle size={15} className="mt-0.5 shrink-0" />}
-      <span className="flex-1">{aviso.texto}</span>
+      <span className="flex-1">{t(aviso.texto)}{aviso.enlace && <>{" "}<a href={aviso.enlace} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-semibold underline">{t("Ver en Instagram")}<ExternalLink size={11} /></a></>}</span>
       {onCerrar && <button type="button" onClick={onCerrar} className="text-xs font-semibold opacity-60 hover:opacity-100">{t("Cerrar")}</button>}
     </div>
   );
@@ -488,7 +550,7 @@ function Publicaciones({ api, onDesconectado }: { api: (p: string, i?: RequestIn
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState("");
   const [publicar, setPublicar] = useState(false);
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ texto: string; enlace?: string | null } | null>(null);
   const [confirmarDesconectar, setConfirmarDesconectar] = useState(false);
 
   const cargar = useCallback(async (after?: string | null) => {
@@ -515,7 +577,7 @@ function Publicaciones({ api, onDesconectado }: { api: (p: string, i?: RequestIn
             <button type="button" onClick={() => setConfirmarDesconectar(true)} title={t("Desconectar la cuenta de Instagram")} className="peligro inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-600"><Unplug size={13} /></button>
           )}
         </div>
-        {aviso && <div className="border-b border-slate-100 p-3"><Aviso aviso={{ tono: "ok", texto: aviso }} onCerrar={() => setAviso(null)} /></div>}
+        {aviso && <div className="border-b border-slate-100 p-3"><Aviso aviso={{ tono: "ok", ...aviso }} onCerrar={() => setAviso(null)} /></div>}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {error && <p className="m-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
           {!medios.length && !cargando && !error && <p className="px-6 py-14 text-center text-xs text-slate-400">{t("Todavía no hay publicaciones.")}</p>}
@@ -547,7 +609,7 @@ function Publicaciones({ api, onDesconectado }: { api: (p: string, i?: RequestIn
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-slate-400">{t("Selecciona una publicación para ver sus comentarios.")}</div>
         )}
       </section>
-      {publicar && <ModalPublicar api={api} onCerrar={() => setPublicar(false)} onPublicado={(t) => { setPublicar(false); setAviso(t); void cargar(); }} />}
+      {publicar && <ModalPublicar api={api} onCerrar={() => setPublicar(false)} onPublicado={(texto, enlace) => { setPublicar(false); setAviso({ texto, enlace }); void cargar(); }} />}
     </div>
   );
 }
@@ -629,7 +691,7 @@ function DetalleMedio({ medio, api, onVolver, movil }: { medio: Medio; api: (p: 
 
 type Formato = "REELS" | "IMAGE" | "STORIES";
 
-function ModalPublicar({ api, onCerrar, onPublicado }: { api: (p: string, i?: RequestInit) => Promise<any>; onCerrar: () => void; onPublicado: (t: string) => void }) {
+function ModalPublicar({ api, onCerrar, onPublicado }: { api: (p: string, i?: RequestInit) => Promise<any>; onCerrar: () => void; onPublicado: (texto: string, enlace?: string | null) => void }) {
   const [formato, setFormato] = useState<Formato>("REELS");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -670,7 +732,7 @@ function ModalPublicar({ api, onCerrar, onPublicado }: { api: (p: string, i?: Re
       for (let i = 0; i < 150; i++) {
         await new Promise((r) => setTimeout(r, 4000));
         const s = await api(`/api/instagram/publicar/${publicacionId}`);
-        if (s.estado === "publicado") { onPublicado(formato === "STORIES" ? "Historia publicada en Instagram." : "Publicado en Instagram."); return; }
+        if (s.estado === "publicado") { onPublicado(formato === "STORIES" ? "Historia publicada en Instagram." : "Publicado en Instagram.", s.enlace); return; }
         if (s.estado === "error") throw new Error(s.error || t("Instagram no ha podido publicarlo."));
       }
       onPublicado("Enviado a Instagram. Aparecerá en unos minutos.");
@@ -716,7 +778,7 @@ function ModalPublicar({ api, onCerrar, onPublicado }: { api: (p: string, i?: Re
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
             {([["REELS", "Reel"], ["IMAGE", "Foto"], ["STORIES", "Historia"]] as [Formato, string][]).map(([f, l]) => (
-              <button key={f} type="button" disabled={Boolean(fase)} onClick={() => cambiarFormato(f)} className={`rounded-lg px-2 py-1.5 text-xs font-bold ${formato === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{l}</button>
+              <button key={f} type="button" disabled={Boolean(fase)} onClick={() => cambiarFormato(f)} className={`rounded-lg px-2 py-1.5 text-xs font-bold ${formato === f ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{t(l)}</button>
             ))}
           </div>
           {formato !== "STORIES" ? (

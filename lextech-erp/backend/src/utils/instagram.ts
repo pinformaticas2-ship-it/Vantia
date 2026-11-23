@@ -149,7 +149,7 @@ export async function tokenLargaDuracion(token: string) {
 type CuentaCompartida ={ id: string; username?: string };
 
 /** Permisos concedidos al token y, por permiso, a qué activos (debug_token). */
-async function permisosDelToken(token: string) {
+export async function permisosDelToken(token: string) {
   const app = `${instagramAppId()}|${instagramAppSecret()}`;
   const d = await igFetch(g(`debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(app)}`));
   const datos = d?.data || {};
@@ -308,6 +308,19 @@ export async function paginaFacebookInstagram(c: CuentaInstagram) {
       id: String(p.id), texto: p.message || '', fecha: p.created_time || null, imagen: p.full_picture || null, enlace: p.permalink_url || null,
     })),
   };
+}
+
+/** Nombre y enlace de la Página de Facebook vinculada (para mostrarla junto a la cuenta). */
+export async function nombrePaginaFacebook(c: CuentaInstagram) {
+  if (!c.pageId) return null;
+  const p = await igFetch(g(`${encodeURIComponent(c.pageId)}?fields=id,name,link`), { token: c.token });
+  return { id: String(p?.id || c.pageId), nombre: p?.name || '', enlace: p?.link || null };
+}
+
+/** Enlace público (permalink) de una publicación de Instagram. */
+export async function enlaceMedioInstagram(c: CuentaInstagram, mediaId: string): Promise<string | null> {
+  const d = await igFetch(g(`${encodeURIComponent(mediaId)}?fields=permalink`), { token: c.token });
+  return d?.permalink || null;
 }
 
 export type FormatoInstagram = 'REELS' | 'IMAGE' | 'STORIES';

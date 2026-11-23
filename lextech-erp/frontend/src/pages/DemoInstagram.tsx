@@ -82,6 +82,9 @@ async function responder(e: Estado, metodo: string, ruta: string, body: any): Pr
       configured: true, connected: true, webhookOk: true, webhookUrl: "", verifyTokenConfigurado: true,
       noLeidos: e.contactos.reduce((n, c) => n + c.noLeidos, 0),
       account: { username: "despacho.demo", name: "Despacho Demo Abogados", followers: 1840, media: e.medios.length },
+      pagina: { id: "100000000000001", nombre: "Despacho Demo Abogados", enlace: "https://www.facebook.com/" },
+      scopes: ["instagram_basic", "instagram_manage_messages", "instagram_manage_comments", "instagram_content_publish",
+        "pages_show_list", "pages_read_engagement", "business_management", "public_profile"],
     });
   }
   if (seg[0] === "conversaciones" && !seg[1]) {
@@ -143,7 +146,7 @@ async function responder(e: Estado, metodo: string, ruta: string, body: any): Pr
     }
     return respuesta({ publicacionId: `demo${e.publicaciones}` });
   }
-  if (seg[0] === "publicar" && seg[1]) return respuesta({ estado: "publicado", error: null, mediaId: seg[1] });
+  if (seg[0] === "publicar" && seg[1]) return respuesta({ estado: "publicado", error: null, mediaId: seg[1], enlace: "https://www.instagram.com/" });
   if (metodo === "DELETE" && !seg.length) return respuesta("En la demostración no se puede desconectar la cuenta.", 400);
   return respuesta({ ok: true });
 }

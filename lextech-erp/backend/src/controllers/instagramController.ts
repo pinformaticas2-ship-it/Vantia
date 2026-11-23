@@ -8,7 +8,7 @@ import {
   instagramPublicBase, instagramVerifyToken, canjearCodigoInstagram, perfilInstagram, suscribirWebhooksInstagram,
   guardarCuentaInstagram, cuentaInstagram, paginaDeInstagram, tokenLargaDuracion, firmaValida, perfilRemitente, enviarMensajeInstagram, listarMediosInstagram,
   crearContenedorInstagram, estadoContenedorInstagram, publicarContenedorInstagram, comentariosInstagram,
-  responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, paginaFacebookInstagram, type FormatoInstagram,
+  responderComentarioInstagram, ocultarComentarioInstagram, borrarComentarioInstagram, paginaFacebookInstagram, nombrePaginaFacebook, enlaceMedioInstagram, permisosDelToken, type FormatoInstagram,
 } from '../utils/instagram';
 
 // Comunicación Externa → Instagram. Conectar va por redirección completa
@@ -33,6 +33,14 @@ const ctx = (req: Request) => ({
 });
 const esGestor = (rol: string) => rol === 'propietario' || rol === 'admin';
 
+/** Permisos que la persona concedió al conectar (se enseñan en el panel). No es grave si falla. */
+async function guardarPermisos(org: string, tokenUsuario: string) {
+  try {
+    const p = await permisosDelToken(tokenUsuario);
+    if (p.scopes.length) await pool.query(`UPDATE instagram_cuentas SET scopes=$1 WHERE organizacion_id=$2`, [p.scopes.join(','), org]);
+  } catch (e: any) { console.warn('[instagram] permisos del token:', e?.message || e); }
+}
+
 // GET /api/instagram/status
 export async function getInstagramStatus(req: Request, res: Response) {
   try {
@@ -48,9 +56,11 @@ export async function getInstagramStatus(req: Request, res: Response) {
     const r = rows[0];
     let account: any = { username: r.username, name: r.name, picture: r.profile_picture };
     let accountError: string | null = null;
+    let pagina: { id: string; nombre: string; enlace: string | null } | null = null;
     try {
       const c = await cuentaInstagram(org);
-      const p = await perfilInstagram(c.token, c.igUserId);
+      const [p, pag] = await Promise.all([perfilInstagram(c.token, c.igUserId), nombrePaginaFacebook(c).catch(() => null)]);
+      pagina = pag;
       account = {
         username: p.username, name: p.name, picture: p.profile_picture_url,
         followers: p.followers_count, follows: p.follows_count, media: p.media_count,
@@ -64,7 +74,7 @@ export async function getInstagramStatus(req: Request, res: Response) {
     }
     const { rows: nl } = await pool.query(`SELECT COALESCE(SUM(no_leidos),0)::int AS n FROM instagram_contactos WHERE organizacion_id=$1`, [org]);
     return ok(res, {
-      ...base, connected: true, account, accountError, noLeidos: nl[0].n,
+      ...base, connected: true, account, pagina, accountError, noLeidos: nl[0].n,
       webhookOk: r.webhook_ok, webhookError: r.webhook_error, tokenExpira: r.token_expiry, connectedAt: r.connected_at,
       scopes: String(r.scopes || '').split(',').filter(Boolean),
     });
@@ -138,6 +148,7 @@ export async function instagramCallback(req: Request, res: Response) {
     const pagina = await paginaDeInstagram(t.accessToken, elegida.id);
     const guardado = pagina ? { accessToken: pagina.pageToken, expiresIn: null } : t;
     await guardarCuentaInstagram(pending.organizacion_id, pending.user_id, { ...guardado, clientBusinessId, pageId: pagina?.pageId }, perfil);
+    await guardarPermisos(pending.organizacion_id, t.accessToken);
     try {
       await suscribirWebhooksInstagram({ igUserId: elegida.id, token: guardado.accessToken, pageId: pagina?.pageId });
       await pool.query(`UPDATE instagram_cuentas SET webhook_ok=TRUE, webhook_error=NULL WHERE organizacion_id=$1`, [pending.organizacion_id]);
@@ -183,6 +194,7 @@ export async function conectarConToken(req: Request, res: Response) {
     const pagina = await paginaDeInstagram(token, igUserId);
     const tokenCuenta = pagina?.pageToken || token;
     await guardarCuentaInstagram(org, userId, { accessToken: tokenCuenta, expiresIn: null, clientBusinessId, pageId: pagina?.pageId }, perfil);
+    await guardarPermisos(org, token);
     let webhookError: string | null = null;
     try { await suscribirWebhooksInstagram({ igUserId, token: tokenCuenta, pageId: pagina?.pageId }); }
     catch (e: any) { webhookError = e?.message || String(e); }
@@ -487,7 +499,11 @@ export async function estadoPublicacion(req: Request, res: Response) {
       `SELECT estado, error, media_id FROM instagram_subidas WHERE token=$1 AND organizacion_id=$2`, [req.params.token, ctx(req).org],
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Publicación no encontrada.' });
-    return ok(res, { estado: rows[0].estado, error: rows[0].error, mediaId: rows[0].media_id });
+    let enlace: string | null = null;
+    if (rows[0].estado === 'publicado' && rows[0].media_id) {
+      enlace = await enlaceMedioInstagram(await cuentaInstagram(ctx(req).org), rows[0].media_id).catch(() => null);
+    }
+    return ok(res, { estado: rows[0].estado, error: rows[0].error, mediaId: rows[0].media_id, enlace });
   } catch (e) { return err(res, e); }
 }
 
