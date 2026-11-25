@@ -66,7 +66,7 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
     try {
       const r = await apiFetch(`/api/plantillas/editor?path=${encodeURIComponent(ref)}`, { getToken });
       if (r?.success === false) throw new Error(r.error);
-      setD(r.data); setError('');
+      setD(normalizar(r.data)); setError('');
     } catch (e: any) { setError(e?.message ? t(e.message) : t("No se pudo abrir la plantilla.")); }
   }, [getToken]);
   useEffect(() => { void cargar(refInicial); }, [cargar, refInicial]);
@@ -76,7 +76,7 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
     try {
       const r = await apiFetch('/api/plantillas/variables', { getToken });
       if (r?.success === false) throw new Error(r.error);
-      setCatalogo((r.data?.variables || []).filter((v: any) => !v.imagen).map((v: any) => ({ nombre: v.nombre, etiqueta: v.etiqueta, grupo: v.grupo, automatica: !!v.automatica || v.tipo === 'propia' })));
+      setCatalogo((r.data?.variables || []).filter((v: any) => !v.imagen).map((v: any) => ({ nombre: v.nombre, etiqueta: v.etiqueta || v.nombre, grupo: v.grupo || '', automatica: !!v.automatica || v.tipo === 'propia' })));
     } catch { setCatalogo([]); }
   }, [catalogo, getToken]);
 
@@ -123,7 +123,7 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
         if (r.code === 'SIN_ESCRITURA') onPedirPermiso?.();
         throw new Error(r.error);
       }
-      setD(r.data);
+      setD(normalizar(r.data));
       onCambiada?.(r.data.ref);
       return true;
     } catch (e: any) {
@@ -298,6 +298,21 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
     </div>,
     document.body,
   );
+}
+
+/** apiFetch convierte los textos vacíos en null: se devuelven a "". */
+function normalizar(d: any): Datos {
+  return {
+    ...d,
+    parrafos: (d.parrafos || []).map((p: any) => ({ ...p, texto: p.texto || '' })),
+    campos: (d.campos || []).map((c: any) => ({
+      ...c,
+      etiqueta: c.etiqueta || c.nombre,
+      grupo: c.grupo || 'Otros',
+      general: c.general ? { ...c.general, valor: c.general.valor || '', modo: c.general.modo || 'auto' } : null,
+      enPlantilla: c.enPlantilla ? { ...c.enPlantilla, valor: c.enPlantilla.valor || '' } : null,
+    })),
+  };
 }
 
 /** Texto del párrafo partido en trozos normales y variables (con su posición). */

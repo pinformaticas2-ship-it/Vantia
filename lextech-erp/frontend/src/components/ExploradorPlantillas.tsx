@@ -64,7 +64,9 @@ export default function ExploradorPlantillas({ puedeSubir, onPedirPermiso, onCam
     try {
       const r = await apiFetch(`/api/plantillas/lista${refrescar ? '?refrescar=1' : ''}`, { getToken });
       if (r?.success === false) throw new Error(r.error);
-      setLista(r.data.plantillas); setOrigen(r.data.origen);
+      // apiFetch convierte los textos vacíos en null: la raíz es carpeta "".
+      setLista((r.data.plantillas || []).map((p: any) => ({ ...p, carpeta: p.carpeta || '', nombre: p.nombre || '' })));
+      setOrigen(r.data.origen || '');
     } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudieron leer las plantillas.")); setLista([]); }
   }, [getToken]);
   useEffect(() => { void cargar(); }, [cargar]);

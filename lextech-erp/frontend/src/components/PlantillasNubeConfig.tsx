@@ -58,9 +58,9 @@ export default function PlantillasNubeConfig() {
     } catch (e: any) { aviso.error(e?.message || t("No se pudo usar esa carpeta.")); }
   };
 
-  const cargar = useCallback(async () => {
+  const cargar = useCallback(async (refrescar = false) => {
     try {
-      const r = await apiFetch('/api/plantillas/config', { getToken });
+      const r = await apiFetch(`/api/plantillas/config${refrescar ? '?refrescar=1' : ''}`, { getToken });
       if (r?.success) setCfg(r.data);
     } catch { /* se queda como estaba */ }
   }, [getToken]);
@@ -97,7 +97,24 @@ export default function PlantillasNubeConfig() {
     });
   };
 
-  if (!cfg) return null;
+  // Mientras se lee la carpeta (en Drive puede tardar unos segundos).
+  if (!cfg) {
+    return (
+      <section className="mt-8 bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50"><FileText size={20} className="text-red-600" /></div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-bold text-slate-800">{t("Plantillas del despacho")}</h3>
+            <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-slate-500"><Loader2 size={12} className="animate-spin" />{" "}{t("Leyendo vuestra carpeta de plantillas…")}</p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-2 animate-pulse">
+          <div className="h-9 rounded-lg bg-slate-100" />
+          <div className="h-24 rounded-xl bg-slate-50" />
+        </div>
+      </section>
+    );
+  }
   const enNube = cfg.origen !== 'integradas';
   const nubeNombre = cfg.origen === 'drive' ? 'Google Drive' : 'Dropbox';
   const imp = cfg.importacion;
@@ -174,8 +191,8 @@ export default function PlantillasNubeConfig() {
                 )}
               </>
             )}
-            <button type="button" onClick={() => { void cargar(); setVersion((v) => v + 1); }} title={t("Volver a leer la carpeta")} className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
-              <RefreshCw size={14} />
+            <button type="button" onClick={async () => { setOcupado('recargar'); await cargar(true); setOcupado(null); setVersion((v) => v + 1); }} title={t("Volver a leer la carpeta")} className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
+              <RefreshCw size={14} className={ocupado === 'recargar' ? 'animate-spin' : ''} />
             </button>
           </div>
 

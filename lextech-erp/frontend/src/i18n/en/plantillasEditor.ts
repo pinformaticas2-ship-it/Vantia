@@ -65,6 +65,7 @@ registrarEn({
   "Con otro dato (se cambia en Ajustes → Plantillas)": "With other data (changed in Settings → Templates)",
 
   "en esta plantilla": "in this template",
+  "Leyendo vuestra carpeta de plantillas…": "Reading your templates folder…",
   "Logo de Empresa": "Firm logo",
   "Fecha de hoy (larga)": "Today's date (long)",
 

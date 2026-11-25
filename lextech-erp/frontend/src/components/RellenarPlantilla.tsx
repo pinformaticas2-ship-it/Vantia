@@ -282,7 +282,7 @@ function AjusteCampo({ c, guardando, onCambiar }: {
 }) {
   const actual = c.enPlantilla?.estado || 'general';
   const [estado, setEstado] = useState<EstadoAjuste | 'general'>(actual);
-  const [valor, setValor] = useState(c.enPlantilla?.estado === 'fijo' ? c.enPlantilla.valor : (c.valor || ''));
+  const [valor, setValor] = useState(c.enPlantilla?.estado === 'fijo' ? (c.enPlantilla.valor || '') : (c.valor || ''));
   useEffect(() => { setEstado(c.enPlantilla?.estado || 'general'); }, [c.enPlantilla?.estado]);
   const pendiente = estado === 'fijo' && (actual !== 'fijo' || valor !== (c.enPlantilla?.valor ?? ''));
   return (

@@ -37,7 +37,7 @@ router.get('/config', requireAuth, async (req: any, res: Response) => {
     let total: number | null = null;
     let error: string | null = null;
     if (usaNube(cfg)) {
-      try { total = (await listarPlantillasNube(req.organizacionId, true)).length; } catch (e: any) { error = e?.message || 'No se pudo leer la carpeta'; }
+      try { total = (await listarPlantillasNube(req.organizacionId, req.query.refrescar === '1')).length; } catch (e: any) { error = e?.message || 'No se pudo leer la carpeta'; }
     }
     const { root } = getDocPlantRoot();
     res.json({

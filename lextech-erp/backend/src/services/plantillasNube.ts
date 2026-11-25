@@ -66,16 +66,27 @@ async function guardarConfig(organizacionId: string, cambios: Partial<ConfigPlan
 
 export const usaNube = (cfg: ConfigPlantillas) => Boolean(cfg.proveedor && (cfg.carpetaId || cfg.carpetaPath));
 
-// ── Listado (con una caché corta: se pide al abrir cada ventana de plantillas)
+// ── Listado (con caché: se pide al abrir cada ventana de plantillas) ────────
+// Se guarda 5 min; lo que sube o edita Vantia lo invalida (olvidarListado) y
+// el botón de recargar lo pide de nuevo. Si dos pantallas lo piden a la vez,
+// comparten la misma lectura.
 const listados = new Map<string, { exp: number; data: PlantillaNube[] }>();
-export function olvidarListado(organizacionId: string) { listados.delete(organizacionId); }
+const enCurso = new Map<string, { gen: number; p: Promise<PlantillaNube[]> }>();
+const generacion = new Map<string, number>();
+export function olvidarListado(organizacionId: string) {
+  listados.delete(organizacionId);
+  enCurso.delete(organizacionId);
+  generacion.set(organizacionId, (generacion.get(organizacionId) || 0) + 1);
+}
 
+/** Drive no tiene listado recursivo: se leen las carpetas de 8 en 8 a la vez. */
 async function listarDrive(organizacionId: string, carpetaId: string): Promise<PlantillaNube[]> {
   const out: PlantillaNube[] = [];
   const pendientes: { id: string; ruta: string }[] = [{ id: carpetaId, ruta: '' }];
-  let vueltas = 0;
-  while (pendientes.length && vueltas++ < 1000) {
-    const { id, ruta } = pendientes.shift()!;
+  let leidas = 0;
+  let activos = 0;
+  let error: Error | null = null;
+  const leerCarpeta = async ({ id, ruta }: { id: string; ruta: string }) => {
     let pageToken = '';
     do {
       const q = encodeURIComponent(`'${id}' in parents and trashed = false`);
@@ -89,7 +100,20 @@ async function listarDrive(organizacionId: string, carpetaId: string): Promise<P
       }
       pageToken = data.nextPageToken || '';
     } while (pageToken);
-  }
+  };
+  await new Promise<void>((fin) => {
+    const siguiente = () => {
+      if (error) { if (!activos) fin(); return; }
+      while (activos < 8 && pendientes.length && leidas < 1000) {
+        const c = pendientes.shift()!;
+        leidas++; activos++;
+        leerCarpeta(c).catch((e) => { error = e; }).finally(() => { activos--; siguiente(); });
+      }
+      if (!activos) fin();
+    };
+    siguiente();
+  });
+  if (error) throw error;
   return out;
 }
 
@@ -111,12 +135,21 @@ async function listarDropbox(organizacionId: string, carpetaPath: string): Promi
 export async function listarPlantillasNube(organizacionId: string, refrescar = false): Promise<PlantillaNube[]> {
   const hit = listados.get(organizacionId);
   if (!refrescar && hit && hit.exp > Date.now()) return hit.data;
-  const cfg = await configPlantillas(organizacionId);
-  if (!usaNube(cfg)) return [];
-  const data = cfg.proveedor === 'drive' ? await listarDrive(organizacionId, cfg.carpetaId!) : await listarDropbox(organizacionId, cfg.carpetaPath!);
-  data.sort((a, b) => a.carpeta.localeCompare(b.carpeta, 'es') || a.nombre.localeCompare(b.nombre, 'es'));
-  listados.set(organizacionId, { exp: Date.now() + 60_000, data });
-  return data;
+  const gen = generacion.get(organizacionId) || 0;
+  const ya = enCurso.get(organizacionId);
+  if (ya && ya.gen === gen) return ya.p;
+  const p = (async () => {
+    const cfg = await configPlantillas(organizacionId);
+    if (!usaNube(cfg)) return [];
+    const data = cfg.proveedor === 'drive' ? await listarDrive(organizacionId, cfg.carpetaId!) : await listarDropbox(organizacionId, cfg.carpetaPath!);
+    data.sort((a, b) => a.carpeta.localeCompare(b.carpeta, 'es') || a.nombre.localeCompare(b.nombre, 'es'));
+    // Si mientras se leía se subió o editó algo, este listado ya es viejo: no se guarda.
+    if ((generacion.get(organizacionId) || 0) === gen) listados.set(organizacionId, { exp: Date.now() + 5 * 60_000, data });
+    return data;
+  })();
+  enCurso.set(organizacionId, { gen, p });
+  p.finally(() => { if (enCurso.get(organizacionId)?.p === p) enCurso.delete(organizacionId); }).catch(() => undefined);
+  return p;
 }
 
 /** Descarga (con caché por versión) una plantilla de la nube y devuelve su ruta local. */
