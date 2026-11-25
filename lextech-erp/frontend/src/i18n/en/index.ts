@@ -17,3 +17,4 @@ import './pendientes3';
 import './contextos';
 import './actividad';
 import './datosIniciales';
+import './variablesDocumentos';

@@ -18,6 +18,7 @@ import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
 import SkillsPanel from './SkillsPanel';
 import PlantillasNubeConfig from '../components/PlantillasNubeConfig';
+import VariablesDocumentos from '../components/VariablesDocumentos';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, SelectorTexto, SelectorMovimiento, MuestraApariencia, CabeceraAjuste, MisDatosPanel, AyudaPanel, IntegracionesPropias } from '../components/AjustesPaneles';
@@ -614,6 +615,8 @@ function DespachoPanel() {
       </div>
       {/* Plantillas en la nube (Drive/Dropbox) del despacho. */}
       <div className="mt-5"><PlantillasNubeConfig /></div>
+      {/* Variables de las plantillas: de dónde sale cada una, valor fijo, propias. */}
+      <VariablesDocumentos />
 
       {rol === 'propietario' && organizacion && (
         <DespachoZonaPeligro onEliminar={() => setShowDeleteModal(true)} />

@@ -107,7 +107,7 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
                   {disponibles.map((g) => (
                     <button key={g} type="button" onClick={() => { setVisibles((p) => new Set(p).add(g)); setAbiertos((p) => new Set(p).add(g)); setEligiendo(false); }}
                       className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                      <span className="truncate">{g}</span>
+                      <span className="truncate">{t(g)}</span>
                       <span className="shrink-0 text-[11px] text-slate-400">{grupos.get(g)!.length}{" "}{t("datos")}</span>
                     </button>
                   ))}
@@ -135,7 +135,7 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
               <button type="button" onClick={() => setAbiertos((p) => { const s = new Set(p); s.has(g) ? s.delete(g) : s.add(g); return s; })}
                 className="flex-1 min-w-0 flex items-center gap-2 text-left">
                 <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${abierto ? '' : '-rotate-90'}`} />
-                <span className="text-sm font-semibold text-slate-800 truncate">{g}</span>
+                <span className="text-sm font-semibold text-slate-800 truncate">{t(g)}</span>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${n ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{n}{" "}{t("de")}{" "}{grupos.get(g)!.length}</span>
               </button>
               {n === 0 && visibles.has(g) && (

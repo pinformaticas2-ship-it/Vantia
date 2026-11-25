@@ -2,7 +2,7 @@ import { Response } from 'express';
 import path from 'path';
 import { rutaPlantillaOrg, nombrePlantillaOrg } from './filesController';
 import { camposDePlantilla, rellenarPlantilla, leerComoDocx, claveCanonica } from '../services/plantillasWord';
-import { contextoPlantilla, valorVantia, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho, logoDespachoConAviso } from '../services/plantillasDatos';
+import { contextoPlantilla, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho, logoDespachoConAviso, configVariables, resolverValor } from '../services/plantillasDatos';
 import { logActivityForReq } from './activityController';
 
 // ── Rellenar plantillas Word (15/10/2026) ───────────────────────────────────
@@ -12,7 +12,7 @@ import { logActivityForReq } from './activityController';
 //      Devuelve el .docx relleno y recuerda lo escrito a mano.
 // Las plantillas .doc antiguas se convierten antes a .docx (LibreOffice).
 
-const ORDEN_GRUPOS = ['Expediente', 'Cliente', 'Contrario', 'Juzgado', 'Procurador', 'Procurador contrario', 'Abogado', 'Abogado contrario', 'Despacho', 'Otros'];
+const ORDEN_GRUPOS = ['Variables del despacho', 'Expediente', 'Cliente', 'Contrario', 'Juzgado', 'Procurador', 'Procurador contrario', 'Abogado', 'Abogado contrario', 'Despacho', 'Otros'];
 
 function clienteDeLaPeticion(req: any): string | null {
   const id = String(req.query.clienteId || req.body?.clienteId || '').trim();
@@ -36,6 +36,7 @@ export const camposPlantilla = async (req: any, res: Response) => {
     if (expedienteId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
     if (clienteId && !(ctx as any).clienteEncontrado) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
+    const config = await configVariables(req.organizacionId);
     const { logo, aviso: avisoLogo } = nombres.some(esCampoLogo) ? await logoDespachoConAviso(req.organizacionId) : { logo: null, aviso: null };
     const campos = nombres.map((nombre) => {
       const clave = claveCanonica(nombre);
@@ -47,19 +48,18 @@ export const camposPlantilla = async (req: any, res: Response) => {
           conoceVantia: true, deDespacho: true, imagen: true, imagenUrl: logo?.url || null, avisoImagen: avisoLogo,
         };
       }
-      const deVantia = valorVantia(nombre, ctx);
-      // Los datos del despacho que están en Mi Despacho mandan siempre; en lo
-      // demás, lo escrito a mano (alguien lo corrigió a propósito) y si no, lo de Vantia.
-      const guardado = esDeDespacho(nombre) && deVantia ? undefined : guardados.get(clave);
-      const valor = guardado ?? deVantia ?? '';
+      // Ver resolverValor: valor fijo del despacho, desactivada, lo escrito a
+      // mano (salvo lo que ya está en Mi Despacho) y si no, lo de Vantia.
+      const cfg = config.get(clave);
+      const r = resolverValor(nombre, ctx, guardados, config);
       return {
         nombre, clave,
-        etiqueta: etiquetaDe(nombre),
-        grupo: grupoDe(clave).grupo,
-        valor,
-        origen: guardado != null ? 'guardado' : deVantia ? 'vantia' : 'vacio',
-        conoceVantia: deVantia !== undefined,
-        deDespacho: esDeDespacho(nombre),
+        etiqueta: cfg?.etiqueta || etiquetaDe(nombre),
+        grupo: cfg?.propia ? 'Variables del despacho' : grupoDe(clave).grupo,
+        valor: r.valor ?? '',
+        origen: r.origen,
+        conoceVantia: r.deVantia !== undefined,
+        deDespacho: esDeDespacho(nombre) && !cfg?.propia,
       };
     }).sort((a, b) => ORDEN_GRUPOS.indexOf(a.grupo) - ORDEN_GRUPOS.indexOf(b.grupo) || a.etiqueta.localeCompare(b.etiqueta, 'es'));
     res.json({ success: true, data: { campos, convertida: !ruta.toLowerCase().endsWith('.docx') } });
@@ -82,6 +82,7 @@ export const generarPlantilla = async (req: any, res: Response) => {
     const enviados: Record<string, string> = req.body?.valores && typeof req.body.valores === 'object' ? req.body.valores : {};
     const enviadosPorClave = new Map(Object.entries(enviados).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
+    const config = await configVariables(req.organizacionId);
 
     const valores: Record<string, string> = {};
     const aGuardar: Record<string, string> = {};
@@ -90,11 +91,13 @@ export const generarPlantilla = async (req: any, res: Response) => {
     for (const nombre of nombres) {
       const clave = claveCanonica(nombre);
       if (esCampoLogo(nombre)) { if (logo) imagenes[clave] = logo; continue; }
-      const deVantia = valorVantia(nombre, ctx);
       const enviado = enviadosPorClave.get(clave);
-      const valor = enviado ?? (esDeDespacho(nombre) && deVantia ? deVantia : guardados.get(clave)) ?? deVantia;
+      const { valor, deVantia } = resolverValor(nombre, ctx, guardados, config, enviado);
       if (valor !== undefined) valores[clave] = valor;
       // Se recuerda lo que difiere de lo que Vantia ya sabe (o lo que Vantia no sabe).
+      // Las de valor fijo no: ese valor se cambia en Variables de documentos.
+      const cfg = config.get(clave);
+      if (cfg?.activa && cfg.modo === 'fijo') continue;
       if (enviado !== undefined && enviado !== (deVantia ?? '')) aGuardar[nombre] = enviado;
       else if (enviado !== undefined && guardados.has(clave) && enviado === (deVantia ?? '')) aGuardar[nombre] = ''; // vuelve a lo de Vantia
     }

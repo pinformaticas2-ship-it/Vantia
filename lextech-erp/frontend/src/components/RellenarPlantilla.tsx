@@ -18,7 +18,7 @@ interface Campo {
   etiqueta: string;
   grupo: string;
   valor: string;
-  origen: 'vantia' | 'guardado' | 'vacio';
+  origen: 'vantia' | 'guardado' | 'vacio' | 'fijo' | 'desactivada';
   conoceVantia: boolean;
   deDespacho: boolean;
   /** El logo: una imagen que sale de Ajustes → Mi Despacho (no se escribe). */
@@ -32,6 +32,9 @@ const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
   vantia: { label: 'De Vantia', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   guardado: { label: 'Guardado', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
   vacio: { label: 'Falta', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  // Ajustes → Mi Despacho → Variables de documentos
+  fijo: { label: 'Valor fijo', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
+  desactivada: { label: 'Desactivada', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
 };
 
 export default function RellenarPlantilla({ path, nombre, expedienteId, clienteId, onVolver, onGenerado, generar: generarFuera, textoBoton = 'Generar documento' }: {
@@ -155,12 +158,12 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
       <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-4 max-h-[52vh]">
         {grupos.map((g) => (
           <section key={g.grupo}>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{g.grupo}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{t(g.grupo)}</p>
             <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
               {g.campos.map((c) => {
                 const v = valores[c.clave] ?? '';
                 const cambiado = v !== (c.valor || '');
-                const origen: Campo['origen'] = cambiado ? (v.trim() ? 'guardado' : 'vacio') : (v.trim() ? c.origen : 'vacio');
+                const origen: Campo['origen'] = cambiado ? (v.trim() ? 'guardado' : 'vacio') : (v.trim() || c.origen === 'desactivada' ? c.origen : 'vacio');
                 const o = ORIGEN[origen];
                 const largo = v.length > 70 || v.includes('\n');
                 return (
@@ -168,7 +171,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                     <div className="min-w-0 pt-1.5">
                       <p className="text-xs font-medium text-slate-700 break-words" title={`«${c.nombre}»`}>{c.etiqueta}</p>
                       <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-semibold ${o.cls}`}>
-                        {origen === 'vantia' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{o.label}
+                        {origen === 'vantia' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{t(o.label)}
                       </span>
                       {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title={t("Lo que escribas aquí se recuerda para todo el despacho")}><Building2 size={9} />{" "}{t("despacho")}</span>}
                     </div>

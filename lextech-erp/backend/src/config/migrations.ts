@@ -2471,6 +2471,29 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_plantillas_valores_unico ON plantillas_valores (organizacion_id, (COALESCE(expediente_id, '00000000-0000-0000-0000-000000000000'::uuid)), clave);`);
     } catch (e: any) { console.error('[migrations] plantillas_valores:', e?.message); }
 
+    // Variables de documentos (25/11/2026): cómo rellena el despacho cada
+    // variable de sus plantillas. Una fila solo si se aparta de lo normal:
+    // desactivada, con valor fijo, o creada por el despacho (propia).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS plantillas_variables (
+          id               BIGSERIAL    PRIMARY KEY,
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          clave            VARCHAR(120) NOT NULL,
+          nombre           VARCHAR(150) NOT NULL,
+          etiqueta         VARCHAR(150),
+          propia           BOOLEAN      NOT NULL DEFAULT FALSE,
+          activa           BOOLEAN      NOT NULL DEFAULT TRUE,
+          modo             VARCHAR(20)  NOT NULL DEFAULT 'auto',
+          valor            TEXT,
+          updated_by       VARCHAR(150),
+          created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          UNIQUE (organizacion_id, clave)
+        );
+      `);
+    } catch (e: any) { console.error('[migrations] plantillas_variables:', e?.message); }
+
     // Documentos base de cada expediente (15/10/2026): LOPD, toma de requisitos y
     // hoja de encargo, generados al crear/abrir el expediente si la organización
     // tiene activada la automatización (ver services/docsBaseExpediente).

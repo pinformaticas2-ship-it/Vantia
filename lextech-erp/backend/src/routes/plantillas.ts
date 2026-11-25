@@ -12,7 +12,12 @@ import { driveTieneLectura } from '../utils/googleDrive';
 import pool from '../config/database';
 import { requireModulePermission } from '../middleware/requireModulePermission';
 import { CATALOGO_CAMPOS_MN } from '../data/catalogoCamposMN';
-import { guardarValores, etiquetaDe } from '../services/plantillasDatos';
+import { CATALOGO_MACROS_BASICAS } from '../data/catalogoMacrosBasicas';
+import {
+  guardarValores, etiquetaDe, configVariables, vantiaLaConoce, nombreVariablePropia, contextoPlantilla,
+  valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso,
+} from '../services/plantillasDatos';
+import { claveCanonica } from '../services/plantillasWord';
 
 // Ajustes → Mi Despacho → Plantillas (ver services/plantillasNube).
 const router = Router();
@@ -146,14 +151,21 @@ router.get('/datos/:id', requireAuth, requireModulePermission('expedientes'), as
     const { rows: usados } = await pool.query(
       `SELECT DISTINCT clave FROM plantillas_valores WHERE organizacion_id = $1 AND expediente_id IS NOT NULL`, [req.organizacionId],
     );
+    // Variables de documentos del despacho: las propias "de cada expediente"
+    // van primero; las desactivadas o con valor fijo no se piden aquí.
+    const config = await configVariables(req.organizacionId);
+    const propias = [...config.values()]
+      .filter((v) => v.propia && v.activa && v.modo === 'expediente')
+      .map((v) => ({ grupo: 'Variables del despacho', etiqueta: v.etiqueta || etiquetaDe(v.nombre), nombre: v.nombre, clave: v.clave }));
+    const fuera = new Set([...config.values()].filter((v) => !v.activa || v.modo === 'fijo' || v.propia).map((v) => v.clave));
     const enCatalogo = new Set(CATALOGO_CAMPOS_MN.map((c) => c.clave));
     const extra = [...new Set([...rows.map((r) => r.clave), ...usados.map((r) => r.clave)])]
-      .filter((k) => !enCatalogo.has(k))
+      .filter((k) => !enCatalogo.has(k) && !fuera.has(k))
       .map((k) => ({ grupo: 'Otros datos del expediente', etiqueta: etiquetaDe(k).replace(/_/g, ' '), nombre: k, clave: k }));
     res.json({
       success: true,
       data: {
-        campos: [...CATALOGO_CAMPOS_MN, ...extra],
+        campos: [...propias, ...CATALOGO_CAMPOS_MN.filter((c) => !fuera.has(c.clave)), ...extra],
         valores: Object.fromEntries(rows.map((r) => [r.clave, r.valor])),
       },
     });
@@ -173,6 +185,140 @@ router.put('/datos/:id', requireAuth, requireModulePermission('expedientes'), as
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'No se pudo guardar.' });
+  }
+});
+
+// ── Variables de documentos (25/11/2026) ────────────────────────────────────
+// Ajustes → Mi Despacho → Variables de documentos: todas las variables que
+// pueden llevar las plantillas, de dónde sale cada una, y lo que el despacho
+// haya cambiado (desactivar, valor fijo) o creado (variables propias).
+// Ver resolverValor en services/plantillasDatos.
+
+const MODOS = ['auto', 'fijo', 'expediente'];
+const textoValor = (v: any) => String(v ?? '').slice(0, 5000);
+
+router.get('/variables', requireAuth, async (req: any, res: Response) => {
+  try {
+    const config = await configVariables(req.organizacionId);
+    // Lo que sale hoy de Mi Despacho (sin expediente: los datos del despacho y la fecha).
+    const ctx = await contextoPlantilla(req.organizacionId, null, null);
+    const { logo } = await logoDespachoConAviso(req.organizacionId);
+    const { rows: deDespacho } = await pool.query(
+      `SELECT clave, valor FROM plantillas_valores WHERE organizacion_id = $1 AND expediente_id IS NULL`, [req.organizacionId],
+    );
+    const escritoDespacho = new Map<string, string>(deDespacho.map((r: any) => [r.clave, r.valor]));
+    const vistas = new Set<string>();
+    const fila = (c: { grupo: string; etiqueta: string; nombre: string; clave: string }, tipo: 'basica' | 'expediente') => {
+      vistas.add(c.clave);
+      const cfg = config.get(c.clave);
+      const despacho = esDeDespacho(c.nombre) || /^FECHA_IMPRESION/.test(c.clave);
+      let actual: string | null = null;
+      if (despacho) actual = esCampoLogo(c.nombre) ? (logo ? 'logo' : '') : (valorVantia(c.nombre, ctx) || escritoDespacho.get(c.clave) || '');
+      return {
+        clave: c.clave, nombre: c.nombre, etiqueta: cfg?.etiqueta || c.etiqueta, grupo: c.grupo, tipo,
+        automatica: vantiaLaConoce(c.nombre), despacho, imagen: esCampoLogo(c.nombre), actual,
+        activa: cfg ? cfg.activa : true, modo: cfg?.modo || 'auto', valor: cfg?.valor ?? '',
+      };
+    };
+    const lista = [
+      ...[...config.values()].filter((v) => v.propia).map((v) => ({
+        clave: v.clave, nombre: v.nombre, etiqueta: v.etiqueta || etiquetaDe(v.nombre), grupo: 'Variables del despacho', tipo: 'propia',
+        automatica: false, despacho: false, imagen: false, actual: null as string | null,
+        activa: v.activa, modo: v.modo, valor: v.valor ?? '',
+      })),
+      ...CATALOGO_MACROS_BASICAS.map((c) => fila(c, 'basica')),
+      ...CATALOGO_CAMPOS_MN.filter((c) => !CATALOGO_MACROS_BASICAS.some((b) => b.clave === c.clave))
+        .map((c) => fila({ ...c, grupo: `Datos del asunto › ${c.grupo}` }, 'expediente')),
+    ];
+    // Cambios guardados de variables que no están en los catálogos (plantillas propias).
+    for (const v of config.values()) {
+      if (v.propia || vistas.has(v.clave)) continue;
+      lista.push(fila({ grupo: 'Otras variables', etiqueta: v.etiqueta || etiquetaDe(v.nombre), nombre: v.nombre, clave: v.clave }, 'basica'));
+    }
+    res.json({ success: true, data: { variables: lista, canManage: esGestor(req) } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudieron cargar las variables.' });
+  }
+});
+
+/** Activar/desactivar una variable, darle (o quitarle) un valor fijo o cambiar su nombre visible. */
+router.put('/variables/:clave', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const b = req.body || {};
+    const clave = claveCanonica(String(req.params.clave || ''));
+    if (!clave) return res.status(400).json({ success: false, error: 'Variable no válida.' });
+    const { rows: ant } = await pool.query(`SELECT * FROM plantillas_variables WHERE organizacion_id = $1 AND clave = $2`, [req.organizacionId, clave]);
+    const previa = ant[0];
+    const propia = Boolean(previa?.propia);
+    const nombre: string = previa?.nombre || String(b.nombre || '').trim().slice(0, 150);
+    if (!nombre || claveCanonica(nombre) !== clave) return res.status(400).json({ success: false, error: 'Variable no válida.' });
+    const activa = typeof b.activa === 'boolean' ? b.activa : (previa ? previa.activa : true);
+    const modo = MODOS.includes(b.modo) ? b.modo : (previa?.modo || 'auto');
+    if (!propia && modo === 'expediente') return res.status(400).json({ success: false, error: 'Solo las variables propias se rellenan en cada expediente.' });
+    if (propia && modo === 'auto') return res.status(400).json({ success: false, error: 'Variable no válida.' });
+    const valor = b.valor !== undefined ? textoValor(b.valor) : (previa?.valor ?? '');
+    const etiqueta = b.etiqueta !== undefined ? (String(b.etiqueta).trim().slice(0, 150) || null) : (previa?.etiqueta ?? null);
+    if (!propia && activa && modo === 'auto') {
+      // Vuelve a como venía: sin fila.
+      await pool.query(`DELETE FROM plantillas_variables WHERE organizacion_id = $1 AND clave = $2`, [req.organizacionId, clave]);
+    } else {
+      await pool.query(
+        `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (organizacion_id, clave) DO UPDATE SET etiqueta = EXCLUDED.etiqueta, activa = EXCLUDED.activa,
+           modo = EXCLUDED.modo, valor = EXCLUDED.valor, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [req.organizacionId, clave, nombre, etiqueta, propia, activa, modo, modo === 'fijo' ? valor : '', req.auth?.userId || ''],
+      );
+    }
+    const estado = !activa ? 'desactivada' : modo === 'fijo' ? 'con valor fijo' : 'activada';
+    logActivityForReq(req, `Variable de documentos «${nombre}» ${estado}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo guardar la variable.' });
+  }
+});
+
+/** Crear una variable propia del despacho. */
+router.post('/variables', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const b = req.body || {};
+    const nombre = nombreVariablePropia(b.nombre || b.etiqueta || '');
+    const clave = claveCanonica(nombre);
+    if (!clave || clave.length > 120) return res.status(400).json({ success: false, error: 'Escribe un nombre para la variable.' });
+    // No puede pisar una variable que ya rellena Vantia o que viene de MN.
+    if (vantiaLaConoce(nombre) || grupoDe(clave).grupo !== 'Otros'
+      || CATALOGO_MACROS_BASICAS.some((c) => c.clave === clave) || CATALOGO_CAMPOS_MN.some((c) => c.clave === clave)) {
+      return res.status(409).json({ success: false, error: 'Ese nombre ya lo usa una variable de las plantillas. Elige otro.' });
+    }
+    const modo = b.modo === 'expediente' ? 'expediente' : 'fijo';
+    const etiqueta = String(b.etiqueta || '').trim().slice(0, 150) || etiquetaDe(nombre);
+    const { rows } = await pool.query(
+      `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, updated_by)
+       VALUES ($1, $2, $3, $4, TRUE, TRUE, $5, $6, $7)
+       ON CONFLICT (organizacion_id, clave) DO NOTHING RETURNING clave`,
+      [req.organizacionId, clave, nombre, etiqueta, modo, modo === 'fijo' ? textoValor(b.valor) : '', req.auth?.userId || ''],
+    );
+    if (!rows[0]) return res.status(409).json({ success: false, error: 'Ya existe una variable con ese nombre.' });
+    logActivityForReq(req, `Variable de documentos creada: «${nombre}»`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    res.json({ success: true, data: { clave, nombre } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo crear la variable.' });
+  }
+});
+
+/** Borrar una variable propia, o devolver una de las plantillas a como venía. */
+router.delete('/variables/:clave', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const clave = claveCanonica(String(req.params.clave || ''));
+    const { rows } = await pool.query(
+      `DELETE FROM plantillas_variables WHERE organizacion_id = $1 AND clave = $2 RETURNING nombre, propia`, [req.organizacionId, clave],
+    );
+    if (rows[0]) {
+      logActivityForReq(req, rows[0].propia ? `Variable de documentos borrada: «${rows[0].nombre}»` : `Variable de documentos «${rows[0].nombre}» como venía`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    }
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo borrar la variable.' });
   }
 });
 

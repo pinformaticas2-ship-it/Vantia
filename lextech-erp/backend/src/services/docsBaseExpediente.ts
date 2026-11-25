@@ -3,7 +3,7 @@ import pool from '../config/database';
 import { rutaPlantillaOrg, nombrePlantillaOrg, saveExpedienteAttachmentFromBuffer } from '../controllers/filesController';
 import { configPlantillas, usaNube, listarPlantillasNube } from './plantillasNube';
 import { leerComoDocx, camposDePlantilla, rellenarPlantilla, claveCanonica } from './plantillasWord';
-import { contextoPlantilla, valorVantia, valoresGuardados, esCampoLogo, logoDespacho, esDeDespacho } from './plantillasDatos';
+import { contextoPlantilla, valoresGuardados, esCampoLogo, logoDespacho, configVariables, resolverValor } from './plantillasDatos';
 
 // ── Documentos base de cada expediente (15/10/2026) ─────────────────────────
 // Con la automatización activada en la organización (Ajustes →
@@ -116,6 +116,7 @@ export async function generarDocBase(opts: {
   const docx = await leerComoDocx(ruta);
   const nombres = camposDePlantilla(docx);
   const guardados = await valoresGuardados(organizacionId, expedienteId);
+  const config = await configVariables(organizacionId);
   const enviados = new Map(Object.entries(opts.valores || {}).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
   const valores: Record<string, string> = {};
   const imagenes: Record<string, { buffer: Buffer; mime: string }> = {};
@@ -124,9 +125,8 @@ export async function generarDocBase(opts: {
   for (const n of nombres) {
     const clave = claveCanonica(n);
     if (esCampoLogo(n)) { if (logo) imagenes[clave] = logo; else pendientes++; continue; }
-    const deVantia = valorVantia(n, ctx);
-    // Lo de Mi Despacho manda sobre lo escrito a mano para el despacho.
-    const v = enviados.get(clave) ?? (esDeDespacho(n) && deVantia ? deVantia : guardados.get(clave)) ?? deVantia;
+    // Valor fijo / desactivada / Mi Despacho / escrito a mano / Vantia (ver resolverValor).
+    const v = resolverValor(n, ctx, guardados, config, enviados.get(clave)).valor;
     if (v !== undefined && v !== '') valores[clave] = v;
     else pendientes++; // se queda «marcado» en el documento
   }

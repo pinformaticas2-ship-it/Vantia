@@ -28,7 +28,7 @@ type Persona = Partial<{
   cuenta: string;   // procurador: cuenta de consignaciones (Directorio)
 }>;
 
-interface Contexto {
+export interface Contexto {
   org: Persona & { nombre?: string };
   exp: any | null;
   /** Última actuación del expediente (Datos_del_Expediente_Última_Actuación_*). */
@@ -394,6 +394,66 @@ export async function guardarValores(organizacionId: string, expedienteId: strin
       [organizacionId, exp, clave, valor, userId],
     );
   }
+}
+
+// ── Variables de documentos: cómo las quiere el despacho (25/11/2026) ────────
+// Ajustes → Mi Despacho → Variables de documentos. Por defecto cada variable
+// sale de Vantia (o se escribe a mano si Vantia no la sabe). El despacho puede:
+//   · desactivarla: Vantia no la rellena (queda «marcada» o se escribe al generar);
+//   · darle un valor fijo: el mismo en todos los documentos, mande sobre Vantia;
+//   · crear variables propias («Despacho_Horario»...): con valor fijo, o que se
+//     rellenan en cada expediente (pestaña "Datos para documentos").
+
+export type ModoVariable = 'auto' | 'fijo' | 'expediente';
+export interface VariableConfig {
+  clave: string; nombre: string; etiqueta: string | null;
+  propia: boolean; activa: boolean; modo: ModoVariable; valor: string | null;
+  updated_at?: string;
+}
+
+export async function configVariables(organizacionId: string): Promise<Map<string, VariableConfig>> {
+  const { rows } = await pool.query(
+    `SELECT clave, nombre, etiqueta, propia, activa, modo, valor, updated_at FROM plantillas_variables WHERE organizacion_id = $1`,
+    [organizacionId],
+  ).catch(() => ({ rows: [] as any[] }));
+  return new Map(rows.map((r: any) => [r.clave, r as VariableConfig]));
+}
+
+export type OrigenValor = 'enviado' | 'fijo' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
+
+/** El valor con el que sale una variable en un documento, y de dónde viene.
+ *  Orden: lo escrito al generar > desactivada > valor fijo del despacho >
+ *  lo guardado a mano (salvo datos de Mi Despacho, que mandan) > Vantia. */
+export function resolverValor(
+  nombre: string, ctx: Contexto, guardados: Map<string, string>, config: Map<string, VariableConfig>, enviado?: string,
+): { valor: string | undefined; origen: OrigenValor; deVantia: string | undefined } {
+  const clave = claveCanonica(nombre);
+  const cfg = config.get(clave);
+  const deVantia = cfg && (!cfg.activa || cfg.propia) ? undefined : valorVantia(nombre, ctx);
+  if (enviado !== undefined) return { valor: enviado, origen: 'enviado', deVantia };
+  if (cfg && !cfg.activa) return { valor: undefined, origen: 'desactivada', deVantia };
+  if (cfg?.modo === 'fijo') return { valor: cfg.valor ?? '', origen: 'fijo', deVantia };
+  const guardado = !cfg?.propia && esDeDespacho(nombre) && deVantia ? undefined : guardados.get(clave);
+  if (guardado !== undefined) return { valor: guardado, origen: 'guardado', deVantia };
+  return { valor: deVantia, origen: deVantia ? 'vantia' : 'vacio', deVantia };
+}
+
+// Un contexto "con todo" para saber si Vantia sabe rellenar una variable.
+const TODO: any = new Proxy({}, { get: (_t, k) => (k === 'then' || typeof k === 'symbol' ? undefined : 'x') });
+const CONTEXTO_LLENO: Contexto = {
+  org: TODO, exp: TODO, ultimaActuacion: TODO, totalCobrado: 1, cliente: TODO, contrario: TODO,
+  juzgado: TODO, procurador: TODO, procuradorContrario: TODO, abogado: TODO, abogadoContrario: TODO,
+};
+/** ¿Vantia rellena sola esta variable (de alguna ficha)? */
+export const vantiaLaConoce = (nombre: string) => esCampoLogo(nombre) || valorVantia(nombre, CONTEXTO_LLENO) !== undefined;
+
+/** Nombre de una variable propia tal y como se escribe en Word: «Despacho_Horario». */
+export function nombreVariablePropia(texto: string): string {
+  const limpio = String(texto || '').normalize('NFC').trim()
+    .replace(/[«»<>{}"'\\/]/g, '').replace(/\s+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80);
+  if (!limpio) return '';
+  // Las plantillas solo reconocen «Grupo_Campo»: con al menos un "_".
+  return limpio.includes('_') ? limpio : `Propio_${limpio}`;
 }
 
 // ── Logo del despacho (se inserta como imagen en «Empresa_Logo_de_Empresa») ──
