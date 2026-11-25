@@ -9,8 +9,10 @@ export function startGoogleDriveConnect(opts: {
   onConnected: () => void;
   /** Además, leer todo el Drive (para elegir la carpeta de plantillas). */
   lectura?: boolean;
+  /** Además, escribir en todo el Drive (subir y editar plantillas en una carpeta elegida). */
+  escritura?: boolean;
 }) {
-  const { getToken, onError, onBusy, onConnected, lectura } = opts;
+  const { getToken, onError, onBusy, onConnected, lectura, escritura } = opts;
   const goog = (window as any).google;
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
   if (!clientId) { onError('VITE_GOOGLE_CLIENT_ID no está configurado.'); return; }
@@ -18,7 +20,9 @@ export function startGoogleDriveConnect(opts: {
 
   const codeClient = goog.accounts.oauth2.initCodeClient({
     client_id: clientId,
-    scope: lectura
+    scope: escritura
+      ? 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive'
+      : lectura
       ? 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly'
       : 'https://www.googleapis.com/auth/drive.file',
     ux_mode: 'popup',

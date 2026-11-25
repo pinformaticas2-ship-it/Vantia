@@ -3,8 +3,8 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import pool from '../config/database';
-import { driveFetch, findFolder, createFolder, ensureRootFolder, uploadFileToDrive, isDriveConnected } from '../utils/googleDrive';
-import { dropboxRpc, ensureFolder, uploadFileToDropbox, downloadDropboxFile } from '../utils/dropboxStorage';
+import { driveFetch, findFolder, createFolder, ensureRootFolder, uploadFileToDrive, isDriveConnected, getDriveAccessToken, driveTieneEscritura } from '../utils/googleDrive';
+import { dropboxRpc, ensureFolder, uploadFileToDropbox, downloadDropboxFile, updateDropboxFileContent, deleteDropboxFile } from '../utils/dropboxStorage';
 import { isDropboxConnected } from '../utils/dropboxAuth';
 
 // ── Plantillas del despacho en su nube (15/10/2026) ─────────────────────────
@@ -239,6 +239,80 @@ export async function importarIntegradas(organizacionId: string, raiz: string): 
   } finally {
     olvidarListado(organizacionId);
   }
+}
+
+// ── Escribir en la carpeta (subir, crear carpetas, editar plantillas) ───────
+// Drive con drive.file solo deja escribir en lo que creó Vantia; en una carpeta
+// elegida del Drive hace falta el permiso completo de Drive ("escritura").
+export async function puedeEscribir(organizacionId: string, cfg?: ConfigPlantillas): Promise<boolean> {
+  const c = cfg || await configPlantillas(organizacionId);
+  if (!usaNube(c)) return false;
+  if (c.proveedor === 'dropbox' || c.carpetaPropia !== false) return true;
+  return driveTieneEscritura(organizacionId);
+}
+
+/** Limpia una ruta de carpeta escrita o venida del navegador ("A/B/C"). */
+export function rutaCarpetaSegura(ruta: string): string {
+  return String(ruta || '').replace(/\\/g, '/').split('/')
+    .map((p) => p.replace(/[:*?"<>|\u0000-\u001f]/g, '').trim())
+    .filter((p) => p && p !== '.' && p !== '..').join('/').slice(0, 300);
+}
+
+/** Crea una subcarpeta (y las intermedias) dentro de la carpeta de plantillas. */
+export async function crearCarpetaPlantillas(organizacionId: string, ruta: string) {
+  const cfg = await configPlantillas(organizacionId);
+  if (!usaNube(cfg)) throw new Error('Primero conecta la carpeta de plantillas.');
+  await carpetaDestino(organizacionId, cfg, rutaCarpetaSegura(ruta), new Map());
+  olvidarListado(organizacionId);
+}
+
+/** Vuelve a guardar en la nube una plantilla editada desde Vantia.
+ *  Un .doc (o un Google Docs) se guarda como .docx al lado y el original va a
+ *  la papelera; devuelve la referencia con la que queda la plantilla. */
+export async function guardarPlantillaEditada(organizacionId: string, ref: string, docx: Buffer): Promise<string> {
+  const cfg = await configPlantillas(organizacionId);
+  if (!usaNube(cfg) || !ref.startsWith('nube:')) throw new Error('Solo se pueden editar las plantillas de vuestra carpeta.');
+  const p = (await listarPlantillasNube(organizacionId)).find((x) => x.ref === ref);
+  if (!p) throw new Error('Plantilla no encontrada.');
+  const id = ref.slice('nube:'.length);
+  let nuevoRef = ref;
+  if (cfg.proveedor === 'drive') {
+    const meta: any = await (await driveFetch(organizacionId, `/files/${encodeURIComponent(id)}?fields=mimeType,name,parents&supportsAllDrives=true`)).json().catch(() => ({}));
+    const esDocx = meta.mimeType === MIME_DOCX || (meta.mimeType !== GDOC && /\.docx$/i.test(meta.name || ''));
+    if (esDocx) {
+      const token = await getDriveAccessToken(organizacionId);
+      const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(id)}?uploadType=media&supportsAllDrives=true`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}`, 'Content-Type': MIME_DOCX }, body: docx,
+      });
+      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as any)?.error?.message || 'No se pudo guardar la plantilla en Google Drive.');
+    } else {
+      const padre = meta.parents?.[0];
+      if (!padre) throw new Error('No se encuentra la carpeta de la plantilla en Google Drive.');
+      const nombre = String(meta.name || p.nombre).replace(/\.docx?$/i, '') + '.docx';
+      const subido = await uploadFileToDrive(organizacionId, padre, nombre, docx, MIME_DOCX);
+      if (!subido?.id) throw new Error('No se pudo guardar la plantilla en Google Drive.');
+      // El original (.doc o Google Docs) a la papelera de Drive: se puede recuperar.
+      await driveFetch(organizacionId, `/files/${encodeURIComponent(id)}?supportsAllDrives=true`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }),
+      }).catch(() => undefined);
+      nuevoRef = `nube:${subido.id}`;
+    }
+  } else if (p.ext === '.docx') {
+    await updateDropboxFileContent(organizacionId, id, docx);
+  } else {
+    const meta = await dropboxRpc(organizacionId, '/files/get_metadata', { path: id });
+    const ruta = String(meta.path_display || '');
+    const carpeta = ruta.slice(0, ruta.lastIndexOf('/'));
+    const subido = await uploadFileToDropbox(organizacionId, carpeta, p.nombre.replace(/\.docx?$/i, '') + '.docx', docx, MIME_DOCX);
+    await deleteDropboxFile(organizacionId, id);
+    nuevoRef = `nube:${subido.id}`;
+  }
+  if (nuevoRef !== ref) {
+    // Los ajustes de variables de la plantilla siguen a la nueva.
+    await pool.query(`UPDATE plantillas_variables_plantilla SET plantilla = $3 WHERE organizacion_id = $1 AND plantilla = $2`, [organizacionId, ref, nuevoRef]);
+  }
+  olvidarListado(organizacionId);
+  return nuevoRef;
 }
 
 export async function proveedoresConectados(organizacionId: string) {

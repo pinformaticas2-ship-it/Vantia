@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Copy, ExternalLink, FileText, FolderOpen, Loader2, RefreshCw, Upload, AlertTriangle } from 'lucide-react';
-import { apiFetch, safeJson } from '../lib/api';
+import { CheckCircle2, Copy, ExternalLink, FileText, FolderOpen, Loader2, RefreshCw, AlertTriangle, KeyRound } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
 import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
 import ElegirCarpetaDrive from './ElegirCarpetaDrive';
+import ExploradorPlantillas from './ExploradorPlantillas';
 import { t } from '../lib/i18n';
 
 // ── Ajustes → Mi Despacho → Plantillas del despacho (15/10/2026) ────────────
@@ -25,13 +26,14 @@ interface Config {
   carpetaNombre: string | null;
   sePuedeSubir: boolean;
   driveLectura: boolean;
+  driveEscritura?: boolean;
 }
 
 export default function PlantillasNubeConfig() {
   const { getToken } = useAuth();
   const [cfg, setCfg] = useState<Config | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [version, setVersion] = useState(0);
   const [eligiendo, setEligiendo] = useState(false);
 
   // Elegir una carpeta cualquiera del Drive: si aún no hay permiso de
@@ -82,22 +84,17 @@ export default function PlantillasNubeConfig() {
     finally { setOcupado(null); }
   };
 
-  const subir = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setOcupado('subir');
-    try {
-      const token = await getToken({ skipCache: true });
-      const fd = new FormData();
-      for (const f of Array.from(files)) fd.append('files', f);
-      const res = await fetch('/api/plantillas/subir', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd });
-      const d = await safeJson(res);
-      if (!res.ok || d?.success === false) throw new Error(d?.error || t("No se pudo subir."));
-      const { subidas = [], rechazadas = [] } = d.data || {};
-      if (subidas.length) aviso.ok(t("{length} plantilla{v} subida{v2}", { length: subidas.length, v: subidas.length === 1 ? '' : 's', v2: subidas.length === 1 ? '' : 's' }));
-      if (rechazadas.length) aviso.error(t("Solo se admiten archivos de Word (.doc, .docx): {join}", { join: rechazadas.join(', ') }));
-      await cargar();
-    } catch (e: any) { aviso.error(e?.message || t("No se pudo subir.")); }
-    finally { setOcupado(null); if (inputRef.current) inputRef.current.value = ''; }
+  // Subir y editar en una carpeta elegida del Drive: Google pide el permiso
+  // completo de Drive (solo propietario/admin, una vez).
+  const pedirEscritura = () => {
+    if (!cfg?.canManage) return;
+    startGoogleDriveConnect({
+      getToken,
+      escritura: true,
+      onBusy: (b) => setOcupado(b ? 'escritura' : null),
+      onError: (m) => { setOcupado(null); aviso.error(m); },
+      onConnected: async () => { setOcupado(null); aviso.ok(t("Listo: ya se puede subir y editar en esa carpeta")); await cargar(); setVersion((v) => v + 1); },
+    });
   };
 
   if (!cfg) return null;
@@ -160,12 +157,13 @@ export default function PlantillasNubeConfig() {
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
                 {ocupado === 'permiso' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Cambiar carpeta")}</button>
             )}
+            {cfg.canManage && !cfg.sePuedeSubir && cfg.origen === 'drive' && (
+              <button type="button" disabled={!!ocupado} onClick={pedirEscritura}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60">
+                {ocupado === 'escritura' ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}{" "}{t("Permitir subir y editar aquí")}</button>
+            )}
             {cfg.canManage && cfg.sePuedeSubir && (
               <>
-                <input ref={inputRef} type="file" multiple accept=".doc,.docx" className="hidden" onChange={(e) => void subir(e.target.files)} />
-                <button type="button" disabled={!!ocupado} onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                  {ocupado === 'subir' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}{" "}{t("Subir plantillas")}</button>
                 {cfg.hayIntegradas && imp?.estado !== 'importando' && (
                   <button type="button" disabled={!!ocupado} onClick={async () => {
                     if (!(await confirmar({ titulo: t("Copiar las plantillas integradas a vuestra carpeta"), mensaje: t("Se copiarán a la carpeta Plantillas de {nubeNombre} (unas 580, con sus subcarpetas). Las que ya estén no se repiten. Tarda unos minutos; puedes seguir trabajando.", { nubeNombre: nubeNombre }), confirmar: t("Copiar") }))) return;
@@ -176,7 +174,7 @@ export default function PlantillasNubeConfig() {
                 )}
               </>
             )}
-            <button type="button" onClick={() => void cargar()} title={t("Volver a leer la carpeta")} className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
+            <button type="button" onClick={() => { void cargar(); setVersion((v) => v + 1); }} title={t("Volver a leer la carpeta")} className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50">
               <RefreshCw size={14} />
             </button>
           </div>
@@ -208,6 +206,16 @@ export default function PlantillasNubeConfig() {
               void accion('desconectar', '/api/plantillas/desconectar', {}, t('Se vuelven a usar las plantillas integradas'));
             }} className="text-xs font-semibold text-slate-500 hover:text-slate-800">{t("Dejar de usar esta carpeta")}</button>
           )}
+        </div>
+      )}
+      {cfg.canManage && (enNube || cfg.hayIntegradas) && (
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("Carpetas y plantillas")}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{enNube
+            ? t("Sube archivos o carpetas enteras a vuestro {nube}. Con «Variables» marcas en el texto dónde va cada dato y eliges con qué se rellena.", { nube: nubeNombre })
+            : t("Con «Variables» eliges con qué se rellena cada dato de una plantilla. Para subir las vuestras o cambiar dónde van las variables, conecta una carpeta de vuestra nube.")}</p>
+          <ExploradorPlantillas key={`${cfg.origen}-${version}`} puedeSubir={cfg.sePuedeSubir}
+            onPedirPermiso={cfg.origen === 'drive' ? pedirEscritura : undefined} onCambio={() => void cargar()} />
         </div>
       )}
       {eligiendo && <ElegirCarpetaDrive onElegir={usarCarpeta} onCerrar={() => setEligiendo(false)} />}

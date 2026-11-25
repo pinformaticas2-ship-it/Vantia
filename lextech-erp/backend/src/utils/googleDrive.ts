@@ -38,6 +38,13 @@ export async function driveTieneLectura(organizacionId: string): Promise<boolean
   return /auth\/drive\.readonly\b|auth\/drive(\s|$)/.test(s);
 }
 
+/** ¿Puede Vantia escribir en todo el Drive? Hace falta para subir o editar
+ *  plantillas en una carpeta elegida del Drive (no creada por Vantia). */
+export async function driveTieneEscritura(organizacionId: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT google_drive_scopes FROM organizaciones WHERE id = $1`, [organizacionId]).catch(() => ({ rows: [] as any[] }));
+  return /auth\/drive(\s|$)/.test(String(rows[0]?.google_drive_scopes || ''));
+}
+
 async function googleTokenRequest(params: Record<string, string>): Promise<GoogleTokenResponse> {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

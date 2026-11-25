@@ -404,7 +404,8 @@ export async function guardarValores(organizacionId: string, expedienteId: strin
 //   · crear variables propias («Despacho_Horario»...): con valor fijo, o que se
 //     rellenan en cada expediente (pestaña "Datos para documentos").
 
-export type ModoVariable = 'auto' | 'fijo' | 'expediente';
+// 'dato' (solo por plantilla): se rellena con otra variable (valor = su nombre).
+export type ModoVariable = 'auto' | 'fijo' | 'expediente' | 'dato';
 export interface VariableConfig {
   clave: string; nombre: string; etiqueta: string | null;
   propia: boolean; activa: boolean; modo: ModoVariable; valor: string | null;
@@ -423,7 +424,7 @@ export async function configVariables(organizacionId: string): Promise<Map<strin
 // En la revisión de un documento, el despacho puede decir que en ESA plantilla
 // una variable va desactivada ('off'), con un valor propio ('fijo'), o activa
 // aunque en general esté desactivada ('on'). Manda sobre lo general.
-export type EstadoEnPlantilla = 'on' | 'off' | 'fijo';
+export type EstadoEnPlantilla = 'on' | 'off' | 'fijo' | 'dato';
 export interface AjustePlantilla { estado: EstadoEnPlantilla; valor: string | null }
 
 /** La referencia de una plantilla tal y como se guarda ("nube:<id>" o la ruta con "/"). */
@@ -447,21 +448,27 @@ export async function configParaPlantilla(organizacionId: string, plantilla?: st
       || { clave, nombre: a.nombre, etiqueta: null, propia: false, activa: true, modo: 'auto', valor: null };
     if (a.estado === 'off') config.set(clave, { ...base, activa: false });
     else if (a.estado === 'fijo') config.set(clave, { ...base, activa: true, modo: 'fijo', valor: a.valor ?? '' });
+    else if (a.estado === 'dato') config.set(clave, { ...base, activa: true, modo: 'dato', valor: a.valor ?? '' });
     else config.set(clave, { ...base, activa: true });
   }
   return config;
 }
 
-export type OrigenValor ='enviado' | 'fijo' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
+export type OrigenValor = 'enviado' | 'fijo' | 'dato' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
 
 /** El valor con el que sale una variable en un documento, y de dónde viene.
  *  Orden: lo escrito al generar > desactivada > valor fijo del despacho >
  *  lo guardado a mano (salvo datos de Mi Despacho, que mandan) > Vantia. */
 export function resolverValor(
-  nombre: string, ctx: Contexto, guardados: Map<string, string>, config: Map<string, VariableConfig>, enviado?: string,
+  nombre: string, ctx: Contexto, guardados: Map<string, string>, config: Map<string, VariableConfig>, enviado?: string, nivel = 0,
 ): { valor: string | undefined; origen: OrigenValor; deVantia: string | undefined } {
   const clave = claveCanonica(nombre);
   const cfg = config.get(clave);
+  // Se rellena con otro dato: el valor de esa otra variable (un solo salto).
+  if (enviado === undefined && cfg?.activa && cfg.modo === 'dato' && cfg.valor && nivel === 0 && claveCanonica(cfg.valor) !== clave) {
+    const r = resolverValor(cfg.valor, ctx, guardados, config, undefined, 1);
+    return { valor: r.valor, origen: r.valor ? 'dato' : 'vacio', deVantia: r.valor };
+  }
   const deVantia = cfg && (!cfg.activa || cfg.propia) ? undefined : valorVantia(nombre, ctx);
   if (enviado !== undefined) return { valor: enviado, origen: 'enviado', deVantia };
   if (cfg && !cfg.activa) return { valor: undefined, origen: 'desactivada', deVantia };

@@ -187,3 +187,64 @@ test('por plantilla: desactivada, valor propio o activa solo en esa plantilla', 
   await put({ plantilla: A, nombre: 'Juzgados_Núm_Autos', estado: 'general' });
   assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), await d.configParaPlantilla(org, A)).valor, '123/2026');
 });
+
+test('por plantilla: una variable se rellena con otro dato de Vantia', { skip }, async () => {
+  const d = await import('../src/services/plantillasDatos');
+  const ctx = await d.contextoPlantilla(org, exp);
+  const put = (body: any) => call('put', '/variables-plantilla', 'pv_jefa', { body });
+  const P = 'nube:con-dato';
+  // «Nombre_Deudor» no la conoce Vantia: en esta plantilla, que salga el nombre del cliente.
+  assert.equal((await put({ plantilla: P, nombre: 'Nombre_Deudor', estado: 'dato', valor: 'Nombre_Deudor' })).status, 400, 'no consigo misma');
+  assert.equal((await put({ plantilla: P, nombre: 'Nombre_Deudor', estado: 'dato', valor: '' })).status, 400);
+  assert.equal((await put({ plantilla: P, nombre: 'Nombre_Deudor', estado: 'dato', valor: 'Clientes_Nombre' })).status, 200);
+  const r = d.resolverValor('Nombre_Deudor', ctx, new Map(), await d.configParaPlantilla(org, P));
+  assert.deepEqual([r.valor, r.origen], ['Ana Cliente', 'dato']);
+  // Lo escrito al generar sigue mandando; en otra plantilla no cambia nada.
+  assert.equal(d.resolverValor('Nombre_Deudor', ctx, new Map(), await d.configParaPlantilla(org, P), 'A mano').valor, 'A mano');
+  assert.equal(d.resolverValor('Nombre_Deudor', ctx, new Map(), await d.configParaPlantilla(org, 'nube:otra')).origen, 'vacio');
+});
+
+test('editor: convertir texto en variable (una vez o todas) y quitarla', { skip }, async () => {
+  const { reemplazarTextoPlantilla, parrafosDePlantilla, camposDePlantilla, esNombreMarcador } = await import('../src/services/plantillasWord');
+  const AdmZip = (await import('adm-zip')).default;
+  const z = new AdmZip();
+  // "Ana Cliente" partido en dos trozos con formato distinto, y repetido.
+  z.addFile('word/document.xml', Buffer.from('<w:document><w:body>'
+    + '<w:p><w:r><w:t>Don/Doña </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>Ana </w:t></w:r><w:r><w:t>Cliente, mayor de edad &amp; vecina.</w:t></w:r></w:p>'
+    + '<w:p><w:r><w:t>Firma: Ana Cliente</w:t></w:r></w:p>'
+    + '<w:p><w:r><w:t>Ref. «Expediente_Ref» de Ana Cliente</w:t></w:r></w:p>'
+    + '</w:body></w:document>'));
+  z.addFile('word/footer1.xml', Buffer.from('<w:ftr><w:p><w:r><w:t>Pie de Ana Cliente</w:t></w:r></w:p></w:ftr>'));
+  const docx = z.toBuffer();
+  const ps = parrafosDePlantilla(docx);
+  assert.deepEqual(ps.map((p) => p.texto), ['Don/Doña Ana Cliente, mayor de edad & vecina.', 'Firma: Ana Cliente', 'Ref. «Expediente_Ref» de Ana Cliente', 'Pie de Ana Cliente']);
+  assert.equal(ps[3].parte, 'word/footer1.xml', 'los pies van después del cuerpo');
+
+  // Solo la selección
+  const uno = reemplazarTextoPlantilla(docx, { parte: 'word/document.xml', parrafo: 0, desde: 9, hasta: 20, esperado: 'Ana Cliente', nuevo: '«Clientes_Nombre»' });
+  assert.equal(uno.cambios, 1);
+  assert.deepEqual(parrafosDePlantilla(uno.docx).map((p) => p.texto).slice(0, 2), ['Don/Doña «Clientes_Nombre», mayor de edad & vecina.', 'Firma: Ana Cliente']);
+  assert.match(new AdmZip(uno.docx).readAsText('word/document.xml'), /&amp; vecina/, 'el resto sigue escapado');
+  // Todas las veces (también en el pie)
+  const todas = reemplazarTextoPlantilla(docx, { parte: 'word/document.xml', parrafo: 0, desde: 9, hasta: 20, esperado: 'Ana Cliente', nuevo: '«Clientes_Nombre»', todas: true });
+  assert.equal(todas.cambios, 4);
+  assert.deepEqual(camposDePlantilla(todas.docx).sort(), ['Clientes_Nombre', 'Expediente_Ref']);
+  // Si el texto ya no es el que se vio, no se toca nada.
+  assert.throws(() => reemplazarTextoPlantilla(docx, { parte: 'word/document.xml', parrafo: 1, desde: 0, hasta: 5, esperado: 'Otra!', nuevo: '«A_B»' }), /ha cambiado/);
+  assert.throws(() => reemplazarTextoPlantilla(docx, { parte: '../evil.xml', parrafo: 0, desde: 0, hasta: 1, esperado: 'D', nuevo: 'x' }), /no válida/);
+  // Quitar una variable y dejar texto
+  const p2 = parrafosDePlantilla(uno.docx)[0];
+  const ini = p2.texto.indexOf('«Clientes_Nombre»');
+  const quitada = reemplazarTextoPlantilla(uno.docx, { parte: p2.parte, parrafo: p2.i, desde: ini, hasta: ini + '«Clientes_Nombre»'.length, esperado: '«Clientes_Nombre»', nuevo: 'Pepe' });
+  assert.equal(parrafosDePlantilla(quitada.docx)[0].texto, 'Don/Doña Pepe, mayor de edad & vecina.');
+  assert.equal(esNombreMarcador('Clientes_Nombre'), true);
+  assert.equal(esNombreMarcador('Sin guion'), false);
+});
+
+test('editor: las plantillas integradas no se editan (son de todos los despachos)', { skip }, async () => {
+  const r = await call('post', '/editor/texto', 'pv_jefa', { body: { path: 'Encargos/Hoja.docx', accion: 'marcar', nombre: 'A_B', esperado: 'x' } });
+  assert.equal(r.status, 400);
+  assert.match(r.body.error, /comunes a todos los despachos/);
+  assert.equal((await call('post', '/editor/texto', 'pv_miembro', { body: { path: 'nube:x' } })).status, 403);
+  assert.equal((await call('get', '/lista', 'pv_miembro')).status, 403);
+});

@@ -18,7 +18,7 @@ interface Campo {
   etiqueta: string;
   grupo: string;
   valor: string;
-  origen: 'vantia' | 'guardado' | 'vacio' | 'fijo' | 'desactivada';
+  origen: 'vantia' | 'guardado' | 'vacio' | 'fijo' | 'desactivada' | 'dato';
   conoceVantia: boolean;
   deDespacho: boolean;
   /** El logo: una imagen que sale de Ajustes → Mi Despacho (no se escribe). */
@@ -32,7 +32,8 @@ interface Campo {
 
 // "Ajustar esta plantilla" (25/11/2026): lo que se elige vale solo para esta
 // plantilla, en todos los expedientes, y manda sobre Ajustes → Variables de documentos.
-type EstadoAjuste = 'on' | 'off' | 'fijo';
+// 'dato' (con otro dato de Vantia) se elige en Ajustes → Plantillas del despacho → Variables.
+type EstadoAjuste = 'on' | 'off' | 'fijo' | 'dato';
 const AJUSTES: [EstadoAjuste | 'general', string][] = [
   ['general', 'Como en general'],
   ['off', 'Desactivada en esta plantilla'],
@@ -47,7 +48,8 @@ const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
   // Ajustes → Mi Despacho → Variables de documentos
   fijo: { label: 'Valor fijo', cls: 'bg-violet-50 text-violet-700 border-violet-200' },
   desactivada: { label: 'Desactivada', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-};
+  dato: { label: 'De Vantia', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+}
 
 export default function RellenarPlantilla({ path, nombre, expedienteId, clienteId, onVolver, onGenerado, generar: generarFuera, textoBoton = 'Generar documento' }: {
   path: string;
@@ -220,7 +222,7 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                     <div className="min-w-0 pt-1.5">
                       <p className="text-xs font-medium text-slate-700 break-words" title={`«${c.nombre}»`}>{c.etiqueta}</p>
                       <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-semibold ${o.cls}`}>
-                        {origen === 'vantia' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{t(o.label)}
+                        {origen === 'vantia' || origen === 'dato' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{t(o.label)}
                       </span>
                       {c.enPlantilla && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-600" title={t("Ajustada solo en esta plantilla")}><SlidersHorizontal size={9} />{" "}{t("esta plantilla")}</span>}
                       {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title={t("Lo que escribas aquí se recuerda para todo el despacho")}><Building2 size={9} />{" "}{t("despacho")}</span>}
@@ -289,6 +291,7 @@ function AjusteCampo({ c, guardando, onCambiar }: {
         <select value={estado} disabled={guardando}
           onChange={(e) => { const v = e.target.value as EstadoAjuste | 'general'; setEstado(v); if (v !== 'fijo') onCambiar(v); }}
           className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-800 outline-none focus:border-red-300">
+          {actual === 'dato' && <option value="dato" disabled>{t("Con otro dato (se cambia en Ajustes → Plantillas)")}</option>}
           {AJUSTES.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}
         </select>
         {guardando && <Loader2 size={14} className="shrink-0 animate-spin text-slate-400" />}

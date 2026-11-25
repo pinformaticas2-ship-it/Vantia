@@ -291,3 +291,103 @@ export async function leerComoDocx(ruta: string): Promise<Buffer> {
   fs.promises.rm(trabajo, { recursive: true, force: true }).catch(() => {});
   throw new Error(`No se pudo convertir la plantilla .doc a .docx (LibreOffice: ${ultimoError?.code || ultimoError?.message || 'no disponible'}).`);
 }
+
+// ── Editor de plantillas (Ajustes → Plantillas del despacho, 25/11/2026) ─────
+// El despacho ve el texto de una plantilla, selecciona un trozo y lo convierte
+// en una variable «Grupo_Campo» (o al revés: quita una variable y deja texto).
+
+export interface ParrafoPlantilla { parte: string; i: number; texto: string }
+
+const ORDEN_PARTE = (p: string) => (p === 'word/document.xml' ? 0 : /header/.test(p) ? 1 : 2);
+
+/** El texto de cada párrafo (cuerpo, luego encabezados y pies), sin los vacíos. */
+export function parrafosDePlantilla(docx: Buffer): ParrafoPlantilla[] {
+  const zip = new AdmZip(docx);
+  const partes = zip.getEntries().filter((e) => PARTES.test(e.entryName))
+    .sort((a, b) => ORDEN_PARTE(a.entryName) - ORDEN_PARTE(b.entryName) || a.entryName.localeCompare(b.entryName));
+  const out: ParrafoPlantilla[] = [];
+  for (const e of partes) {
+    nodosPorParrafo(e.getData().toString('utf-8')).forEach((g, i) => {
+      const texto = g.map((n) => n.texto).join('');
+      if (texto.trim()) out.push({ parte: e.entryName, i, texto });
+    });
+  }
+  return out;
+}
+
+/** ¿Es un nombre de variable que las plantillas reconocen? («Grupo_Campo») */
+export const esNombreMarcador = (nombre: string) => new RegExp(`^${RE_MARCADOR.source}$`).test(`«${nombre}»`);
+
+/** Cambia los trozos [desde, hasta) del texto de un párrafo por otro texto,
+ *  tocando solo los nodos <w:t> afectados (el formato del primero se queda). */
+function reemplazarEnParrafo(xml: string, grupo: NodoTexto[], rangos: { desde: number; hasta: number; nuevo: string }[]): string {
+  const textos = grupo.map((n) => n.texto);
+  const desdeN: number[] = []; let acc = 0;
+  for (const t of textos) { desdeN.push(acc); acc += t.length; }
+  const nuevos = [...textos];
+  for (const r of [...rangos].sort((a, b) => b.desde - a.desde)) {
+    const na = desdeN.findIndex((d, k) => r.desde >= d && r.desde < d + textos[k].length);
+    const nb = desdeN.findIndex((d, k) => r.hasta - 1 >= d && r.hasta - 1 < d + textos[k].length);
+    if (na < 0 || nb < 0) continue;
+    if (na === nb) {
+      nuevos[na] = nuevos[na].slice(0, r.desde - desdeN[na]) + r.nuevo + nuevos[na].slice(r.hasta - desdeN[na]);
+    } else {
+      nuevos[na] = nuevos[na].slice(0, r.desde - desdeN[na]) + r.nuevo;
+      for (let k = na + 1; k < nb; k++) nuevos[k] = '';
+      nuevos[nb] = nuevos[nb].slice(r.hasta - desdeN[nb]);
+    }
+  }
+  const cambios = grupo.map((n, k) => ({ n, k })).filter(({ k }) => nuevos[k] !== textos[k]);
+  for (const { n, k } of cambios.reverse()) {
+    xml = xml.slice(0, n.ini) + `<w:t xml:space="preserve">${escapar(nuevos[k])}</w:t>` + xml.slice(n.fin);
+  }
+  return xml;
+}
+
+/**
+ * Sustituye un trozo de texto de la plantilla. Con `todas`, también las demás
+ * veces que aparece ese mismo texto (entero dentro de un párrafo).
+ * Si el texto del párrafo ya no es el que se vio, falla (alguien lo cambió).
+ */
+export function reemplazarTextoPlantilla(docx: Buffer, op: {
+  parte: string; parrafo: number; desde: number; hasta: number; esperado: string; nuevo: string; todas?: boolean;
+}): { docx: Buffer; cambios: number } {
+  if (!PARTES.test(op.parte)) throw new Error('Parte del documento no válida.');
+  if (!op.esperado || op.hasta <= op.desde) throw new Error('Selecciona un texto.');
+  const zip = new AdmZip(docx);
+  let cambios = 0;
+  const entradas = op.todas ? zip.getEntries().filter((e) => PARTES.test(e.entryName)) : [zip.getEntry(op.parte)].filter(Boolean) as AdmZip.IZipEntry[];
+  if (!entradas.length) throw new Error('Parte del documento no encontrada.');
+  // El trozo elegido tiene que seguir ahí, tal cual.
+  const grupos0 = nodosPorParrafo(zip.getEntry(op.parte)?.getData().toString('utf-8') || '');
+  const texto0 = grupos0[op.parrafo]?.map((n) => n.texto).join('') ?? '';
+  if (texto0.slice(op.desde, op.hasta) !== op.esperado) throw new Error('La plantilla ha cambiado mientras la editabas. Vuelve a abrirla.');
+  for (const e of entradas) {
+    let xml = e.getData().toString('utf-8');
+    const grupos = nodosPorParrafo(xml);
+    let aqui = 0;
+    // De atrás hacia delante: cada edición no mueve las posiciones de las anteriores.
+    for (let gi = grupos.length - 1; gi >= 0; gi--) {
+      const texto = grupos[gi].map((n) => n.texto).join('');
+      const rangos: { desde: number; hasta: number; nuevo: string }[] = [];
+      if (op.todas) {
+        let p = texto.indexOf(op.esperado);
+        while (p >= 0) {
+          // No se toca lo que ya está dentro de otra variable «...».
+          const antes = texto.slice(0, p);
+          const dentro = antes.lastIndexOf('«') > antes.lastIndexOf('»');
+          if (!dentro) rangos.push({ desde: p, hasta: p + op.esperado.length, nuevo: op.nuevo });
+          p = texto.indexOf(op.esperado, p + op.esperado.length);
+        }
+      } else if (e.entryName === op.parte && gi === op.parrafo) {
+        rangos.push({ desde: op.desde, hasta: op.hasta, nuevo: op.nuevo });
+      }
+      if (!rangos.length) continue;
+      xml = reemplazarEnParrafo(xml, grupos[gi], rangos);
+      aqui += rangos.length;
+    }
+    cambios += aqui;
+    if (aqui) zip.updateFile(e.entryName, Buffer.from(xml, 'utf-8'));
+  }
+  return { docx: zip.toBuffer(), cambios };
+}

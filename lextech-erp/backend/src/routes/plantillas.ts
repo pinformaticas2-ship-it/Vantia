@@ -7,7 +7,9 @@ import { logActivityForReq } from '../controllers/activityController';
 import {
   configPlantillas, usaNube, listarPlantillasNube, conectarCarpeta, desconectarCarpeta,
   subirPlantilla, importarIntegradas, proveedoresConectados, olvidarListado, carpetasDrive, elegirCarpetaDrive,
+  puedeEscribir, rutaCarpetaSegura, crearCarpetaPlantillas, guardarPlantillaEditada,
 } from '../services/plantillasNube';
+import { driveTieneEscritura } from '../utils/googleDrive';
 import { driveTieneLectura } from '../utils/googleDrive';
 import pool from '../config/database';
 import { requireModulePermission } from '../middleware/requireModulePermission';
@@ -15,16 +17,18 @@ import { CATALOGO_CAMPOS_MN } from '../data/catalogoCamposMN';
 import { CATALOGO_MACROS_BASICAS } from '../data/catalogoMacrosBasicas';
 import {
   guardarValores, etiquetaDe, configVariables, vantiaLaConoce, nombreVariablePropia, contextoPlantilla,
-  valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso, refPlantilla,
+  valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso, refPlantilla, ajustesDePlantilla,
 } from '../services/plantillasDatos';
-import { claveCanonica } from '../services/plantillasWord';
+import { claveCanonica, esNombreMarcador, leerComoDocx, parrafosDePlantilla, camposDePlantilla, reemplazarTextoPlantilla } from '../services/plantillasWord';
+import { rutaPlantillaOrg, nombrePlantillaOrg } from '../controllers/filesController';
+import path from 'path';
 
 // Ajustes → Mi Despacho → Plantillas (ver services/plantillasNube).
 const router = Router();
 const esGestor = (req: any) => ['propietario', 'admin'].includes(req.organizacionRol);
 const soloGestor = (req: any, res: Response, next: any) =>
   esGestor(req) ? next() : res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
-const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 50 } });
+const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024, files: 50, fields: 120 } });
 
 router.get('/config', requireAuth, async (req: any, res: Response) => {
   try {
@@ -43,7 +47,11 @@ router.get('/config', requireAuth, async (req: any, res: Response) => {
         carpetaUrl: cfg.proveedor === 'drive' && cfg.carpetaId ? `https://drive.google.com/drive/folders/${cfg.carpetaId}` : null,
         carpetaNombre: cfg.carpetaNombre || null,
         // En una carpeta elegida del Drive (no creada por Vantia) no se puede subir desde aquí.
-        sePuedeSubir: usaNube(cfg) && (cfg.proveedor === 'dropbox' || cfg.carpetaPropia !== false),
+        // Subir/editar: en Dropbox y en la carpeta creada por Vantia siempre; en una
+        // carpeta elegida del Drive, con el permiso completo de Drive.
+        sePuedeSubir: await puedeEscribir(req.organizacionId, cfg),
+        driveEscritura: conectados.drive ? await driveTieneEscritura(req.organizacionId) : false,
+        carpetaPropia: cfg.carpetaPropia !== false,
         driveLectura: conectados.drive ? await driveTieneLectura(req.organizacionId) : false,
         carpetaTexto: cfg.proveedor === 'dropbox' ? 'Dropbox › Aplicaciones › (Vantia) › Plantillas' : null,
         total, error, conectados,
@@ -100,13 +108,18 @@ router.post('/desconectar', requireAuth, soloGestor, async (req: any, res: Respo
 // Subir plantillas (.doc / .docx) a la carpeta, opcionalmente a una subcarpeta.
 router.post('/subir', requireAuth, soloGestor, subida.array('files', 50), async (req: any, res: Response) => {
   const files = (req.files || []) as Express.Multer.File[];
-  const carpeta = String(req.body?.carpeta || '').replace(/[\\:*?"<>|]/g, '').slice(0, 200);
+  if (!(await puedeEscribir(req.organizacionId))) return res.status(403).json({ success: false, error: 'Vantia no tiene permiso para escribir en esa carpeta de Google Drive.', code: 'SIN_ESCRITURA' });
+  const carpeta = rutaCarpetaSegura(req.body?.carpeta || '');
+  // Al subir una carpeta, cada archivo trae su ruta relativa ("Encargos/Civil").
+  const rutas: string[] = ([] as string[]).concat(req.body?.rutas ?? []);
+  const cacheDrive = new Map<string, string>();
   const subidas: string[] = [];
   const rechazadas: string[] = [];
-  for (const f of files) {
-    const nombre = Buffer.from(f.originalname, 'latin1').toString('utf8');
-    if (!/\.docx?$/i.test(nombre)) { rechazadas.push(nombre); continue; }
-    try { await subirPlantilla(req.organizacionId, nombre, f.buffer, carpeta); subidas.push(nombre); }
+  for (const [i, f] of files.entries()) {
+    const nombre = Buffer.from(f.originalname, 'latin1').toString('utf8').split(/[\\/]/).pop() || '';
+    if (!/\.docx?$/i.test(nombre) || nombre.startsWith('~$')) { rechazadas.push(nombre); continue; }
+    const destino = rutaCarpetaSegura([carpeta, rutas[i] || ''].filter(Boolean).join('/'));
+    try { await subirPlantilla(req.organizacionId, nombre, f.buffer, destino, cacheDrive); subidas.push(destino ? `${destino}/${nombre}` : nombre); }
     catch (e: any) { return res.status(400).json({ success: false, error: e?.message || 'No se pudo subir.', subidas }); }
   }
   olvidarListado(req.organizacionId);
@@ -336,8 +349,13 @@ router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res
     const plantilla = refPlantilla(b.plantilla);
     const nombre = String(b.nombre || '').trim().slice(0, 150);
     const clave = claveCanonica(nombre);
-    const estado = ['general', 'on', 'off', 'fijo'].includes(b.estado) ? b.estado : null;
+    const estado = ['general', 'on', 'off', 'fijo', 'dato'].includes(b.estado) ? b.estado : null;
     if (!plantilla || !clave || !estado) return res.status(400).json({ success: false, error: 'Variable no válida.' });
+    // 'dato': se rellena con otra variable (la que se elige en el editor).
+    const origenDato = estado === 'dato' ? String(b.valor || '').trim().slice(0, 150) : '';
+    if (estado === 'dato' && (!esNombreMarcador(origenDato) || claveCanonica(origenDato) === clave)) {
+      return res.status(400).json({ success: false, error: 'Elige con qué dato se rellena.' });
+    }
     if (estado === 'general') {
       await pool.query(`DELETE FROM plantillas_variables_plantilla WHERE organizacion_id = $1 AND plantilla = $2 AND clave = $3`, [req.organizacionId, plantilla, clave]);
     } else {
@@ -346,14 +364,153 @@ router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (organizacion_id, plantilla, clave) DO UPDATE SET estado = EXCLUDED.estado, valor = EXCLUDED.valor,
            updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [req.organizacionId, plantilla, clave, nombre, estado, estado === 'fijo' ? textoValor(b.valor) : null, req.auth?.userId || ''],
+        [req.organizacionId, plantilla, clave, nombre, estado, estado === 'fijo' ? textoValor(b.valor) : estado === 'dato' ? origenDato : null, req.auth?.userId || ''],
       );
     }
-    const que = estado === 'general' ? 'como en general' : estado === 'off' ? 'desactivada' : estado === 'on' ? 'activada' : 'con valor propio';
+    const que = estado === 'general' ? 'como en general' : estado === 'off' ? 'desactivada' : estado === 'on' ? 'activada' : estado === 'dato' ? `rellenada con «${origenDato}»` : 'con valor propio';
     logActivityForReq(req, `Plantilla «${plantilla.split('/').pop()}»: variable «${nombre}» ${que}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'No se pudo guardar la variable.' });
+  }
+});
+
+// ── Explorador y editor de plantillas (Ajustes → Plantillas del despacho) ────
+
+/** Todas las plantillas del despacho, con su carpeta (para el explorador). */
+router.get('/lista', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const cfg = await configPlantillas(req.organizacionId);
+    if (usaNube(cfg)) {
+      const lista = await listarPlantillasNube(req.organizacionId, req.query.refrescar === '1');
+      return res.json({ success: true, data: { origen: cfg.proveedor, plantillas: lista.map((p) => ({ ref: p.ref, nombre: p.nombre, carpeta: p.carpeta, ext: p.ext })) } });
+    }
+    const { root } = getDocPlantRoot();
+    const plantillas: { ref: string; nombre: string; carpeta: string; ext: string }[] = [];
+    (function recorrer(dir: string, rel: string) {
+      if (!fs.existsSync(dir)) return;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const r = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) recorrer(path.join(dir, e.name), r);
+        else if (/\.docx?$/i.test(e.name) && !e.name.startsWith('~$')) plantillas.push({ ref: r, nombre: e.name, carpeta: rel, ext: path.extname(e.name).toLowerCase() });
+      }
+    })(root, '');
+    res.json({ success: true, data: { origen: 'integradas', plantillas } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudieron leer las plantillas.' });
+  }
+});
+
+router.post('/carpeta', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const ruta = rutaCarpetaSegura(req.body?.ruta || '');
+    if (!ruta) return res.status(400).json({ success: false, error: 'Escribe el nombre de la carpeta.' });
+    if (!(await puedeEscribir(req.organizacionId))) return res.status(403).json({ success: false, error: 'Vantia no tiene permiso para escribir en esa carpeta de Google Drive.', code: 'SIN_ESCRITURA' });
+    await crearCarpetaPlantillas(req.organizacionId, ruta);
+    logActivityForReq(req, `Plantillas: carpeta «${ruta}» creada`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(400).json({ success: false, error: e?.message || 'No se pudo crear la carpeta.' });
+  }
+});
+
+/** Lo que muestra el editor: el texto, las variables y cómo se rellena cada una. */
+async function datosEditor(req: any, ref: string) {
+  const ruta = await rutaPlantillaOrg(req.organizacionId, ref);
+  if (!ruta) return null;
+  const docx = await leerComoDocx(ruta);
+  const nombres = camposDePlantilla(docx);
+  const config = await configVariables(req.organizacionId);
+  const ajustes = await ajustesDePlantilla(req.organizacionId, ref);
+  const nube = ref.startsWith('nube:');
+  const escribir = nube && (await puedeEscribir(req.organizacionId));
+  return {
+    ref,
+    nombre: await nombrePlantillaOrg(req.organizacionId, ref),
+    ext: path.extname(ruta).toLowerCase(),
+    editable: escribir,
+    motivo: escribir ? null : nube ? 'sin_permiso' : 'integrada',
+    parrafos: parrafosDePlantilla(docx),
+    campos: nombres.map((nombre) => {
+      const clave = claveCanonica(nombre);
+      const cfg = config.get(clave);
+      const a = ajustes.get(clave);
+      return {
+        nombre, clave,
+        etiqueta: cfg?.etiqueta || etiquetaDe(nombre),
+        grupo: cfg?.propia ? 'Variables del despacho' : grupoDe(clave).grupo,
+        conoceVantia: esCampoLogo(nombre) || (!cfg?.propia && vantiaLaConoce(nombre)),
+        imagen: esCampoLogo(nombre),
+        general: cfg ? { activa: cfg.activa, modo: cfg.modo, valor: cfg.valor ?? '', propia: cfg.propia } : null,
+        enPlantilla: a ? { estado: a.estado, valor: a.valor ?? '' } : null,
+      };
+    }),
+  };
+}
+
+router.get('/editor', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const d = await datosEditor(req, String(req.query.path || ''));
+    if (!d) return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
+    res.json({ success: true, data: d });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo abrir la plantilla.' });
+  }
+});
+
+// Una edición a la vez por plantilla (dos clics seguidos o dos personas):
+// cada una lee la versión que dejó la anterior.
+const colas = new Map<string, Promise<unknown>>();
+function enCola<T>(clave: string, fn: () => Promise<T>): Promise<T> {
+  const previa = colas.get(clave) || Promise.resolve();
+  const sig = previa.catch(() => undefined).then(fn);
+  colas.set(clave, sig);
+  sig.finally(() => { if (colas.get(clave) === sig) colas.delete(clave); }).catch(() => undefined);
+  return sig;
+}
+
+/** Convertir un trozo de texto en variable ('marcar') o una variable en texto ('quitar'). */
+router.post('/editor/texto', requireAuth, soloGestor, async (req: any, res: Response) => {
+  const b = req.body || {};
+  const ref = String(b.path || '');
+  if (!ref.startsWith('nube:')) {
+    return res.status(400).json({ success: false, error: 'Las plantillas integradas de Vantia son comunes a todos los despachos. Copiadlas a vuestra carpeta para poder editarlas.' });
+  }
+  try {
+    if (!(await puedeEscribir(req.organizacionId))) return res.status(403).json({ success: false, error: 'Vantia no tiene permiso para escribir en esa carpeta de Google Drive.', code: 'SIN_ESCRITURA' });
+    const esperado = String(b.esperado || '');
+    let nuevo: string;
+    if (b.accion === 'marcar') {
+      const nombre = nombreVariablePropia(String(b.nombre || ''));
+      if (!esNombreMarcador(nombre)) return res.status(400).json({ success: false, error: 'Nombre de variable no válido.' });
+      if (/[«»]/.test(esperado)) return res.status(400).json({ success: false, error: 'El texto elegido ya contiene una variable.' });
+      nuevo = `«${nombre}»`;
+    } else if (b.accion === 'quitar') {
+      if (!/^«[^«»]+»$/.test(esperado)) return res.status(400).json({ success: false, error: 'Eso no es una variable.' });
+      nuevo = String(b.texto ?? '').replace(/[«»]/g, '').slice(0, 2000);
+    } else {
+      return res.status(400).json({ success: false, error: 'Acción no válida.' });
+    }
+    const nuevoRef = await enCola(`${req.organizacionId}|${ref}`, async () => {
+      const ruta = await rutaPlantillaOrg(req.organizacionId, ref);
+      if (!ruta) throw Object.assign(new Error('Plantilla no encontrada.'), { status: 404 });
+      const docx = await leerComoDocx(ruta);
+      const r = reemplazarTextoPlantilla(docx, {
+        parte: String(b.parte || ''), parrafo: Number(b.parrafo), desde: Number(b.desde), hasta: Number(b.hasta),
+        esperado, nuevo, todas: !!b.todas,
+      });
+      if (!r.cambios) throw Object.assign(new Error('No se ha cambiado nada.'), { status: 400 });
+      return guardarPlantillaEditada(req.organizacionId, ref, r.docx);
+    });
+    const nombrePl = await nombrePlantillaOrg(req.organizacionId, nuevoRef);
+    logActivityForReq(req, b.accion === 'marcar'
+      ? `Plantilla «${nombrePl}»: «${esperado.slice(0, 80)}» pasa a ser la variable ${nuevo}`
+      : `Plantilla «${nombrePl}»: variable ${esperado} quitada`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    const d = await datosEditor(req, nuevoRef);
+    res.json({ success: true, data: d });
+  } catch (e: any) {
+    const status = e?.status || (/ha cambiado|Selecciona/.test(e?.message || '') ? 409 : 500);
+    res.status(status).json({ success: false, error: e?.message || 'No se pudo guardar la plantilla.' });
   }
 });
 

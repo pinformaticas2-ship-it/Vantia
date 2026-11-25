@@ -18,3 +18,4 @@ import './contextos';
 import './actividad';
 import './datosIniciales';
 import './variablesDocumentos';
+import './plantillasEditor';
