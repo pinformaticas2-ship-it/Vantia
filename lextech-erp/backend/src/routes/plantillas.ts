@@ -15,7 +15,7 @@ import { CATALOGO_CAMPOS_MN } from '../data/catalogoCamposMN';
 import { CATALOGO_MACROS_BASICAS } from '../data/catalogoMacrosBasicas';
 import {
   guardarValores, etiquetaDe, configVariables, vantiaLaConoce, nombreVariablePropia, contextoPlantilla,
-  valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso,
+  valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso, refPlantilla,
 } from '../services/plantillasDatos';
 import { claveCanonica } from '../services/plantillasWord';
 
@@ -207,6 +207,10 @@ router.get('/variables', requireAuth, async (req: any, res: Response) => {
       `SELECT clave, valor FROM plantillas_valores WHERE organizacion_id = $1 AND expediente_id IS NULL`, [req.organizacionId],
     );
     const escritoDespacho = new Map<string, string>(deDespacho.map((r: any) => [r.clave, r.valor]));
+    const { rows: porPlantilla } = await pool.query(
+      `SELECT clave, COUNT(*)::int AS n FROM plantillas_variables_plantilla WHERE organizacion_id = $1 GROUP BY clave`, [req.organizacionId],
+    );
+    const enPlantillas = new Map<string, number>(porPlantilla.map((r: any) => [r.clave, r.n]));
     const vistas = new Set<string>();
     const fila = (c: { grupo: string; etiqueta: string; nombre: string; clave: string }, tipo: 'basica' | 'expediente') => {
       vistas.add(c.clave);
@@ -218,6 +222,7 @@ router.get('/variables', requireAuth, async (req: any, res: Response) => {
         clave: c.clave, nombre: c.nombre, etiqueta: cfg?.etiqueta || c.etiqueta, grupo: c.grupo, tipo,
         automatica: vantiaLaConoce(c.nombre), despacho, imagen: esCampoLogo(c.nombre), actual,
         activa: cfg ? cfg.activa : true, modo: cfg?.modo || 'auto', valor: cfg?.valor ?? '',
+        enPlantillas: enPlantillas.get(c.clave) || 0,
       };
     };
     const lista = [
@@ -225,6 +230,7 @@ router.get('/variables', requireAuth, async (req: any, res: Response) => {
         clave: v.clave, nombre: v.nombre, etiqueta: v.etiqueta || etiquetaDe(v.nombre), grupo: 'Variables del despacho', tipo: 'propia',
         automatica: false, despacho: false, imagen: false, actual: null as string | null,
         activa: v.activa, modo: v.modo, valor: v.valor ?? '',
+        enPlantillas: enPlantillas.get(v.clave) || 0,
       })),
       ...CATALOGO_MACROS_BASICAS.map((c) => fila(c, 'basica')),
       ...CATALOGO_CAMPOS_MN.filter((c) => !CATALOGO_MACROS_BASICAS.some((b) => b.clave === c.clave))
@@ -319,6 +325,35 @@ router.delete('/variables/:clave', requireAuth, soloGestor, async (req: any, res
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'No se pudo borrar la variable.' });
+  }
+});
+
+/** Ajuste de una variable solo en una plantilla: 'general' (quitar el ajuste),
+ *  'off' (desactivada aquí), 'on' (activa aquí aunque en general no) o 'fijo'. */
+router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const b = req.body || {};
+    const plantilla = refPlantilla(b.plantilla);
+    const nombre = String(b.nombre || '').trim().slice(0, 150);
+    const clave = claveCanonica(nombre);
+    const estado = ['general', 'on', 'off', 'fijo'].includes(b.estado) ? b.estado : null;
+    if (!plantilla || !clave || !estado) return res.status(400).json({ success: false, error: 'Variable no válida.' });
+    if (estado === 'general') {
+      await pool.query(`DELETE FROM plantillas_variables_plantilla WHERE organizacion_id = $1 AND plantilla = $2 AND clave = $3`, [req.organizacionId, plantilla, clave]);
+    } else {
+      await pool.query(
+        `INSERT INTO plantillas_variables_plantilla (organizacion_id, plantilla, clave, nombre, estado, valor, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (organizacion_id, plantilla, clave) DO UPDATE SET estado = EXCLUDED.estado, valor = EXCLUDED.valor,
+           updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [req.organizacionId, plantilla, clave, nombre, estado, estado === 'fijo' ? textoValor(b.valor) : null, req.auth?.userId || ''],
+      );
+    }
+    const que = estado === 'general' ? 'como en general' : estado === 'off' ? 'desactivada' : estado === 'on' ? 'activada' : 'con valor propio';
+    logActivityForReq(req, `Plantilla «${plantilla.split('/').pop()}»: variable «${nombre}» ${que}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo guardar la variable.' });
   }
 });
 

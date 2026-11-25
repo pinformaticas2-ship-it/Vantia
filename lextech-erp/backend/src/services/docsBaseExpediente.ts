@@ -3,7 +3,7 @@ import pool from '../config/database';
 import { rutaPlantillaOrg, nombrePlantillaOrg, saveExpedienteAttachmentFromBuffer } from '../controllers/filesController';
 import { configPlantillas, usaNube, listarPlantillasNube } from './plantillasNube';
 import { leerComoDocx, camposDePlantilla, rellenarPlantilla, claveCanonica } from './plantillasWord';
-import { contextoPlantilla, valoresGuardados, esCampoLogo, logoDespacho, configVariables, resolverValor } from './plantillasDatos';
+import { contextoPlantilla, valoresGuardados, esCampoLogo, logoDespacho, configParaPlantilla, resolverValor } from './plantillasDatos';
 
 // ── Documentos base de cada expediente (15/10/2026) ─────────────────────────
 // Con la automatización activada en la organización (Ajustes →
@@ -116,7 +116,7 @@ export async function generarDocBase(opts: {
   const docx = await leerComoDocx(ruta);
   const nombres = camposDePlantilla(docx);
   const guardados = await valoresGuardados(organizacionId, expedienteId);
-  const config = await configVariables(organizacionId);
+  const config = await configParaPlantilla(organizacionId, rel);
   const enviados = new Map(Object.entries(opts.valores || {}).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
   const valores: Record<string, string> = {};
   const imagenes: Record<string, { buffer: Buffer; mime: string }> = {};

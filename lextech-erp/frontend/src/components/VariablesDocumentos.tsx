@@ -17,6 +17,8 @@ interface Variable {
   tipo: 'basica' | 'expediente' | 'propia';
   automatica: boolean; despacho: boolean; imagen: boolean; actual: string | null;
   activa: boolean; modo: Modo; valor: string;
+  /** En cuántas plantillas tiene un ajuste propio (Ajustar esta plantilla). */
+  enPlantillas?: number;
 }
 
 type Filtro = 'despacho' | 'todas' | 'cambiadas' | 'desactivadas';
@@ -27,7 +29,7 @@ const PROPIAS = 'Variables del despacho';
 const MAX_FILAS = 150;
 
 const nombreGrupo = (g: string) => g.split(' › ').map((p) => t(p)).join(' › ');
-const cambiada = (v: Variable) => v.tipo === 'propia' || !v.activa || v.modo !== 'auto';
+const cambiada = (v: Variable) => v.tipo === 'propia' || !v.activa || v.modo !== 'auto' || (v.enPlantillas || 0) > 0;
 
 /** De dónde sale hoy la variable, en una frase. */
 function origen(v: Variable): { texto: string; valor?: string; tono: string } {
@@ -228,6 +230,9 @@ function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBo
           <p className={`mt-0.5 text-xs ${o.tono} break-words`}>
             {o.texto}{o.valor !== undefined && <> <span className="font-semibold">{o.valor.length > 120 ? o.valor.slice(0, 120) + '…' : o.valor}</span></>}
           </p>
+          {(v.enPlantillas || 0) > 0 && (
+            <p className="mt-0.5 text-[11px] text-violet-600">{v.enPlantillas === 1 ? t('Distinta en 1 plantilla (se cambia al revisar esa plantilla)') : t('Distinta en {n} plantillas (se cambia al revisar cada plantilla)', { n: v.enPlantillas })}</p>
+          )}
         </div>
         {puede && (
           <div className="shrink-0 flex items-center gap-1.5">

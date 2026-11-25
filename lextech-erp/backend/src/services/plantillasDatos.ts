@@ -419,7 +419,40 @@ export async function configVariables(organizacionId: string): Promise<Map<strin
   return new Map(rows.map((r: any) => [r.clave, r as VariableConfig]));
 }
 
-export type OrigenValor = 'enviado' | 'fijo' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
+// ── Ajustes de una sola plantilla (25/11/2026) ───────────────────────────────
+// En la revisión de un documento, el despacho puede decir que en ESA plantilla
+// una variable va desactivada ('off'), con un valor propio ('fijo'), o activa
+// aunque en general esté desactivada ('on'). Manda sobre lo general.
+export type EstadoEnPlantilla = 'on' | 'off' | 'fijo';
+export interface AjustePlantilla { estado: EstadoEnPlantilla; valor: string | null }
+
+/** La referencia de una plantilla tal y como se guarda ("nube:<id>" o la ruta con "/"). */
+export const refPlantilla = (ref: string) => String(ref || '').replace(/\\/g, '/').replace(/^\/+/, '').slice(0, 500);
+
+export async function ajustesDePlantilla(organizacionId: string, plantilla: string): Promise<Map<string, AjustePlantilla & { nombre: string }>> {
+  const { rows } = await pool.query(
+    `SELECT clave, nombre, estado, valor FROM plantillas_variables_plantilla WHERE organizacion_id = $1 AND plantilla = $2`,
+    [organizacionId, refPlantilla(plantilla)],
+  ).catch(() => ({ rows: [] as any[] }));
+  return new Map(rows.map((r: any) => [r.clave, { nombre: r.nombre, estado: r.estado, valor: r.valor }]));
+}
+
+/** La configuración general del despacho con los ajustes de esa plantilla encima. */
+export async function configParaPlantilla(organizacionId: string, plantilla?: string | null): Promise<Map<string, VariableConfig>> {
+  const config = await configVariables(organizacionId);
+  if (!plantilla) return config;
+  const ajustes = await ajustesDePlantilla(organizacionId, plantilla);
+  for (const [clave, a] of ajustes) {
+    const base: VariableConfig = config.get(clave)
+      || { clave, nombre: a.nombre, etiqueta: null, propia: false, activa: true, modo: 'auto', valor: null };
+    if (a.estado === 'off') config.set(clave, { ...base, activa: false });
+    else if (a.estado === 'fijo') config.set(clave, { ...base, activa: true, modo: 'fijo', valor: a.valor ?? '' });
+    else config.set(clave, { ...base, activa: true });
+  }
+  return config;
+}
+
+export type OrigenValor ='enviado' | 'fijo' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
 
 /** El valor con el que sale una variable en un documento, y de dónde viene.
  *  Orden: lo escrito al generar > desactivada > valor fijo del despacho >

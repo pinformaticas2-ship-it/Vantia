@@ -2494,6 +2494,26 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (e: any) { console.error('[migrations] plantillas_variables:', e?.message); }
 
+    // Variables de una sola plantilla (25/11/2026): "en esta plantilla, esta
+    // variable va desactivada / con este valor / activa aunque en general no".
+    // plantilla = la misma referencia que usa el relleno ("nube:<id>" o la ruta).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS plantillas_variables_plantilla (
+          id               BIGSERIAL    PRIMARY KEY,
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          plantilla        VARCHAR(500) NOT NULL,
+          clave            VARCHAR(120) NOT NULL,
+          nombre           VARCHAR(150) NOT NULL,
+          estado           VARCHAR(10)  NOT NULL,
+          valor            TEXT,
+          updated_by       VARCHAR(150),
+          updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          UNIQUE (organizacion_id, plantilla, clave)
+        );
+      `);
+    } catch (e: any) { console.error('[migrations] plantillas_variables_plantilla:', e?.message); }
+
     // Documentos base de cada expediente (15/10/2026): LOPD, toma de requisitos y
     // hoja de encargo, generados al crear/abrir el expediente si la organización
     // tiene activada la automatización (ver services/docsBaseExpediente).

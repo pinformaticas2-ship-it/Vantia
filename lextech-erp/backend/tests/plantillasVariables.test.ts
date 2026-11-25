@@ -159,3 +159,31 @@ test('variables propias: fija para todo el despacho o de cada expediente', { ski
   await call('delete', '/variables/:clave', 'pv_jefa', { params: { clave: 'HORARIO_DE_ATENCION' } });
   assert.equal((await d.configVariables(org)).has('HORARIO_DE_ATENCION'), false);
 });
+
+test('por plantilla: desactivada, valor propio o activa solo en esa plantilla', { skip }, async () => {
+  const d = await import('../src/services/plantillasDatos');
+  const ctx = await d.contextoPlantilla(org, exp);
+  const A = ['Encargos', 'Hoja de encargo.doc'].join(String.fromCharCode(92)), B = 'nube:otra'; // ruta con barra de Windows
+  const put = (body: any, u = 'pv_jefa') => call('put', '/variables-plantilla', u, { body });
+  assert.equal((await put({ plantilla: A, nombre: 'Juzgados_Núm_Autos', estado: 'off' }, 'pv_miembro')).status, 403);
+  assert.equal((await put({ plantilla: A, nombre: 'Juzgados_Núm_Autos', estado: 'off' })).status, 200);
+  assert.equal((await put({ plantilla: A, nombre: 'Empresa_Nombre', estado: 'fijo', valor: 'Solo en la hoja de encargo' })).status, 200);
+  // En general Contrarios_Nombre está desactivada (test anterior): en A se activa.
+  assert.equal((await put({ plantilla: '/Encargos/Hoja de encargo.doc', nombre: 'Contrarios_Nombre', estado: 'on' })).status, 200);
+
+  const cA = await d.configParaPlantilla(org, A);
+  assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), cA).origen, 'desactivada');
+  assert.equal(d.resolverValor('Empresa_Nombre', ctx, new Map(), cA).valor, 'Solo en la hoja de encargo');
+  assert.equal(d.resolverValor('Contrarios_Nombre', ctx, new Map(), cA).valor, 'Banco Contrario', 'la misma ruta con otras barras es la misma plantilla');
+  // Otra plantilla: lo general.
+  const cB = await d.configParaPlantilla(org, B);
+  assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), cB).valor, '123/2026');
+  assert.equal(d.resolverValor('Empresa_Nombre', ctx, new Map(), cB).valor, 'Despacho Variables');
+  assert.equal(d.resolverValor('Contrarios_Nombre', ctx, new Map(), cB).origen, 'desactivada');
+  // La lista general avisa de cuántas plantillas la cambian.
+  const lista = (await call('get', '/variables', 'pv_jefa')).body.data.variables;
+  assert.equal(lista.find((v: any) => v.clave === 'EMPRESA_NOMBRE').enPlantillas, 1);
+  // Volver a lo general.
+  await put({ plantilla: A, nombre: 'Juzgados_Núm_Autos', estado: 'general' });
+  assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), await d.configParaPlantilla(org, A)).valor, '123/2026');
+});

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { ArrowLeft, CheckCircle2, FileText, Loader2, Sparkles, AlertCircle, Building2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, Loader2, Sparkles, AlertCircle, Building2, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { safeJson, resolveUploadUrl } from '../lib/api';
+import { safeJson, resolveUploadUrl, apiFetch } from '../lib/api';
 import { aviso } from '../lib/avisos';
 import { t } from '../lib/i18n';
 
@@ -26,7 +26,19 @@ interface Campo {
   imagenUrl?: string | null;
   /** Por qué no se puede poner: sin_logo | perdido | formato. */
   avisoImagen?: string | null;
+  /** Ajuste solo de esta plantilla (null = como en general). */
+  enPlantilla?: { estado: EstadoAjuste; valor: string } | null;
 }
+
+// "Ajustar esta plantilla" (25/11/2026): lo que se elige vale solo para esta
+// plantilla, en todos los expedientes, y manda sobre Ajustes → Variables de documentos.
+type EstadoAjuste = 'on' | 'off' | 'fijo';
+const AJUSTES: [EstadoAjuste | 'general', string][] = [
+  ['general', 'Como en general'],
+  ['off', 'Desactivada en esta plantilla'],
+  ['fijo', 'Valor fijo en esta plantilla'],
+  ['on', 'Activa en esta plantilla aunque en general no'],
+];
 
 const ORIGEN: Record<Campo['origen'], { label: string; cls: string }> = {
   vantia: { label: 'De Vantia', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -57,26 +69,51 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
   const [soloFaltan, setSoloFaltan] = useState(false);
   const [dejarMarcados, setDejarMarcados] = useState(true);
   const [generando, setGenerando] = useState(false);
+  const [puedeAjustar, setPuedeAjustar] = useState(false);
+  const [ajustando, setAjustando] = useState(false);
+  const [guardandoAjuste, setGuardandoAjuste] = useState<string | null>(null);
+
+  const leerCampos = useCallback(async () => {
+    const token = await getToken({ skipCache: true });
+    const de = expedienteId ? `expedienteId=${encodeURIComponent(expedienteId)}` : `clienteId=${encodeURIComponent(clienteId || '')}`;
+    const res = await fetch(`/api/files/templates/campos?path=${encodeURIComponent(path)}&${de}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const d = await safeJson(res);
+    if (!res.ok || !d?.success) throw new Error(d?.error || t("No se pudo leer la plantilla."));
+    return d.data as { campos: Campo[]; convertida: boolean; canManage?: boolean };
+  }, [path, expedienteId, clienteId, getToken]);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       try {
-        const token = await getToken({ skipCache: true });
-        const de = expedienteId ? `expedienteId=${encodeURIComponent(expedienteId)}` : `clienteId=${encodeURIComponent(clienteId || '')}`;
-        const res = await fetch(`/api/files/templates/campos?path=${encodeURIComponent(path)}&${de}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const d = await safeJson(res);
+        const d = await leerCampos();
         if (!vivo) return;
-        if (!res.ok || !d?.success) throw new Error(d?.error || t("No se pudo leer la plantilla."));
-        setCampos(d.data.campos);
-        setConvertida(!!d.data.convertida);
-        setValores(Object.fromEntries(d.data.campos.map((c: Campo) => [c.clave, c.valor || ''])));
+        setCampos(d.campos);
+        setConvertida(!!d.convertida);
+        setPuedeAjustar(!!d.canManage);
+        setValores(Object.fromEntries(d.campos.map((c: Campo) => [c.clave, c.valor || ''])));
       } catch (e: any) { if (vivo) setError(e?.message || t("No se pudo leer la plantilla.")); }
     })();
     return () => { vivo = false; };
-  }, [path, expedienteId, clienteId, getToken]);
+  }, [leerCampos]);
+
+  /** Guarda el ajuste de una variable solo para esta plantilla y refresca su valor. */
+  const ajustar = async (c: Campo, estado: EstadoAjuste | 'general', valor = '') => {
+    setGuardandoAjuste(c.clave);
+    try {
+      const r = await apiFetch('/api/plantillas/variables-plantilla', {
+        method: 'PUT', getToken, body: JSON.stringify({ plantilla: path, nombre: c.nombre, estado, valor }),
+      });
+      if (r?.success === false) throw new Error(r.error);
+      const d = await leerCampos();
+      const nuevo = d.campos.find((x) => x.clave === c.clave);
+      setCampos(d.campos);
+      if (nuevo) setValores((p) => ({ ...p, [c.clave]: nuevo.valor || '' }));
+    } catch (e: any) { aviso.error(e?.message || t("No se pudo guardar la variable.")); }
+    finally { setGuardandoAjuste(null); }
+  };
 
   const rellenos = useMemo(() => (campos || []).filter((c) => (valores[c.clave] || '').trim()).length, [campos, valores]);
   const grupos = useMemo(() => {
@@ -149,12 +186,24 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
             {convertida && t(" · plantilla .doc: se entregará como .docx")}
           </p>
         </div>
-        {faltan > 0 && (
+        {puedeAjustar && campos.length > 0 && (
+          <button type="button" onClick={() => setAjustando((a) => !a)}
+            title={t("Desactivar variables o darles un valor solo en esta plantilla")}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${ajustando ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <SlidersHorizontal size={13} />{ajustando ? t("Listo") : t("Ajustar esta plantilla")}
+          </button>
+        )}
+        {faltan > 0 && !ajustando && (
           <label className="shrink-0 inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
             <input type="checkbox" checked={soloFaltan} onChange={(e) => setSoloFaltan(e.target.checked)} className="accent-red-600" />{t("Solo los que faltan")}</label>
         )}
       </div>
 
+      {ajustando && (
+        <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          {t("Lo que elijas aquí vale solo para esta plantilla, en todos los expedientes. Lo general está en Ajustes → Mi Despacho → Variables de documentos.")}
+        </p>
+      )}
       <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1 space-y-4 max-h-[52vh]">
         {grupos.map((g) => (
           <section key={g.grupo}>
@@ -173,9 +222,12 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
                       <span className={`mt-1 inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-semibold ${o.cls}`}>
                         {origen === 'vantia' ? <Sparkles size={9} /> : origen === 'guardado' ? <CheckCircle2 size={9} /> : null}{t(o.label)}
                       </span>
+                      {c.enPlantilla && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-600" title={t("Ajustada solo en esta plantilla")}><SlidersHorizontal size={9} />{" "}{t("esta plantilla")}</span>}
                       {c.deDespacho && <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-slate-400" title={t("Lo que escribas aquí se recuerda para todo el despacho")}><Building2 size={9} />{" "}{t("despacho")}</span>}
                     </div>
-                    {c.imagen ? (
+                    {ajustando && !c.imagen ? (
+                      <AjusteCampo c={c} guardando={guardandoAjuste === c.clave} onCambiar={(e, v) => void ajustar(c, e, v)} />
+                    ) : c.imagen ? (
                       c.imagenUrl ? (
                         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
                           <img src={resolveUploadUrl(c.imagenUrl) || undefined} alt={t("Logo del despacho")} className="h-9 max-w-[140px] object-contain" />
@@ -219,6 +271,37 @@ export default function RellenarPlantilla({ path, nombre, expedienteId, clienteI
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AjusteCampo({ c, guardando, onCambiar }: {
+  c: Campo; guardando: boolean; onCambiar: (estado: EstadoAjuste | 'general', valor?: string) => void;
+}) {
+  const actual = c.enPlantilla?.estado || 'general';
+  const [estado, setEstado] = useState<EstadoAjuste | 'general'>(actual);
+  const [valor, setValor] = useState(c.enPlantilla?.estado === 'fijo' ? c.enPlantilla.valor : (c.valor || ''));
+  useEffect(() => { setEstado(c.enPlantilla?.estado || 'general'); }, [c.enPlantilla?.estado]);
+  const pendiente = estado === 'fijo' && (actual !== 'fijo' || valor !== (c.enPlantilla?.valor ?? ''));
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <select value={estado} disabled={guardando}
+          onChange={(e) => { const v = e.target.value as EstadoAjuste | 'general'; setEstado(v); if (v !== 'fijo') onCambiar(v); }}
+          className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-800 outline-none focus:border-red-300">
+          {AJUSTES.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}
+        </select>
+        {guardando && <Loader2 size={14} className="shrink-0 animate-spin text-slate-400" />}
+      </div>
+      {estado === 'fijo' && (
+        <div className="flex items-start gap-2">
+          <textarea value={valor} rows={Math.min(4, Math.max(1, valor.split('\n').length))} onChange={(e) => setValor(e.target.value)}
+            placeholder={t("El texto que saldrá siempre en esta plantilla")}
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-800 outline-none focus:border-red-300" />
+          <button type="button" disabled={!pendiente || guardando} onClick={() => onCambiar('fijo', valor)}
+            className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40">{t("Guardar")}</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import path from 'path';
 import { rutaPlantillaOrg, nombrePlantillaOrg } from './filesController';
 import { camposDePlantilla, rellenarPlantilla, leerComoDocx, claveCanonica } from '../services/plantillasWord';
-import { contextoPlantilla, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho, logoDespachoConAviso, configVariables, resolverValor } from '../services/plantillasDatos';
+import { contextoPlantilla, valoresGuardados, guardarValores, grupoDe, etiquetaDe, esDeDespacho, esCampoLogo, logoDespacho, logoDespachoConAviso, configParaPlantilla, ajustesDePlantilla, refPlantilla, resolverValor } from '../services/plantillasDatos';
 import { logActivityForReq } from './activityController';
 
 // ── Rellenar plantillas Word (15/10/2026) ───────────────────────────────────
@@ -36,7 +36,9 @@ export const camposPlantilla = async (req: any, res: Response) => {
     if (expedienteId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
     if (clienteId && !(ctx as any).clienteEncontrado) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
-    const config = await configVariables(req.organizacionId);
+    // Lo general del despacho con los ajustes de esta plantilla encima.
+    const config = await configParaPlantilla(req.organizacionId, req.query.path as string);
+    const ajustes = await ajustesDePlantilla(req.organizacionId, req.query.path as string);
     const { logo, aviso: avisoLogo } = nombres.some(esCampoLogo) ? await logoDespachoConAviso(req.organizacionId) : { logo: null, aviso: null };
     const campos = nombres.map((nombre) => {
       const clave = claveCanonica(nombre);
@@ -60,9 +62,15 @@ export const camposPlantilla = async (req: any, res: Response) => {
         origen: r.origen,
         conoceVantia: r.deVantia !== undefined,
         deDespacho: esDeDespacho(nombre) && !cfg?.propia,
+        // Ajuste solo de esta plantilla (null = como en general).
+        enPlantilla: ajustes.has(clave) ? { estado: ajustes.get(clave)!.estado, valor: ajustes.get(clave)!.valor ?? '' } : null,
       };
     }).sort((a, b) => ORDEN_GRUPOS.indexOf(a.grupo) - ORDEN_GRUPOS.indexOf(b.grupo) || a.etiqueta.localeCompare(b.etiqueta, 'es'));
-    res.json({ success: true, data: { campos, convertida: !ruta.toLowerCase().endsWith('.docx') } });
+    res.json({ success: true, data: {
+      campos, convertida: !ruta.toLowerCase().endsWith('.docx'),
+      plantilla: refPlantilla(req.query.path as string),
+      canManage: ['propietario', 'admin'].includes(req.organizacionRol),
+    } });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'No se pudo leer la plantilla.' });
   }
@@ -82,7 +90,7 @@ export const generarPlantilla = async (req: any, res: Response) => {
     const enviados: Record<string, string> = req.body?.valores && typeof req.body.valores === 'object' ? req.body.valores : {};
     const enviadosPorClave = new Map(Object.entries(enviados).map(([k, v]) => [claveCanonica(k), String(v ?? '')]));
     const guardados = await valoresGuardados(req.organizacionId, expedienteId);
-    const config = await configVariables(req.organizacionId);
+    const config = await configParaPlantilla(req.organizacionId, req.body?.path);
 
     const valores: Record<string, string> = {};
     const aGuardar: Record<string, string> = {};
