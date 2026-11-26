@@ -104,4 +104,20 @@ registrarEn({
   "creado": "created",
   "actualizado": "updated",
   "eliminado": "deleted",
+
+  // Plantillas y variables de documentos
+  "Variable de documentos «{a}» desactivada": "Document variable «{a}» turned off",
+  "Variable de documentos «{a}» con valor fijo": "Document variable «{a}» given a fixed value",
+  "Variable de documentos «{a}» activada": "Document variable «{a}» turned on",
+  "Variable de documentos «{a}» como venía": "Document variable «{a}» reset to default",
+  "Variable de documentos creada": "Document variable created",
+  "Variable de documentos borrada": "Document variable deleted",
+  "Plantilla «{a}»: variable «{b}» como en general": "Template «{a}»: variable «{b}» back to the general setting",
+  "Plantilla «{a}»: variable «{b}» desactivada": "Template «{a}»: variable «{b}» turned off",
+  "Plantilla «{a}»: variable «{b}» activada": "Template «{a}»: variable «{b}» turned on",
+  "Plantilla «{a}»: variable «{b}» con valor propio": "Template «{a}»: variable «{b}» given its own value",
+  "Plantilla «{a}»: variable «{b}» rellenada con «{c}»": "Template «{a}»: variable «{b}» filled with «{c}»",
+  "Plantilla «{a}»: «{b}» pasa a ser la variable «{c}»": "Template «{a}»: «{b}» becomes the variable «{c}»",
+  "Plantilla «{a}»: variable «{b}» quitada": "Template «{a}»: variable «{b}» removed",
+  "Plantillas: carpeta «{a}» creada": "Templates: folder «{a}» created",
 });

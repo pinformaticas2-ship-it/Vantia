@@ -28,6 +28,19 @@ const PLANTILLAS: [RegExp, string, number[]?][] = [
   [/^Plantillas del despacho: carpeta conectada en (.+)$/, "Plantillas del despacho: carpeta conectada en {a}"],
   [/^Automatización «(.+)» guardada \(activa\)$/, "Automatización «{a}» guardada (activa)"],
   [/^(Procurador|Abogado|Parte contraria) (creado|actualizado|eliminado): (.+)$/, "{a} {b}: {c}", [1, 2]],
+  // Plantillas y variables de documentos (25/11/2026)
+  [/^Variable de documentos «(.+)» desactivada$/, "Variable de documentos «{a}» desactivada"],
+  [/^Variable de documentos «(.+)» con valor fijo$/, "Variable de documentos «{a}» con valor fijo"],
+  [/^Variable de documentos «(.+)» activada$/, "Variable de documentos «{a}» activada"],
+  [/^Variable de documentos «(.+)» como venía$/, "Variable de documentos «{a}» como venía"],
+  [/^Plantilla «(.+?)»: variable «(.+)» como en general$/, "Plantilla «{a}»: variable «{b}» como en general"],
+  [/^Plantilla «(.+?)»: variable «(.+)» desactivada$/, "Plantilla «{a}»: variable «{b}» desactivada"],
+  [/^Plantilla «(.+?)»: variable «(.+)» activada$/, "Plantilla «{a}»: variable «{b}» activada"],
+  [/^Plantilla «(.+?)»: variable «(.+)» con valor propio$/, "Plantilla «{a}»: variable «{b}» con valor propio"],
+  [/^Plantilla «(.+?)»: variable «(.+)» rellenada con «(.+)»$/, "Plantilla «{a}»: variable «{b}» rellenada con «{c}»"],
+  [/^Plantilla «(.+?)»: «(.*)» pasa a ser la variable «(.+)»$/, "Plantilla «{a}»: «{b}» pasa a ser la variable «{c}»"],
+  [/^Plantilla «(.+?)»: variable «(.+)» quitada$/, "Plantilla «{a}»: variable «{b}» quitada"],
+  [/^Plantillas: carpeta «(.+)» creada$/, "Plantillas: carpeta «{a}» creada"],
 ];
 
 export function traducirActividad(s?: string | null): string {

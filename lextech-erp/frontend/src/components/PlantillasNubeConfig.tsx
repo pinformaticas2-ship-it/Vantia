@@ -55,7 +55,7 @@ export default function PlantillasNubeConfig() {
       setEligiendo(false);
       aviso.ok(t("Plantillas: se usará la carpeta «{ruta}»", { ruta: c.ruta }));
       await cargar();
-    } catch (e: any) { aviso.error(e?.message || t("No se pudo usar esa carpeta.")); }
+    } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo usar esa carpeta.")); }
   };
 
   const cargar = useCallback(async (refrescar = false) => {
@@ -80,7 +80,7 @@ export default function PlantillasNubeConfig() {
       if (r?.success === false) throw new Error(r.error);
       if (ok) aviso.ok(ok);
       await cargar();
-    } catch (e: any) { aviso.error(e?.message || t("No se pudo hacer.")); }
+    } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo hacer.")); }
     finally { setOcupado(null); }
   };
 
@@ -133,7 +133,7 @@ export default function PlantillasNubeConfig() {
         </div>
       </div>
 
-      {cfg.error && <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><AlertTriangle size={13} className="shrink-0 mt-0.5" /> {cfg.error}</p>}
+      {cfg.error && <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2"><AlertTriangle size={13} className="shrink-0 mt-0.5" /> {t(cfg.error)}</p>}
 
       {!enNube && cfg.canManage && (
         <div className="mt-4">
