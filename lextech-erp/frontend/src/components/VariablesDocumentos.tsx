@@ -85,6 +85,7 @@ export default function VariablesDocumentos() {
       });
       if (r?.success === false) throw new Error(r.error);
       setVars((p) => (p || []).map((x) => (x.clave === v.clave ? { ...x, ...cambios } : x)));
+      olvidarCatalogoFormulas();
       if (ok) aviso.ok(ok);
       return true;
     } catch (e: any) { aviso.error(e?.message ? traducirErrorFormula(e.message) : t('No se pudo guardar la variable.')); return false; }

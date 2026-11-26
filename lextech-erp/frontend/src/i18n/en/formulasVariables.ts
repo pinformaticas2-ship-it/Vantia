@@ -7,6 +7,14 @@ import { registrarEn } from '../../lib/i18n';
 registrarEn({
   // Editor de fórmulas
   "Insertar dato": "Insert data",
+  "Datos@@insertar": "Data",
+  "Fórmulas": "Formulas",
+  "Fórmulas ({n})": "Formulas ({n})",
+  "Buscar una variable con fórmula…": "Search for a formula variable…",
+  "Aún no hay variables calculadas con fórmula. Crea una con «Nueva variable» → «Calculada con una fórmula», o cambia una existente.": "There are no formula variables yet. Create one with «New variable» → «Calculated with a formula», or change an existing one.",
+  "Usar su resultado (si cambias esa fórmula, cambia aquí también)": "Use its result (if you change that formula, it changes here too)",
+  "Copiar el texto de la fórmula aquí para cambiarlo": "Copy the formula text here so you can change it",
+  "Copiar fórmula": "Copy formula",
   "Insertar función": "Insert function",
   "Recetas": "Recipes",
   "Cómo se escribe": "How to write it",

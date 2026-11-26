@@ -11,7 +11,7 @@ import { CATEGORIAS, FUNCIONES, RECETAS, dentroDeLlaves, formulaEnIdioma, refVar
 // prueba en vivo con los datos de un expediente de verdad, sin guardar nada.
 // Backend: POST /api/plantillas/variables/probar y services/plantillasFormulas.
 
-interface VarCat { nombre: string; etiqueta: string; grupo: string }
+interface VarCat { nombre: string; etiqueta: string; grupo: string; formula: string | null }
 interface Prueba { valor: string | null; error: string | null; pos: number | null; variables: { nombre: string; conocida: boolean; valor: string }[] }
 
 // La lista de variables se pide una vez (son ~1.000 y no cambian al escribir).
@@ -19,7 +19,7 @@ let catalogo: Promise<VarCat[]> | null = null;
 function cargarCatalogo(getToken: () => Promise<string | null>) {
   if (!catalogo) {
     catalogo = apiFetch('/api/plantillas/variables', { getToken })
-      .then((r: any) => (r?.data?.variables || []).map((v: any) => ({ nombre: v.nombre, etiqueta: v.etiqueta, grupo: v.grupo })))
+      .then((r: any) => (r?.data?.variables || []).map((v: any) => ({ nombre: v.nombre, etiqueta: v.etiqueta, grupo: v.grupo, formula: v.modo === 'formula' && v.activa !== false && v.valor ? String(v.valor) : null })))
       .catch(() => { catalogo = null; return []; });
   }
   return catalogo;
@@ -44,6 +44,8 @@ export default function EditorFormula({ valor, onChange, nombre, plantilla, auto
   const [panel, setPanel] = useState<'datos' | 'funciones' | 'recetas' | 'ayuda' | null>(null);
   const [vars, setVars] = useState<VarCat[] | null>(null);
   const [q, setQ] = useState('');
+  // Dentro de «Insertar dato»: los datos de Vantia/del despacho o las variables calculadas con fórmula.
+  const [clase, setClase] = useState<'datos' | 'formulas'>('datos');
   const [cat, setCat] = useState<CategoriaFuncion>('Texto');
   const [prueba, setPrueba] = useState<Prueba | null>(null);
   const [probando, setProbando] = useState(false);
@@ -101,9 +103,19 @@ export default function EditorFormula({ valor, onChange, nombre, plantilla, auto
   };
 
   const texto = sinTildes(q.trim());
-  const varsVisibles = useMemo(() => (vars || [])
-    .filter((v) => !texto || sinTildes(`${v.etiqueta} ${v.nombre} ${v.grupo}`).includes(texto))
-    .slice(0, 80), [vars, texto]);
+  const conFormula = useMemo(() => (vars || []).filter((v) => v.formula && v.nombre !== nombre), [vars, nombre]);
+  const varsVisibles = useMemo(() => (clase === 'formulas' ? conFormula : vars || [])
+    .filter((v) => !texto || sinTildes(`${v.etiqueta} ${v.nombre} ${v.grupo} ${clase === 'formulas' ? v.formula : ''}`).includes(texto))
+    .slice(0, 80), [vars, conFormula, clase, texto]);
+  /** Copia el texto de otra fórmula donde está el cursor (sin envolverla en llaves: ya las lleva). */
+  const pegarFormula = (fx: string) => {
+    const el = ref.current;
+    const ini = el?.selectionStart ?? valor.length, fin = el?.selectionEnd ?? ini;
+    onChange(valor.slice(0, ini) + fx + valor.slice(fin));
+    const pos = ini + fx.length;
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(pos, pos); });
+    setPanel(null);
+  };
   const fnVisibles = texto
     ? FUNCIONES.filter((f) => sinTildes(`${f.nombre} ${f.en} ${t(f.desc)}`).includes(texto))
     : FUNCIONES.filter((f) => f.cat === cat);
@@ -126,18 +138,38 @@ export default function EditorFormula({ valor, onChange, nombre, plantilla, auto
 
       {panel && (
         <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+          {panel === 'datos' && (
+            <div className="mb-2 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+              {([['datos', t("Datos@@insertar")], ['formulas', vars ? t("Fórmulas ({n})", { n: conFormula.length }) : t("Fórmulas")]] as const).map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setClase(k)}
+                  className={`h-7 rounded-md px-3 text-xs font-semibold ${clase === k ? 'bg-white text-red-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}>{l}</button>
+              ))}
+            </div>
+          )}
           {(panel === 'datos' || panel === 'funciones') && (
             <div className="relative mb-2">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder={panel === 'datos' ? t("Buscar un dato (nombre, NIF, juzgado…)") : t("Buscar una función…")}
+                placeholder={panel === 'datos' ? (clase === 'formulas' ? t("Buscar una variable con fórmula…") : t("Buscar un dato (nombre, NIF, juzgado…)")) : t("Buscar una función…")}
                 className="h-8 w-full rounded-md border border-slate-200 pl-8 pr-2 text-xs outline-none focus:border-red-300" />
             </div>
           )}
           {panel === 'datos' && (
             <div className="max-h-60 overflow-y-auto">
               {!vars ? <div className="py-4 flex justify-center"><Loader2 size={16} className="animate-spin text-slate-400" /></div>
-                : varsVisibles.length === 0 ? <p className="px-2 py-3 text-xs text-slate-500">{t("Ningún dato coincide.")}</p>
+                : varsVisibles.length === 0 ? <p className="px-2 py-3 text-xs text-slate-500">{clase === 'formulas' && !texto ? t("Aún no hay variables calculadas con fórmula. Crea una con «Nueva variable» → «Calculada con una fórmula», o cambia una existente.") : t("Ningún dato coincide.")}</p>
+                : clase === 'formulas' ? varsVisibles.map((v) => (
+                  <div key={v.nombre} className="flex items-start gap-1 rounded-md px-2 py-1.5 hover:bg-slate-50">
+                    <button type="button" onClick={() => { insertar(refVariable(v.nombre)); setPanel(null); }} className="min-w-0 flex-1 text-left"
+                      title={t("Usar su resultado (si cambias esa fórmula, cambia aquí también)")}>
+                      <p className="flex items-baseline gap-2"><span className="min-w-0 flex-1 truncate text-xs font-medium text-slate-800">{t(v.etiqueta)}</span><span className="shrink-0 max-w-[45%] truncate font-mono text-[10px] text-fuchsia-700">{v.nombre}</span></p>
+                      <p className="truncate font-mono text-[10px] text-slate-400">{formulaEnIdioma(v.formula || '')}</p>
+                    </button>
+                    <button type="button" onClick={() => pegarFormula(formulaEnIdioma(v.formula || ''))}
+                      className="shrink-0 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-100"
+                      title={t("Copiar el texto de la fórmula aquí para cambiarlo")}>{t("Copiar fórmula")}</button>
+                  </div>
+                ))
                 : varsVisibles.map((v) => (
                   <button key={v.nombre} type="button" onClick={() => { insertar(refVariable(v.nombre)); setPanel(null); }}
                     className="w-full flex items-baseline gap-2 rounded-md px-2 py-1.5 text-left hover:bg-slate-50">
