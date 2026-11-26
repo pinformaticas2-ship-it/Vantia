@@ -21,6 +21,7 @@ import {
   PlantillaVars,
 } from '../services/vistasAutomation';
 import { reconcileVistasIdle } from '../services/vistasIdle';
+import { sugerirClientes, buscarClientes } from '../services/vistasClientes';
 import { sendPushToUsers } from '../utils/webPush';
 import { emitirConCliente, emitirEvento } from '../services/motorAutomatizaciones';
 
@@ -444,7 +445,12 @@ export async function getVista(req: any, res: Response) {
           .map(({ real, ...a }: any) => a);
       }
     } catch { /**/ }
-    const [coincidencias, miembros] = await Promise.all([findCoincidencias(req.organizacionId, sol.datos), listMiembros(req.organizacionId)]);
+    const [coincidencias, miembros, clientesSugeridos] = await Promise.all([
+      findCoincidencias(req.organizacionId, sol.datos),
+      listMiembros(req.organizacionId),
+      // Para el expediente nuevo: clientes del despacho que salen en el correo.
+      sol.expediente_id ? Promise.resolve([]) : sugerirClientes(req.organizacionId, sol).catch(() => []),
+    ]);
     let expediente = null;
     if (sol.expediente_id) {
       const { rows } = await pool.query(
@@ -467,6 +473,7 @@ export async function getVista(req: any, res: Response) {
       adjuntos,
       emailDisponible,
       coincidencias,
+      clientesSugeridos,
       miembros,
       expediente,
       defaults: {
@@ -482,6 +489,20 @@ export async function getVista(req: any, res: Response) {
     });
   } catch (e: any) {
     return fail(res, e?.message || 'Error leyendo la vista');
+  }
+}
+
+// ── GET /api/vistas/:id/clientes?q= ─────────────────────────────────────────
+// Buscador de clientes para el expediente nuevo de la vista. Va por la vista
+// (y no por /api/entities) porque quien acepta vistas puede no tener el módulo
+// de Clientes; solo devuelve nombre y NIF, y solo de su despacho.
+export async function buscarClientesVista(req: any, res: Response) {
+  try {
+    const ctx = await loadSolicitud(req, res);
+    if (!ctx) return;
+    return ok(res, await buscarClientes(req.organizacionId, String(req.query.q || '')));
+  } catch (e: any) {
+    return fail(res, e?.message || 'Error buscando clientes');
   }
 }
 

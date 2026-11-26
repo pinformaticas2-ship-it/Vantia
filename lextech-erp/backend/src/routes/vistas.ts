@@ -19,6 +19,7 @@ import {
   downloadVistaAdjunto,
   documentarVista,
   modificarVista,
+  buscarClientesVista,
 } from '../controllers/vistasController';
 
 // La visibilidad de cada solicitud la decide el propio controlador
@@ -35,6 +36,7 @@ router.get('/', listVistas);
 router.get('/avisos', getVistasAvisos);
 router.get('/:id', getVista);
 router.get('/:id/conflictos', getVistaConflictos);
+router.get('/:id/clientes', buscarClientesVista);
 router.get('/:id/adjuntos/:index', downloadVistaAdjunto);
 router.post('/:id/preview', previewVistaCorreo);
 router.post('/:id/aceptar', costlyActionLimiter, aceptarVista);

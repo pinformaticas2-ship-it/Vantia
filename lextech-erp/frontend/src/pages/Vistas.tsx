@@ -3,7 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, Bell, BellOff, Search, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
-  Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
+  Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, User, X, XCircle,
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
 import { FilePreviewModal } from "../components/FilePreviewModal";
@@ -29,6 +29,8 @@ interface Relacion {
 }
 type Paso = { paso: string; ok: boolean; detalle: string };
 type Conflicto = { id: string; title: string; start_at: string; end_at: string | null; all_day: boolean; type: string };
+/** Cliente del despacho para el expediente nuevo (backend: services/vistasClientes.ts). */
+type ClienteVista = { id: string; nombre: string; nif: string | null; motivo: "nif" | "cliente" | "partes" | "correo" };
 
 interface Solicitud {
   id: string;
@@ -65,6 +67,8 @@ interface Detalle extends Solicitud {
   adjuntos: { index: number; filename: string; contentType: string; size: number }[];
   emailDisponible: boolean;
   coincidencias: { id: string; anio: number; num_exp: number; descripcion: string | null; juzgado: string | null; num_autos: string | null; cliente_nombre: string | null }[];
+  /** Clientes del despacho que aparecen en el correo (por NIF o nombre). */
+  clientesSugeridos?: ClienteVista[];
   miembros: { userId: string; nombre: string; rol: string }[];
   expediente: { id: string; anio: number; num_exp: number; descripcion: string | null } | null;
   defaults: { duracionMin: number; recordatorioDias: number; recordatorioHora: string; guardarAdjuntos: boolean; responsableUserId: string | null; responderAlAceptar?: boolean; responderAlRechazar?: boolean; recordatorioActivo?: boolean };
@@ -472,6 +476,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [localidad, setLocalidad] = useState("");
   const [expModo, setExpModo] = useState<"nuevo" | "existente">("nuevo");
   const [expId, setExpId] = useState("");
+  // Cliente del expediente nuevo (26/11/2026): antes se creaba siempre sin cliente.
+  const [cliente, setCliente] = useState<ClienteVista | null>(null);
   const [guardarAdjuntos, setGuardarAdjuntos] = useState(true);
   const [conRecordatorio, setConRecordatorio] = useState(true);
   const [recordatorio, setRecordatorio] = useState("");
@@ -499,6 +505,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       setLocalidad(v.datos?.localidad || "");
       if (v.expediente_id) { setExpModo("existente"); setExpId(v.expediente_id); }
       else if (v.coincidencias.length) { setExpModo("existente"); setExpId(v.coincidencias[0].id); }
+      // Se elige solo si hay una única propuesta segura (su NIF sale en el correo o es el cliente que leyó la IA).
+      setCliente((prev) => {
+        if (prev) return prev;
+        const seguros = (v.clientesSugeridos || []).filter((c) => c.motivo === "nif" || c.motivo === "cliente");
+        return seguros.length === 1 ? seguros[0] : null;
+      });
       setGuardarAdjuntos(v.defaults.guardarAdjuntos);
       setRecordatorio(toLocalInput(v.recordatorio_at));
       // Si un intento anterior ya envió el correo, no se vuelve a enviar al reintentar.
@@ -584,7 +596,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
         if (expModo === "existente" && !expId) throw new Error(t("Elige el expediente al que vincular la vista."));
         body = {
           ...formBody(),
-          expediente: expModo === "existente" ? { modo: "existente", id: expId } : { modo: "nuevo" },
+          expediente: expModo === "existente" ? { modo: "existente", id: expId } : { modo: "nuevo", cliente_id: cliente?.id || null },
           guardar_adjuntos: guardarAdjuntos,
           recordatorio: conRecordatorio,
           recordatorio_at: conRecordatorio && recordatorio ? fromLocalInput(recordatorio) : undefined,
@@ -952,7 +964,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <h3 className="text-sm font-bold text-slate-800">{t("Si aceptas, Vantia hará esto:")}</h3>
             <ol className="mt-2 space-y-1.5 text-sm text-slate-700">
               <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{enviarCorreo ? <>{t("Responder a")}{" "}<b>{d.from_email}</b>{" "}{t("confirmando la asistencia")}</> : <span className="text-slate-500">{t("No se enviará ninguna respuesta")}</span>}</span></li>
-              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{expModo === "existente" && expedienteElegido ? <>{t("Vincularla al expediente")}{" "}<b>{expedienteElegido}</b></> : <>{t("Crear un")}{" "}<b>{t("expediente nuevo")}</b>{" "}{t("con estos datos")}</>}</span></li>
+              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{expModo === "existente" && expedienteElegido ? <>{t("Vincularla al expediente")}{" "}<b>{expedienteElegido}</b></> : <>{t("Crear un")}{" "}<b>{t("expediente nuevo")}</b>{" "}{t("con estos datos")}{cliente && !d.expediente_id ? <>{" "}{t("para@@cliente")}{" "}<b>{cliente.nombre}</b></> : null}</>}</span></li>
               <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{t("Apuntarla en")}{" "}<b>{t("tu agenda")}</b></span></li>
               <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{guardarAdjuntos && d.adjuntos.length ? <>{t("Guardar")}{" "}<b>{d.adjuntos.length}{" "}{t("adjunto")}{d.adjuntos.length === 1 ? "" : "s"}</b>{" "}{t("y el correo en el expediente")}</> : <>{t("Guardar el correo como nota en el expediente")}</>}</span></li>
               <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{conRecordatorio && recordatorioCalculado ? <>{t("Recordarte prepararla el")}{" "}<b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">{t("Sin recordatorio")}</span>}</span></li>
@@ -1041,6 +1053,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                 <input type="radio" checked={expModo === "nuevo"} onChange={() => setExpModo("nuevo")} className="mt-1 accent-red-600" disabled={!!d.expediente_id} />
                 <span>{t("Dar de alta un")}{" "}<b>{t("expediente nuevo")}</b>{" "}{t("con los datos de la vista")}</span>
               </label>
+              {expModo === "nuevo" && !d.expediente_id && (
+                <ElegirClienteVista vistaId={d.id} sugeridos={d.clientesSugeridos || []} valor={cliente} onChange={setCliente} />
+              )}
               {(d.coincidencias.length > 0 || d.expediente_id) && (
                 <label className="flex items-start gap-2 text-sm">
                   <input type="radio" checked={expModo === "existente"} onChange={() => setExpModo("existente")} className="mt-1 accent-red-600" />
@@ -1117,6 +1132,90 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           {correoOrigen}
           <div className="pb-6" />
         </>
+      )}
+    </div>
+  );
+}
+
+// ── Cliente del expediente nuevo (26/11/2026) ────────────────────────────────
+// Propuestas: clientes del despacho que salen en el correo (por NIF o nombre).
+// Buscador: cualquier cliente del despacho. Nunca se crea un cliente desde aquí.
+const MOTIVO_CLIENTE: Record<ClienteVista["motivo"], string> = {
+  nif: "su NIF sale en el correo",
+  cliente: "es el cliente que indica el correo",
+  partes: "sale entre las partes",
+  correo: "se nombra en el correo",
+};
+
+function ElegirClienteVista({ vistaId, sugeridos, valor, onChange }: {
+  vistaId: string; sugeridos: ClienteVista[]; valor: ClienteVista | null; onChange: (c: ClienteVista | null) => void;
+}) {
+  const { getToken } = useAuth();
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<ClienteVista[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  useEffect(() => {
+    const texto = q.trim();
+    if (texto.length < 2) { setRes(null); setBuscando(false); return; }
+    let vivo = true;
+    setBuscando(true);
+    const h = window.setTimeout(async () => {
+      try {
+        const r = await apiFetch(`/api/vistas/${vistaId}/clientes?q=${encodeURIComponent(texto)}`, { getToken });
+        if (vivo) setRes(r?.data || []);
+      } catch { if (vivo) setRes([]); }
+      finally { if (vivo) setBuscando(false); }
+    }, 250);
+    return () => { vivo = false; window.clearTimeout(h); };
+  }, [q, vistaId, getToken]);
+
+  const elegir = (c: ClienteVista) => { onChange(c); setQ(""); setRes(null); };
+  const otros = sugeridos.filter((c) => c.id !== valor?.id);
+
+  return (
+    <div className="ml-6 rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t("Cliente del expediente")}</p>
+      {valor ? (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5">
+          <User size={14} className="shrink-0 text-emerald-600" />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{valor.nombre}{valor.nif ? <span className="font-normal text-slate-400"> · {valor.nif}</span> : null}</span>
+          <button type="button" onClick={() => onChange(null)} className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800">{t("Quitar@@cliente")}</button>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">{t("Sin cliente: podrás asignarlo después desde el expediente.")}</p>
+      )}
+      {otros.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] text-slate-500">{valor ? t("Otros clientes que salen en el correo:") : t("Clientes del despacho que salen en el correo:")}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {otros.map((c) => (
+              <button key={c.id} type="button" onClick={() => elegir(c)} title={t(MOTIVO_CLIENTE[c.motivo])}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 hover:border-red-300 hover:bg-red-50">
+                <User size={11} className="shrink-0 text-slate-400" />
+                <span className="truncate font-medium">{c.nombre}</span>
+                <span className="hidden shrink-0 text-[10px] text-slate-400 sm:inline">{t(MOTIVO_CLIENTE[c.motivo])}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="relative">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={valor ? t("Elegir otro cliente (nombre o NIF)…") : t("Buscar un cliente del despacho (nombre o NIF)…")}
+          className={`${inputCls} pl-8`} />
+        {buscando && <Loader2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />}
+      </div>
+      {res && (
+        <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+          {res.length === 0
+            ? <p className="px-3 py-2 text-xs text-slate-500">{t("Ningún cliente coincide. Si es nuevo, créalo en Clientes y asígnalo después al expediente.")}</p>
+            : res.map((c) => (
+              <button key={c.id} type="button" onClick={() => elegir(c)} className="flex w-full items-baseline gap-2 px-3 py-1.5 text-left hover:bg-slate-50">
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-800">{c.nombre || t("Cliente sin nombre")}</span>
+                {c.nif && <span className="shrink-0 font-mono text-[11px] text-slate-400">{c.nif}</span>}
+              </button>
+            ))}
+        </div>
       )}
     </div>
   );
