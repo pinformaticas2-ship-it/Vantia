@@ -62,6 +62,8 @@ export const camposPlantilla = async (req: any, res: Response) => {
         origen: r.origen,
         conoceVantia: r.deVantia !== undefined,
         deDespacho: esDeDespacho(nombre) && !cfg?.propia,
+        // Variables propias: cómo se escriben (fecha, opciones...).
+        formato: cfg?.propia && cfg.modo === 'expediente' ? (cfg.formato || null) : null,
         // Ajuste solo de esta plantilla (null = como en general).
         enPlantilla: ajustes.has(clave) ? { estado: ajustes.get(clave)!.estado, valor: ajustes.get(clave)!.valor ?? '' } : null,
       };
@@ -105,7 +107,12 @@ export const generarPlantilla = async (req: any, res: Response) => {
       // Se recuerda lo que difiere de lo que Vantia ya sabe (o lo que Vantia no sabe).
       // Las de valor fijo no: ese valor se cambia en Variables de documentos.
       const cfg = config.get(clave);
-      if (cfg?.activa && cfg.modo === 'fijo') continue;
+      if (cfg?.activa && (cfg.modo === 'fijo' || cfg.modo === 'formula' || cfg.modo === 'dato')) continue;
+      // Si se deja el valor por defecto tal cual, no se guarda (así sigue calculándose).
+      if (enviado !== undefined && cfg?.propia && cfg.formato?.defecto) {
+        const sin = resolverValor(nombre, ctx, guardados, config);
+        if (sin.origen === 'defecto' && sin.valor === enviado) continue;
+      }
       if (enviado !== undefined && enviado !== (deVantia ?? '')) aGuardar[nombre] = enviado;
       else if (enviado !== undefined && guardados.has(clave) && enviado === (deVantia ?? '')) aGuardar[nombre] = ''; // vuelve a lo de Vantia
     }

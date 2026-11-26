@@ -3,6 +3,7 @@ import path from 'path';
 import pool from '../config/database';
 import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 import { claveCanonica, medidasImagen } from './plantillasWord';
+import { evaluarFormula } from './plantillasFormulas';
 
 // ── Datos de Vantia para los campos de MN Program (15/10/2026) ───────────────
 // Traduce cada campo de las plantillas («Contrario_Principal_Nombre»,
@@ -405,16 +406,48 @@ export async function guardarValores(organizacionId: string, expedienteId: strin
 //     rellenan en cada expediente (pestaña "Datos para documentos").
 
 // 'dato' (solo por plantilla): se rellena con otra variable (valor = su nombre).
-export type ModoVariable = 'auto' | 'fijo' | 'expediente' | 'dato';
+// 'formula' (26/11/2026): se calcula con una fórmula (valor = la fórmula, ver plantillasFormulas).
+export type ModoVariable = 'auto' | 'fijo' | 'expediente' | 'dato' | 'formula';
+
+/** Cómo se pide en cada expediente una variable propia (modo 'expediente'). */
+export type TipoCampo = 'texto' | 'texto_largo' | 'fecha' | 'numero' | 'importe' | 'opciones' | 'si_no';
+export interface FormatoVariable {
+  tipo: TipoCampo;
+  /** Para 'opciones': las que se pueden elegir. */
+  opciones?: string[];
+  /** Valor si en el expediente no se ha escrito nada. Puede llevar {fórmula}. */
+  defecto?: string;
+  /** Texto de ayuda que se ve debajo del campo. */
+  ayuda?: string;
+}
+const TIPOS_CAMPO: TipoCampo[] = ['texto', 'texto_largo', 'fecha', 'numero', 'importe', 'opciones', 'si_no'];
+
+/** Limpia el formato que llega del navegador (o null si no vale nada). */
+export function normalizarFormato(f: any): FormatoVariable | null {
+  if (!f || typeof f !== 'object') return null;
+  const tipo: TipoCampo = TIPOS_CAMPO.includes(f.tipo) ? f.tipo : 'texto';
+  const opciones = Array.isArray(f.opciones)
+    ? [...new Set(f.opciones.map((o: any) => String(o ?? '').trim().slice(0, 200)).filter(Boolean))].slice(0, 100) as string[]
+    : [];
+  const defecto = String(f.defecto ?? '').slice(0, 5000);
+  const ayuda = String(f.ayuda ?? '').trim().slice(0, 300);
+  const r: FormatoVariable = { tipo };
+  if (tipo === 'opciones') r.opciones = opciones;
+  if (defecto.trim()) r.defecto = defecto;
+  if (ayuda) r.ayuda = ayuda;
+  return r;
+}
+
 export interface VariableConfig {
   clave: string; nombre: string; etiqueta: string | null;
   propia: boolean; activa: boolean; modo: ModoVariable; valor: string | null;
+  formato?: FormatoVariable | null;
   updated_at?: string;
 }
 
 export async function configVariables(organizacionId: string): Promise<Map<string, VariableConfig>> {
   const { rows } = await pool.query(
-    `SELECT clave, nombre, etiqueta, propia, activa, modo, valor, updated_at FROM plantillas_variables WHERE organizacion_id = $1`,
+    `SELECT clave, nombre, etiqueta, propia, activa, modo, valor, formato, updated_at FROM plantillas_variables WHERE organizacion_id = $1`,
     [organizacionId],
   ).catch(() => ({ rows: [] as any[] }));
   return new Map(rows.map((r: any) => [r.clave, r as VariableConfig]));
@@ -424,7 +457,7 @@ export async function configVariables(organizacionId: string): Promise<Map<strin
 // En la revisión de un documento, el despacho puede decir que en ESA plantilla
 // una variable va desactivada ('off'), con un valor propio ('fijo'), o activa
 // aunque en general esté desactivada ('on'). Manda sobre lo general.
-export type EstadoEnPlantilla = 'on' | 'off' | 'fijo' | 'dato';
+export type EstadoEnPlantilla = 'on' | 'off' | 'fijo' | 'dato' | 'formula';
 export interface AjustePlantilla { estado: EstadoEnPlantilla; valor: string | null }
 
 /** La referencia de una plantilla tal y como se guarda ("nube:<id>" o la ruta con "/"). */
@@ -449,25 +482,50 @@ export async function configParaPlantilla(organizacionId: string, plantilla?: st
     if (a.estado === 'off') config.set(clave, { ...base, activa: false });
     else if (a.estado === 'fijo') config.set(clave, { ...base, activa: true, modo: 'fijo', valor: a.valor ?? '' });
     else if (a.estado === 'dato') config.set(clave, { ...base, activa: true, modo: 'dato', valor: a.valor ?? '' });
+    else if (a.estado === 'formula') config.set(clave, { ...base, activa: true, modo: 'formula', valor: a.valor ?? '' });
     else config.set(clave, { ...base, activa: true });
   }
   return config;
 }
 
-export type OrigenValor = 'enviado' | 'fijo' | 'dato' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
+export type OrigenValor = 'enviado' | 'fijo' | 'dato' | 'formula' | 'defecto' | 'guardado' | 'vantia' | 'desactivada' | 'vacio';
+
+/** Fórmulas que usan otras fórmulas: hasta este fondo (y nunca en círculo). */
+const MAX_NIVEL = 8;
 
 /** El valor con el que sale una variable en un documento, y de dónde viene.
- *  Orden: lo escrito al generar > desactivada > valor fijo del despacho >
- *  lo guardado a mano (salvo datos de Mi Despacho, que mandan) > Vantia. */
+ *  Orden: lo escrito al generar > desactivada > con otro dato / fórmula >
+ *  valor fijo del despacho > lo guardado a mano (salvo datos de Mi Despacho,
+ *  que mandan) > Vantia > valor por defecto (variables propias). */
 export function resolverValor(
   nombre: string, ctx: Contexto, guardados: Map<string, string>, config: Map<string, VariableConfig>, enviado?: string, nivel = 0,
+  cadena: string[] = [],
 ): { valor: string | undefined; origen: OrigenValor; deVantia: string | undefined } {
   const clave = claveCanonica(nombre);
   const cfg = config.get(clave);
-  // Se rellena con otro dato: el valor de esa otra variable (un solo salto).
-  if (enviado === undefined && cfg?.activa && cfg.modo === 'dato' && cfg.valor && nivel === 0 && claveCanonica(cfg.valor) !== clave) {
-    const r = resolverValor(cfg.valor, ctx, guardados, config, undefined, 1);
-    return { valor: r.valor, origen: r.valor ? 'dato' : 'vacio', deVantia: r.valor };
+  const camino = [...cadena, clave];
+  /** El valor de otra variable dentro de una fórmula (o de 'dato'). Si es la
+   *  misma, su valor de siempre (sin la fórmula): «{MAYUSCULAS(Clientes_Nombre)}». */
+  const otra = (n: string): string => {
+    const c = claveCanonica(n);
+    if (!c || nivel >= MAX_NIVEL) return '';
+    if (c === clave) {
+      const sin = new Map(config); sin.delete(clave);
+      return resolverValor(n, ctx, guardados, sin, undefined, nivel + 1, camino).valor ?? '';
+    }
+    if (camino.includes(c)) return ''; // en círculo
+    return resolverValor(n, ctx, guardados, config, undefined, nivel + 1, camino).valor ?? '';
+  };
+  const calcular = (formula: string): string => { try { return evaluarFormula(formula, otra); } catch { return ''; } };
+  // Se rellena con otro dato: el valor de esa otra variable.
+  if (enviado === undefined && cfg?.activa && cfg.modo === 'dato' && cfg.valor && claveCanonica(cfg.valor) !== clave) {
+    const v = otra(cfg.valor);
+    return { valor: v || undefined, origen: v ? 'dato' : 'vacio', deVantia: v || undefined };
+  }
+  // Se calcula con una fórmula.
+  if (enviado === undefined && cfg?.activa && cfg.modo === 'formula') {
+    const v = calcular(cfg.valor || '');
+    return { valor: v, origen: v ? 'formula' : 'vacio', deVantia: v };
   }
   const deVantia = cfg && (!cfg.activa || cfg.propia) ? undefined : valorVantia(nombre, ctx);
   if (enviado !== undefined) return { valor: enviado, origen: 'enviado', deVantia };
@@ -475,6 +533,11 @@ export function resolverValor(
   if (cfg?.modo === 'fijo') return { valor: cfg.valor ?? '', origen: 'fijo', deVantia };
   const guardado = !cfg?.propia && esDeDespacho(nombre) && deVantia ? undefined : guardados.get(clave);
   if (guardado !== undefined) return { valor: guardado, origen: 'guardado', deVantia };
+  // Variable propia de cada expediente sin rellenar: su valor por defecto.
+  if (!deVantia && cfg?.propia && cfg.modo === 'expediente' && cfg.formato?.defecto) {
+    const v = calcular(cfg.formato.defecto);
+    if (v) return { valor: v, origen: 'defecto', deVantia };
+  }
   return { valor: deVantia, origen: deVantia ? 'vantia' : 'vacio', deVantia };
 }
 

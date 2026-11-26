@@ -2493,6 +2493,10 @@ export async function runMigrations(): Promise<void> {
         );
       `);
     } catch (e: any) { console.error('[migrations] plantillas_variables:', e?.message); }
+    // Tipo de campo, opciones y valor por defecto de las variables propias (26/11/2026).
+    try {
+      await client.query(`ALTER TABLE plantillas_variables ADD COLUMN IF NOT EXISTS formato JSONB`);
+    } catch (e: any) { console.error('[migrations] plantillas_variables.formato:', e?.message); }
 
     // Variables de una sola plantilla (25/11/2026): "en esta plantilla, esta
     // variable va desactivada / con este valor / activa aunque en general no".

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { Braces, ChevronDown, Copy, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Braces, ChevronDown, Copy, CopyPlus, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
 import { t } from '../lib/i18n';
+import EditorFormula, { olvidarCatalogoFormulas } from './EditorFormula';
+import { EditorFormato, TIPOS, type FormatoVariable } from './FormatoCampo';
+import { refVariable, traducirErrorFormula } from '../lib/formulasVariables';
 
 // ── Ajustes → Mi Despacho → Variables de documentos (25/11/2026) ─────────────
 // Las variables son los «Campos» de las plantillas Word («Empresa_Nombre»,
@@ -11,12 +14,15 @@ import { t } from '../lib/i18n';
 // despacho puede desactivarla, darle un valor fijo o crear las suyas.
 // Backend: routes/plantillas.ts (/api/plantillas/variables) y resolverValor.
 
-type Modo = 'auto' | 'fijo' | 'expediente';
+// 'formula' (26/11/2026): se calcula con otras variables (ver EditorFormula).
+type Modo = 'auto' | 'fijo' | 'expediente' | 'formula';
 interface Variable {
   clave: string; nombre: string; etiqueta: string; grupo: string;
   tipo: 'basica' | 'expediente' | 'propia';
   automatica: boolean; despacho: boolean; imagen: boolean; actual: string | null;
   activa: boolean; modo: Modo; valor: string;
+  /** Variables propias de cada expediente: tipo de campo, opciones, por defecto. */
+  formato?: FormatoVariable | null;
   /** En cuántas plantillas tiene un ajuste propio (Ajustar esta plantilla). */
   enPlantillas?: number;
 }
@@ -35,7 +41,11 @@ const cambiada = (v: Variable) => v.tipo === 'propia' || !v.activa || v.modo !==
 function origen(v: Variable): { texto: string; valor?: string; tono: string } {
   if (!v.activa) return { texto: t('Desactivada: Vantia no la rellena'), tono: 'text-slate-400' };
   if (v.modo === 'fijo') return { texto: t('Valor fijo:'), valor: v.valor || t('(vacío)'), tono: 'text-sky-700' };
-  if (v.modo === 'expediente') return { texto: t('Se rellena en cada expediente (pestaña Datos para documentos)'), tono: 'text-violet-700' };
+  if (v.modo === 'formula') return { texto: t('Fórmula:'), valor: v.valor, tono: 'text-fuchsia-700' };
+  if (v.modo === 'expediente') {
+    const tipo = TIPOS.find(([k]) => k === (v.formato?.tipo || 'texto'))?.[1] || 'Texto corto';
+    return { texto: t('Se rellena en cada expediente (pestaña Datos para documentos)') + ' · ' + t(tipo) + (v.formato?.defecto ? ' · ' + t('con valor por defecto') : ''), tono: 'text-violet-700' };
+  }
   if (v.imagen) return { texto: v.actual ? t('El logo de Mi Despacho') : t('Falta el logo en Mi Despacho'), tono: v.actual ? 'text-emerald-700' : 'text-amber-700' };
   if (v.despacho) return v.actual
     ? { texto: t('De Mi Despacho:'), valor: v.actual, tono: 'text-emerald-700' }
@@ -53,7 +63,8 @@ export default function VariablesDocumentos() {
   const [filtro, setFiltro] = useState<Filtro>('despacho');
   const [grupos, setGrupos] = useState<Set<string>>(new Set([PROPIAS, 'Empresa']));
   const [editando, setEditando] = useState<string | null>(null);
-  const [nueva, setNueva] = useState(false);
+  // Nueva variable (vacía, o una copia de otra con «Duplicar»).
+  const [nueva, setNueva] = useState<Partial<Inicial> | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
@@ -66,7 +77,7 @@ export default function VariablesDocumentos() {
   }, [getToken]);
   useEffect(() => { if (abierta && !vars) void cargar(); }, [abierta, vars, cargar]);
 
-  const guardar = async (v: Variable, cambios: Partial<Pick<Variable, 'activa' | 'modo' | 'valor' | 'etiqueta'>>, ok?: string) => {
+  const guardar = async (v: Variable, cambios: Partial<Pick<Variable, 'activa' | 'modo' | 'valor' | 'etiqueta' | 'formato'>>, ok?: string) => {
     setOcupado(v.clave);
     try {
       const r = await apiFetch(`/api/plantillas/variables/${encodeURIComponent(v.clave)}`, {
@@ -76,7 +87,7 @@ export default function VariablesDocumentos() {
       setVars((p) => (p || []).map((x) => (x.clave === v.clave ? { ...x, ...cambios } : x)));
       if (ok) aviso.ok(ok);
       return true;
-    } catch (e: any) { aviso.error(e?.message || t('No se pudo guardar la variable.')); return false; }
+    } catch (e: any) { aviso.error(e?.message ? traducirErrorFormula(e.message) : t('No se pudo guardar la variable.')); return false; }
     finally { setOcupado(null); }
   };
 
@@ -99,6 +110,24 @@ export default function VariablesDocumentos() {
   const copiar = (v: Variable) => {
     const texto = `«${v.nombre}»`;
     navigator.clipboard?.writeText(texto).then(() => aviso.ok(t('Copiada: pégala en la plantilla de Word')), () => aviso.error(texto));
+  };
+  /** Copiar todas las variables de un grupo (una por línea) para pegarlas en Word. */
+  const copiarGrupo = (lista: Variable[]) => {
+    const texto = lista.map((v) => `${v.etiqueta}: «${v.nombre}»`).join('\n');
+    navigator.clipboard?.writeText(texto).then(() => aviso.ok(t('Copiadas {n} variables: pégalas en Word', { n: lista.length })), () => aviso.error(t('No se pudo copiar.')));
+  };
+  /** Duplicar: una variable nueva del despacho que empieza igual que esta. */
+  const duplicar = (v: Variable) => {
+    const propia = v.tipo === 'propia';
+    setNueva({
+      etiqueta: t('{nombre} (copia)', { nombre: v.etiqueta }),
+      // "Copia_…" nunca choca con los nombres de Vantia/MN (Empresa_, Clientes_…).
+      nombre: `Copia_${v.nombre}`.replace(/[^\p{L}\p{N}_ºª]+/gu, '_').replace(/_+/g, '_').replace(/_$/, '').slice(0, 80),
+      // Las de Vantia se copian como fórmula que las usa: así se pueden transformar.
+      modo: propia ? (v.modo as Inicial['modo']) : v.modo === 'fijo' ? 'fijo' : 'formula',
+      valor: propia || v.modo === 'fijo' || v.modo === 'formula' ? v.valor : `{${refVariable(v.nombre)}}`,
+      formato: v.formato || null,
+    });
   };
 
   const texto = q.trim().toLowerCase();
@@ -143,7 +172,7 @@ export default function VariablesDocumentos() {
                   className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-8 pr-2 text-sm outline-none focus:border-red-300" />
               </div>
               {puede && (
-                <button type="button" onClick={() => setNueva(true)}
+                <button type="button" onClick={() => setNueva({})}
                   className="h-9 px-3 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 inline-flex items-center gap-1.5">
                   <Plus size={14} />{t('Nueva variable')}</button>
               )}
@@ -170,12 +199,16 @@ export default function VariablesDocumentos() {
               const abierto = !!texto || grupos.has(g);
               return (
                 <div key={g} className="rounded-xl border border-slate-200">
-                  <button type="button" onClick={() => setGrupos((p) => { const s = new Set(p); s.has(g) ? s.delete(g) : s.add(g); return s; })}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
-                    <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${abierto ? '' : '-rotate-90'}`} />
-                    <span className="flex-1 min-w-0 truncate text-sm font-semibold text-slate-800">{nombreGrupo(g)}</span>
-                    <span className="shrink-0 text-[11px] text-slate-400">{lista.length}</span>
-                  </button>
+                  <div className="flex items-center gap-1 pr-2">
+                    <button type="button" onClick={() => setGrupos((p) => { const s = new Set(p); s.has(g) ? s.delete(g) : s.add(g); return s; })}
+                      className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 text-left">
+                      <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${abierto ? '' : '-rotate-90'}`} />
+                      <span className="flex-1 min-w-0 truncate text-sm font-semibold text-slate-800">{nombreGrupo(g)}</span>
+                      <span className="shrink-0 text-[11px] text-slate-400">{lista.length}</span>
+                    </button>
+                    <button type="button" onClick={() => copiarGrupo(lista)} title={t('Copiar todas las variables de este grupo')}
+                      className="h-7 w-7 shrink-0 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center"><Copy size={13} /></button>
+                  </div>
                   {abierto && (
                     <div className="divide-y divide-slate-100 border-t border-slate-100">
                       {lista.slice(0, MAX_FILAS).map((v) => (
@@ -183,7 +216,7 @@ export default function VariablesDocumentos() {
                           editando={editando === v.clave} onEditar={() => setEditando(editando === v.clave ? null : v.clave)}
                           onGuardar={async (c) => { if (await guardar(v, c, t('Variable guardada'))) setEditando(null); }}
                           onActiva={(a) => void guardar(v, { activa: a })}
-                          onBorrar={() => void borrar(v)} onCopiar={() => copiar(v)} />
+                          onBorrar={() => void borrar(v)} onCopiar={() => copiar(v)} onDuplicar={() => duplicar(v)} />
                       ))}
                       {lista.length > MAX_FILAS && <p className="px-3 py-2 text-xs text-slate-400">{t('Hay más: usa el buscador.')}</p>}
                     </div>
@@ -195,26 +228,35 @@ export default function VariablesDocumentos() {
         )
       )}
 
-      {nueva && <NuevaVariable onCerrar={() => setNueva(false)} onCreada={async () => { setNueva(false); setFiltro('despacho'); setGrupos((p) => new Set(p).add(PROPIAS)); await cargar(); }} />}
+      {nueva && <NuevaVariable inicial={nueva} onCerrar={() => setNueva(null)}
+        onCreada={async () => { setNueva(null); olvidarCatalogoFormulas(); setFiltro('despacho'); setGrupos((p) => new Set(p).add(PROPIAS)); await cargar(); }} />}
     </section>
   );
 }
 
-function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBorrar, onCopiar }: {
+function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBorrar, onCopiar, onDuplicar }: {
   v: Variable; puede: boolean; ocupado: boolean; editando: boolean;
   onEditar: () => void; onGuardar: (c: Partial<Variable>) => void; onActiva: (a: boolean) => void;
-  onBorrar: () => void; onCopiar: () => void;
+  onBorrar: () => void; onCopiar: () => void; onDuplicar: () => void;
 }) {
   const o = origen(v);
   const propia = v.tipo === 'propia';
   const [modo, setModo] = useState<Modo>(v.modo);
   const [valor, setValor] = useState(v.valor || (v.modo === 'auto' && v.actual && !v.imagen ? v.actual : ''));
   const [etiqueta, setEtiqueta] = useState(v.etiqueta);
-  useEffect(() => { if (editando) { setModo(v.modo); setValor(v.valor || (v.modo === 'auto' && v.actual && !v.imagen ? v.actual : '')); setEtiqueta(v.etiqueta); } }, [editando, v]);
+  const [formato, setFormato] = useState<FormatoVariable | null>(v.formato || null);
+  // El texto de cada modo se guarda aparte: cambiar de modo no borra lo escrito.
+  const [formula, setFormula] = useState(v.modo === 'formula' ? v.valor : `{${refVariable(v.nombre)}}`);
+  useEffect(() => {
+    if (!editando) return;
+    setModo(v.modo); setValor(v.modo === 'formula' ? '' : v.valor || (v.modo === 'auto' && v.actual && !v.imagen ? v.actual : ''));
+    setEtiqueta(v.etiqueta); setFormato(v.formato || null);
+    setFormula(v.modo === 'formula' ? v.valor : propia ? '' : `{${refVariable(v.nombre)}}`);
+  }, [editando, v, propia]);
 
   const opciones: [Modo, string][] = propia
-    ? [['fijo', 'Valor fijo para todos los documentos'], ['expediente', 'Se rellena en cada expediente']]
-    : [['auto', v.automatica || v.despacho ? 'Automático (de Vantia)' : 'Normal (se escribe en cada expediente)'], ['fijo', 'Valor fijo para todos los documentos']];
+    ? [['fijo', 'Valor fijo para todos los documentos'], ['expediente', 'Se rellena en cada expediente'], ['formula', 'Calculada con una fórmula (a partir de otros datos)']]
+    : [['auto', v.automatica || v.despacho ? 'Automático (de Vantia)' : 'Normal (se escribe en cada expediente)'], ['fijo', 'Valor fijo para todos los documentos'], ['formula', 'Calculada con una fórmula (a partir de otros datos)']];
 
   return (
     <div className={`px-3 py-2.5 ${v.activa ? '' : 'bg-slate-50/60'}`}>
@@ -237,6 +279,8 @@ function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBo
         {puede && (
           <div className="shrink-0 flex items-center gap-1.5">
             {ocupado && <Loader2 size={13} className="animate-spin text-slate-400" />}
+            <button type="button" onClick={onDuplicar} title={t('Duplicar: crear una variable nueva a partir de esta')}
+              className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center"><CopyPlus size={13} /></button>
             <button type="button" onClick={onEditar} title={t('Cambiar')}
               className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center"><Pencil size={13} /></button>
             <button type="button" role="switch" aria-checked={v.activa} disabled={ocupado}
@@ -273,6 +317,11 @@ function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBo
           {modo === 'fijo' && !propia && (v.automatica || v.despacho) && (
             <p className="text-xs text-slate-500">{t('Este valor manda sobre lo que tenga Vantia en sus fichas, en todos los expedientes.')}</p>
           )}
+          {modo === 'formula' && <EditorFormula valor={formula} onChange={setFormula} nombre={v.nombre} />}
+          {modo === 'formula' && !propia && (
+            <p className="text-xs text-slate-500">{t('Dentro de la fórmula, «{nombre}» es lo que traería Vantia sin la fórmula.', { nombre: v.nombre })}</p>
+          )}
+          {modo === 'expediente' && propia && <EditorFormato formato={formato} onChange={setFormato} />}
           <div className="flex flex-wrap items-center gap-2">
             {propia && (
               <button type="button" onClick={onBorrar} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700">
@@ -281,7 +330,11 @@ function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBo
             <div className="ml-auto flex gap-2">
               <button type="button" onClick={onEditar} className="px-3 py-1.5 text-xs font-semibold text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50">{t('Cancelar')}</button>
               <button type="button" disabled={ocupado}
-                onClick={() => onGuardar({ modo, valor: modo === 'fijo' ? valor : '', ...(propia ? { etiqueta: etiqueta.trim() || v.etiqueta } : {}) })}
+                onClick={() => onGuardar({
+                  modo, valor: modo === 'fijo' ? valor : modo === 'formula' ? formula : '',
+                  ...(propia ? { etiqueta: etiqueta.trim() || v.etiqueta } : {}),
+                  ...(propia && modo === 'expediente' ? { formato: formato || { tipo: 'texto' } } : {}),
+                })}
                 className="px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60">{t('Guardar')}</button>
             </div>
           </div>
@@ -291,17 +344,22 @@ function Fila({ v, puede, ocupado, editando, onEditar, onGuardar, onActiva, onBo
   );
 }
 
-function NuevaVariable({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: () => void }) {
+interface Inicial { etiqueta: string; nombre?: string; modo: 'fijo' | 'expediente' | 'formula'; valor: string; formato: FormatoVariable | null }
+
+function NuevaVariable({ inicial, onCerrar, onCreada }: { inicial: Partial<Inicial>; onCerrar: () => void; onCreada: () => void }) {
   const { getToken } = useAuth();
-  const [etiqueta, setEtiqueta] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [tocado, setTocado] = useState(false);
-  const [modo, setModo] = useState<'fijo' | 'expediente'>('fijo');
-  const [valor, setValor] = useState('');
+  const [etiqueta, setEtiqueta] = useState(inicial.etiqueta || '');
+  const [nombre, setNombre] = useState(inicial.nombre || '');
+  const [tocado, setTocado] = useState(Boolean(inicial.nombre));
+  const [modo, setModo] = useState<Inicial['modo']>(inicial.modo || 'fijo');
+  const [valor, setValor] = useState(inicial.modo === 'fijo' ? inicial.valor || '' : '');
+  const [formula, setFormula] = useState(inicial.modo === 'formula' ? inicial.valor || '' : '');
+  const [formato, setFormato] = useState<FormatoVariable | null>(inicial.formato || null);
   const [guardando, setGuardando] = useState(false);
   // El nombre para Word se propone a partir del nombre visible.
   const sugerido = (s: string) => {
-    const n = s.normalize('NFC').trim().replace(/[«»<>{}"'\\/]/g, '').replace(/\s+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80);
+    // Solo letras, números y "_": así se puede usar tal cual en las fórmulas.
+    const n = s.normalize('NFC').trim().replace(/[^\p{L}\p{N}_ºª]+/gu, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80);
     return n && !n.includes('_') ? `Propio_${n}` : n;
   };
   const final = sugerido(tocado ? nombre : etiqueta);
@@ -310,17 +368,20 @@ function NuevaVariable({ onCerrar, onCreada }: { onCerrar: () => void; onCreada:
     if (!final) return;
     setGuardando(true);
     try {
-      const r = await apiFetch('/api/plantillas/variables', { method: 'POST', getToken, body: JSON.stringify({ nombre: final, etiqueta, modo, valor }) });
+      const r = await apiFetch('/api/plantillas/variables', {
+        method: 'POST', getToken,
+        body: JSON.stringify({ nombre: final, etiqueta, modo, valor: modo === 'formula' ? formula : valor, formato: modo === 'expediente' ? formato || { tipo: 'texto' } : null }),
+      });
       if (r?.success === false) throw new Error(r.error);
       aviso.ok(t('Variable creada: escribe «{nombre}» en la plantilla', { nombre: r.data.nombre }));
       onCreada();
-    } catch (e: any) { aviso.error(e?.message || t('No se pudo crear la variable.')); }
+    } catch (e: any) { aviso.error(e?.message ? traducirErrorFormula(e.message) : t('No se pudo crear la variable.')); }
     finally { setGuardando(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onCerrar}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className={`w-full ${modo === 'fijo' ? 'max-w-md' : 'max-w-2xl'} max-h-[92vh] overflow-y-auto rounded-2xl bg-white p-5 shadow-xl space-y-4`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h4 className="text-base font-bold text-slate-800">{t('Nueva variable')}</h4>
@@ -329,7 +390,7 @@ function NuevaVariable({ onCerrar, onCreada }: { onCerrar: () => void; onCreada:
           <button type="button" onClick={onCerrar} className="h-8 w-8 shrink-0 rounded-lg text-slate-400 hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button>
         </div>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('Nombre')}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{t('Nombre@@variable')}</span>
           <input autoFocus value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)} maxLength={150} placeholder={t('p. ej. Horario de atención')}
             className="h-9 rounded-lg border border-slate-200 px-2.5 text-sm outline-none focus:border-red-300" />
         </label>
@@ -348,16 +409,23 @@ function NuevaVariable({ onCerrar, onCreada }: { onCerrar: () => void; onCreada:
             <input type="radio" checked={modo === 'fijo'} onChange={() => setModo('fijo')} className="accent-red-600" />{t('Valor fijo para todos los documentos')}</label>
           <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="radio" checked={modo === 'expediente'} onChange={() => setModo('expediente')} className="accent-red-600" />{t('Se rellena en cada expediente')}</label>
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+            <input type="radio" checked={modo === 'formula'} onChange={() => setModo('formula')} className="accent-red-600" />{t('Calculada con una fórmula (a partir de otros datos)')}</label>
         </div>
-        {modo === 'fijo' ? (
+        {modo === 'fijo' && (
           <textarea value={valor} onChange={(e) => setValor(e.target.value)} rows={3} placeholder={t('El texto que saldrá en todos los documentos')}
             className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-red-300" />
-        ) : (
-          <p className="text-xs text-slate-500">{t('Saldrá en la pestaña «Datos para documentos» de cada expediente para rellenarla allí.')}</p>
         )}
+        {modo === 'expediente' && (
+          <>
+            <p className="text-xs text-slate-500">{t('Saldrá en la pestaña «Datos para documentos» de cada expediente para rellenarla allí.')}</p>
+            <EditorFormato formato={formato} onChange={setFormato} />
+          </>
+        )}
+        {modo === 'formula' && <EditorFormula valor={formula} onChange={setFormula} nombre={final || undefined} />}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCerrar} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">{t('Cancelar')}</button>
-          <button type="button" onClick={crear} disabled={!final || guardando}
+          <button type="button" onClick={crear} disabled={!final || guardando || (modo === 'formula' && !formula.trim())}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 rounded-xl">
             {guardando && <Loader2 size={14} className="animate-spin" />}{t('Crear variable')}</button>
         </div>

@@ -5,6 +5,8 @@ import { AlertTriangle, Eraser, Loader2, Search, Sparkles, Wand2, X } from 'luci
 import { apiFetch } from '../lib/api';
 import { aviso } from '../lib/avisos';
 import { t } from '../lib/i18n';
+import EditorFormula from './EditorFormula';
+import { refVariable, traducirErrorFormula } from '../lib/formulasVariables';
 
 // ── Editor de una plantilla (Ajustes → Plantillas del despacho, 25/11/2026) ──
 // A la izquierda el texto del documento con sus variables «Grupo_Campo»; se
@@ -13,7 +15,7 @@ import { t } from '../lib/i18n';
 // esta plantilla. Backend: routes/plantillas.ts (/editor, /editor/texto,
 // /variables-plantilla).
 
-type Estado = 'on' | 'off' | 'fijo' | 'dato';
+type Estado = 'on' | 'off' | 'fijo' | 'dato' | 'formula';
 interface Campo {
   nombre: string; clave: string; etiqueta: string; grupo: string;
   conoceVantia: boolean; imagen: boolean;
@@ -38,6 +40,7 @@ function textoGeneral(c: Campo): string {
   if (g && !g.activa) return t("desactivada: se escribe al generar");
   if (g?.modo === 'fijo') return t("valor fijo «{valor}»", { valor: (g.valor || '').slice(0, 40) });
   if (g?.modo === 'expediente') return t("se rellena en cada expediente");
+  if (g?.modo === 'formula') return t("con fórmula");
   if (c.imagen) return t("el logo de Mi Despacho");
   return c.conoceVantia ? t("dato de Vantia") : t("se escribe al generar");
 }
@@ -159,7 +162,7 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
       const r = await apiFetch('/api/plantillas/variables-plantilla', { method: 'PUT', getToken, body: JSON.stringify({ plantilla: d.ref, nombre: c.nombre, estado, valor }) });
       if (r?.success === false) throw new Error(r.error);
       setD((x) => x && ({ ...x, campos: x.campos.map((y) => (y.clave === c.clave ? { ...y, enPlantilla: estado === 'general' ? null : { estado, valor } } : y)) }));
-    } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo guardar la variable.")); }
+    } catch (e: any) { aviso.error(e?.message ? traducirErrorFormula(e.message) : t("No se pudo guardar la variable.")); }
     finally { setGuardando(null); }
   };
 
@@ -283,7 +286,7 @@ export default function EditorPlantilla({ refInicial, onCerrar, onCambiada, onPe
                     <p className="mb-1 text-[11px] font-semibold text-slate-400">{nombreGrupo(g)}</p>
                     <div className="space-y-1.5">
                       {cs.map((c) => (
-                        <FilaVariable key={c.clave} c={c} activa={activa === c.clave} guardando={guardando === c.clave}
+                        <FilaVariable key={c.clave} c={c} plantillaRef={d.ref} activa={activa === c.clave} guardando={guardando === c.clave}
                           catalogo={catalogo} extra={deLaPlantilla} pedirCatalogo={pedirCatalogo}
                           onVer={() => verEnTexto(c.clave)} onAjustar={(e, v) => void ajustar(c, e, v)} />
                       ))}
@@ -387,12 +390,13 @@ const OPCIONES: [Estado | 'general', string][] = [
   ['general', 'Como en general'],
   ['dato', 'Con otro dato de Vantia'],
   ['fijo', 'Con un texto fijo'],
+  ['formula', 'Con una fórmula'],
   ['off', 'No rellenar (se escribe al generar)'],
   ['on', 'Activa aunque en general no'],
 ];
 
-function FilaVariable({ c, activa, guardando, catalogo, extra, pedirCatalogo, onVer, onAjustar }: {
-  c: Campo; activa: boolean; guardando: boolean;
+function FilaVariable({ c, activa, guardando, catalogo, extra, pedirCatalogo, onVer, onAjustar, plantillaRef }: {
+  c: Campo; activa: boolean; guardando: boolean; plantillaRef: string;
   catalogo: VarCatalogo[] | null; extra: VarCatalogo[]; pedirCatalogo: () => void;
   onVer: () => void; onAjustar: (estado: Estado | 'general', valor?: string) => void;
 }) {
@@ -400,6 +404,7 @@ function FilaVariable({ c, activa, guardando, catalogo, extra, pedirCatalogo, on
   const [estado, setEstado] = useState<Estado | 'general'>(actual);
   const [valor, setValor] = useState(c.enPlantilla?.estado === 'fijo' ? c.enPlantilla.valor : '');
   const [buscando, setBuscando] = useState(false);
+  const [formula, setFormula] = useState(c.enPlantilla?.estado === 'formula' ? c.enPlantilla.valor : `{${refVariable(c.nombre)}}`);
   useEffect(() => { setEstado(c.enPlantilla?.estado || 'general'); }, [c.enPlantilla?.estado]);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (activa) ref.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [activa]);
@@ -426,7 +431,7 @@ function FilaVariable({ c, activa, guardando, catalogo, extra, pedirCatalogo, on
               const v = e.target.value as Estado | 'general';
               setEstado(v);
               if (v === 'dato') { setBuscando(true); pedirCatalogo(); }
-              else if (v !== 'fijo') { setBuscando(false); onAjustar(v); }
+              else if (v !== 'fijo' && v !== 'formula') { setBuscando(false); onAjustar(v); }
             }}
             className="mt-1.5 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 outline-none focus:border-red-300">
             {opciones.map(([k, l]) => <option key={k} value={k}>{k === 'general' ? `${t(l)} (${textoGeneral(c)})` : t(l)}</option>)}
@@ -440,6 +445,15 @@ function FilaVariable({ c, activa, guardando, catalogo, extra, pedirCatalogo, on
               {(buscando || !datoActual) && (
                 <ElegirVariable catalogo={catalogo} extra={extra.filter((x) => x.nombre !== c.nombre)} onElegir={(n) => { setBuscando(false); onAjustar('dato', n); }} />
               )}
+            </div>
+          )}
+          {estado === 'formula' && (
+            <div className="mt-1.5 space-y-1.5">
+              <EditorFormula valor={formula} onChange={setFormula} nombre={c.nombre} plantilla={plantillaRef} />
+              <div className="flex justify-end">
+                <button type="button" disabled={guardando || !formula.trim() || (actual === 'formula' && formula === (c.enPlantilla?.valor ?? ''))} onClick={() => onAjustar('formula', formula)}
+                  className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40">{t("Guardar fórmula")}</button>
+              </div>
             </div>
           )}
           {estado === 'fijo' && (

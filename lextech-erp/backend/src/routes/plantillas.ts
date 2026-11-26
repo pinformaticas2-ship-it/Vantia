@@ -18,7 +18,9 @@ import { CATALOGO_MACROS_BASICAS } from '../data/catalogoMacrosBasicas';
 import {
   guardarValores, etiquetaDe, configVariables, vantiaLaConoce, nombreVariablePropia, contextoPlantilla,
   valorVantia, esDeDespacho, esCampoLogo, grupoDe, logoDespachoConAviso, refPlantilla, ajustesDePlantilla,
+  normalizarFormato, resolverValor, valoresGuardados, configParaPlantilla,
 } from '../services/plantillasDatos';
+import { analizarFormula, ErrorFormula, MAX_FORMULA } from '../services/plantillasFormulas';
 import { claveCanonica, esNombreMarcador, leerComoDocx, parrafosDePlantilla, camposDePlantilla, reemplazarTextoPlantilla } from '../services/plantillasWord';
 import { rutaPlantillaOrg, nombrePlantillaOrg } from '../controllers/filesController';
 import path from 'path';
@@ -167,9 +169,20 @@ router.get('/datos/:id', requireAuth, requireModulePermission('expedientes'), as
     // Variables de documentos del despacho: las propias "de cada expediente"
     // van primero; las desactivadas o con valor fijo no se piden aquí.
     const config = await configVariables(req.organizacionId);
-    const propias = [...config.values()]
-      .filter((v) => v.propia && v.activa && v.modo === 'expediente')
-      .map((v) => ({ grupo: 'Variables del despacho', etiqueta: v.etiqueta || etiquetaDe(v.nombre), nombre: v.nombre, clave: v.clave }));
+    const deExpediente = [...config.values()].filter((v) => v.propia && v.activa && v.modo === 'expediente');
+    // El valor por defecto (puede ser una fórmula con los datos de este expediente).
+    const conDefecto = deExpediente.some((v) => v.formato?.defecto);
+    const ctxExp = conDefecto ? await contextoPlantilla(req.organizacionId, id, null) : null;
+    const guardadosExp = conDefecto ? await valoresGuardados(req.organizacionId, id) : null;
+    const propias = deExpediente.map((v) => {
+      let porDefecto = '';
+      if (ctxExp && guardadosExp && v.formato?.defecto) {
+        const sinValor = new Map(guardadosExp); sinValor.delete(v.clave);
+        const r = resolverValor(v.nombre, ctxExp, sinValor, config);
+        porDefecto = r.origen === 'defecto' ? (r.valor || '') : '';
+      }
+      return { grupo: 'Variables del despacho', etiqueta: v.etiqueta || etiquetaDe(v.nombre), nombre: v.nombre, clave: v.clave, formato: v.formato || null, porDefecto };
+    });
     const fuera = new Set([...config.values()].filter((v) => !v.activa || v.modo === 'fijo' || v.propia).map((v) => v.clave));
     const enCatalogo = new Set(CATALOGO_CAMPOS_MN.map((c) => c.clave));
     const extra = [...new Set([...rows.map((r) => r.clave), ...usados.map((r) => r.clave)])]
@@ -207,8 +220,17 @@ router.put('/datos/:id', requireAuth, requireModulePermission('expedientes'), as
 // haya cambiado (desactivar, valor fijo) o creado (variables propias).
 // Ver resolverValor en services/plantillasDatos.
 
-const MODOS = ['auto', 'fijo', 'expediente'];
+const MODOS = ['auto', 'fijo', 'expediente', 'formula'];
 const textoValor = (v: any) => String(v ?? '').slice(0, 5000);
+
+/** null si la fórmula está bien; si no, el error y dónde (para señalarlo). */
+function errorFormula(texto: string): { error: string; pos: number } | null {
+  if (!String(texto || '').trim()) return { error: 'Escribe la fórmula.', pos: 0 };
+  if (String(texto).length > MAX_FORMULA) return { error: `La fórmula no puede pasar de ${MAX_FORMULA} caracteres`, pos: MAX_FORMULA };
+  try { analizarFormula(texto); return null; } catch (e: any) {
+    return { error: e?.message || 'Fórmula no válida.', pos: e instanceof ErrorFormula ? e.pos : 0 };
+  }
+}
 
 router.get('/variables', requireAuth, async (req: any, res: Response) => {
   try {
@@ -242,7 +264,7 @@ router.get('/variables', requireAuth, async (req: any, res: Response) => {
       ...[...config.values()].filter((v) => v.propia).map((v) => ({
         clave: v.clave, nombre: v.nombre, etiqueta: v.etiqueta || etiquetaDe(v.nombre), grupo: 'Variables del despacho', tipo: 'propia',
         automatica: false, despacho: false, imagen: false, actual: null as string | null,
-        activa: v.activa, modo: v.modo, valor: v.valor ?? '',
+        activa: v.activa, modo: v.modo, valor: v.valor ?? '', formato: v.formato || null,
         enPlantillas: enPlantillas.get(v.clave) || 0,
       })),
       ...CATALOGO_MACROS_BASICAS.map((c) => fila(c, 'basica')),
@@ -277,19 +299,32 @@ router.put('/variables/:clave', requireAuth, soloGestor, async (req: any, res: R
     if (propia && modo === 'auto') return res.status(400).json({ success: false, error: 'Variable no válida.' });
     const valor = b.valor !== undefined ? textoValor(b.valor) : (previa?.valor ?? '');
     const etiqueta = b.etiqueta !== undefined ? (String(b.etiqueta).trim().slice(0, 150) || null) : (previa?.etiqueta ?? null);
+    if (modo === 'formula') {
+      const err = errorFormula(valor);
+      if (err) return res.status(400).json({ success: false, ...err });
+    }
+    // Tipo de campo / opciones / por defecto: solo variables propias de cada expediente.
+    const formato = propia && modo === 'expediente'
+      ? (b.formato !== undefined ? normalizarFormato(b.formato) : (previa?.formato ?? null))
+      : null;
+    if (formato?.defecto && /\{/.test(formato.defecto)) {
+      const err = errorFormula(formato.defecto);
+      if (err) return res.status(400).json({ success: false, error: `Valor por defecto: ${err.error}`, pos: err.pos, campo: 'defecto' });
+    }
     if (!propia && activa && modo === 'auto') {
       // Vuelve a como venía: sin fila.
       await pool.query(`DELETE FROM plantillas_variables WHERE organizacion_id = $1 AND clave = $2`, [req.organizacionId, clave]);
     } else {
       await pool.query(
-        `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, formato, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (organizacion_id, clave) DO UPDATE SET etiqueta = EXCLUDED.etiqueta, activa = EXCLUDED.activa,
-           modo = EXCLUDED.modo, valor = EXCLUDED.valor, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [req.organizacionId, clave, nombre, etiqueta, propia, activa, modo, modo === 'fijo' ? valor : '', req.auth?.userId || ''],
+           modo = EXCLUDED.modo, valor = EXCLUDED.valor, formato = EXCLUDED.formato, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [req.organizacionId, clave, nombre, etiqueta, propia, activa, modo, modo === 'fijo' || modo === 'formula' ? valor : '',
+          formato ? JSON.stringify(formato) : null, req.auth?.userId || ''],
       );
     }
-    const estado = !activa ? 'desactivada' : modo === 'fijo' ? 'con valor fijo' : 'activada';
+    const estado = !activa ? 'desactivada' : modo === 'fijo' ? 'con valor fijo' : modo === 'formula' ? 'calculada con una fórmula' : 'activada';
     logActivityForReq(req, `Variable de documentos «${nombre}» ${estado}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
     res.json({ success: true });
   } catch (e: any) {
@@ -309,13 +344,23 @@ router.post('/variables', requireAuth, soloGestor, async (req: any, res: Respons
       || CATALOGO_MACROS_BASICAS.some((c) => c.clave === clave) || CATALOGO_CAMPOS_MN.some((c) => c.clave === clave)) {
       return res.status(409).json({ success: false, error: 'Ese nombre ya lo usa una variable de las plantillas. Elige otro.' });
     }
-    const modo = b.modo === 'expediente' ? 'expediente' : 'fijo';
+    const modo = b.modo === 'expediente' || b.modo === 'formula' ? b.modo : 'fijo';
     const etiqueta = String(b.etiqueta || '').trim().slice(0, 150) || etiquetaDe(nombre);
+    const valor = modo === 'expediente' ? '' : textoValor(b.valor);
+    if (modo === 'formula') {
+      const err = errorFormula(valor);
+      if (err) return res.status(400).json({ success: false, ...err });
+    }
+    const formato = modo === 'expediente' ? normalizarFormato(b.formato) : null;
+    if (formato?.defecto && /\{/.test(formato.defecto)) {
+      const err = errorFormula(formato.defecto);
+      if (err) return res.status(400).json({ success: false, error: `Valor por defecto: ${err.error}`, pos: err.pos, campo: 'defecto' });
+    }
     const { rows } = await pool.query(
-      `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, updated_by)
-       VALUES ($1, $2, $3, $4, TRUE, TRUE, $5, $6, $7)
+      `INSERT INTO plantillas_variables (organizacion_id, clave, nombre, etiqueta, propia, activa, modo, valor, formato, updated_by)
+       VALUES ($1, $2, $3, $4, TRUE, TRUE, $5, $6, $7, $8)
        ON CONFLICT (organizacion_id, clave) DO NOTHING RETURNING clave`,
-      [req.organizacionId, clave, nombre, etiqueta, modo, modo === 'fijo' ? textoValor(b.valor) : '', req.auth?.userId || ''],
+      [req.organizacionId, clave, nombre, etiqueta, modo, valor, formato ? JSON.stringify(formato) : null, req.auth?.userId || ''],
     );
     if (!rows[0]) return res.status(409).json({ success: false, error: 'Ya existe una variable con ese nombre.' });
     logActivityForReq(req, `Variable de documentos creada: «${nombre}»`, 'ORGANIZACION', req.organizacionId).catch(() => {});
@@ -341,6 +386,66 @@ router.delete('/variables/:clave', requireAuth, soloGestor, async (req: any, res
   }
 });
 
+/** Probar una fórmula con los datos de un expediente (o sin expediente: solo
+ *  Mi Despacho). Devuelve el resultado, o el error y dónde está, y qué
+ *  variables usa (y si Vantia las conoce). No guarda nada. */
+router.post('/variables/probar', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const b = req.body || {};
+    const formula = textoValor(b.formula);
+    const err = errorFormula(formula);
+    if (err) return res.json({ success: true, data: { valor: null, ...err, variables: [] } });
+    const expId = /^[0-9a-f-]{36}$/i.test(String(b.expedienteId || '')) ? String(b.expedienteId) : null;
+    const ctx = await contextoPlantilla(req.organizacionId, expId, null);
+    if (expId && !ctx.exp) return res.status(404).json({ success: false, error: 'Expediente no encontrado.' });
+    const guardados = await valoresGuardados(req.organizacionId, expId);
+    const plantilla = b.plantilla ? refPlantilla(String(b.plantilla)) : null;
+    const config = await configParaPlantilla(req.organizacionId, plantilla);
+    // La fórmula se prueba como si fuera la de una variable de paso.
+    const PRUEBA = 'Prueba_De_Formula_Vantia';
+    const yo = b.nombre ? String(b.nombre).slice(0, 150) : PRUEBA;
+    const claveYo = claveCanonica(yo);
+    const base = config.get(claveYo);
+    config.set(claveYo, { clave: claveYo, nombre: yo, etiqueta: null, propia: base?.propia ?? yo === PRUEBA, activa: true, modo: 'formula', valor: formula });
+    const r = resolverValor(yo, ctx, guardados, config);
+    const conocidas = new Set([...config.keys()]);
+    const variables = analizarFormula(formula).variables.map((n) => {
+      const c = claveCanonica(n);
+      const v = c === claveYo ? null : resolverValor(n, ctx, guardados, config);
+      return {
+        nombre: n,
+        conocida: c === claveYo || conocidas.has(c) || vantiaLaConoce(n) || esCampoLogo(n)
+          || CATALOGO_MACROS_BASICAS.some((x) => x.clave === c) || CATALOGO_CAMPOS_MN.some((x) => x.clave === c),
+        valor: v?.valor ?? '',
+      };
+    });
+    res.json({ success: true, data: { valor: r.valor ?? '', error: null, pos: null, variables } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo probar la fórmula.' });
+  }
+});
+
+/** Los últimos expedientes del despacho, para probar las fórmulas con datos reales. */
+router.get('/variables/expedientes-ejemplo', requireAuth, soloGestor, async (req: any, res: Response) => {
+  try {
+    const q = String(req.query.q || '').trim().slice(0, 80);
+    const { rows } = await pool.query(
+      `SELECT id, anio, num_exp, cliente_nombre, contrario, descripcion FROM expedientes
+        WHERE organizacion_id = $1
+          AND ($2 = '' OR cliente_nombre ILIKE '%' || $2 || '%' OR contrario ILIKE '%' || $2 || '%'
+               OR descripcion ILIKE '%' || $2 || '%' OR (anio::text || '/' || num_exp::text) ILIKE '%' || $2 || '%')
+        ORDER BY updated_at DESC NULLS LAST LIMIT 20`,
+      [req.organizacionId, q],
+    );
+    res.json({ success: true, data: rows.map((r: any) => ({
+      id: r.id,
+      etiqueta: [r.num_exp ? `${r.anio}/${r.num_exp}` : '', r.cliente_nombre, r.contrario ? `c/ ${r.contrario}` : ''].filter(Boolean).join(' · ') || r.descripcion || r.id,
+    })) });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudieron cargar los expedientes.' });
+  }
+});
+
 /** Ajuste de una variable solo en una plantilla: 'general' (quitar el ajuste),
  *  'off' (desactivada aquí), 'on' (activa aquí aunque en general no) o 'fijo'. */
 router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res: Response) => {
@@ -349,12 +454,16 @@ router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res
     const plantilla = refPlantilla(b.plantilla);
     const nombre = String(b.nombre || '').trim().slice(0, 150);
     const clave = claveCanonica(nombre);
-    const estado = ['general', 'on', 'off', 'fijo', 'dato'].includes(b.estado) ? b.estado : null;
+    const estado = ['general', 'on', 'off', 'fijo', 'dato', 'formula'].includes(b.estado) ? b.estado : null;
     if (!plantilla || !clave || !estado) return res.status(400).json({ success: false, error: 'Variable no válida.' });
     // 'dato': se rellena con otra variable (la que se elige en el editor).
     const origenDato = estado === 'dato' ? String(b.valor || '').trim().slice(0, 150) : '';
     if (estado === 'dato' && (!esNombreMarcador(origenDato) || claveCanonica(origenDato) === clave)) {
       return res.status(400).json({ success: false, error: 'Elige con qué dato se rellena.' });
+    }
+    if (estado === 'formula') {
+      const err = errorFormula(textoValor(b.valor));
+      if (err) return res.status(400).json({ success: false, ...err });
     }
     if (estado === 'general') {
       await pool.query(`DELETE FROM plantillas_variables_plantilla WHERE organizacion_id = $1 AND plantilla = $2 AND clave = $3`, [req.organizacionId, plantilla, clave]);
@@ -364,10 +473,10 @@ router.put('/variables-plantilla', requireAuth, soloGestor, async (req: any, res
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (organizacion_id, plantilla, clave) DO UPDATE SET estado = EXCLUDED.estado, valor = EXCLUDED.valor,
            updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [req.organizacionId, plantilla, clave, nombre, estado, estado === 'fijo' ? textoValor(b.valor) : estado === 'dato' ? origenDato : null, req.auth?.userId || ''],
+        [req.organizacionId, plantilla, clave, nombre, estado, estado === 'fijo' || estado === 'formula' ? textoValor(b.valor) : estado === 'dato' ? origenDato : null, req.auth?.userId || ''],
       );
     }
-    const que = estado === 'general' ? 'como en general' : estado === 'off' ? 'desactivada' : estado === 'on' ? 'activada' : estado === 'dato' ? `rellenada con «${origenDato}»` : 'con valor propio';
+    const que = estado === 'general' ? 'como en general' : estado === 'off' ? 'desactivada' : estado === 'on' ? 'activada' : estado === 'dato' ? `rellenada con «${origenDato}»` : estado === 'formula' ? 'calculada con una fórmula' : 'con valor propio';
     logActivityForReq(req, `Plantilla «${plantilla.split('/').pop()}»: variable «${nombre}» ${que}`, 'ORGANIZACION', req.organizacionId).catch(() => {});
     res.json({ success: true });
   } catch (e: any) {

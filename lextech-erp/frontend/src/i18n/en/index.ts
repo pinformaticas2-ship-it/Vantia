@@ -19,3 +19,4 @@ import './actividad';
 import './datosIniciales';
 import './variablesDocumentos';
 import './plantillasEditor';
+import './formulasVariables';

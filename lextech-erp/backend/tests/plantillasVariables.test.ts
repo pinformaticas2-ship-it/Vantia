@@ -248,3 +248,94 @@ test('editor: las plantillas integradas no se editan (son de todos los despachos
   assert.equal((await call('post', '/editor/texto', 'pv_miembro', { body: { path: 'nube:x' } })).status, 403);
   assert.equal((await call('get', '/lista', 'pv_miembro')).status, 403);
 });
+
+// ── Fórmulas (26/11/2026) ────────────────────────────────────────────────────
+
+test('fórmulas: funciones de texto, condiciones, importes y fechas', async () => {
+  const { evaluarFormula, analizarFormula, nombresFunciones } = await import('../src/services/plantillasFormulas');
+  const v: Record<string, string> = { Clientes_Nombre: 'ANA DE LA FUENTE', Clientes_Sexo: 'Mujer', 'Empresa_NIF/CIF': 'B1', Cuantia_X: '1.234,50 €', F_X: '05/03/2026', Vacia_X: '' };
+  const ev = (f: string) => evaluarFormula(f, (n) => v[n]);
+  assert.equal(ev('{DON_DONA(Clientes_Sexo)} {NOMPROPIO(Clientes_Nombre)}'), 'doña Ana de la Fuente');
+  assert.equal(ev('{EUROS_LETRAS(Cuantia_X)} ({IMPORTE(Cuantia_X)})'), 'mil doscientos treinta y cuatro euros con cincuenta céntimos (1.234,50 €)');
+  assert.equal(ev('{EUROS_LETRAS(21)}|{EUROS_LETRAS(1000000)}|{LETRAS(21)}'), 'veintiún euros|un millón de euros|veintiuno');
+  assert.equal(ev('{FECHA_LARGA(F_X)}|{FECHA_LETRAS(F_X)}|{SUMAR_MESES("31/01/2026"; 1)}'), '5 de marzo de 2026|cinco de marzo de dos mil veintiséis|28/02/2026');
+  assert.equal(ev('{SI(Cuantia_X > 1000; "verbal"; "otro")} {Cuantia_X * 2}'), 'verbal 2469');
+  assert.equal(ev('{«Empresa_NIF/CIF»}{SI_VACIO(Vacia_X; "-")}{TEXTO_SI(Vacia_X; ", tel ")}'), 'B1-');
+  assert.equal(ev('{LISTA("Juan"; "Pedro"; "Isabel")}'), 'Juan, Pedro e Isabel');
+  assert.equal(ev('{UPPER(Clientes_Nombre)} {IF(Clientes_Sexo = "mujer"; "F"; "M")} {{x}}'), 'ANA DE LA FUENTE F {x}', 'nombres en inglés y comparación sin mayúsculas');
+  assert.deepEqual(analizarFormula('{A_B & «C/D»} {X_Y}').variables, ['A_B', 'C/D', 'X_Y']);
+  for (const [f, re] of [['{NOEXISTE(1)}', /No existe la función/], ['{SI(1)}', /entre 2 y 3/], ['{1 +}', /incompleta/], ['a }', /Sobra una llave/], ['{"a}', /llave|comillas/]] as const) {
+    assert.throws(() => analizarFormula(f), re, f);
+  }
+  // Las funciones de la ayuda del navegador existen todas aquí.
+  const fs = await import('fs');
+  const front = fs.readFileSync(require('path').join(__dirname, '../../frontend/src/lib/formulasVariables.ts'), 'utf8');
+  const enAyuda = [...front.matchAll(/nombre: '([A-ZÑ_]+)', en: '([A-Z_]+)'/g)].map((m) => `${m[1]}/${m[2]}`).sort();
+  assert.deepEqual(enAyuda, nombresFunciones().map((f) => `${f.nombre}/${f.en}`).sort());
+});
+
+test('fórmulas: variables calculadas, sin círculos y por plantilla', { skip }, async () => {
+  const d = await import('../src/services/plantillasDatos');
+  const ctx = await d.contextoPlantilla(org, exp);
+  const post = (body: any) => call('post', '/variables', 'pv_jefa', { body });
+  // Una fórmula mal escrita no se guarda y dice dónde falla.
+  const mal = await post({ nombre: 'Formula_Mala', modo: 'formula', valor: 'Hola {MAYUSCULAS(Clientes_Nombre}' });
+  assert.equal(mal.status, 400);
+  assert.match(mal.body.error, /paréntesis/);
+  assert.equal(typeof mal.body.pos, 'number');
+  assert.equal((await post({ nombre: 'Formula_Cliente', modo: 'formula', valor: '{MAYUSCULAS(Clientes_Nombre)} c/ {Contrarios_Nombre}' })).status, 200);
+  // Una fórmula que usa otra, y dos que se usan entre sí (no se cuelga).
+  assert.equal((await post({ nombre: 'Formula_Doble', modo: 'formula', valor: '[{Formula_Cliente}]' })).status, 200);
+  await post({ nombre: 'Circulo_A', modo: 'formula', valor: 'A{Circulo_B}' });
+  await post({ nombre: 'Circulo_B', modo: 'formula', valor: 'B{Circulo_A}' });
+  // (Contrarios_Nombre está desactivada en general por un test anterior)
+  const config = await d.configVariables(org);
+  let r = d.resolverValor('Formula_Cliente', ctx, new Map(), config);
+  assert.deepEqual([r.valor, r.origen], ['ANA CLIENTE c/ ', 'formula']);
+  assert.equal(d.resolverValor('Formula_Doble', ctx, new Map(), config).valor, '[ANA CLIENTE c/ ]');
+  assert.equal(d.resolverValor('Circulo_A', ctx, new Map(), config).valor, 'AB');
+  // Una variable de Vantia transformada con su propio valor.
+  const put = await call('put', '/variables/:clave', 'pv_jefa', { params: { clave: 'CLIENTES_NOMBRE' }, body: { nombre: 'Clientes_Nombre', modo: 'formula', valor: '{MAYUSCULAS(Clientes_Nombre)}' } });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  r = d.resolverValor('Clientes_Nombre', ctx, new Map(), await d.configVariables(org));
+  assert.deepEqual([r.valor, r.origen], ['ANA CLIENTE', 'formula']);
+  await call('put', '/variables/:clave', 'pv_jefa', { params: { clave: 'CLIENTES_NOMBRE' }, body: { nombre: 'Clientes_Nombre', modo: 'auto' } });
+  // Solo en una plantilla.
+  const pp = await call('put', '/variables-plantilla', 'pv_jefa', { body: { plantilla: 'nube:f', nombre: 'Juzgados_Núm_Autos', estado: 'formula', valor: 'Autos {Juzgados_Núm_Autos}' } });
+  assert.equal(pp.status, 200);
+  assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), await d.configParaPlantilla(org, 'nube:f')).valor, 'Autos 123/2026');
+  assert.equal(d.resolverValor('Juzgados_Núm_Autos', ctx, new Map(), await d.configParaPlantilla(org, 'nube:g')).valor, '123/2026');
+  // Probar: con los datos de un expediente, sin guardar nada; marca las variables que no existen.
+  const p = await call('post', '/variables/probar', 'pv_jefa', { body: { formula: '{NOMPROPIO(Clientes_Nombre)} {No_Existe_Nunca}', expedienteId: exp } });
+  assert.equal(p.body.data.valor, 'Ana Cliente ');
+  assert.deepEqual(p.body.data.variables.map((x: any) => [x.nombre, x.conocida]), [['Clientes_Nombre', true], ['No_Existe_Nunca', false]]);
+  const pe = await call('post', '/variables/probar', 'pv_jefa', { body: { formula: '{SI(}' } });
+  assert.ok(pe.body.data.error);
+  assert.equal((await call('post', '/variables/probar', 'pv_miembro', { body: { formula: 'x' } })).status, 403);
+  const ej = await call('get', '/variables/expedientes-ejemplo', 'pv_jefa');
+  assert.deepEqual(ej.body.data.map((x: any) => x.id), [exp], 'solo los de su despacho');
+});
+
+test('variables de cada expediente: tipo de campo, opciones y valor por defecto', { skip }, async () => {
+  const d = await import('../src/services/plantillasDatos');
+  const r = await call('post', '/variables', 'pv_jefa', { body: {
+    nombre: 'Asunto_Tipo_Juicio', modo: 'expediente',
+    formato: { tipo: 'opciones', opciones: ['Verbal', 'Ordinario', 'Verbal', ''], defecto: '{SI(1 = 1; "Verbal")}', ayuda: 'Según la cuantía' },
+  } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const cfg = (await d.configVariables(org)).get('ASUNTO_TIPO_JUICIO')!;
+  assert.deepEqual(cfg.formato, { tipo: 'opciones', opciones: ['Verbal', 'Ordinario'], defecto: '{SI(1 = 1; "Verbal")}', ayuda: 'Según la cuantía' });
+  const ctx = await d.contextoPlantilla(org, exp);
+  const config = await d.configVariables(org);
+  const def = d.resolverValor('Asunto_Tipo_Juicio', ctx, new Map(), config);
+  assert.deepEqual([def.valor, def.origen], ['Verbal', 'defecto']);
+  assert.equal(d.resolverValor('Asunto_Tipo_Juicio', ctx, new Map([['ASUNTO_TIPO_JUICIO', 'Ordinario']]), config).valor, 'Ordinario');
+  const datos = await call('get', '/datos/:id', 'pv_jefa', { params: { id: exp } });
+  const campo = datos.body.data.campos.find((c: any) => c.clave === 'ASUNTO_TIPO_JUICIO');
+  assert.equal(campo.formato.tipo, 'opciones');
+  assert.equal(campo.porDefecto, 'Verbal');
+  // Por defecto mal escrito: no se guarda.
+  const mal = await call('put', '/variables/:clave', 'pv_jefa', { params: { clave: 'ASUNTO_TIPO_JUICIO' }, body: { formato: { tipo: 'texto', defecto: '{SI(' } } });
+  assert.equal(mal.status, 400);
+  assert.equal(mal.body.campo, 'defecto');
+});

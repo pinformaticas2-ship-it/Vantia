@@ -4,6 +4,7 @@ import { CheckCircle2, ChevronDown, FilePlus2, Loader2, Search, X } from 'lucide
 import { apiFetch } from '../lib/api';
 import { aviso } from '../lib/avisos';
 import { t } from '../lib/i18n';
+import { InputSegunFormato, type FormatoVariable } from './FormatoCampo';
 
 // ── Datos para documentos (15/10/2026) ──────────────────────────────────────
 // Los datos propios del asunto que Vantia no guarda en otra ficha (WIZINK,
@@ -11,7 +12,13 @@ import { t } from '../lib/i18n';
 // una vez y TODAS las plantillas del expediente los usan (las de la nube,
 // el autorrelleno y los documentos base). Backend: /api/plantillas/datos/:id.
 
-interface Campo { grupo: string; etiqueta: string; nombre: string; clave: string }
+interface Campo {
+  grupo: string; etiqueta: string; nombre: string; clave: string;
+  /** Variables propias del despacho: tipo de campo, opciones, ayuda (26/11/2026). */
+  formato?: FormatoVariable | null;
+  /** Lo que sale si se deja vacío (ya calculado para este expediente). */
+  porDefecto?: string;
+}
 
 const esFecha = (etiqueta: string) => /\bfecha\b/i.test(etiqueta);
 
@@ -148,10 +155,20 @@ export default function DatosDocumentosExpediente({ expedienteId, bloqueado = fa
                 {lista.map((c) => (
                   <label key={c.clave} className="flex flex-col gap-1 min-w-0">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 truncate" title={`«${c.nombre}»`}>{c.etiqueta}</span>
-                    <input value={valores[c.clave] || ''} disabled={bloqueado}
-                      onChange={(e) => cambiar(c, e.target.value)}
-                      placeholder={esFecha(c.etiqueta) ? t("dd/mm/aaaa") : ''}
-                      className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:bg-white focus:border-red-300 disabled:opacity-60" />
+                    {c.formato ? (
+                      <InputSegunFormato formato={c.formato} valor={valores[c.clave] || ''} disabled={bloqueado}
+                        onChange={(v) => cambiar(c, v)}
+                        placeholder={c.porDefecto ? t("Por defecto: {valor}", { valor: c.porDefecto }) : undefined} />
+                    ) : (
+                      <input value={valores[c.clave] || ''} disabled={bloqueado}
+                        onChange={(e) => cambiar(c, e.target.value)}
+                        placeholder={esFecha(c.etiqueta) ? t("dd/mm/aaaa") : ''}
+                        className="h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm text-slate-800 outline-none focus:bg-white focus:border-red-300 disabled:opacity-60" />
+                    )}
+                    {c.formato?.ayuda && <span className="text-[11px] text-slate-500">{c.formato.ayuda}</span>}
+                    {c.porDefecto && !(valores[c.clave] || '').trim() && (c.formato?.tipo === 'opciones' || c.formato?.tipo === 'si_no' || c.formato?.tipo === 'fecha') && (
+                      <span className="text-[11px] text-violet-600">{t("Si no eliges nada: {valor}", { valor: c.porDefecto })}</span>
+                    )}
                   </label>
                 ))}
               </div>

@@ -31,6 +31,8 @@ const PLANTILLAS: [RegExp, string, number[]?][] = [
   // Plantillas y variables de documentos (25/11/2026)
   [/^Variable de documentos «(.+)» desactivada$/, "Variable de documentos «{a}» desactivada"],
   [/^Variable de documentos «(.+)» con valor fijo$/, "Variable de documentos «{a}» con valor fijo"],
+  [/^Variable de documentos «(.+)» calculada con una fórmula$/, "Variable de documentos «{a}» calculada con una fórmula"],
+  [/^Plantilla «(.+?)»: variable «(.+)» calculada con una fórmula$/, "Plantilla «{a}»: variable «{b}» calculada con una fórmula"],
   [/^Variable de documentos «(.+)» activada$/, "Variable de documentos «{a}» activada"],
   [/^Variable de documentos «(.+)» como venía$/, "Variable de documentos «{a}» como venía"],
   [/^Plantilla «(.+?)»: variable «(.+)» como en general$/, "Plantilla «{a}»: variable «{b}» como en general"],
