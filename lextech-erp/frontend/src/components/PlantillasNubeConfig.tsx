@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Copy, ExternalLink, FileText, FolderOpen, Loader2, RefreshCw, AlertTriangle, KeyRound, FilePlus2 } from 'lucide-react';
+import { CheckCircle2, Copy, ExternalLink, FileText, FolderOpen, Loader2, RefreshCw, AlertTriangle, KeyRound } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { aviso, confirmar } from '../lib/avisos';
 import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
-import { abrirPickerGoogle, hayPickerGoogle } from '../lib/googlePicker';
 import ElegirCarpetaDrive from './ElegirCarpetaDrive';
 import ExploradorPlantillas from './ExploradorPlantillas';
 import { t } from '../lib/i18n';
@@ -28,9 +27,6 @@ interface Config {
   sePuedeSubir: boolean;
   driveLectura: boolean;
   driveEscritura?: boolean;
-  carpetaSelector?: boolean;
-  carpetaId?: string | null;
-  carpetaPropia?: boolean;
 }
 
 export default function PlantillasNubeConfig() {
@@ -40,42 +36,9 @@ export default function PlantillasNubeConfig() {
   const [version, setVersion] = useState(0);
   const [eligiendo, setEligiendo] = useState(false);
 
-  // Con el selector oficial de Google (si está configurado): la carpeta y las
-  // plantillas se eligen en una ventana de Google y Vantia solo recibe acceso
-  // a eso (permiso básico drive.file, sin el aviso de "app no verificada").
-  const conSelector = hayPickerGoogle();
-  const idioma = typeof document !== 'undefined' && document.documentElement.lang?.startsWith('en') ? 'en' : 'es';
-  const darAccesoPlantillas = async (carpetaId: string | null | undefined) => {
-    if (!carpetaId) return;
-    setOcupado('acceso');
-    try {
-      const elegidos = await abrirPickerGoogle({ modo: 'plantillas', padre: carpetaId, titulo: t("Elige las plantillas y subcarpetas que ya tenéis (Ctrl+A para todas)"), idioma });
-      if (elegidos?.length) {
-        aviso.ok(t("Vantia ya puede usar {n} elementos más", { n: elegidos.length }));
-        await cargar(true); setVersion((v) => v + 1);
-      }
-    } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo abrir la ventana de Google.")); }
-    finally { setOcupado(null); }
-  };
-
   // Elegir una carpeta cualquiera del Drive: si aún no hay permiso de
   // lectura, primero se pide a Google (popup) y luego se abre el explorador.
-  const elegirCarpeta = async () => {
-    if (conSelector) {
-      setOcupado('permiso');
-      let elegida: { id: string; nombre: string } | undefined;
-      try {
-        elegida = (await abrirPickerGoogle({ modo: 'carpeta', titulo: t("Elige la carpeta de plantillas"), idioma }))?.[0];
-      } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo abrir la ventana de Google.")); }
-      setOcupado(null);
-      if (!elegida) return;
-      if (await usarCarpeta({ id: elegida.id, ruta: elegida.nombre }, true)) {
-        // Las plantillas que ya hubiera dentro: Google pide elegirlas una vez.
-        aviso.info(t("Ahora elige las plantillas que ya tenéis en esa carpeta para que Vantia pueda usarlas."));
-        await darAccesoPlantillas(elegida.id);
-      }
-      return;
-    }
+  const elegirCarpeta = () => {
     if (cfg?.driveLectura) { setEligiendo(true); return; }
     startGoogleDriveConnect({
       getToken,
@@ -85,15 +48,14 @@ export default function PlantillasNubeConfig() {
       onConnected: async () => { setOcupado(null); await cargar(); setEligiendo(true); },
     });
   };
-  const usarCarpeta = async (c: { id: string; ruta: string }, selector = false): Promise<boolean> => {
+  const usarCarpeta = async (c: { id: string; ruta: string }) => {
     try {
-      const r = await apiFetch('/api/plantillas/elegir-carpeta', { method: 'POST', getToken, body: JSON.stringify({ carpetaId: c.id, nombre: c.ruta, selector }) });
+      const r = await apiFetch('/api/plantillas/elegir-carpeta', { method: 'POST', getToken, body: JSON.stringify({ carpetaId: c.id, nombre: c.ruta }) });
       if (r?.success === false) throw new Error(r.error);
       setEligiendo(false);
       aviso.ok(t("Plantillas: se usará la carpeta «{ruta}»", { ruta: c.ruta }));
-      await cargar(true); setVersion((v) => v + 1);
-      return true;
-    } catch (e: any) { aviso.error(e?.message ? t(e.message) : t("No se pudo usar esa carpeta.")); return false; }
+      await cargar();
+    } catch (e: any) { aviso.error(e?.message || t("No se pudo usar esa carpeta.")); }
   };
 
   const cargar = useCallback(async (refrescar = false) => {
@@ -126,8 +88,6 @@ export default function PlantillasNubeConfig() {
   // completo de Drive (solo propietario/admin, una vez).
   const pedirEscritura = () => {
     if (!cfg?.canManage) return;
-    // Con el selector: basta con volver a elegir la carpeta en la ventana de Google.
-    if (conSelector) { void elegirCarpeta(); return; }
     startGoogleDriveConnect({
       getToken,
       escritura: true,
@@ -180,7 +140,7 @@ export default function PlantillasNubeConfig() {
           {cfg.conectados.drive || cfg.conectados.dropbox ? (
             <div className="flex flex-wrap gap-2">
               {cfg.conectados.drive && (
-                <button type="button" disabled={!!ocupado} onClick={() => void elegirCarpeta()}
+                <button type="button" disabled={!!ocupado} onClick={elegirCarpeta}
                   className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60">
                   {ocupado === 'permiso' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Elegir carpeta de Google Drive")}</button>
               )}
@@ -198,9 +158,7 @@ export default function PlantillasNubeConfig() {
           ) : (
             <p className="text-xs text-slate-600">{t("Primero conecta Google Drive o Dropbox en")}{" "}<Link to="/dashboard/config?section=integraciones" className="font-semibold text-red-600 hover:underline">{t("Integraciones")}</Link>.</p>
           )}
-          <p className="mt-2 text-xs text-slate-500">{conSelector
-            ? t("Elige en Google Drive la carpeta donde tenéis las plantillas, o crea una nueva. Vantia solo tendrá acceso a esa carpeta y a lo que elijáis. Desde ese momento este despacho solo verá sus plantillas.")
-            : t("Elige la carpeta de vuestro Drive donde tenéis las plantillas (Google pedirá permiso para que Vantia pueda leer vuestro Drive), o crea una nueva. Desde ese momento este despacho solo verá sus plantillas.")}</p>
+          <p className="mt-2 text-xs text-slate-500">{t("Elige la carpeta de vuestro Drive donde tenéis las plantillas (Google pedirá permiso para que Vantia pueda leer vuestro Drive), o crea una nueva. Desde ese momento este despacho solo verá sus plantillas.")}</p>
         </div>
       )}
 
@@ -212,7 +170,7 @@ export default function PlantillasNubeConfig() {
                 <ExternalLink size={14} />{" "}{t("Abrir la carpeta")}</a>
             )}
             {cfg.canManage && cfg.origen === 'drive' && (
-              <button type="button" disabled={!!ocupado} onClick={() => void elegirCarpeta()}
+              <button type="button" disabled={!!ocupado} onClick={elegirCarpeta}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
                 {ocupado === 'permiso' ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}{" "}{t("Cambiar carpeta")}</button>
             )}
@@ -220,12 +178,6 @@ export default function PlantillasNubeConfig() {
               <button type="button" disabled={!!ocupado} onClick={pedirEscritura}
                 className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60">
                 {ocupado === 'escritura' ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}{" "}{t("Permitir subir y editar aquí")}</button>
-            )}
-            {cfg.canManage && conSelector && cfg.origen === 'drive' && cfg.carpetaId && (
-              <button type="button" disabled={!!ocupado} onClick={() => void darAccesoPlantillas(cfg.carpetaId)}
-                title={t("Vantia solo ve en vuestro Drive lo que sube ella y lo que elegís aquí")}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                {ocupado === 'acceso' ? <Loader2 size={14} className="animate-spin" /> : <FilePlus2 size={14} />}{" "}{t("Añadir plantillas que ya están en Drive")}</button>
             )}
             {cfg.canManage && cfg.sePuedeSubir && (
               <>
@@ -259,9 +211,7 @@ export default function PlantillasNubeConfig() {
 
           <p className="text-xs text-slate-500">
             {cfg.origen === 'drive'
-              ? (conSelector && !cfg.driveLectura
-                ? t("Vantia solo ve en vuestro Drive las plantillas que sube ella y las que elegís con «Añadir plantillas que ya están en Drive». Si añadís plantillas directamente en Drive, elegidlas ahí una vez.")
-                : cfg.driveLectura
+              ? (cfg.driveLectura
                 ? t("Añadid, cambiad o borrad las plantillas directamente en esa carpeta de Drive (también con subcarpetas): Vantia las lee de ahí. Sirven los Word (.doc, .docx) y los documentos de Google Docs.")
                 : t("Vantia solo puede ver en vuestro Drive lo que ella misma ha subido. Para usar las plantillas que ya tenéis en Drive, pulsa «Cambiar carpeta» y dale permiso de lectura."))
               : <>{t("Lo que pongáis en")}{" "}<b>{cfg.carpetaTexto}</b>{" "}{t("(también desde el Dropbox del ordenador) aparece aquí, con sus subcarpetas.")}</>}
@@ -285,7 +235,7 @@ export default function PlantillasNubeConfig() {
             onPedirPermiso={cfg.origen === 'drive' ? pedirEscritura : undefined} onCambio={() => void cargar()} />
         </div>
       )}
-      {eligiendo && <ElegirCarpetaDrive onElegir={async (c) => { await usarCarpeta(c); }} onCerrar={() => setEligiendo(false)} />}
+      {eligiendo && <ElegirCarpetaDrive onElegir={usarCarpeta} onCerrar={() => setEligiendo(false)} />}
     </section>
   );
 }

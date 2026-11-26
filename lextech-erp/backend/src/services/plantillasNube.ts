@@ -28,7 +28,6 @@ export interface ConfigPlantillas {
   carpetaPath?: string;        // Dropbox: "/Plantillas"
   carpetaNombre?: string;      // Drive: ruta legible de la carpeta elegida
   carpetaPropia?: boolean;     // Drive: la creó Vantia (se puede subir a ella)
-  carpetaSelector?: boolean;   // Drive: elegida con el selector de Google (drive.file: se puede subir a ella)
   importacion?: { estado: 'importando' | 'hecha' | 'error'; hechos: number; total: number; error?: string; at: string };
 }
 
@@ -201,12 +200,12 @@ export async function carpetasDrive(organizacionId: string, padre: string): Prom
   return (d.files || []).map((x: any) => ({ id: x.id, nombre: x.name }));
 }
 
-export async function elegirCarpetaDrive(organizacionId: string, carpetaId: string, carpetaNombre: string, selector = false) {
+export async function elegirCarpetaDrive(organizacionId: string, carpetaId: string, carpetaNombre: string) {
   // Que exista y se pueda leer
   const r = await driveFetch(organizacionId, `/files/${encodeURIComponent(carpetaId)}?fields=id,name,mimeType&supportsAllDrives=true`);
   const d: any = await r.json().catch(() => ({}));
   if (!r.ok || d.mimeType !== 'application/vnd.google-apps.folder') throw new Error('No se puede leer esa carpeta de Google Drive.');
-  await guardarConfig(organizacionId, { proveedor: 'drive', carpetaId, carpetaPath: null as any, carpetaPropia: false, carpetaSelector: selector, carpetaNombre: String(carpetaNombre || d.name).slice(0, 300) });
+  await guardarConfig(organizacionId, { proveedor: 'drive', carpetaId, carpetaPath: null as any, carpetaPropia: false, carpetaNombre: String(carpetaNombre || d.name).slice(0, 300) });
   olvidarListado(organizacionId);
 }
 
@@ -282,9 +281,6 @@ export async function puedeEscribir(organizacionId: string, cfg?: ConfigPlantill
   const c = cfg || await configPlantillas(organizacionId);
   if (!usaNube(c)) return false;
   if (c.proveedor === 'dropbox' || c.carpetaPropia !== false) return true;
-  // Elegida con el selector de Google: con drive.file se puede crear dentro y
-  // editar lo que se eligió o creó Vantia.
-  if (c.carpetaSelector) return true;
   return driveTieneEscritura(organizacionId);
 }
 

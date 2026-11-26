@@ -248,14 +248,3 @@ test('editor: las plantillas integradas no se editan (son de todos los despachos
   assert.equal((await call('post', '/editor/texto', 'pv_miembro', { body: { path: 'nube:x' } })).status, 403);
   assert.equal((await call('get', '/lista', 'pv_miembro')).status, 403);
 });
-
-test('carpeta de Drive elegida con el selector de Google: se puede subir sin el permiso completo', { skip }, async () => {
-  const { puedeEscribir } = await import('../src/services/plantillasNube');
-  const poner = (cfg: any) => pool.query(`UPDATE organizaciones SET plantillas_config = $2::jsonb WHERE id = $1`, [org, JSON.stringify(cfg)]);
-  await poner({ proveedor: 'drive', carpetaId: 'x', carpetaPropia: false });
-  assert.equal(await puedeEscribir(org), false, 'elegida con el explorador antiguo: hace falta el permiso completo');
-  await poner({ proveedor: 'drive', carpetaId: 'x', carpetaPropia: false, carpetaSelector: true });
-  assert.equal(await puedeEscribir(org), true);
-  await poner({});
-  assert.equal(await puedeEscribir(org), false);
-});
