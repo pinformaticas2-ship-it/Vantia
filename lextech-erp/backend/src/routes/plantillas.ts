@@ -52,6 +52,8 @@ router.get('/config', requireAuth, async (req: any, res: Response) => {
         sePuedeSubir: await puedeEscribir(req.organizacionId, cfg),
         driveEscritura: conectados.drive ? await driveTieneEscritura(req.organizacionId) : false,
         carpetaPropia: cfg.carpetaPropia !== false,
+        carpetaSelector: !!cfg.carpetaSelector,
+        carpetaId: cfg.proveedor === 'drive' ? cfg.carpetaId || null : null,
         driveLectura: conectados.drive ? await driveTieneLectura(req.organizacionId) : false,
         carpetaTexto: cfg.proveedor === 'dropbox' ? 'Dropbox › Aplicaciones › (Vantia) › Plantillas' : null,
         total, error, conectados,
@@ -91,7 +93,7 @@ router.post('/elegir-carpeta', requireAuth, soloGestor, async (req: any, res: Re
   try {
     const id = String(req.body?.carpetaId || '').trim();
     if (!id) return res.status(400).json({ success: false, error: 'Falta la carpeta.' });
-    await elegirCarpetaDrive(req.organizacionId, id, String(req.body?.nombre || ''));
+    await elegirCarpetaDrive(req.organizacionId, id, String(req.body?.nombre || ''), req.body?.selector === true);
     logActivityForReq(req, `Plantillas del despacho: carpeta de Drive elegida «${String(req.body?.nombre || id).slice(0, 200)}»`, 'ORGANIZACION', req.organizacionId).catch(() => {});
     res.json({ success: true });
   } catch (e: any) {

@@ -65,6 +65,19 @@ registrarEn({
   "Con otro dato (se cambia en Ajustes → Plantillas)": "With other data (changed in Settings → Templates)",
 
   "en esta plantilla": "in this template",
+
+  // Selector de Google Drive (Google Picker)
+  "Elige las plantillas y subcarpetas que ya tenéis (Ctrl+A para todas)": "Choose the templates and subfolders you already have (Ctrl+A for all)",
+  "Vantia ya puede usar {n} elementos más": "Vantia can now use {n} more items",
+  "No se pudo abrir la ventana de Google.": "The Google window could not be opened.",
+  "Ahora elige las plantillas que ya tenéis en esa carpeta para que Vantia pueda usarlas.": "Now choose the templates you already have in that folder so Vantia can use them.",
+  "Elige en Google Drive la carpeta donde tenéis las plantillas, o crea una nueva. Vantia solo tendrá acceso a esa carpeta y a lo que elijáis. Desde ese momento este despacho solo verá sus plantillas.": "Choose the Google Drive folder where you keep your templates, or create a new one. Vantia will only have access to that folder and to what you choose. From then on this firm will only see its own templates.",
+  "Vantia solo ve en vuestro Drive lo que sube ella y lo que elegís aquí": "In your Drive, Vantia only sees what it uploads and what you choose here",
+  "Añadir plantillas que ya están en Drive": "Add templates already in Drive",
+  "Vantia solo ve en vuestro Drive las plantillas que sube ella y las que elegís con «Añadir plantillas que ya están en Drive». Si añadís plantillas directamente en Drive, elegidlas ahí una vez.": "In your Drive, Vantia only sees the templates it uploads and the ones you choose with «Add templates already in Drive». If you add templates directly in Drive, choose them there once.",
+  "No se pudo cargar el selector de Google.": "The Google picker could not be loaded.",
+  "Google no ha dado permiso.": "Google did not grant permission.",
+  "Se cerró la ventana de Google.": "The Google window was closed.",
   "Leyendo vuestra carpeta de plantillas…": "Reading your templates folder…",
   "Logo de Empresa": "Firm logo",
   "Fecha de hoy (larga)": "Today's date (long)",
