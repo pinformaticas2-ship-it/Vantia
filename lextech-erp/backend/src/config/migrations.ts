@@ -2498,6 +2498,29 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE plantillas_variables ADD COLUMN IF NOT EXISTS formato JSONB`);
     } catch (e: any) { console.error('[migrations] plantillas_variables.formato:', e?.message); }
 
+    // Etiquetas de Vantia para el correo (27/11/2026): iguales para Gmail e IMAP,
+    // de cada persona en cada organización (controllers/correoEtiquetasController.ts).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS correo_etiquetas (
+          id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          user_id         VARCHAR(150) NOT NULL,
+          nombre          VARCHAR(60)  NOT NULL,
+          color           VARCHAR(7)   NOT NULL DEFAULT '#3b82f6',
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )`);
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_correo_etiquetas_nombre ON correo_etiquetas (organizacion_id, user_id, (lower(nombre)))`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS correo_etiquetas_emails (
+          etiqueta_id UUID        NOT NULL REFERENCES correo_etiquetas(id) ON DELETE CASCADE,
+          email_id    UUID        NOT NULL REFERENCES emails(id) ON DELETE CASCADE,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (etiqueta_id, email_id)
+        )`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_correo_etiquetas_emails_email ON correo_etiquetas_emails (email_id)`);
+    } catch (e: any) { console.error('[migrations] correo_etiquetas:', e?.message); }
+
     // Variables de una sola plantilla (25/11/2026): "en esta plantilla, esta
     // variable va desactivada / con este valor / activa aunque en general no".
     // plantilla = la misma referencia que usa el relleno ("nube:<id>" o la ruta).

@@ -87,8 +87,10 @@ function leerPlegados(): Set<string> {
 
 export default function CorreoArbol({
   cuentas, activa, carpetaSeleccionada, carpetasDe, noLeidos, etiquetasGmail, oscuro,
-  onElegir, onRedactar,
+  onElegir, onRedactar, pie,
 }: {
+  /** Lo que va debajo de los buzones (la sección de etiquetas). */
+  pie?: React.ReactNode;
   cuentas: CuentaArbol[];
   /** La cuenta que está abierta ahora. */
   activa: { tipo: 'imap' | 'gmail'; id: string } | null;
@@ -261,6 +263,7 @@ export default function CorreoArbol({
         {cuentas.length === 0
           ? <p className={`px-2 py-3 text-xs ${c('text-slate-400', 'text-slate-500')}`}>{t("No hay buzones conectados.")}</p>
           : cuentas.map(renderCuenta)}
+        {pie}
       </nav>
     </div>
   );

@@ -37,6 +37,9 @@ import {
   downloadMessageAttachment,
   saveAttachmentToExpediente,
 } from '../controllers/emailController';
+import {
+  listarEtiquetas, crearEtiqueta, editarEtiqueta, borrarEtiqueta, etiquetasDeCorreos, ponerEtiquetasCorreo,
+} from '../controllers/correoEtiquetasController';
 
 const router = Router();
 
@@ -108,6 +111,13 @@ router.get('/drafts',             getDrafts);
 // ── Stats ────────────────────────────────────────────────────────────────────
 router.get('/stats',              getStats);
 router.get('/folder-counts',      getFolderCounts);
+// Etiquetas de Vantia (27/11/2026), iguales para Gmail e IMAP.
+router.get('/etiquetas',                    listarEtiquetas);
+router.get('/etiquetas/asignadas',          etiquetasDeCorreos);
+router.post('/etiquetas',                   crearEtiqueta);
+router.patch('/etiquetas/:id',              editarEtiqueta);
+router.delete('/etiquetas/:id',             borrarEtiqueta);
+router.put('/etiquetas/correo/:emailId',    ponerEtiquetasCorreo);
 
 // ── Papelera ──────────────────────────────────────────────────────────────────
 router.delete('/trash',           emptyTrash);

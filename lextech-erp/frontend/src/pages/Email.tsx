@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
 import CorreoArbol, { type CuentaArbol, type CarpetaImap } from '../components/CorreoArbol';
+import { BotonEtiquetas, ChipsEtiquetas, SeccionEtiquetas, esCarpetaEtiqueta, useEtiquetasCorreo } from '../components/EtiquetasCorreo';
 import { getActiveOrganizacionId } from '../lib/api';
 import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
@@ -1861,6 +1862,16 @@ function Sidebar({
           );
         })}
 
+        {/* Etiquetas de Vantia: las mismas para Gmail e IMAP (27/11/2026) */}
+        {(isGmailActive || selectedImapAccountId) && (
+          <SeccionEtiquetas
+            seleccionada={selectedFolder}
+            onElegir={(c) => onSelectFolder(c as FolderKey)}
+            disabled={!canUseMailbox}
+            cls={{ borde: sectionBorderCls, titulo: sectionLabelCls, boton: iconBtnCls, activa: activeItemClsNoBold, inactiva: inactiveItemCls, apagado: mutedTextCls }}
+          />
+        )}
+
         {/* Carpetas propias: las mismas para Gmail (etiquetas) e IMAP */}
         {(isGmailActive || selectedImapAccountId) && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
@@ -1973,6 +1984,7 @@ function EmailItem({
           <span className={`min-w-0 flex-1 truncate text-[13px] ${unreadC ? 'font-semibold text-slate-800' : 'text-slate-700'}`}>
             {email.subject || <span className="italic opacity-50">{t("(sin asunto)")}</span>}
           </span>
+          <ChipsEtiquetas emailId={email.id} />
           {email.hasAttachments && <Paperclip size={12} className="shrink-0 text-slate-400" />}
           <button onClick={onStar} title={email.isStarred ? t("Quitar estrella") : t("Marcar con estrella")}
             className={`shrink-0 rounded p-0.5 ${email.isStarred ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}>
@@ -2056,6 +2068,7 @@ function EmailItem({
           <p className="flex-1 text-[11.5px] truncate leading-snug text-slate-400">
             {email.snippet || <span className="italic">{t("Sin previsualización")}</span>}
           </p>
+          <ChipsEtiquetas emailId={email.id} />
           <div className="flex items-center gap-1 flex-shrink-0">
             {email.isPinned && (
               <span title={t("Fijado")}>
@@ -2435,6 +2448,7 @@ function EmailReader({
           title={email.isPinned ? t("Despinear") : t("Pinear")}>
           <Pin size={17} />
         </button>
+        <BotonEtiquetas emailId={email.id} className={`p-2 rounded-full transition-colors ${toolbarHoverCls} ${toolbarIconCls}`} />
         <div className={`h-6 w-px mx-1 hidden md:block ${dividerCls}`} />
         <div className="flex-1" />
         <div className="flex items-center gap-1.5">
@@ -2508,6 +2522,7 @@ function EmailReader({
                   <h1 className="text-xl font-semibold leading-snug tracking-[-0.01em] text-slate-900 break-words">
                     {email.subject || t("(Sin asunto)")}
                   </h1>
+                  <div className="mt-1.5"><ChipsEtiquetas emailId={email.id} grande /></div>
                   {onLinkExpediente && (
                     <div className="mt-2 inline-block">
                       <button
@@ -3801,6 +3816,8 @@ export default function Email() {
   });
   useEffect(() => { try { localStorage.setItem('vantia.correo.vista', vistaCorreo); } catch { /* noop */ } }, [vistaCorreo]);
   const [noLeidosCarpetas, setNoLeidosCarpetas] = useState<Map<string, number>>(new Map());
+  const etiquetasCorreo = useEtiquetasCorreo();
+  const cargarEtiquetasAsignadas = etiquetasCorreo.cargarAsignadas;
   const [showSignatures, setShowSignatures]     = useState(false);
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
@@ -4378,6 +4395,13 @@ export default function Email() {
           if (!isStale()) handleGmailError(e);
           return;
         }
+      }
+
+      if (esCarpetaEtiqueta(selectedFolder)) {
+        // Sin perfil guardado los correos no están en Vantia: no hay etiquetados.
+        setEmails([]);
+        setNextPageToken(undefined);
+        return;
       }
 
       if (selectedFolder === 'PINNED') {
@@ -5410,6 +5434,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
     const h = window.setTimeout(() => void cargarNoLeidosCarpetas(), 1500);
     return () => window.clearTimeout(h);
   }, [hasActiveMailbox, emails, cargarNoLeidosCarpetas]);
+  // Las etiquetas de los correos que se ven en la lista.
+  useEffect(() => {
+    if (!emails.length) return;
+    const h = window.setTimeout(() => void cargarEtiquetasAsignadas(emails.map((e) => e.id)), 150);
+    return () => window.clearTimeout(h);
+  }, [emails, cargarEtiquetasAsignadas]);
+
   const elegirEnArbol = (cuenta: CuentaArbol, carpeta: string) => {
     setSelectedEmail(null);
     setSearchQ('');
@@ -5537,6 +5568,15 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               oscuro={mailTheme === 'dark'}
               onElegir={elegirEnArbol}
               onRedactar={() => startCompose()}
+              pie={hasActiveMailbox ? (
+                <SeccionEtiquetas
+                  seleccionada={selectedFolder}
+                  onElegir={(c) => { setSelectedFolder(c as FolderKey); setSelectedEmail(null); setSearchQ(''); }}
+                  cls={mailTheme === 'dark'
+                    ? { borde: 'border-white/10', titulo: 'text-slate-500', boton: 'text-slate-500 hover:text-red-300 hover:bg-white/5', activa: 'bg-red-600/25 text-white', inactiva: 'text-slate-300 hover:bg-white/5', apagado: 'text-slate-400' }
+                    : { borde: 'border-slate-200', titulo: 'text-slate-500', boton: 'text-slate-400 hover:text-red-600 hover:bg-slate-100', activa: 'bg-red-50 text-red-700 ring-1 ring-red-100', inactiva: 'text-slate-700 hover:bg-slate-100', apagado: 'text-slate-500' }}
+                />
+              ) : null}
             />
           ) : (
           <Sidebar
@@ -5610,7 +5650,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           {/* Mobile top: folder name */}
           <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 lg:hidden">
             <span className="text-sm font-semibold text-slate-700 flex-1">
-              {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : nombreCarpeta(selectedFolder)}
+              {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : esCarpetaEtiqueta(selectedFolder) ? (etiquetasCorreo.etiquetas.find((e) => `ETQ:${e.id}` === selectedFolder)?.nombre || t("Etiqueta")) : nombreCarpeta(selectedFolder)}
             </span>
             <button
               onClick={() => startCompose()}
@@ -5624,7 +5664,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3">
             <div className="flex items-center justify-between mb-2.5 px-1">
               <h2 className="text-sm font-bold text-slate-800">
-                {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : nombreCarpeta(selectedFolder)}
+                {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : esCarpetaEtiqueta(selectedFolder) ? (etiquetasCorreo.etiquetas.find((e) => `ETQ:${e.id}` === selectedFolder)?.nombre || t("Etiqueta")) : nombreCarpeta(selectedFolder)}
               </h2>
               <button
                 onClick={() => void refrescarSinParpadeo()} disabled={loading || bgRefreshing || !hasActiveMailbox}
