@@ -104,6 +104,11 @@ registrarEn({
   "Eliminar": "Delete",
   "Notificaciones": "Notifications",
   "Marcar todas como leídas": "Mark all as read",
+  // Campana agrupada por tipo (27/11/2026)
+  "Plazos": "Deadlines",
+  "Marcar como leídas": "Mark as read",
+  "Ver los {n}": "Show all {n}",
+  "Ver todas ({n})": "Show all ({n})",
   "Activar avisos push": "Turn on push notifications",
   "— entérate aunque tengas la pestaña cerrada": "— get notified even with the tab closed",
   "Avisos activados en este dispositivo ✓": "Notifications on for this device ✓",

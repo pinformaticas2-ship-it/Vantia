@@ -1044,34 +1044,53 @@ type UnifiedNotification = {
   count?: number;
   created_at: string;
   onClick?: () => void;
+  /** Lo que agrupa este aviso (los correos sin leer de ese remitente), para verlos uno a uno. */
+  children?: { id: string; title: string; subtitle?: string; created_at: string; onClick: () => void }[];
 };
 
-function notificationIcon(kind: UnifiedNotification["kind"]) {
-  if (kind === "auto") return "⚡";
-  if (kind === "chat") return "💬";
-  if (kind === "email") return "✉️";
-  if (kind === "plazo") return "⏰";
-  if (kind === "soporte") return "🛟";
-  if (kind === "vista") return "⚖️";
-  return "🟢";
-}
+// 27/11/2026: iconos de verdad (los emoji salían como dibujos raros en Windows),
+// el texto entero (antes todo cortado con «…»), agrupadas por tipo y sin el
+// tope de 10 avisos (lo demás desaparecía sin decir nada).
+const TIPOS_AVISO: Record<UnifiedNotification["kind"], { label: string; icono: React.ComponentType<{ className?: string }>; color: string }> = {
+  vista:    { label: "Vistas",           icono: Gavel,         color: "bg-rose-50 text-rose-600 ring-rose-100" },
+  plazo:    { label: "Plazos",           icono: Clock,         color: "bg-amber-50 text-amber-600 ring-amber-100" },
+  chat:     { label: "Chat",             icono: MessageSquare, color: "bg-violet-50 text-violet-600 ring-violet-100" },
+  whatsapp: { label: "WhatsApp",         icono: MessageCircle, color: "bg-emerald-50 text-emerald-600 ring-emerald-100" },
+  email:    { label: "Correo",           icono: Mail,          color: "bg-sky-50 text-sky-600 ring-sky-100" },
+  auto:     { label: "Automatizaciones", icono: Sparkles,      color: "bg-indigo-50 text-indigo-600 ring-indigo-100" },
+  soporte:  { label: "Soporte",          icono: LifeBuoy,      color: "bg-slate-100 text-slate-600 ring-slate-200" },
+};
+/** Cuántos avisos de cada grupo se ven antes de «Ver todos». */
+const AVISOS_POR_GRUPO = 4;
 
 function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll, push }: {
   notifs: UnifiedNotification[];
   loading: boolean;
   onClose: () => void;
   onDismiss: (id: string) => void;
-  onDismissAll: () => void;
+  onDismissAll: (ids?: string[]) => void;
   push: ReturnType<typeof usePushNotifications>;
 }) {
   const [pushJustEnabled, setPushJustEnabled] = useState(false);
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const [desplegados, setDesplegados] = useState<Set<string>>(new Set());
+  const alternar = (set: React.Dispatch<React.SetStateAction<Set<string>>>, k: string) =>
+    set((p) => { const n = new Set(p); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+
+  // Grupos por tipo; primero el grupo con lo más reciente (los avisos ya llegan ordenados).
+  const grupos = useMemo(() => {
+    const m = new Map<UnifiedNotification["kind"], UnifiedNotification[]>();
+    for (const n of notifs) { const l = m.get(n.kind); if (l) l.push(n); else m.set(n.kind, [n]); }
+    return [...m.entries()];
+  }, [notifs]);
+
   return (
-    <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+    <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-        <h3 className="font-bold text-slate-800 text-sm">{t("Notificaciones")}</h3>
+        <h3 className="font-bold text-slate-800 text-sm">{t("Notificaciones")}{notifs.length > 0 && <span className="ml-1.5 text-slate-400 font-semibold">{notifs.length}</span>}</h3>
         <div className="flex items-center gap-3 shrink-0">
           {notifs.length > 0 && (
-            <button type="button" onClick={onDismissAll} className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={() => onDismissAll()} className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600">
               <CheckCircle2 size={13} />{" "}{t("Marcar todas como leídas")}</button>
           )}
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
@@ -1092,43 +1111,97 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
       {pushJustEnabled && (
         <div className="px-4 py-2 text-[11px] text-emerald-700 bg-emerald-50 border-b border-emerald-100">{t("Avisos activados en este dispositivo ✓")}</div>
       )}
-      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-        {loading ? (
+      <div className="max-h-[min(70vh,560px)] overflow-y-auto">
+        {loading && notifs.length === 0 ? (
           <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
         ) : notifs.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">{t("Sin mensajes pendientes")}</div>
-        ) : notifs.map((n) => (
-          <div key={n.id} className="group relative flex items-start">
-            <button
-              type="button"
-              onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
-              className="w-full flex items-start gap-3 px-4 py-3 pr-10 hover:bg-slate-50 text-left">
-              <span className="text-base mt-0.5 shrink-0">{notificationIcon(n.kind)}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
-                {n.subtitle && <p className="text-[11px] text-slate-500 truncate">{n.subtitle}</p>}
-                {n.meta && <p className="text-[11px] text-slate-400 truncate mt-0.5">{n.meta}</p>}
-                {/* Para plazos, el "hace X días" ya está en el subtítulo (Vencida hace/Vence en...);
-                    repetirlo aquí con la hora real de creación de la notificación (que es "ahora")
-                    solo contradice al subtítulo -- se omite para ese tipo. */}
-                {n.kind !== "plazo" && <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>}
+          <div className="py-10 text-center text-slate-400 text-xs">
+            <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-emerald-400" />{t("Sin mensajes pendientes")}</div>
+        ) : grupos.map(([kind, lista]) => {
+          const tipo = TIPOS_AVISO[kind];
+          const Icono = tipo.icono;
+          const todos = abiertos.has(kind);
+          const visibles = todos ? lista : lista.slice(0, AVISOS_POR_GRUPO);
+          return (
+            <section key={kind} className="border-b border-slate-100 last:border-b-0">
+              <div className="sticky top-0 z-[1] flex items-center gap-2 bg-slate-50/95 backdrop-blur px-4 py-1.5">
+                <Icono className="h-3.5 w-3.5 text-slate-400" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t(tipo.label)}</span>
+                <span className="rounded-full bg-white px-1.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200">{lista.length}</span>
+                <button type="button" onClick={() => onDismissAll(lista.map((n) => n.id))}
+                  className="ml-auto text-[10px] font-semibold text-slate-400 hover:text-slate-700">{t("Marcar como leídas")}</button>
               </div>
-              {!!n.count && n.count > 1 && (
-                <span className="ml-2 min-w-[20px] h-5 shrink-0 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
-                  {n.count > 99 ? "99+" : n.count}
-                </span>
+              <ul className="divide-y divide-slate-50">
+                {visibles.map((n) => {
+                  const hijos = n.children || [];
+                  const desplegado = desplegados.has(n.id);
+                  return (
+                    <li key={n.id} className="group relative">
+                      <button
+                        type="button"
+                        onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
+                        className="w-full flex items-start gap-3 px-4 py-2.5 pr-10 hover:bg-slate-50 text-left">
+                        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${tipo.color}`}><Icono className="h-4 w-4" /></span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <p className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-slate-800 break-words">{n.title}</p>
+                            {n.kind !== "plazo" && <span className="shrink-0 text-[10px] text-slate-400">{timeAgo(n.created_at)}</span>}
+                          </div>
+                          {n.subtitle && <p className="text-xs leading-snug text-slate-600 break-words">{n.subtitle}</p>}
+                          {n.meta && <p className="mt-0.5 text-[11px] leading-snug text-slate-400 break-words line-clamp-3">{n.meta}</p>}
+                        </div>
+                        {!!n.count && n.count > 1 && (
+                          <span className="mt-0.5 min-w-[20px] h-5 shrink-0 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+                            {n.count > 99 ? "99+" : n.count}
+                          </span>
+                        )}
+                      </button>
+                      {hijos.length > 1 && (
+                        <div className="pl-[60px] pr-4 pb-2 -mt-1">
+                          <button type="button" onClick={() => alternar(setDesplegados, n.id)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800">
+                            <ChevronDown className={`h-3 w-3 transition-transform ${desplegado ? "rotate-180" : ""}`} />
+                            {desplegado ? t("Ocultar") : t("Ver los {n}", { n: hijos.length })}
+                          </button>
+                          {desplegado && (
+                            <ul className="mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2">
+                              {hijos.map((h) => (
+                                <li key={h.id}>
+                                  <button type="button" onClick={() => { h.onClick(); onClose(); }}
+                                    className="w-full rounded-md px-2 py-1 text-left hover:bg-slate-50">
+                                    <span className="flex items-baseline gap-2">
+                                      <span className="min-w-0 flex-1 text-xs font-medium text-slate-700 break-words">{h.title}</span>
+                                      <span className="shrink-0 text-[10px] text-slate-400">{timeAgo(h.created_at)}</span>
+                                    </span>
+                                    {h.subtitle && <span className="block text-[11px] text-slate-400 break-words line-clamp-2">{h.subtitle}</span>}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        title={t("Marcar como leído")}
+                        onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
+                        className="absolute right-2.5 top-3 rounded-full p-1.5 text-slate-300 opacity-0 transition-opacity hover:bg-emerald-50 hover:text-emerald-600 group-hover:opacity-100 focus:opacity-100"
+                      >
+                        <Check size={13} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {lista.length > AVISOS_POR_GRUPO && (
+                <button type="button" onClick={() => alternar(setAbiertos, kind)}
+                  className="w-full px-4 py-1.5 text-left text-[11px] font-semibold text-red-600 hover:bg-red-50/50">
+                  {todos ? t("Ver menos") : t("Ver todas ({n})", { n: lista.length })}
+                </button>
               )}
-            </button>
-            <button
-              type="button"
-              title={t("Marcar como leído")}
-              onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-300 opacity-0 transition-opacity hover:bg-emerald-50 hover:text-emerald-600 group-hover:opacity-100"
-            >
-              <Check size={13} />
-            </button>
-          </div>
-        ))}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
@@ -2462,12 +2535,13 @@ export default function DashboardLayout() {
 
       if (emailRes.ok) {
         const emailItems = Array.isArray(emailData?.data?.emails) ? emailData.data.emails : [];
-        const groupedEmails = new Map<string, { from: string; subject: string; snippet: string; count: number; created_at: string; id: string }>();
+        const groupedEmails = new Map<string, { from: string; subject: string; snippet: string; count: number; created_at: string; id: string; items: { id: string; subject: string; snippet: string; created_at: string }[] }>();
         for (const item of emailItems) {
           const key = String(item?.from_email || item?.from_name || item?.id || "");
           if (!key) continue;
           const existing = groupedEmails.get(key);
           const createdAt = item?.sent_at || new Date().toISOString();
+          const uno = { id: String(item?.id || ""), subject: item?.subject || t("(Sin asunto)"), snippet: item?.snippet || "", created_at: createdAt };
           if (!existing) {
             groupedEmails.set(key, {
               from: item?.from_name || item?.from_email || t("Nuevo correo"),
@@ -2476,9 +2550,11 @@ export default function DashboardLayout() {
               count: 1,
               created_at: createdAt,
               id: item?.id,
+              items: [uno],
             });
           } else {
             existing.count += 1;
+            existing.items.push(uno);
             if (new Date(createdAt).getTime() > new Date(existing.created_at).getTime()) {
               existing.created_at = createdAt;
               existing.subject = item?.subject || existing.subject;
@@ -2499,6 +2575,12 @@ export default function DashboardLayout() {
             count: grouped.count,
             created_at: grouped.created_at,
             onClick: () => navigate(`/dashboard/correo?openEmail=${encodeURIComponent(grouped.id)}`),
+            children: grouped.count > 1
+              ? grouped.items
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((m) => ({ id: m.id, title: m.subject, subtitle: m.snippet || undefined, created_at: m.created_at,
+                  onClick: () => navigate(`/dashboard/correo?openEmail=${encodeURIComponent(m.id)}`) }))
+              : undefined,
           });
         }
       }
@@ -2618,7 +2700,6 @@ export default function DashboardLayout() {
             kind: "auto",
             title: a.titulo,
             subtitle: a.cuerpo || undefined,
-            meta: t("Automatización"),
             created_at: a.created_at || new Date().toISOString(),
             onClick: () => navigate(typeof a.url === "string" && a.url.startsWith("/") ? a.url : "/dashboard"),
           });
@@ -2663,7 +2744,7 @@ export default function DashboardLayout() {
       const filtered = next.filter((n) => !dismissedNotifIdsRef.current.has(n.id));
 
       filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setNotifications(filtered.slice(0, 20));
+      setNotifications(filtered.slice(0, 200));
     } catch (_e) {
     } finally {
       notifBusyRef.current = false;
@@ -2683,11 +2764,13 @@ export default function DashboardLayout() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, [persistDismissedNotifIds, syncDescartados]);
 
-  const dismissAllNotifications = useCallback(() => {
+  const dismissAllNotifications = useCallback((ids?: string[]) => {
     setNotifications((prev) => {
-      for (const n of prev) dismissedNotifIdsRef.current.add(n.id);
-      void syncDescartados(prev.map((n) => n.id));
-      return [];
+      const quitar = ids ? new Set(ids) : null;
+      const marcadas = quitar ? prev.filter((n) => quitar.has(n.id)) : prev;
+      for (const n of marcadas) dismissedNotifIdsRef.current.add(n.id);
+      void syncDescartados(marcadas.map((n) => n.id));
+      return quitar ? prev.filter((n) => !quitar.has(n.id)) : [];
     });
     persistDismissedNotifIds();
   }, [persistDismissedNotifIds, syncDescartados]);
@@ -2909,7 +2992,7 @@ export default function DashboardLayout() {
             </button>
             {isNotifOpen && (
               <NotificationsPanel
-                notifs={visibleNotifications.slice(0, 10)}
+                notifs={visibleNotifications}
                 loading={notifLoading}
                 onClose={() => setIsNotifOpen(false)}
                 onDismiss={dismissNotification}
