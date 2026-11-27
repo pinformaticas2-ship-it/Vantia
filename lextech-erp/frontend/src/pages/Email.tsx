@@ -698,7 +698,8 @@ function ComposeWindow({
   gmail: GmailService | null;
   accountId?: string | null;
   getToken: () => Promise<string>;
-  onClose: (draft?: ComposeData) => void;
+  /** draft: se guarda como borrador. descartar: se cierra sin guardar y, si venía de Borradores, se quita de allí. */
+  onClose: (draft?: ComposeData, opts?: { descartar?: boolean }) => void;
   onSent: (draftId?: string) => void;
   autoOpenTemplates?: boolean;
   autoOpenAttachments?: boolean;
@@ -710,6 +711,8 @@ function ComposeWindow({
   const [showCc, setShowCc]   = useState(!!data.cc);
   const [showBcc, setShowBcc] = useState(!!data.bcc);
   const [minimized, setMinimized] = useState(false);
+  // «Cancelar» con algo escrito: preguntar si se guarda como borrador o se descarta (27/11/2026).
+  const [preguntaCerrar, setPreguntaCerrar] = useState(false);
   const { isCollapsed } = useSidebar();
   const [sending, setSending] = useState(false);
   const [sent, setSent]       = useState(false);
@@ -800,6 +803,21 @@ function ComposeWindow({
       replyToId: data.replyToId,
     };
   }, [bcc, cc, data.body, data.draftId, data.replyToId, subject, to]);
+
+  const cancelar = () => {
+    if (!buildDraftPayload()) { onClose(undefined, { descartar: !!data.draftId }); return; }
+    setPreguntaCerrar(true);
+  };
+  const borrar = async () => {
+    if (buildDraftPayload() && !(await confirmar({
+      titulo: t("¿Borrar este correo?"),
+      mensaje: data.draftId ? t("Se quitará de Borradores y no se podrá recuperar.") : t("No se guardará como borrador y no se podrá recuperar."),
+      confirmar: t("Borrar"),
+      cancelar: t("Seguir escribiendo"),
+      peligro: true,
+    }))) return;
+    onClose(undefined, { descartar: true });
+  };
 
   // Initialize contenteditable body (body from data takes priority over auto-signature)
   useEffect(() => {
@@ -994,6 +1012,23 @@ function ComposeWindow({
         </div>
       </div>
 
+      {!minimized && preguntaCerrar && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center rounded-2xl bg-slate-900/30 p-4" onClick={() => setPreguntaCerrar(false)}>
+          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h4 className="text-base font-bold text-gray-900">{t("¿Qué hacemos con este correo?")}</h4>
+            <p className="mt-1 text-sm text-gray-500">{t("Puedes guardarlo en Borradores para terminarlo más tarde o descartarlo.")}</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button type="button" autoFocus onClick={() => { setPreguntaCerrar(false); onClose(buildDraftPayload() || undefined); }}
+                className="w-full rounded-full bg-[#ab0433] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8f022a]">{t("Guardar como borrador")}</button>
+              <button type="button" onClick={() => { setPreguntaCerrar(false); onClose(undefined, { descartar: true }); }}
+                className="peligro w-full rounded-full border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">{data.draftId ? t("Borrar el borrador") : t("Descartar")}</button>
+              <button type="button" onClick={() => setPreguntaCerrar(false)}
+                className="w-full rounded-full px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">{t("Seguir escribiendo")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!minimized && (
         <div className="flex flex-col flex-1 min-h-0">
           {/* From */}
@@ -1143,6 +1178,9 @@ function ComposeWindow({
               onClick={handleSend} disabled={sending}
               className="flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2 rounded-full transition-colors disabled:opacity-60 mr-1">
               {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}{t("Enviar")}</button>
+            <button type="button" onClick={cancelar} disabled={sending}
+              className="mr-1 px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-full hover:bg-gray-50 hover:text-gray-800 transition-colors disabled:opacity-60">
+              {t("Cancelar")}</button>
 
             {/* Adjuntar */}
             <input ref={fileInputRef} type="file" multiple className="hidden"
@@ -1202,8 +1240,8 @@ function ComposeWindow({
             </div>
 
             <div className="flex-1" />
-            <button onClick={() => onClose()}
-              title={t("Guardar borrador y cerrar")}
+            <button onClick={() => { void borrar(); }}
+              title={t("Borrar este correo")}
               className="peligro p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors">
               <Trash2 size={16} />
             </button>
@@ -5224,8 +5262,12 @@ export default function Email() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProvider]);
 
-  const handleCloseCompose = (draft?: ComposeData) => {
-    if (draft) {
+  const handleCloseCompose = (draft?: ComposeData, opts?: { descartar?: boolean }) => {
+    if (opts?.descartar && compose?.draftId) {
+      const nextDrafts = removeLocalDraft(compose.draftId);
+      setDraftCount((gmailLabels.find((label) => label.id === 'DRAFT')?.messagesTotal || 0) + nextDrafts.length);
+      if (selectedFolder === 'DRAFTS') void refrescarSinParpadeo();
+    } else if (draft) {
       const nextDrafts = upsertLocalDraft({
         id: draft.draftId || `draft-${Date.now()}`,
         to: draft.to,
