@@ -35,7 +35,7 @@ import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 import { confirmar } from "../lib/avisos";
 import { confirmarAntesDeEnviar } from "../lib/preferencias";
-import { t } from '../lib/i18n';
+import { t, locale as localeApp } from '../lib/i18n';
 import { avisoSyncCorreo } from '../lib/avisoSyncCorreo';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -571,15 +571,15 @@ function fmtDate(d: string | null) {
   if (!d) return '';
   const dt = new Date(d), now = new Date();
   if (dt.toDateString() === now.toDateString())
-    return dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return dt.toLocaleTimeString(localeApp(), { hour: '2-digit', minute: '2-digit' });
   if (dt.getFullYear() === now.getFullYear())
-    return dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-  return dt.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    return dt.toLocaleDateString(localeApp(), { day: 'numeric', month: 'short' });
+  return dt.toLocaleDateString(localeApp(), { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 function fmtFull(d: string | null) {
   if (!d) return '';
-  return new Date(d).toLocaleString('es-ES', {
+  return new Date(d).toLocaleString(localeApp(), {
     weekday: 'long', year: 'numeric', month: 'long',
     day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -2040,8 +2040,8 @@ function EmailItem({
       : email.fromName && email.from && email.fromName !== email.from ? `${email.fromName} <${email.from}>` : (email.fromName || email.from || '(desconocido)');
     const d = email.date ? new Date(email.date) : null;
     const fecha = !d ? '' : d.toDateString() === new Date().toDateString()
-      ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-      : `${d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+      ? d.toLocaleTimeString(localeApp(), { hour: '2-digit', minute: '2-digit' })
+      : `${d.toLocaleDateString(localeApp(), { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${d.toLocaleTimeString(localeApp(), { hour: '2-digit', minute: '2-digit' })}`;
     return (
       <a
         href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
@@ -3392,7 +3392,7 @@ function RibbonBar({
                 ? 'text-red-600 border-red-600'
                 : 'text-slate-500 border-transparent hover:text-slate-700 hover:border-slate-300'}`}
           >
-            {TAB_LABELS[tab]}
+            {t(TAB_LABELS[tab])}
           </button>
         ))}
         <div className="flex-1 border-b-2 border-transparent self-end" />

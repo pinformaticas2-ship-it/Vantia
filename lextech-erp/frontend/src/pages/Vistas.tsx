@@ -10,7 +10,7 @@ import { FilePreviewModal } from "../components/FilePreviewModal";
 import ComoFunciona from "../components/ComoFunciona";
 import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 import { usePushNotifications } from "../lib/usePushNotifications";
-import { t, tn } from '../lib/i18n';
+import { t, tn, locale as localeApp } from '../lib/i18n';
 
 // ── Vistas recibidas por correo ──────────────────────────────────────────────
 // Página de la automatización de vistas (Configuración → Automatizaciones):
@@ -118,7 +118,7 @@ const PASO_LABEL: Record<string, string> = {
 
 function fmtFecha(iso: string | null, withTime = true) {
   if (!iso) return "Sin fecha";
-  return new Date(iso).toLocaleString("es-ES", {
+  return new Date(iso).toLocaleString(localeApp(), {
     weekday: "short", day: "numeric", month: "short", year: "numeric",
     ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
   });
@@ -128,13 +128,13 @@ function fmtFecha(iso: string | null, withTime = true) {
 function fmtCorto(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
-  const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const hora = d.toLocaleTimeString(localeApp(), { hour: "2-digit", minute: "2-digit" });
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const dia = new Date(d); dia.setHours(0, 0, 0, 0);
   const dias = Math.round((hoy.getTime() - dia.getTime()) / 86400000);
   if (dias === 0) return t("hoy {hora}", { hora });
   if (dias === 1) return t("ayer {hora}", { hora });
-  const fecha = d.toLocaleDateString("es-ES", { day: "numeric", month: "short", ...(d.getFullYear() !== hoy.getFullYear() ? { year: "numeric" } : {}) });
+  const fecha = d.toLocaleDateString(localeApp(), { day: "numeric", month: "short", ...(d.getFullYear() !== hoy.getFullYear() ? { year: "numeric" } : {}) });
   return `${fecha}, ${hora}`;
 }
 
@@ -1038,7 +1038,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               {conflictos.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5 text-xs text-amber-900">
                   {conflictos.map((c) => (
-                    <li key={c.id}>• {c.title} — {c.all_day ? t("{v} (todo el día)", { v: fmtFecha(c.start_at, false) }) : `${fmtFecha(c.start_at)}${c.end_at ? " – " + new Date(c.end_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}`}</li>
+                    <li key={c.id}>• {c.title} — {c.all_day ? t("{v} (todo el día)", { v: fmtFecha(c.start_at, false) }) : `${fmtFecha(c.start_at)}${c.end_at ? " – " + new Date(c.end_at).toLocaleTimeString(localeApp(), { hour: "2-digit", minute: "2-digit" }) : ""}`}</li>
                   ))}
                 </ul>
               )}

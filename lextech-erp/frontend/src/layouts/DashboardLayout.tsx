@@ -49,7 +49,7 @@ const fuenteDeAviso = (id: string) =>
   : id.startsWith("plazo-exp-") ? "exp" : id.startsWith("plazo-") ? "tareas" : id.startsWith("soporte-") ? "soporte"
   : id.startsWith("vista-") ? "vistas" : id.startsWith("auto-") ? "auto" : "otro";
 import type { Modulo } from "../lib/useOrganizacion";
-import { t, t as tr, tn, idioma } from '../lib/i18n';
+import { t, t as tr, tn, idioma, locale as localeApp } from '../lib/i18n';
 import { haceTiempo } from "../lib/haceTiempo";
 
 // Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
@@ -2754,7 +2754,7 @@ export default function DashboardLayout() {
         for (const v of vistaItems) {
           if (!v?.id) continue;
           const cuando = v.fecha_vista
-            ? new Date(v.fecha_vista).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+            ? new Date(v.fecha_vista).toLocaleString(localeApp(), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
             : t("Fecha por confirmar");
           const pendiente = v.estado === "pendiente";
           next.push({

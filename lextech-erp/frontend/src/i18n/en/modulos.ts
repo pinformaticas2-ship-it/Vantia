@@ -781,6 +781,7 @@ registrarEn({
   "Reset": "Reset",
   "Todo el día": "All day",
   "Inicio": "Start",
+  "Herramientas": "Tools",
   "Fin": "End",
   "Lugar / ubicación": "Place / location",
   "Ej: Sala A, Juzgado nº3, Online…": "E.g.: Room A, Court no. 3, Online…",
