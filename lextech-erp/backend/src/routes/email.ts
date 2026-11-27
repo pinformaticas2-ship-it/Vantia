@@ -26,7 +26,7 @@ import {
   sendMail,
   saveDraft,
   getDrafts,
-  getStats,
+  getStats, getFolderCounts,
   getRecipientSuggestions,
   logGmailSent,
   linkEmailToExpediente,
@@ -107,6 +107,7 @@ router.get('/drafts',             getDrafts);
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 router.get('/stats',              getStats);
+router.get('/folder-counts',      getFolderCounts);
 
 // ── Papelera ──────────────────────────────────────────────────────────────────
 router.delete('/trash',           emptyTrash);

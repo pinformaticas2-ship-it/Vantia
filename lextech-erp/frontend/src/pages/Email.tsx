@@ -26,9 +26,10 @@ import {
   MoreVertical, AlertCircle, Eye, EyeOff,
   AlertTriangle, Stethoscope, ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
+  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, FolderTree, type LucideIcon,
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
+import CorreoArbol, { type CuentaArbol, type CarpetaImap } from '../components/CorreoArbol';
 import { getActiveOrganizacionId } from '../lib/api';
 import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
@@ -558,6 +559,12 @@ function fmtAttachmentSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
+/** Nombre de una carpeta IMAP a partir de su ruta: «INBOX.GESTIONADO» → «GESTIONADO». */
+function nombreCarpeta(ruta: string) {
+  const partes = String(ruta || '').split(/[./]/).filter(Boolean);
+  return partes[partes.length - 1] || ruta;
 }
 
 function fmtDate(d: string | null) {
@@ -2015,15 +2022,52 @@ function Sidebar({
 // ─── Email List Item ──────────────────────────────────────────────────────────
 
 function EmailItem({
-  email, selected, onClick, onDoubleClick, onStar, sentFolder,
+  email, selected, onClick, onDoubleClick, onStar, sentFolder, compacta,
 }: {
   email: ParsedEmail; selected: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
   onStar: (e: React.MouseEvent) => void;
   sentFolder?: boolean;
+  /** Vista de árbol: tarjeta con «Nombre <correo>», fecha completa y asunto (27/11/2026). */
+  compacta?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+  if (compacta) {
+    const unreadC = !email.isRead;
+    const quien = sentFolder
+      ? t("Para: {a}", { a: email.to || t('(sin destinatario)') })
+      : email.fromName && email.from && email.fromName !== email.from ? `${email.fromName} <${email.from}>` : (email.fromName || email.from || '(desconocido)');
+    const d = email.date ? new Date(email.date) : null;
+    const fecha = !d ? '' : d.toDateString() === new Date().toDateString()
+      ? d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+      : `${d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
+    return (
+      <a
+        href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
+        onClick={(e) => { e.preventDefault(); onClick(); }}
+        onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
+        className={`group relative mx-2 my-1 block rounded-md border px-3 py-2 transition-colors ${
+          selected ? 'border-red-300 bg-red-50/70' : unreadC ? 'border-slate-200 bg-white hover:border-slate-300' : 'border-slate-200 bg-white hover:bg-slate-50'
+        }`}>
+        {unreadC && !selected && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-red-400" />}
+        <div className="flex items-baseline gap-2">
+          <span className={`min-w-0 flex-1 truncate text-[12px] ${unreadC ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>{quien}</span>
+          <span className={`shrink-0 text-[11px] tabular-nums ${unreadC ? 'font-semibold text-slate-700' : 'text-slate-500'}`}>{fecha}</span>
+        </div>
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className={`min-w-0 flex-1 truncate text-[13px] ${unreadC ? 'font-semibold text-slate-800' : 'text-slate-700'}`}>
+            {email.subject || <span className="italic opacity-50">{t("(sin asunto)")}</span>}
+          </span>
+          {email.hasAttachments && <Paperclip size={12} className="shrink-0 text-slate-400" />}
+          <button onClick={onStar} title={email.isStarred ? t("Quitar estrella") : t("Marcar con estrella")}
+            className={`shrink-0 rounded p-0.5 ${email.isStarred ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}>
+            <Star size={13} fill={email.isStarred ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+      </a>
+    );
+  }
 
   const displayName = sentFolder
     ? t("Para: {a}", { a: email.to || t('(sin destinatario)') })
@@ -3323,13 +3367,15 @@ interface RibbonBarProps {
   onShowGroups: () => void;
   mailTheme: MailTheme;
   onToggleTheme: () => void;
+  vistaCorreo: 'actual' | 'arbol';
+  onToggleVista: () => void;
 }
 
 function RibbonBar({
   activeTab, onTabChange, selectedEmail, hasActiveMailbox,
   onCompose, onReply, onReplyAll, onForward, onDelete, onPrint, onSync,
   onSearch, onEmptyTrash, onShowAccounts, onShowSignatures, onShowTemplates, onShowGroups,
-  mailTheme, onToggleTheme,
+  mailTheme, onToggleTheme, vistaCorreo, onToggleVista,
 }: RibbonBarProps) {
   const hasEmail = !!selectedEmail;
 
@@ -3367,6 +3413,8 @@ function RibbonBar({
           <RibbonSep/>
           <RibbonButton icon={<Search size={17}/>}    label={t("Buscador")}        onClick={onSearch}   disabled={!hasActiveMailbox}/>
           <RibbonButton icon={<Eye size={17}/>}       label={t("Vista Previa")}    onClick={() => {}}   disabled={!hasEmail}/>
+          <RibbonButton icon={vistaCorreo === 'arbol' ? <Inbox size={17}/> : <FolderTree size={17}/>}
+            label={vistaCorreo === 'arbol' ? t("Vista actual") : t("Vista árbol")} onClick={onToggleVista}/>
           <RibbonSep/>
           <RibbonButton icon={<Inbox size={17}/>}     label={t("Imprimir")}        onClick={onPrint}    disabled={!hasEmail}/>
         </>)}
@@ -3394,6 +3442,8 @@ function RibbonBar({
             icon={mailTheme === 'dark' ? <Sun size={17}/> : <Moon size={17}/>}
             label={mailTheme === 'dark' ? t("Tema claro") : t("Tema oscuro")}
             onClick={onToggleTheme}/>
+          <RibbonButton icon={vistaCorreo === 'arbol' ? <Inbox size={17}/> : <FolderTree size={17}/>}
+            label={vistaCorreo === 'arbol' ? t("Vista actual") : t("Vista árbol")} onClick={onToggleVista}/>
         </>)}
       </div>
     </div>
@@ -3830,6 +3880,13 @@ export default function Email() {
     () => (localStorage.getItem(MAIL_THEME_KEY) as MailTheme) || 'light',
   );
   useEffect(() => { localStorage.setItem(MAIL_THEME_KEY, mailTheme); }, [mailTheme]);
+  // Vista del correo (27/11/2026): la de siempre o «árbol», con todos los buzones
+  // y sus carpetas a la vez, al estilo MN Program. Se recuerda en este navegador.
+  const [vistaCorreo, setVistaCorreo] = useState<'actual' | 'arbol'>(() => {
+    try { return localStorage.getItem('vantia.correo.vista') === 'arbol' ? 'arbol' : 'actual'; } catch { return 'actual'; }
+  });
+  useEffect(() => { try { localStorage.setItem('vantia.correo.vista', vistaCorreo); } catch { /* noop */ } }, [vistaCorreo]);
+  const [noLeidosCarpetas, setNoLeidosCarpetas] = useState<Map<string, number>>(new Map());
   const [showSignatures, setShowSignatures]     = useState(false);
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
@@ -3900,6 +3957,26 @@ export default function Email() {
 
     return map;
   }, [imapFolders]);
+
+  const cargarNoLeidosCarpetas = useCallback(async () => {
+    const r = await authFetch(`${API}/email/folder-counts`).catch(() => null);
+    const p = r ? await r.json().catch(() => null) : null;
+    if (!r?.ok || !p?.success || !Array.isArray(p.data)) return;
+    const m = new Map<string, number>();
+    for (const row of p.data) {
+      const id = row.account_id || row.gmail_profile_id;
+      if (!id) continue;
+      m.set(`${id}|${row.folder}`, (m.get(`${id}|${row.folder}`) || 0) + Number(row.unread || 0));
+    }
+    setNoLeidosCarpetas(m);
+  }, [authFetch]);
+  const carpetasDeCuenta = useCallback(async (cuentaId: string): Promise<CarpetaImap[]> => {
+    if (cuentaId === selectedImapAccountId && imapFolders.length) return imapFolders;
+    const r = await authFetch(`${API}/email/accounts/${cuentaId}/folders`);
+    const p = await r.json().catch(() => null);
+    if (!r.ok || !p?.success) throw new Error(p?.error || 'error');
+    return (p.data || []).filter((f: any) => f && typeof f.path === 'string');
+  }, [authFetch, imapFolders, selectedImapAccountId]);
 
   const normalizedLabelName = newLabelName.trim().replace(/\s+/g, ' ');
   const applyPinnedState = useCallback((items: ParsedEmail[]) => {
@@ -5383,6 +5460,59 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   const hasConfiguredAccounts = !!gmail || savedGmailProfiles.length > 0 || imapAccounts.length > 0;
   const hasActiveMailbox = activeProvider !== 'none';
 
+  // ── Vista árbol (27/11/2026) ──
+  const gmailActivaId = !selectedImapAccountId && gmail && gmailProfile?.emailAddress
+    ? (savedGmailProfiles.find((p) => p.email === gmailProfile.emailAddress)?.id || 'gmail-activa')
+    : null;
+  const cuentasArbol = useMemo<CuentaArbol[]>(() => {
+    const lista: CuentaArbol[] = imapAccounts.filter((a) => a.active !== false).map((a) => ({ tipo: 'imap', id: a.id, email: a.email }));
+    for (const p of savedGmailProfiles) {
+      lista.push({ tipo: 'gmail', id: p.id, email: p.email, sinSesion: !(gmail && gmailProfile?.emailAddress === p.email) });
+    }
+    if (gmail && gmailProfile?.emailAddress && !savedGmailProfiles.some((p) => p.email === gmailProfile.emailAddress)) {
+      lista.push({ tipo: 'gmail', id: 'gmail-activa', email: gmailProfile.emailAddress });
+    }
+    return lista;
+  }, [imapAccounts, savedGmailProfiles, gmail, gmailProfile?.emailAddress]);
+  // La Gmail abierta cuenta sus no leídos con las etiquetas de Google (más al día que la base).
+  const noLeidosArbol = useMemo(() => {
+    if (!gmailActivaId) return noLeidosCarpetas;
+    const m = new Map(noLeidosCarpetas);
+    const inbox = gmailLabels.find((l) => l.id === 'INBOX');
+    if (inbox) m.set(`${gmailActivaId}|INBOX`, Number(inbox.messagesUnread || 0));
+    return m;
+  }, [noLeidosCarpetas, gmailActivaId, gmailLabels]);
+  useEffect(() => {
+    if (vistaCorreo !== 'arbol') return;
+    void cargarNoLeidosCarpetas();
+    const h = window.setInterval(() => void cargarNoLeidosCarpetas(), 60_000);
+    return () => window.clearInterval(h);
+  }, [vistaCorreo, cargarNoLeidosCarpetas]);
+  // Al leer o mover correos de la carpeta abierta, los números se ponen al día.
+  useEffect(() => {
+    if (vistaCorreo !== 'arbol') return;
+    const h = window.setTimeout(() => void cargarNoLeidosCarpetas(), 1500);
+    return () => window.clearTimeout(h);
+  }, [vistaCorreo, emails, cargarNoLeidosCarpetas]);
+  const elegirEnArbol = (cuenta: CuentaArbol, carpeta: string) => {
+    setSelectedEmail(null);
+    setSearchQ('');
+    if (cuenta.tipo === 'imap') {
+      if (selectedImapAccountId !== cuenta.id) setSelectedImapAccountId(cuenta.id);
+      setSelectedFolder(carpeta as FolderKey);
+      return;
+    }
+    // Gmail: si su sesión está abierta en este navegador, se cambia sin más;
+    // si no, hay que volver a conectarla (se abre en Recibidos).
+    if (gmail && gmailProfile?.emailAddress === cuenta.email) {
+      setSelectedImapAccountId(null);
+      setSelectedFolder(carpeta as FolderKey);
+      return;
+    }
+    const perfil = savedGmailProfiles.find((p) => p.id === cuenta.id);
+    if (perfil) reconnectGoogleProfile(perfil);
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   // ── Solo mode: full-window email reader (opened via double-click in new tab) ──
   if (soloMode) {
@@ -5468,16 +5598,31 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
         onShowGroups={() => setShowGroups(true)}
         mailTheme={mailTheme}
         onToggleTheme={() => setMailTheme(t => t === 'dark' ? 'light' : 'dark')}
+        vistaCorreo={vistaCorreo}
+        onToggleVista={() => setVistaCorreo((v) => (v === 'arbol' ? 'actual' : 'arbol'))}
       />
 
       {/* ── Three-panel layout ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
       {/* ── Sidebar ── */}
-      <div className={`hidden lg:flex h-full w-[250px] flex-shrink-0 flex-col overflow-hidden border-r ${
+      <div className={`hidden lg:flex h-full ${vistaCorreo === 'arbol' ? 'w-[300px]' : 'w-[250px]'} flex-shrink-0 flex-col overflow-hidden border-r ${
         mailTheme === 'dark' ? 'border-slate-800/80' : 'border-slate-200'
       }`}>
         <div className="flex-1 min-h-0 overflow-hidden">
+          {vistaCorreo === 'arbol' ? (
+            <CorreoArbol
+              cuentas={cuentasArbol}
+              activa={selectedImapAccountId ? { tipo: 'imap', id: selectedImapAccountId } : gmailActivaId ? { tipo: 'gmail', id: gmailActivaId } : null}
+              carpetaSeleccionada={selectedFolder}
+              carpetasDe={carpetasDeCuenta}
+              noLeidos={noLeidosArbol}
+              etiquetasGmail={gmailLabels.filter((l) => l.type === 'user').map((l) => ({ id: l.id, name: l.name, unread: Number(l.messagesUnread || 0) }))}
+              oscuro={mailTheme === 'dark'}
+              onElegir={elegirEnArbol}
+              onRedactar={() => startCompose()}
+            />
+          ) : (
           <Sidebar
             userEmail={userEmail}
             userName={userName}
@@ -5530,6 +5675,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             canUseMailbox={hasActiveMailbox}
             theme={mailTheme}
           />
+          )}
         </div>
       </div>
 
@@ -5539,13 +5685,15 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
         {/* ── Email list panel: siempre 340px en desktop, full en móvil sin email ── */}
         <div
           className={`flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white ${
-            selectedEmail ? 'hidden lg:flex lg:w-[360px]' : 'flex w-full lg:w-[360px]'
+            selectedEmail
+              ? `hidden lg:flex ${vistaCorreo === 'arbol' ? 'lg:w-[460px] bg-slate-50' : 'lg:w-[360px]'}`
+              : `flex w-full ${vistaCorreo === 'arbol' ? 'lg:w-[460px] bg-slate-50' : 'lg:w-[360px]'}`
           }`}>
 
           {/* Mobile top: folder name */}
           <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-slate-100 lg:hidden">
             <span className="text-sm font-semibold text-slate-700 flex-1">
-              {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
+              {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : nombreCarpeta(selectedFolder)}
             </span>
             <button
               onClick={() => startCompose()}
@@ -5559,7 +5707,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           <div className="border-b border-slate-100 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3">
             <div className="flex items-center justify-between mb-2.5 px-1">
               <h2 className="text-sm font-bold text-slate-800">
-                {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
+                {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label ? t(SYSTEM_FOLDERS.find(f => f.key === selectedFolder)!.label) : nombreCarpeta(selectedFolder)}
               </h2>
               <button
                 onClick={() => void refrescarSinParpadeo()} disabled={loading || bgRefreshing || !hasActiveMailbox}
@@ -5730,6 +5878,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                     onDoubleClick={() => { void openEmail(email); setFullscreenEmail(email); }}
                     onStar={e => toggleStar(email.id, email.isStarred, e)}
                     sentFolder={selectedFolder === 'SENT'}
+                    compacta={vistaCorreo === 'arbol'}
                   />
                 ))}
                 {nextPageToken && (

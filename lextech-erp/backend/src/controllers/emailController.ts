@@ -2232,6 +2232,30 @@ export async function getStats(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
+// ── GET /api/email/folder-counts ─────────────────────────────────────────────
+// No leídos por buzón y carpeta (27/11/2026), para la vista de árbol del correo
+// (todos los buzones a la vez, al estilo MN Program). Solo del usuario y de la
+// organización activa, igual que getStats; se cuenta en la base, sin IMAP.
+export async function getFolderCounts(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  try {
+    const { rows } = await pool.query(
+      `SELECT account_id, gmail_profile_id, folder,
+              COUNT(*) FILTER (WHERE is_read = false)::int AS unread,
+              COUNT(*)::int AS total
+         FROM emails
+        WHERE user_id = $1 AND NOT is_draft
+          AND (account_id IN (SELECT id FROM email_accounts WHERE organizacion_id = $2)
+               OR gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id = $2))
+        GROUP BY account_id, gmail_profile_id, folder`,
+      [uid, organizacionId],
+    );
+    return ok(res, rows);
+  } catch (e: any) { return err(res, e.message); }
+}
+
 // ── Helpers reutilizables fuera de HTTP (automatización de vistas) ───────────
 
 const EMAIL_ROW_WITH_ACCOUNT_SQL = `
