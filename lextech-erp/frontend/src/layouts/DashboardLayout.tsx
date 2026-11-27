@@ -1044,8 +1044,14 @@ type UnifiedNotification = {
   count?: number;
   created_at: string;
   onClick?: () => void;
+  /** Adónde lleva (para poder guardarlo: los avisos se conservan hasta «Marcar como leído»). */
+  url?: string;
+  /** Identifica «lo mismo» aunque cambie el id (p. ej. un canal de chat con mensajes nuevos). */
+  clave?: string;
+  /** Su origen ya no lo trae (el correo ya se leyó, el chat se abrió…): se enseña más apagado. */
+  leida?: boolean;
   /** Lo que agrupa este aviso (los correos sin leer de ese remitente), para verlos uno a uno. */
-  children?: { id: string; title: string; subtitle?: string; created_at: string; onClick: () => void }[];
+  children?: { id: string; title: string; subtitle?: string; created_at: string; url?: string; onClick?: () => void }[];
 };
 
 // 27/11/2026: iconos de verdad (los emoji salían como dibujos raros en Windows),
@@ -1060,11 +1066,15 @@ const TIPOS_AVISO: Record<UnifiedNotification["kind"], { label: string; icono: R
   auto:     { label: "Automatizaciones", icono: Sparkles,      color: "bg-indigo-50 text-indigo-600 ring-indigo-100" },
   soporte:  { label: "Soporte",          icono: LifeBuoy,      color: "bg-slate-100 text-slate-600 ring-slate-200" },
 };
+/** Días que se conserva un aviso que su origen ya no trae, si nadie lo marca como leído. */
+const AVISOS_GUARDADOS_DIAS = 30;
 /** Cuántos avisos de cada grupo se ven antes de «Ver todos». */
 const AVISOS_POR_GRUPO = 4;
 
-function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll, push }: {
+function NotificationsPanel({ notifs, nuevos, loading, onClose, onDismiss, onDismissAll, push }: {
   notifs: UnifiedNotification[];
+  /** Ids que no se habían visto al abrir la campana (llevan el punto rojo). */
+  nuevos: Set<string>;
   loading: boolean;
   onClose: () => void;
   onDismiss: (id: string) => void;
@@ -1139,12 +1149,15 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
                     <li key={n.id} className="group relative">
                       <button
                         type="button"
-                        onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
+                        // 27/11/2026: abrirlo ya no lo quita de la lista; solo «Marcar como leído».
+                        onClick={() => { n.onClick?.(); onClose(); }}
                         className="w-full flex items-start gap-3 px-4 py-2.5 pr-10 hover:bg-slate-50 text-left">
-                        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${tipo.color}`}><Icono className="h-4 w-4" /></span>
+                        <span className={`relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ${tipo.color} ${n.leida ? "opacity-50" : ""}`}><Icono className="h-4 w-4" />
+                          {nuevos.has(n.id) && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" title={t("Nuevo")} />}
+                        </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2">
-                            <p className="min-w-0 flex-1 text-[13px] font-semibold leading-snug text-slate-800 break-words">{n.title}</p>
+                            <p className={`min-w-0 flex-1 text-[13px] leading-snug break-words ${n.leida ? "font-medium text-slate-500" : "font-semibold text-slate-800"}`}>{n.title}</p>
                             {n.kind !== "plazo" && <span className="shrink-0 text-[10px] text-slate-400">{timeAgo(n.created_at)}</span>}
                           </div>
                           {n.subtitle && <p className="text-xs leading-snug text-slate-600 break-words">{n.subtitle}</p>}
@@ -1167,7 +1180,7 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll,
                             <ul className="mt-1 space-y-0.5 border-l-2 border-slate-100 pl-2">
                               {hijos.map((h) => (
                                 <li key={h.id}>
-                                  <button type="button" onClick={() => { h.onClick(); onClose(); }}
+                                  <button type="button" onClick={() => { h.onClick?.(); onClose(); }}
                                     className="w-full rounded-md px-2 py-1 text-left hover:bg-slate-50">
                                     <span className="flex items-baseline gap-2">
                                       <span className="min-w-0 flex-1 text-xs font-medium text-slate-700 break-words">{h.title}</span>
@@ -2335,6 +2348,29 @@ export default function DashboardLayout() {
       } catch { /* sin conexión: queda lo de este navegador */ }
     })();
   }, [dismissedNotifStorageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Avisos conservados y avisos ya vistos (27/11/2026), por usuario y en este navegador.
+  const guardadasKey = user?.id ? `vantia.notifs.guardadas.${user.id}` : null;
+  const vistasKey = user?.id ? `vantia.notifs.vistas.${user.id}` : null;
+  const leerAvisosGuardados = (): Map<string, any> => {
+    try { return new Map(guardadasKey ? JSON.parse(localStorage.getItem(guardadasKey) || "[]") : []); } catch { return new Map(); }
+  };
+  const escribirAvisosGuardados = (m: Map<string, any>) => {
+    if (!guardadasKey) return;
+    // Los más recientes primero; tope para no crecer sin fin.
+    const lista = [...m.entries()].sort((a, b) => new Date(b[1].created_at).getTime() - new Date(a[1].created_at).getTime()).slice(0, 150);
+    try { localStorage.setItem(guardadasKey, JSON.stringify(lista)); } catch { /* lleno o sin acceso */ }
+  };
+  const quitarDeGuardados = (ids: string[]) => {
+    const quitar = new Set(ids);
+    const m = leerAvisosGuardados();
+    for (const [k, g] of m) if (quitar.has(g.id)) m.delete(k);
+    escribirAvisosGuardados(m);
+  };
+  const [vistos, setVistos] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!vistasKey) return;
+    try { setVistos(new Set(JSON.parse(localStorage.getItem(vistasKey) || "[]"))); } catch { setVistos(new Set()); }
+  }, [vistasKey]);
   const syncDescartados = useCallback(async (ids: string[]) => {
     if (!ids.length) return;
     try {
@@ -2519,7 +2555,9 @@ export default function DashboardLayout() {
             ? (item?.dm_target_user_name || t("Chat directo"))
             : `#${item?.nombre || "canal"}`;
           next.push({
-            id: `chat-${item.id}`,
+            // Con la hora del último mensaje: si llegan más tras marcarlo como leído, vuelve a salir.
+            id: `chat-${item.id}-${item?.ultimo_mensaje_at || ""}`,
+            clave: `chat-${item.id}`,
             kind: "chat",
             title: channelLabel,
             subtitle: isDM
@@ -2528,7 +2566,7 @@ export default function DashboardLayout() {
             meta: item?.ultimo_mensaje || undefined,
             count: unread,
             created_at: item?.ultimo_mensaje_at || item?.created_at || new Date().toISOString(),
-            onClick: () => navigate(`/dashboard/chat?canal=${encodeURIComponent(item.id)}`),
+            url: `/dashboard/chat?canal=${encodeURIComponent(item.id)}`,
           });
         }
       }
@@ -2568,18 +2606,19 @@ export default function DashboardLayout() {
         for (const grouped of groupedEmails.values()) {
           next.push({
             id: `email-${grouped.id}`,
+            clave: `email-de-${grouped.from}`,
             kind: "email",
             title: grouped.from,
             subtitle: grouped.count > 1 ? t("{count} correos sin leer", { count: grouped.count }) : grouped.subject,
             meta: grouped.count > 1 ? grouped.subject : grouped.snippet,
             count: grouped.count,
             created_at: grouped.created_at,
-            onClick: () => navigate(`/dashboard/correo?openEmail=${encodeURIComponent(grouped.id)}`),
+            url: `/dashboard/correo?openEmail=${encodeURIComponent(grouped.id)}`,
             children: grouped.count > 1
               ? grouped.items
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .map((m) => ({ id: m.id, title: m.subject, subtitle: m.snippet || undefined, created_at: m.created_at,
-                  onClick: () => navigate(`/dashboard/correo?openEmail=${encodeURIComponent(m.id)}`) }))
+                  url: `/dashboard/correo?openEmail=${encodeURIComponent(m.id)}` }))
               : undefined,
           });
         }
@@ -2600,13 +2639,15 @@ export default function DashboardLayout() {
           if (seenAt && msgTime <= new Date(seenAt).getTime()) continue;
           const contactName = item?.commercial_name || `${item?.first_name || ""} ${item?.last_name || ""}`.trim() || item?.email || "WhatsApp";
           next.push({
-            id: `wa-${item.id}`,
+            id: `wa-${item.id}-${item.last_message_at}`,
+            clave: `wa-${item.id}`,
             kind: "whatsapp",
             title: contactName,
             subtitle: t("Mensaje recibido por WhatsApp"),
             meta: item?.last_message_body || undefined,
             count: 1,
             created_at: item?.last_message_at,
+            url: `/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`,
             onClick: () => {
               markWaSeen(item.id);
               navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`);
@@ -2665,7 +2706,7 @@ export default function DashboardLayout() {
             subtitle,
             meta: `Exp. ${n.anio}/${n.num_exp}${n.cliente_nombre ? " · " + n.cliente_nombre : ""}`,
             created_at: nowIso,
-            onClick: () => navigate(`/dashboard/expedientes/${n.expediente_id}?tab=cronologia`),
+            url: `/dashboard/expedientes/${n.expediente_id}?tab=cronologia`,
           });
         }
       }
@@ -2685,7 +2726,7 @@ export default function DashboardLayout() {
             subtitle: s.asunto || undefined,
             meta: s.resumen || `Estado: ${s.estadoLabel}`,
             created_at: s.actualizadoAt || new Date().toISOString(),
-            onClick: () => navigate(`/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`),
+            url: `/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`,
           });
         }
       }
@@ -2701,7 +2742,7 @@ export default function DashboardLayout() {
             title: a.titulo,
             subtitle: a.cuerpo || undefined,
             created_at: a.created_at || new Date().toISOString(),
-            onClick: () => navigate(typeof a.url === "string" && a.url.startsWith("/") ? a.url : "/dashboard"),
+            url: typeof a.url === "string" && a.url.startsWith("/") ? a.url : "/dashboard",
           });
         }
       }
@@ -2727,7 +2768,7 @@ export default function DashboardLayout() {
             subtitle: `${cuando}${v.juzgado ? " · " + v.juzgado : ""}`,
             meta: pendiente && Number(v.num_conflictos) > 0 ? `⚠️ ${t("Choca con tu agenda")}` : (v.subject || undefined),
             created_at: (pendiente ? v.created_at : v.recordatorio_at) || new Date().toISOString(),
-            onClick: () => navigate(`/dashboard/vistas?id=${encodeURIComponent(v.id)}`),
+            url: `/dashboard/vistas?id=${encodeURIComponent(v.id)}`,
           });
         }
       }
@@ -2737,11 +2778,38 @@ export default function DashboardLayout() {
       // vez, se olvida la marca de "descartado" en cuanto el propio origen
       // deja de mandar ese id (p.ej. el mensaje ya se leyó de verdad), para
       // no acumular ids para siempre.
+      // Copia antes de olvidar descartados: un aviso conservado que se marcó como leído no debe volver.
+      const descartadosAntes = new Set(dismissedNotifIdsRef.current);
       const freshIds = new Set(next.map((n) => n.id));
       for (const id of dismissedNotifIdsRef.current) {
         if (!freshIds.has(id) && fuentesOk.has(fuenteDeAviso(id))) dismissedNotifIdsRef.current.delete(id);
       }
-      const filtered = next.filter((n) => !dismissedNotifIdsRef.current.has(n.id));
+      const frescos = next.filter((n) => !dismissedNotifIdsRef.current.has(n.id));
+
+      // 27/11/2026: lo que su origen ya no trae (el correo se leyó, el chat se
+      // abrió…) sigue en la campana, más apagado, hasta «Marcar como leído».
+      // Los plazos no: son un estado vivo (si la tarea se completa, sobra).
+      const guardadas = leerAvisosGuardados();
+      const claveDe = (n: UnifiedNotification) => n.clave || n.id;
+      const clavesFrescas = new Set(frescos.map(claveDe));
+      const ahora = Date.now();
+      for (const n of frescos) {
+        if (n.kind === "plazo") continue;
+        const { onClick: _o, leida: _l, children, ...resto } = n;
+        guardadas.set(claveDe(n), { ...resto, children: children?.map(({ onClick: _c, ...h }) => h), guardada_at: ahora });
+      }
+      const conservadas: UnifiedNotification[] = [];
+      for (const [k, g] of guardadas) {
+        if (clavesFrescas.has(k)) continue;
+        if (descartadosAntes.has(g.id) || ahora - (g.guardada_at || 0) > AVISOS_GUARDADOS_DIAS * 86400000 || (g.kind === "plazo")) { guardadas.delete(k); continue; }
+        conservadas.push({ ...g, leida: true });
+      }
+      escribirAvisosGuardados(guardadas);
+      const filtered = [...frescos, ...conservadas].map((n) => ({
+        ...n,
+        onClick: n.onClick || (n.url ? () => navigate(n.url!) : undefined),
+        children: n.children?.map((h) => ({ ...h, onClick: h.onClick || (h.url ? () => navigate(h.url!) : undefined) })),
+      }));
 
       filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setNotifications(filtered.slice(0, 200));
@@ -2750,8 +2818,18 @@ export default function DashboardLayout() {
       notifBusyRef.current = false;
       if (showLoader) setNotifLoading(false);
     }
-  }, [getToken, navigate, markWaSeen]);
+  }, [getToken, navigate, markWaSeen, guardadasKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Los que no se habían visto al abrir la campana (llevan el punto rojo mientras está abierta).
+  const [nuevosAlAbrir, setNuevosAlAbrir] = useState<Set<string>>(new Set());
+  const marcarVistos = useCallback((ids: string[]) => {
+    setVistos((prev) => {
+      if (ids.every((id) => prev.has(id))) return prev;
+      const n = new Set(prev); for (const id of ids) n.add(id);
+      if (vistasKey) { try { localStorage.setItem(vistasKey, JSON.stringify([...n].slice(-600))); } catch { /* noop */ } }
+      return n;
+    });
+  }, [vistasKey]);
   const openNotifications = useCallback(async () => {
     setIsNotifOpen(true);
     await fetchNotifications(true);
@@ -2761,6 +2839,7 @@ export default function DashboardLayout() {
     dismissedNotifIdsRef.current.add(id);
     persistDismissedNotifIds();
     void syncDescartados([id]);
+    quitarDeGuardados([id]);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, [persistDismissedNotifIds, syncDescartados]);
 
@@ -2770,6 +2849,7 @@ export default function DashboardLayout() {
       const marcadas = quitar ? prev.filter((n) => quitar.has(n.id)) : prev;
       for (const n of marcadas) dismissedNotifIdsRef.current.add(n.id);
       void syncDescartados(marcadas.map((n) => n.id));
+      quitarDeGuardados(marcadas.map((n) => n.id));
       return quitar ? prev.filter((n) => !quitar.has(n.id)) : [];
     });
     persistDismissedNotifIds();
@@ -2831,7 +2911,20 @@ export default function DashboardLayout() {
     [hiddenKinds, notifications],
   );
 
-  const totalBadge = visibleNotifications.length + (!hiddenKinds.has("email") && emailUnreadCount > 0 ? 1 : 0);
+  // 27/11/2026: la burbuja cuenta solo lo que aún no has visto; al abrir la
+  // campana se va, pero los avisos siguen ahí hasta «Marcar como leído».
+  const totalBadge = visibleNotifications.filter((n) => !n.leida && !vistos.has(n.id)).length;
+  useEffect(() => {
+    if (!isNotifOpen) return;
+    const ids = visibleNotifications.map((n) => n.id);
+    setNuevosAlAbrir((prev) => {
+      const n = new Set(prev);
+      for (const id of ids) if (!vistos.has(id)) n.add(id);
+      return n;
+    });
+    marcarVistos(ids);
+  }, [isNotifOpen, visibleNotifications]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!isNotifOpen) setNuevosAlAbrir(new Set()); }, [isNotifOpen]);
 
   const isFullPage = useMemo(() => (
     [
@@ -2993,6 +3086,7 @@ export default function DashboardLayout() {
             {isNotifOpen && (
               <NotificationsPanel
                 notifs={visibleNotifications}
+                nuevos={nuevosAlAbrir}
                 loading={notifLoading}
                 onClose={() => setIsNotifOpen(false)}
                 onDismiss={dismissNotification}
