@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AlertOctagon, Archive, ChevronDown, ChevronRight, FileText, Folder, Inbox, Mail, Plus, Send, Star, Tag, Trash2,
+  AlertOctagon, ChevronDown, ChevronRight, FileText, Folder, Inbox, Mail, Pin, Plus, Send, Star, Trash2,
   type LucideIcon,
 } from 'lucide-react';
 import { t } from '../lib/i18n';
@@ -23,14 +23,18 @@ export interface CuentaArbol {
   sinSesion?: boolean;
 }
 
-const SISTEMA: { clave: ClaveSistema; label: string; icono: LucideIcon }[] = [
+// Las mismas carpetas, en el mismo orden, para Gmail y para IMAP (27/11/2026).
+// Lo demás (Archivo, carpetas propias, etiquetas de Gmail) va debajo como carpetas.
+const SISTEMA: { clave: string; label: string; icono: LucideIcon; sinContador?: boolean }[] = [
   { clave: 'INBOX',   label: 'Bandeja de entrada', icono: Inbox },
-  { clave: 'DRAFTS',  label: 'Borradores',         icono: FileText },
+  { clave: 'STARRED', label: 'Destacados',         icono: Star, sinContador: true },
+  { clave: 'PINNED',  label: 'Pineados',           icono: Pin, sinContador: true },
   { clave: 'SENT',    label: 'Enviados',           icono: Send },
+  { clave: 'DRAFTS',  label: 'Borradores',         icono: FileText, sinContador: true },
   { clave: 'SPAM',    label: 'Mensaje no deseado', icono: AlertOctagon },
   { clave: 'TRASH',   label: 'Papelera',           icono: Trash2 },
-  { clave: 'ARCHIVE', label: 'Archivo@@correo',    icono: Archive },
 ];
+const RUTA_POR_DEFECTO: Record<string, string> = { INBOX: 'INBOX', SENT: 'Sent', DRAFTS: 'Drafts', TRASH: 'Trash', SPAM: 'Spam' };
 
 /** Qué carpeta de un buzón IMAP es Enviados, Papelera… (mismo criterio que la vista actual). */
 export function mapaCarpetasSistema(carpetas: CarpetaImap[]): Partial<Record<ClaveSistema, string>> {
@@ -143,90 +147,92 @@ export default function CorreoArbol({
 
     let cuerpo: React.ReactNode = null;
     if (abierta) {
-      if (cuenta.tipo === 'gmail') {
-        const items: { clave: string; label: string; icono: LucideIcon; unread?: number }[] = [
-          { clave: 'INBOX', label: 'Bandeja de entrada', icono: Inbox, unread: unreadDe('INBOX') },
-          { clave: 'STARRED', label: 'Destacados', icono: Star },
-          { clave: 'DRAFTS', label: 'Borradores', icono: FileText },
-          { clave: 'SENT', label: 'Enviados', icono: Send },
-          { clave: 'SPAM', label: 'Mensaje no deseado', icono: AlertOctagon },
-          { clave: 'TRASH', label: 'Papelera', icono: Trash2 },
-        ];
-        cuerpo = (
-          <>
-            {items.map((it) => {
-              const sel = esActiva && carpetaSeleccionada === it.clave;
-              const Icono = it.icono;
-              return (
-                <button key={it.clave} type="button" onClick={() => onElegir(cuenta, it.clave)} className={fila(sel)} style={{ paddingLeft: 26 }}>
-                  <Icono size={14} className="shrink-0 opacity-80" /><span className="truncate">{t(it.label)}</span>{contador(it.unread, sel)}
-                </button>
-              );
-            })}
-            {esActiva && etiquetasGmail.map((l) => {
-              const sel = carpetaSeleccionada === l.id;
-              return (
-                <button key={l.id} type="button" onClick={() => onElegir(cuenta, l.id)} className={fila(sel)} style={{ paddingLeft: 26 }}>
-                  <Tag size={14} className="shrink-0 opacity-80" /><span className="truncate">{l.name}</span>{contador(l.unread, sel)}
-                </button>
-              );
-            })}
-          </>
-        );
-      } else {
+      // Lo que cambia entre Gmail e IMAP es solo de dónde salen las carpetas;
+      // lo que se ve es igual: carpetas fijas y debajo las propias.
+      let personales: Nodo[] = [];
+      let hijosInbox: Nodo[] = [];
+      let rutaDe = (clave: string) => clave;
+      let claveDeNodo = (path: string) => path;
+      let unreadNodo = (_n: Nodo) => 0;
+      let estadoCarpetas: 'ok' | 'cargando' | 'error' = 'ok';
+      if (cuenta.tipo === 'imap') {
         const estado = carpetas[cuenta.id];
-        if (estado === 'cargando' || !estado) cuerpo = <p className={`py-1 pl-7 text-[11px] ${c('text-slate-500', 'text-slate-400')}`}>{t("Cargando carpetas…")}</p>;
+        if (estado === 'cargando' || !estado) estadoCarpetas = 'cargando';
         else {
           const lista = estado === 'error' ? [] : estado;
+          if (estado === 'error') estadoCarpetas = 'error';
           const mapa = mapaCarpetasSistema(lista);
-          const rutaSistema = new Map<string, ClaveSistema>();
-          for (const [k, v] of Object.entries(mapa)) if (v) rutaSistema.set(v, k as ClaveSistema);
-          const arbol = construirArbol(lista.length ? lista : [{ path: 'INBOX', name: 'INBOX' }]);
-          const subir = (nodos: Nodo[]) => {
-            for (const n of nodos) {
-              const quedan: Nodo[] = [];
-              for (const h of n.hijos) {
-                if (rutaSistema.has(h.path) && rutaSistema.get(h.path) !== 'INBOX') arbol.push(h); else quedan.push(h);
-              }
-              n.hijos = quedan;
-              subir(n.hijos);
-            }
-          };
-          subir([...arbol]);
-          const claveDe = (path: string) => rutaSistema.get(path) || path;
-          const orden = (n: Nodo) => { const k = rutaSistema.get(n.path); return k ? SISTEMA.findIndex((s) => s.clave === k) : 100; };
-          arbol.sort((a, b) => orden(a) - orden(b) || a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+          delete mapa.ARCHIVE; // el Archivo va con las demás carpetas, como en Gmail
+          const rutaSistema = new Map<string, string>();
+          for (const [k, v] of Object.entries(mapa)) if (v) rutaSistema.set(v, k);
+          // Las de sistema ya están en la lista fija; sus subcarpetas sí se enseñan.
+          const quitarSistema = (nodos: Nodo[]): Nodo[] => nodos.flatMap((n) => (rutaSistema.has(n.path) && rutaSistema.get(n.path) !== 'INBOX'
+            ? quitarSistema(n.hijos) : [{ ...n, hijos: quitarSistema(n.hijos) }]));
+          const arbol = construirArbol(lista);
+          const inbox = arbol.find((n) => n.path.toUpperCase() === 'INBOX');
+          hijosInbox = inbox ? quitarSistema(inbox.hijos) : [];
+          personales = quitarSistema(arbol.filter((n) => n !== inbox));
+          rutaDe = (clave) => mapa[clave as keyof typeof mapa] || RUTA_POR_DEFECTO[clave] || clave;
+          unreadNodo = (n) => unreadDe(n.path);
+        }
+      } else {
+        // Etiquetas propias de Gmail («Clientes/2026» → carpeta y subcarpeta).
+        const etiquetas = esActiva ? etiquetasGmail : [];
+        const idPorRuta = new Map(etiquetas.map((l) => [l.name, l.id]));
+        const unreadPorRuta = new Map(etiquetas.map((l) => [l.name, l.unread || 0]));
+        personales = construirArbol(etiquetas.map((l) => ({ path: l.name, name: l.name.split('/').pop() || l.name, delimiter: '/' })));
+        claveDeNodo = (path) => idPorRuta.get(path) || path;
+        unreadNodo = (n) => unreadPorRuta.get(n.path) || 0;
+      }
+      const ordenar = (ns: Nodo[]) => [...ns].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 
-          const renderNodo = (n: Nodo, nivel: number): React.ReactNode => {
-            const k = rutaSistema.get(n.path);
-            const sis = k ? SISTEMA.find((s) => s.clave === k) : null;
-            const Icono = sis?.icono || Folder;
-            const clave = claveDe(n.path);
-            const sel = esActiva && carpetaSeleccionada === clave;
-            const kNodo = `carpeta:${cuenta.id}:${n.path}`;
-            const abiertaN = n.hijos.length > 0 && !plegados.has(kNodo);
+      const renderNodo = (n: Nodo, nivel: number): React.ReactNode => {
+        const clave = claveDeNodo(n.path);
+        const sel = esActiva && carpetaSeleccionada === clave;
+        const kNodo = `carpeta:${cuenta.id}:${n.path}`;
+        const abiertaN = n.hijos.length > 0 && !plegados.has(kNodo);
+        const un = unreadNodo(n);
+        return (
+          <React.Fragment key={n.path}>
+            <button type="button" title={n.path}
+              onClick={() => (n.seleccionable ? onElegir(cuenta, clave) : alternar(kNodo))}
+              className={fila(sel)} style={{ paddingLeft: 10 + nivel * 16 }}>
+              {flecha(abiertaN, () => alternar(kNodo), n.hijos.length > 0)}
+              <Folder size={14} className={`shrink-0 ${c('text-amber-300', 'text-amber-500')}`} />
+              <span className={`truncate ${un > 0 ? 'font-bold' : ''} ${n.seleccionable ? '' : 'italic opacity-70'}`}>{n.nombre}</span>
+              {contador(un, sel)}
+            </button>
+            {abiertaN && ordenar(n.hijos).map((h) => renderNodo(h, nivel + 1))}
+          </React.Fragment>
+        );
+      };
+
+      const kInbox = `carpeta:${cuenta.id}:INBOX`;
+      const inboxAbierta = hijosInbox.length > 0 && !plegados.has(kInbox);
+      cuerpo = (
+        <>
+          {estadoCarpetas === 'error' && <p className={`py-1 pl-7 text-[11px] ${c('text-amber-300', 'text-amber-600')}`}>{t("No se pudieron leer las carpetas de este buzón.")}</p>}
+          {SISTEMA.map((it) => {
+            const sel = esActiva && carpetaSeleccionada === it.clave;
+            const Icono = it.icono;
+            const un = it.sinContador ? 0 : unreadDe(rutaDe(it.clave));
             return (
-              <React.Fragment key={n.path}>
-                <button type="button" title={n.path}
-                  onClick={() => (n.seleccionable ? onElegir(cuenta, clave) : alternar(kNodo))}
-                  className={fila(sel)} style={{ paddingLeft: 10 + nivel * 16 }}>
-                  {flecha(abiertaN, () => alternar(kNodo), n.hijos.length > 0)}
-                  <Icono size={14} className={`shrink-0 ${sis ? 'opacity-80' : c('text-amber-300', 'text-amber-500')}`} />
-                  <span className={`truncate ${unreadDe(n.path) > 0 ? 'font-bold' : ''} ${n.seleccionable ? '' : 'italic opacity-70'}`}>{sis ? t(sis.label) : n.nombre}</span>
-                  {contador(unreadDe(n.path), sel)}
+              <React.Fragment key={it.clave}>
+                <button type="button" onClick={() => onElegir(cuenta, it.clave)} className={fila(sel)} style={{ paddingLeft: 10 + 16 }}>
+                  {flecha(inboxAbierta, () => alternar(kInbox), it.clave === 'INBOX' && hijosInbox.length > 0)}
+                  <Icono size={14} className="shrink-0 opacity-80" />
+                  <span className={`truncate ${un > 0 ? 'font-bold' : ''}`}>{t(it.label)}</span>
+                  {contador(un, sel)}
                 </button>
-                {abiertaN && n.hijos.map((h) => renderNodo(h, nivel + 1))}
+                {it.clave === 'INBOX' && inboxAbierta && ordenar(hijosInbox).map((h) => renderNodo(h, 2))}
               </React.Fragment>
             );
-          };
-          cuerpo = (
-            <>
-              {estado === 'error' && <p className={`py-1 pl-7 text-[11px] ${c('text-amber-300', 'text-amber-600')}`}>{t("No se pudieron leer las carpetas de este buzón.")}</p>}
-              {arbol.map((n) => renderNodo(n, 1))}
-            </>
-          );
-        }
-      }
+          })}
+          {estadoCarpetas === 'cargando'
+            ? <p className={`py-1 pl-7 text-[11px] ${c('text-slate-500', 'text-slate-400')}`}>{t("Cargando carpetas…")}</p>
+            : ordenar(personales).map((n) => renderNodo(n, 1))}
+        </>
+      );
     }
 
     return (

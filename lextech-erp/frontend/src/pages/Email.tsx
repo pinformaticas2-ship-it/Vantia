@@ -1275,6 +1275,9 @@ type FolderKey =
   | 'TRASH'
   | string;
 
+/** Carpetas fijas del lateral, iguales para Gmail e IMAP (27/11/2026). */
+const CARPETAS_COMUNES: FolderKey[] = ['INBOX', 'STARRED', 'PINNED', 'SENT', 'DRAFTS', 'SPAM', 'TRASH'];
+
 const SYSTEM_FOLDERS: {
   key: FolderKey; label: string; icon: LucideIcon;
 }[] = [
@@ -1496,16 +1499,21 @@ function buildImapFolderTree(folders: ImapFolderInfo[], systemLabels: Map<string
   const byName = (a: ImapFolderNode, b: ImapFolderNode) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
   const prune = (list: ImapFolderNode[]): ImapFolderNode[] => list
     .map((n) => ({ ...n, children: prune(n.children) }))
-    // Una carpeta del sistema sin subcarpetas ya está arriba en la lista fija.
-    .filter((n) => !(systemLabels.has(n.path.toLowerCase()) && n.children.length === 0))
+    // Una carpeta del sistema ya está arriba en la lista fija: no se repite aquí;
+    // sus subcarpetas (INBOX.GESTIONADO…) suben a «Carpetas» (27/11/2026, igual que Gmail).
+    .flatMap((n) => (systemLabels.has(n.path.toLowerCase()) ? n.children : [n]))
     .sort(byName);
   return prune(roots);
 }
 
 function ImapFolderTree({
   folders, systemFolderMap, accountId, selectedFolder, onSelectFolder, disabled,
-  activeItemCls, inactiveItemCls, activeIconCls, inactiveIconCls, emptyCls,
+  activeItemCls, inactiveItemCls, activeIconCls, inactiveIconCls, emptyCls, noLeidosDe, onDelete,
 }: {
+  /** No leídos de una carpeta (por su ruta). */
+  noLeidosDe?: (path: string) => number;
+  /** Borrar la carpeta (solo las etiquetas de Gmail; IMAP no lo permite aún). */
+  onDelete?: (path: string) => void;
   folders: ImapFolderInfo[];
   systemFolderMap: Partial<Record<ImapSystemFolderKey, string>>;
   accountId: string;
@@ -1545,7 +1553,7 @@ function ImapFolderTree({
     return (
       <React.Fragment key={node.path}>
         <div
-          className={`mx-2 flex w-[calc(100%-16px)] items-center rounded-lg text-[13px] transition-colors ${active ? activeItemCls : inactiveItemCls} ${disabled ? 'opacity-40' : ''}`}
+          className={`group mx-2 flex w-[calc(100%-16px)] items-center rounded-lg text-[13px] transition-colors ${active ? activeItemCls : inactiveItemCls} ${disabled ? 'opacity-40' : ''}`}
           style={{ paddingLeft: 4 + depth * 14 }}
         >
           <button
@@ -1565,8 +1573,15 @@ function ImapFolderTree({
             title={node.path}
           >
             <Folder size={12} className={`shrink-0 ${active ? activeIconCls : inactiveIconCls}`} />
-            <span className={`truncate ${node.selectable ? '' : 'italic opacity-80'}`}>{node.name}</span>
+            <span className={`flex-1 truncate ${node.selectable ? '' : 'italic opacity-80'}`}>{node.name}</span>
+            {(noLeidosDe?.(node.path) || 0) > 0 && <span className="shrink-0 text-[10px] font-semibold opacity-80">{noLeidosDe!(node.path)}</span>}
           </button>
+          {onDelete && node.selectable && (
+            <button type="button" disabled={disabled} onClick={() => onDelete(node.path)} title={t("Borrar carpeta")}
+              className="mr-1 shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:bg-black/5 group-hover:opacity-100 disabled:opacity-30">
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
         {isOpen && node.children.map((c) => renderNode(c, depth + 1))}
       </React.Fragment>
@@ -1583,7 +1598,7 @@ function Sidebar({
   onSync, syncing, unreadCount, draftCount, pinnedCount, imapAccounts, selectedImapAccountId,
   imapFolders, imapSystemFolderMap, onSelectGmail, onSelectImapAccount,
   onCreateLabel, onDeleteLabel,
-  onCreateImapFolder, onProbeImap, onDeleteImapAccount, canUseMailbox, theme,
+  onCreateImapFolder, onProbeImap, onDeleteImapAccount, canUseMailbox, theme, noLeidosCarpetas,
 }: {
   theme: MailTheme;
   userEmail: string; userName: string; userAvatar?: string;
@@ -1611,6 +1626,8 @@ function Sidebar({
   onProbeImap: () => void;
   onDeleteImapAccount: (accountId: string) => void;
   canUseMailbox: boolean;
+  /** No leídos por «idCuenta|carpeta» (GET /email/folder-counts). */
+  noLeidosCarpetas: Map<string, number>;
 }) {
   const userLabels = labels.filter(l => l.type === 'user');
   const categoryLabels = labels.filter((label) =>
@@ -1623,15 +1640,20 @@ function Sidebar({
   );
   const isImapActive = Boolean(selectedImapAccountId);
   const isGmailActive = gmailConnected && !isImapActive;
-  const visibleSystemFolders = SYSTEM_FOLDERS.filter((folder) => {
-    // PINNED y SNOOZED son exclusivos de Gmail OAuth — no están disponibles via IMAP
-    if (!isGmailActive && (folder.key === 'PINNED' || folder.key === 'SNOOZED')) return false;
-    if (!isImapActive) return true;
-    if (folder.key === 'STARRED') return true;
-    if (folder.key === 'ALL' || folder.key === 'IMPORTANT') return false;
-    if (folder.key === 'INBOX') return true;
-    return Boolean(imapSystemFolderMap[folder.key as ImapSystemFolderKey]);
-  });
+  // 27/11/2026: Gmail e IMAP con exactamente la misma estructura: estas
+  // carpetas fijas, en este orden, y debajo «Carpetas» (las propias de IMAP o
+  // las etiquetas de Gmail, en árbol). Lo que solo existía en Gmail
+  // (Pospuestos, Importantes, Programados, Todos, Categorías) ya no se enseña.
+  const visibleSystemFolders = CARPETAS_COMUNES
+    .map((key) => SYSTEM_FOLDERS.find((f) => f.key === key))
+    .filter((f): f is (typeof SYSTEM_FOLDERS)[number] => Boolean(f));
+  // Gmail: las etiquetas propias como carpetas («Clientes/2026» → carpeta y subcarpeta).
+  const carpetasGmail: ImapFolderInfo[] = userLabels.map((l) => ({ path: normalizeLabelName(l.name, l.id), name: normalizeLabelName(l.name, l.id).split('/').pop() || l.name, flags: [], delimiter: '/' }));
+  const idEtiquetaPorRuta = new Map(userLabels.map((l) => [normalizeLabelName(l.name, l.id), l.id]));
+  const rutaPorIdEtiqueta = new Map(userLabels.map((l) => [l.id, normalizeLabelName(l.name, l.id)]));
+  const noLeidosEtiqueta = new Map(userLabels.map((l) => [normalizeLabelName(l.name, l.id), Number(l.messagesUnread || 0)]));
+  // IMAP: el Archivo va con las demás carpetas (Gmail no tiene una carpeta Archivo).
+  const mapaSistemaSinArchivo = { ...imapSystemFolderMap, ARCHIVE: undefined };
   const gmailBadgeByFolder = new Map(
     labels.map((label) => [label.id, Number(label.messagesUnread ?? label.messagesTotal ?? 0)]),
   );
@@ -1809,15 +1831,14 @@ function Sidebar({
       <nav className="modules-scrollbar flex-1 overflow-y-auto py-2">
         {visibleSystemFolders.map(({ key, label, icon: Icon }) => {
           const active = selectedFolder === key;
+          // Los mismos números para Gmail e IMAP.
           const badge = key === 'INBOX'
             ? unreadCount
             : key === 'DRAFTS'
               ? draftCount
               : key === 'PINNED'
                 ? pinnedCount
-                : gmailConnected && !isImapActive
-                  ? Number(gmailBadgeByFolder.get(key === 'DRAFTS' ? 'DRAFT' : key) || 0)
-                  : 0;
+                : 0;
           return (
             <button
               key={key}
@@ -1828,7 +1849,7 @@ function Sidebar({
               } disabled:cursor-not-allowed disabled:opacity-40`}
               >
               <Icon size={14} className={active ? activeIconCls : inactiveIconCls} />
-              <span className="flex-1 text-left">{label}</span>
+              <span className="flex-1 text-left">{t(label)}</span>
               {badge > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                   active ? badgeActiveCls : badgeInactiveCls
@@ -1840,170 +1861,63 @@ function Sidebar({
           );
         })}
 
-        {/* User labels */}
-        {isGmailActive && userLabels.length > 0 && (
+        {/* Carpetas propias: las mismas para Gmail (etiquetas) e IMAP */}
+        {(isGmailActive || selectedImapAccountId) && (
           <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1 flex items-center justify-between">
               <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Carpetas")}</p>
-              <button
-                type="button"
-                disabled={!canUseMailbox}
-                onClick={() => onCreateLabel()}
-                className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
-                title={t("Crear carpeta")}>
-                <FolderPlus size={12} />
-              </button>
-            </div>
-            {userLabels.map(l => (
-              <div
-                key={l.id}
-                className={`group mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
-                  selectedFolder === l.id ? activeItemClsNoBold : inactiveItemCls
-                }`}
-                >
+              <div className="flex items-center">
                 <button
                   type="button"
                   disabled={!canUseMailbox}
-                  onClick={() => onSelectFolder(l.id)}
-                  className="flex flex-1 min-w-0 items-center gap-2.5 text-left disabled:cursor-not-allowed">
-                  <Folder size={12} className={selectedFolder === l.id ? activeIconCls : inactiveIconCls} />
-                  <span className="flex-1 truncate">{normalizeLabelName(l.name, l.id)}</span>
-                  {l.messagesUnread ? (
-                    <span className={`text-[10px] ${mutedTextCls}`}>{l.messagesUnread}</span>
-                  ) : null}
+                  onClick={() => (selectedImapAccountId ? onCreateImapFolder() : onCreateLabel())}
+                  className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
+                  title={t("Crear carpeta")}>
+                  <FolderPlus size={12} />
                 </button>
-                <button
-                  type="button"
-                  disabled={!canUseMailbox}
-                  onClick={() => onDeleteLabel(l.id)}
-                  className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all disabled:opacity-30 ${iconBtnCls}`}
-                  title={t("Borrar carpeta")}>
-                  <Trash2 size={12} />
-                </button>
+                {selectedImapAccountId && (
+                  <button
+                    type="button"
+                    onClick={onProbeImap}
+                    className={`p-1 rounded-full transition-colors ${iconBtnCls}`}
+                    title={t("Diagnosticar buzón: revisa todas las carpetas del servidor y repara las atrasadas")}>
+                    <Stethoscope size={12} />
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-        {userLabels.length === 0 && isGmailActive && (
-          <div className={`mt-2 border-t px-3 pt-2 ${sectionBorderCls}`}>
-            <button
-              type="button"
-              disabled={!canUseMailbox}
-              onClick={() => onCreateLabel()}
-              className={`w-full flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                cx('border-white/15 text-slate-400 hover:border-red-400/40 hover:text-red-300', 'border-slate-300 text-slate-500 hover:border-red-300 hover:text-red-600')
-              }`}>
-              <FolderPlus size={13} />{t("Crear primera carpeta")}</button>
-          </div>
-        )}
-
-        {isGmailActive && extraGmailSystemLabels.length > 0 && (
-          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
-            <div className="px-3 pb-1">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Gmail")}</p>
             </div>
-            {extraGmailSystemLabels.map((label) => (
-              <button
-                key={label.id}
-                type="button"
+            {selectedImapAccountId ? (
+              <ImapFolderTree
+                folders={imapFolders}
+                systemFolderMap={mapaSistemaSinArchivo}
+                accountId={selectedImapAccountId}
+                selectedFolder={selectedFolder}
+                onSelectFolder={onSelectFolder}
                 disabled={!canUseMailbox}
-                onClick={() => onSelectFolder(label.id)}
-                className={`mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
-                  selectedFolder === label.id ? activeItemClsNoBold : inactiveItemCls
-                } disabled:cursor-not-allowed disabled:opacity-40`}>
-                <Folder size={12} className={selectedFolder === label.id ? activeIconCls : inactiveIconCls} />
-                <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
-                {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className={`text-[10px] ${mutedTextCls}`}>
-                    {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isGmailActive && categoryLabels.length > 0 && (
-          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
-            <div className="px-3 pb-1">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Categorías")}</p>
-            </div>
-            {categoryLabels.map((label) => (
-              <button
-                key={label.id}
-                type="button"
+                activeItemCls={activeItemClsNoBold}
+                inactiveItemCls={inactiveItemCls}
+                activeIconCls={activeIconCls}
+                inactiveIconCls={inactiveIconCls}
+                emptyCls={sectionLabelCls}
+                noLeidosDe={(path) => noLeidosCarpetas.get(`${selectedImapAccountId}|${path}`) || 0}
+              />
+            ) : (
+              <ImapFolderTree
+                folders={carpetasGmail}
+                systemFolderMap={{}}
+                accountId={`gmail-${gmailProfile?.emailAddress || ''}`}
+                selectedFolder={(rutaPorIdEtiqueta.get(selectedFolder) || selectedFolder) as FolderKey}
+                onSelectFolder={(ruta) => onSelectFolder((idEtiquetaPorRuta.get(ruta) || ruta) as FolderKey)}
                 disabled={!canUseMailbox}
-                onClick={() => onSelectFolder(label.id)}
-                className={`mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
-                  selectedFolder === label.id ? activeItemClsNoBold : inactiveItemCls
-                } disabled:cursor-not-allowed disabled:opacity-40`}>
-                <Folder size={12} className={selectedFolder === label.id ? activeIconCls : inactiveIconCls} />
-                <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
-                {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className={`text-[10px] ${mutedTextCls}`}>
-                    {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isGmailActive && (
-          <div className={`mt-2 border-t pt-2 px-2 space-y-0.5 ${sectionBorderCls}`}>
-            <button
-              type="button"
-              disabled={!canUseMailbox}
-              onClick={() => onSelectFolder('SCHEDULED')}
-              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
-              <Send size={12} />{t("Gestionar suscripciones")}</button>
-            <button
-              type="button"
-              disabled={!canUseMailbox}
-              onClick={() => onCreateLabel()}
-              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
-              <Folder size={12} />{t("Gestionar etiquetas")}</button>
-            <button
-              type="button"
-              onClick={() => onCreateLabel()}
-              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${iconBtnCls}`}>
-              <Plus size={12} />{t("Nueva etiqueta")}</button>
-          </div>
-        )}
-
-        {selectedImapAccountId && (
-          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
-            <div className="px-3 pb-1 flex items-center justify-between">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>{t("Carpetas IMAP")}</p>
-              <button
-                type="button"
-                disabled={!canUseMailbox}
-                onClick={onCreateImapFolder}
-                className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
-                title={t("Crear carpeta IMAP")}>
-                <FolderPlus size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={onProbeImap}
-                className={`p-1 rounded-full transition-colors ${iconBtnCls}`}
-                title={t("Diagnosticar buzón: revisa todas las carpetas del servidor y repara las atrasadas")}>
-                <Stethoscope size={12} />
-              </button>
-            </div>
-            <ImapFolderTree
-              folders={imapFolders}
-              systemFolderMap={imapSystemFolderMap}
-              accountId={selectedImapAccountId}
-              selectedFolder={selectedFolder}
-              onSelectFolder={onSelectFolder}
-              disabled={!canUseMailbox}
-              activeItemCls={activeItemClsNoBold}
-              inactiveItemCls={inactiveItemCls}
-              activeIconCls={activeIconCls}
-              inactiveIconCls={inactiveIconCls}
-              emptyCls={sectionLabelCls}
-            />
+                activeItemCls={activeItemClsNoBold}
+                inactiveItemCls={inactiveItemCls}
+                activeIconCls={activeIconCls}
+                inactiveIconCls={inactiveIconCls}
+                emptyCls={sectionLabelCls}
+                noLeidosDe={(ruta) => noLeidosEtiqueta.get(ruta) || 0}
+                onDelete={(ruta) => { const id = idEtiquetaPorRuta.get(ruta); if (id) onDeleteLabel(id); }}
+              />
+            )}
           </div>
         )}
       </nav>
@@ -4358,13 +4272,15 @@ export default function Email() {
     try {
       if (currentImapAccount) {
         const folder = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+        // Pineados: los que se han fijado en este navegador (igual que en Gmail).
+        const pineados = selectedFolder === 'PINNED' ? `&ids=${encodeURIComponent(readPinnedEmailIds(activePinnedKey).join(','))}` : '';
         if (reset) setNextPageToken(undefined);
 
         // Mensajes y stats no dependen entre si — se piden en paralelo para no
         // pagar dos round trips seguidos en cada carga/refresco de carpeta.
         const [res, statsRes] = await Promise.all([
           authFetch(
-            `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folder)}&q=${encodeURIComponent(searchQ.trim())}&limit=100`,
+            `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folder)}${pineados}&q=${encodeURIComponent(searchQ.trim())}&limit=100`,
           ),
           authFetch(`${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`),
         ]);
@@ -4639,7 +4555,7 @@ export default function Email() {
         const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
         imapStatsPromise = authFetch(`${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`).catch(() => null);
         const res = await authFetch(
-          `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folderStr)}&limit=50`,
+          `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folderStr)}${selectedFolder === 'PINNED' ? `&ids=${encodeURIComponent(readPinnedEmailIds(activePinnedKey).join(','))}` : ''}&limit=50`,
         ).catch(() => null);
         if (res?.ok) {
           const payload = await res.json().catch(() => null);
@@ -5483,17 +5399,17 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
     return m;
   }, [noLeidosCarpetas, gmailActivaId, gmailLabels]);
   useEffect(() => {
-    if (vistaCorreo !== 'arbol') return;
+    if (!hasActiveMailbox) return;
     void cargarNoLeidosCarpetas();
     const h = window.setInterval(() => void cargarNoLeidosCarpetas(), 60_000);
     return () => window.clearInterval(h);
-  }, [vistaCorreo, cargarNoLeidosCarpetas]);
+  }, [hasActiveMailbox, cargarNoLeidosCarpetas]);
   // Al leer o mover correos de la carpeta abierta, los números se ponen al día.
   useEffect(() => {
-    if (vistaCorreo !== 'arbol') return;
+    if (!hasActiveMailbox) return;
     const h = window.setTimeout(() => void cargarNoLeidosCarpetas(), 1500);
     return () => window.clearTimeout(h);
-  }, [vistaCorreo, emails, cargarNoLeidosCarpetas]);
+  }, [hasActiveMailbox, emails, cargarNoLeidosCarpetas]);
   const elegirEnArbol = (cuenta: CuentaArbol, carpeta: string) => {
     setSelectedEmail(null);
     setSearchQ('');
@@ -5674,6 +5590,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             onDeleteImapAccount={requestDeleteImapAccount}
             canUseMailbox={hasActiveMailbox}
             theme={mailTheme}
+            noLeidosCarpetas={noLeidosCarpetas}
           />
           )}
         </div>

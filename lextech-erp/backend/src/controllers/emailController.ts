@@ -1265,7 +1265,12 @@ export async function getMessages(req: Request, res: Response) {
       conditions.push(`e.gmail_profile_id=$${params.length - 1} AND e.gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$${params.length})`);
     }
 
-    if (folder === 'STARRED') {
+    if (folder === 'PINNED') {
+      // Pineados (27/11/2026): los ids que el usuario fijó en su navegador, de
+      // cualquier carpeta de ese buzón (igual que en Gmail). Solo ids válidos.
+      const ids = String(req.query.ids || '').split(',').map((x) => x.trim()).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 500);
+      params.push(ids); conditions.push(`e.id::text = ANY($${params.length}::text[])`);
+    } else if (folder === 'STARRED') {
       conditions.push(`e.is_starred=true`);
     } else if (folder === 'UNREAD') {
       conditions.push(`e.is_read=false`);
